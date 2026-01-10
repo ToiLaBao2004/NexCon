@@ -1,0 +1,152 @@
+import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { z } from "zod"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { FcGoogle } from "react-icons/fc"
+import { useOTPStore } from "@/stores/useOtpStore"
+import { useAuthStore } from "@/stores/useAuthStore"
+import { useNavigate } from "react-router"
+
+const signInSchema = z.object({
+  email: z.email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+})
+
+type SignInFormValues = z.infer<typeof signInSchema>
+
+export function SigninForm({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  const { signIn } = useAuthStore();
+  const { sendOtpResetPassword } = useOTPStore();
+  const navigate = useNavigate();
+  const {register, handleSubmit, formState: {errors, isSubmitting}, setError, watch} = useForm<SignInFormValues>({
+    resolver: zodResolver(signInSchema),
+  });
+  const onSubmit = async (data: SignInFormValues) => {
+    const {email, password} = data;
+    try {
+      await signIn(email, password);
+      navigate("/");
+    } catch (error: any) {
+      console.error("Sign in failed:", error);
+      // map backend error message to form fields
+      const backendMsg = error.response?.data?.message || "Sign in failed.";
+      if (backendMsg.toLowerCase().includes("email")) {
+        setError("email", { type: "server", message: backendMsg });
+      } else if (backendMsg.toLowerCase().includes("password")) {
+        setError("password", { type: "server", message: backendMsg });
+      } else {
+        setError("root", { type: "server", message: backendMsg });
+      }
+    }
+  }
+  const handleForgotPassword = async () => {
+    const emailValue = watch("email");
+    console.log("Forgot Password clicked, email:", emailValue);
+    if (!emailValue) {
+      setError("email", {
+        type: "manual",
+        message: "Please enter your email to reset password",
+      });
+      return;
+    }
+    try {
+      await sendOtpResetPassword(emailValue);
+      navigate("/otp-resetpass", {
+        state: { 
+          emailOTPResetPassData: { email: emailValue }
+        }
+      });
+    } catch (error: any) {
+      console.error("Send OTP failed:", error);
+      // map backend error message to form fields
+      const backendMsg = error.response?.data?.message || "Send OTP failed.";
+      if (backendMsg.toLowerCase().includes("email")) {
+        setError("email", { type: "server", message: backendMsg });
+      } else if (backendMsg.toLowerCase().includes("password")) {
+        setError("password", { type: "server", message: backendMsg });
+      } else {
+        setError("root", { type: "server", message: backendMsg });
+      }
+    }
+  }
+  const handleGoogleSignIn = async () => {
+    console.log("Google Sign-In clicked");
+  }
+  return (
+    <div className={cn("flex flex-col gap-6", className)} {...props}>
+      <Card className="overflow-hidden p-0 border-border">
+        <CardContent className="grid p-0 md:grid-cols-2">
+          <form className="p-6 md:p-8" onSubmit={handleSubmit(onSubmit)}>
+            <div className="flex flex-col gap-6"></div>
+              {/* header - logo */}
+              <div className="flex flex-col items-center text-center gap-2">
+                <a href="/" className="mx-auto block w-fit text-center">
+                  <img src="/logo.svg" alt="logo" />
+                </a>
+                <h1 className="text-2xl font-bold">Moji</h1>
+                <p className="text-sm text-muted-foreground text-balance">
+                  Login your Moji account to continue
+                </p>
+              </div>
+              {/* email */}
+              <div className="flex flex-col gap-2 mt-3">
+                <Label htmlFor="email" className="block text-sm">
+                  Email
+                </Label>
+                <Input id="email" type="text" placeholder="moji@gmail.com" {...register("email")} />
+                {/* todo: error message */}
+                {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+              </div>
+              {/* password */}
+              <div className="flex flex-col gap-2 mt-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-sm">
+                    Password
+                  </Label>
+                  <a onClick={handleForgotPassword} className="text-center text-sm underline-offset-4 hover:underline cursor-pointer">
+                    Forgot password?
+                  </a>
+                </div>
+                <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
+                {/* todo: error message */}
+                {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+              </div>
+              {/* submit button */}
+              <Button type="submit" className="w-full mt-5 cursor-pointer" disabled={isSubmitting}>
+                Submit
+              </Button>
+              <div className="flex items-center my-4">
+                <div className="flex-1 h-px bg-border" />
+                <span className="px-2 text-xs text-muted-foreground">Or continue with</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+              <Button type="button" variant="outline" className="w-full flex items-center justify-center gap-2 cursor-pointer" onClick={handleGoogleSignIn}>
+                <FcGoogle className="h-5 w-5" />Continue with Google
+              </Button>
+              <div className="text-center text-sm mt-3">
+                Don't have an account?{" "}<a href="/signup" className="underline underline-offset-4 hover:text-primary">Sign up</a>
+              </div>
+          </form>
+          <div className="bg-muted relative hidden md:block">
+            <img
+              src="/placeholder.png"
+              alt="Image"
+              className="absolute top-1/2 -translate-y-1/2 object-cover"
+            />
+          </div>
+        </CardContent>
+      </Card>
+      <div className="text-xs text-center px-6 text-muted-foreground [a]:underline [a]:underline-offset-4 [a]:hover:text-primary text-balance">
+        By clicking continue, you agree to our <a href="#" className="underline underline-offset-4">Terms of Service</a>{" "}
+        and <a href="#" className="underline underline-offset-4">Privacy Policy</a>.
+      </div>
+    </div>
+  )
+}
