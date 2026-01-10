@@ -32,4 +32,6 @@ export default interface AuthState {
   ) => Promise<void>;
 
   signOut: () => Promise<void>;
+
+  loginGoogle: () => void;
 }

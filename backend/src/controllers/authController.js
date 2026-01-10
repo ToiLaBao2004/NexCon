@@ -129,3 +129,28 @@ export async function updateNewPassword(req, res) {
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }
+
+export async function googleAuthCallback(req, res) {
+    try {
+        const user = req.user;
+        const accessToken = jwt.sign({ userId: user._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+        const refreshToken = crypto.randomBytes(64).toString('hex');
+        await Session.create({
+            userId: user._id,
+            refreshToken: refreshToken,
+            expiresAt: Date.now() + REFRESH_TOKEN_TTL
+        });
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            maxAge: REFRESH_TOKEN_TTL
+        });
+        res.redirect(
+            `${process.env.FRONTEND_URL}/oauth-success?accessToken=${accessToken}`
+        );
+    } catch (error) {
+        console.error('Error during Google OAuth callback:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}

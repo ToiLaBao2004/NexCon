@@ -104,5 +104,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } finally {
       set({ loading: false });
     }
-  }
+  },
+
+  loginGoogle: () => {
+    try {
+      authService.loginGoogle();
+    } catch (error) {
+      console.error('Google login error:', error);
+      toast.error('Google login failed.');
+    }
+  },
 }));

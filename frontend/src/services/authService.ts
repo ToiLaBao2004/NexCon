@@ -1,5 +1,7 @@
 import api from '@/lib/axios';
 
+const BACKEND_URL="http://localhost:5001";
+
 export const authService = {
   verifyValidFieldsSignUp: async (
     email: string,
@@ -51,5 +53,9 @@ export const authService = {
   
   signOut: async () => {
     return await api.post('/auth/signout', {}, { withCredentials: true });
+  },
+
+  loginGoogle: () => {
+    window.location.href = `${BACKEND_URL}/api/auth/google`;
   },
 };

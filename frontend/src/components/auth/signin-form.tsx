@@ -22,7 +22,7 @@ export function SigninForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const { signIn } = useAuthStore();
+  const { signIn, loginGoogle } = useAuthStore();
   const { sendOtpResetPassword } = useOTPStore();
   const navigate = useNavigate();
   const {register, handleSubmit, formState: {errors, isSubmitting}, setError, watch} = useForm<SignInFormValues>({
@@ -77,7 +77,7 @@ export function SigninForm({
     }
   }
   const handleGoogleSignIn = async () => {
-    console.log("Google Sign-In clicked");
+    loginGoogle();
   }
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
