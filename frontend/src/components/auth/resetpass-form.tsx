@@ -30,14 +30,14 @@ export function ResetPassForm({
   });
   useEffect(() => {
     if (!emailOTPResetPassData) {
-      navigate("/signup");
+      navigate("/signin");
     }
   }, [emailOTPResetPassData, navigate]);
   const onSubmit = async (data: ResetPassFormValues) => {
     const { newPassword, confirmNewPassword } = data;
     try {
       await updateNewPassword(emailOTPResetPassData.email, newPassword, confirmNewPassword);
-      navigate("/signup");
+      navigate("/signin");
     } catch (error: any) {
       console.error("Update Password failed:", error);
       // map backend error message to form fields

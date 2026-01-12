@@ -23,7 +23,7 @@ export function OTPForm() {
 
   useEffect(() => {
     if (!emailOTPResetPassData) {
-      navigate("/signup");
+      navigate("/signin");
     }
   }, [emailOTPResetPassData, navigate]);
 
