@@ -56,6 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { accessToken } = await authService.signIn(email, password);
       set({ accessToken });
       toast.success('Sign in successful!');
+      await get().fetchMe();
     } catch (error: any) {
       console.error('Sign in error:', error);
       if (error.response?.data?.message) {
@@ -114,4 +115,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       toast.error('Google login failed.');
     }
   },
+
+  fetchMe: async () => {
+    try {
+      set({ loading: true });
+      const user =  await authService.fetchMe();
+      set({ user });
+    } catch (error: any) {
+      console.error('Fetch me error:', error);
+      if (error.response?.data?.message) {
+        toast.error(error.response.data.message);            
+      } else {
+        toast.error('Failed to fetch user data. Please sign in again.');
+      }
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  }
 }));

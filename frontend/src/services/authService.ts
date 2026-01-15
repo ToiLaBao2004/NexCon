@@ -58,4 +58,9 @@ export const authService = {
   loginGoogle: () => {
     window.location.href = `${BACKEND_URL}/api/auth/google`;
   },
+
+  fetchMe: async () => {
+    const response =  await api.get('/users/me', { withCredentials: true });
+    return response.data.user;
+  },
 };
