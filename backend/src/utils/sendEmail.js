@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
 export async function sendMail(to, subject, text = "", html = "") {
     try {
         const info = await transporter.sendMail({
-            from: `"Moji App" <${process.env.EMAIL_USER}>`,
+            from: `"NexCon App" <${process.env.EMAIL_USER}>`,
             to,
             subject,
             text,

@@ -6,6 +6,7 @@ import OtpPage from "./pages/OtpPage";
 import OtpResetPassPage from "./pages/OtpResetPassPage";
 import ResetPassPage from "./pages/ResetPassPage";
 import { Toaster } from "sonner";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
 
 function App() {
   return (
@@ -20,7 +21,9 @@ function App() {
             <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
             <Route path="/reset-password" element={<ResetPassPage />} />
             {/* private routes */}
-            <Route path="/" element={<ChatAppPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<ChatAppPage />} />
+            </Route>
           </Routes>
         </BrowserRouter>
     </>
