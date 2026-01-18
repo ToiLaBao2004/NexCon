@@ -5,6 +5,8 @@ export default interface AuthState {
   user: User | null;
   loading: boolean;
 
+  setAccessToken: (accessToken: string | null) => void;
+
   clearState: () => void;
 
   verifyValidFieldsSignUp: (
@@ -36,4 +38,6 @@ export default interface AuthState {
   loginGoogle: () => void;
 
   fetchMe: () => Promise<void>;
+
+  refreshToken: () => Promise<void>;
 }

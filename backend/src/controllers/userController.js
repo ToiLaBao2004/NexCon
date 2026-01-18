@@ -7,3 +7,7 @@ export async function getCurrentUser(req, res) {
         return res.status(500).json({ message: 'Server error' });
     }
 }
+
+export async function test(req, res) {
+    return res.sendStatus(204);
+}
