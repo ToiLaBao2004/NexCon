@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import Otp from '../models/otpModel.js';
 import validator from 'validator';
 
-const ACCESS_TOKEN_TTL = '30m';
+const ACCESS_TOKEN_TTL = '30s';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 
 export async function verifyValidFieldsSignUp(req, res) {
@@ -151,6 +151,24 @@ export async function googleAuthCallback(req, res) {
         );
     } catch (error) {
         console.error('Error during Google OAuth callback:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function refreshToken(req, res) {
+    try {
+        const token = req.cookies?.refreshToken;
+        if (!token) {
+            return res.status(400).json({ message: 'Token not found.' });
+        }
+        const session = await Session.findOne({ refreshToken: token });
+        if (!session || session.expiresAt < Date.now()) {
+            return res.status(403).json({ message: 'Invalid or expired refresh token.' });
+        }
+        const accessToken = jwt.sign({ userId: session.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+        return res.status(200).json({ accessToken: accessToken });
+    } catch (error) {
+        console.error('Error during token refresh:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }

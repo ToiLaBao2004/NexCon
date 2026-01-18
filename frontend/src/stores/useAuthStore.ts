@@ -8,6 +8,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   loading: false,
 
+  setAccessToken: (accessToken: string | null) => {
+    set({ accessToken });
+  },
+
   clearState: () => {
     set({ accessToken: null, user: null, loading: false });
   },
@@ -54,7 +58,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ loading: true });
       // call API
       const { accessToken } = await authService.signIn(email, password);
-      set({ accessToken });
+      get().setAccessToken(accessToken);
       toast.success('Sign in successful!');
       await get().fetchMe();
     } catch (error: any) {
@@ -132,5 +136,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } finally {
       set({ loading: false });
     }
-  }
+  },
+
+  refreshToken: async () => {
+    try {
+      set({ loading: true });
+      const { user, fetchMe, setAccessToken } = get();
+      const accessToken = await authService.refreshToken();
+      setAccessToken(accessToken);
+      if (!user) {
+        await fetchMe();
+      }
+    } catch (error) {
+      console.error('Refresh token error:', error);
+      toast.error('Session expired. Please sign in again.');
+      get().clearState();
+      throw error;
+    } finally {
+      set({ loading: false });
+    }
+  },
 }));
