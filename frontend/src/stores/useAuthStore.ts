@@ -157,4 +157,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ loading: false });
     }
   },
+
+  handleGoogleCallback: async () => {
+    try {
+      set({ loading: true });
+      const accessToken = await authService.googleSuccess();
+      get().setAccessToken(accessToken);
+      await get().fetchMe();
+      toast.success('Signed in with Google successfully!');
+    } catch (err) {
+      get().clearState();
+      throw err;
+    } finally {
+      set({ loading: false });
+    }
+  },
 }));
