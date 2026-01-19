@@ -40,4 +40,6 @@ export default interface AuthState {
   fetchMe: () => Promise<void>;
 
   refreshToken: () => Promise<void>;
+
+  handleGoogleCallback: () => Promise<void>;
 }

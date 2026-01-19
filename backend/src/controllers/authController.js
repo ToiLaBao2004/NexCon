@@ -147,12 +147,36 @@ export async function googleAuthCallback(req, res) {
             maxAge: REFRESH_TOKEN_TTL
         });
         res.redirect(
-            `${process.env.FRONTEND_URL}/oauth-success?accessToken=${accessToken}`
+            `${process.env.FRONTEND_URL}/oauth-success`
         );
     } catch (error) {
         console.error('Error during Google OAuth callback:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
+}
+
+export async function googleSuccess(req, res) {
+	try {
+		const refreshToken = req.cookies?.refreshToken;
+		if (!refreshToken) {
+			return res.status(401).json({ message: 'Unauthorized' });
+		}
+
+		const session = await Session.findOne({ refreshToken });
+		if (!session || session.expiresAt < Date.now()) {
+			return res.status(401).json({ message: 'Session expired' });
+		}
+
+		const accessToken = jwt.sign(
+			{ userId: session.userId },
+			process.env.ACCESS_TOKEN_SECRET,
+			{ expiresIn: ACCESS_TOKEN_TTL }
+		);
+
+		res.json({ accessToken });
+	} catch (err) {
+		res.status(500).json({ message: 'OAuth failed' });
+	}
 }
 
 export async function refreshToken(req, res) {

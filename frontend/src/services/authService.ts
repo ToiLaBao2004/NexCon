@@ -68,4 +68,12 @@ export const authService = {
     const response = await api.post('/auth/refresh-token', {}, { withCredentials: true });
     return response.data.accessToken;
   },
+
+  googleSuccess: async () => {
+    const res = await api.get('/auth/google/success', {
+      withCredentials: true
+    });
+    return res.data.accessToken;
+  },
+
 };

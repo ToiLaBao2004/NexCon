@@ -1,6 +1,6 @@
 import express from 'express';
 import { signUp, signIn, signOut, verifyValidFieldsSignUp, 
-    updateNewPassword, googleAuthCallback, refreshToken } from '../controllers/authController.js';
+    updateNewPassword, googleAuthCallback, refreshToken, googleSuccess } from '../controllers/authController.js';
 import passport from '../config/passport.js';
 
 const authRouter = express.Router();
@@ -24,6 +24,8 @@ authRouter.get(
     }),
     googleAuthCallback
 );
+
+authRouter.get('/google/success', googleSuccess);
 
 authRouter.post('/refresh-token', refreshToken);
 
