@@ -127,6 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user });
     } catch (error: any) {
       console.error('Fetch me error:', error);
+      set({ user: null, accessToken: null });
       if (error.response?.data?.message) {
         toast.error(error.response.data.message);            
       } else {
