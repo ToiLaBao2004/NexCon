@@ -1,6 +1,5 @@
 import { useAuthStore } from '@/stores/useAuthStore';
 import axios from 'axios';
-import { use } from 'react';
 
 const BACKEND_URL="http://localhost:5001";
 
@@ -40,11 +39,11 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        originalRequest._retry = originalRequest._retry || 0;
+        originalRequest._retryCount = originalRequest._retryCount || 0;
 
-        if (error.response?.status === 403 && originalRequest._retry < 4) {
-            originalRequest._retry += 1;
-            console.log("refreshing token...", originalRequest._retry);
+        if (error.response?.status === 403 && originalRequest._retryCount < 4) {
+            originalRequest._retryCount += 1;
+            console.log("refreshing token...", originalRequest._retryCount);
             try {
                 const response = await api.post('/auth/refresh-token', { withCredentials: true });
                 const newAccessToken = response.data.accessToken;
