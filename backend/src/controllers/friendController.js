@@ -40,8 +40,21 @@ export async function sendFriendRequest(req, res) {
             status: 'pending'
         });
         if (reverseRequest) {
-            // Call accept friend request function here or handle it accordingly
-            return res.status(400).json({ message: 'This user has already sent you a friend request.' });
+            reverseRequest.status = 'accepted';
+            const newFriend = new Friend({
+                userA: receiver._id,
+                userB: sender._id
+            });
+            await newFriend.save();
+            const notification = new Notification({
+                userId: receiver._id,
+                title: "Friend Request Accepted",
+                content: `${sender.displayName} accepted your friend request.`,
+                linkUrl: `${process.env.FRONTEND_URL}/friends`,
+                isRead: false
+            });
+            await notification.save();
+            return res.status(201).json({ message: `You and ${receiver.displayName} are now friends.` });
         }
         const friendRequest = new FriendRequest({
             from: sender._id,
@@ -122,6 +135,38 @@ export async function rejectFriendRequest(req, res) {
         return res.status(200).json({ message: `You rejected the friend request from ${sender.displayName}.` });
     } catch (error) {
         console.error('Reject friend request error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function resendFriendRequest(req, res) {
+    try {
+        const sender = req.user;
+        const { requestId } = req.params;
+        const friendRequest = await FriendRequest.findById(requestId);
+        if (!friendRequest) {
+            return res.status(404).json({ message: 'Friend request not found.' });
+        }
+        if (friendRequest.to.toString() !== sender._id.toString()) {
+            return res.status(403).json({ message: 'You are not authorized to resend this friend request.' });
+        }
+        if (friendRequest.status !== 'rejected') {
+            return res.status(400).json({ message: 'This friend request is no longer rejected.' });
+        }
+        const receiver = await User.findById(friendRequest.to);
+        friendRequest.status = 'pending';
+        await friendRequest.save();
+        const notification = new Notification({
+            userId: receiver._id,
+            title: "Friend Request Resent",
+            content: `${sender.displayName} resent you friend request.`,
+            linkUrl: `${process.env.FRONTEND_URL}/friends/requests`,
+            isRead: false
+        });
+        await notification.save();
+        return res.status(200).json({ message: `You resent the friend request to ${receiver.displayName}.` });
+    } catch (error) {
+        console.error('Accept friend request error:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 }
