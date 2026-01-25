@@ -170,3 +170,15 @@ export async function resendFriendRequest(req, res) {
         return res.status(500).json({ message: 'Server error' });
     }
 }
+
+export async function getFriendRequests(req, res) {
+    try {
+        const user = req.user;
+        const friendRequests = await FriendRequest.find({ to: user._id, status: 'pending' })
+            .populate('from', 'displayName email avatarUrl');
+        return res.status(200).json({ friendRequests });
+    } catch (error) {
+        console.error('Get friend requests error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
