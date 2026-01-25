@@ -64,3 +64,64 @@ export async function sendFriendRequest(req, res) {
         return res.status(500).json({ message: 'Server error' });
     }
 }
+
+export async function acceptFriendRequest(req, res) {
+    try {
+        const receiver = req.user;
+        const { requestId } = req.params;
+        const friendRequest = await FriendRequest.findById(requestId);
+        if (!friendRequest) {
+            return res.status(404).json({ message: 'Friend request not found.' });
+        }
+        if (friendRequest.to.toString() !== receiver._id.toString()) {
+            return res.status(403).json({ message: 'You are not authorized to accept this friend request.' });
+        }
+        if (friendRequest.status !== 'pending') {
+            return res.status(400).json({ message: 'This friend request is no longer pending.' });
+        }
+        const sender = await User.findById(friendRequest.from);
+        const newFriend = new Friend({
+            userA: receiver._id,
+            userB: sender._id
+        });
+        await newFriend.save();
+        friendRequest.status = 'accepted';
+        await friendRequest.save();
+        const notification = new Notification({
+            userId: sender._id,
+            title: "Friend Request Accepted",
+            content: `${receiver.displayName} accepted your friend request.`,
+            linkUrl: `${process.env.FRONTEND_URL}/friends`,
+            isRead: false
+        });
+        await notification.save();
+        return res.status(200).json({ message: `You accepted the friend request from ${sender.displayName}.` });
+    } catch (error) {
+        console.error('Accept friend request error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function rejectFriendRequest(req, res) {
+    try {
+        const receiver = req.user;
+        const { requestId } = req.params;
+        const friendRequest = await FriendRequest.findById(requestId);
+        if (!friendRequest) {
+            return res.status(404).json({ message: 'Friend request not found.' });
+        }
+        if (friendRequest.to.toString() !== receiver._id.toString()) {
+            return res.status(403).json({ message: 'You are not authorized to reject this friend request.' });
+        }
+        if (friendRequest.status !== 'pending') {
+            return res.status(400).json({ message: 'This friend request is no longer pending.' });
+        }
+        const sender = await User.findById(friendRequest.from);
+        friendRequest.status = 'rejected';
+        await friendRequest.save();
+        return res.status(200).json({ message: `You rejected the friend request from ${sender.displayName}.` });
+    } catch (error) {
+        console.error('Reject friend request error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}

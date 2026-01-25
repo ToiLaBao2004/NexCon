@@ -1,8 +1,10 @@
 import express from 'express';
-import { sendFriendRequest } from '../controllers/friendController.js';
+import { sendFriendRequest, acceptFriendRequest, rejectFriendRequest } from '../controllers/friendController.js';
 
 const friendRouter = express.Router();
 
 friendRouter.post('/send-request', sendFriendRequest);
+friendRouter.post('/accept-request/:requestId', acceptFriendRequest);
+friendRouter.post('/reject-request/:requestId', rejectFriendRequest);
 
 export default friendRouter;
