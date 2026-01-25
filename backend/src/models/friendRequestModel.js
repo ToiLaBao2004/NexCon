@@ -27,6 +27,13 @@ friendRequestSchema.index({ from: 1, to: 1 }, { unique: true });
 friendRequestSchema.index({ from: 1 });
 friendRequestSchema.index({ to: 1 });
 
+// Auto delete friend requests if status is accepted
+friendRequestSchema.post('findOneAndUpdate', async function(doc) {
+    if (doc && doc.status === 'accepted') {
+        await doc.remove();
+    }
+});
+
 const FriendRequestModel = mongoose.models.FriendRequest || mongoose.model('FriendRequest', friendRequestSchema);
 
 export default FriendRequestModel;
