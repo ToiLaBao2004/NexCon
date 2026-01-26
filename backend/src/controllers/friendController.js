@@ -2,6 +2,7 @@ import FriendRequest from "../models/friendRequestModel.js";
 import User from '../models/userModel.js';
 import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
+import BlockUser from "../models/blockUserModel.js";
 
 export async function sendFriendRequest(req, res) {
     try {
@@ -13,6 +14,14 @@ export async function sendFriendRequest(req, res) {
         const receiver = await User.findOne({ email: email.toLowerCase() }).select('_id displayName').lean();
         if (!receiver) {
             return res.status(404).json({ message: "User with this email not found." });
+        }
+        const isBlocked = await BlockUser.findOne({ from: receiver._id, to: sender._id });
+        if (isBlocked) {
+            return res.status(403).json({ message: "You cannot send a friend request to this user." });
+        }
+        const blockedBySender = await BlockUser.findOne({ from: sender._id, to: receiver._id });
+        if (blockedBySender) {
+            await BlockUser.deleteOne({ _id: blockedBySender._id });
         }
         if (sender._id.toString() === receiver._id.toString()) {
             return res.status(400).json({ message: 'You cannot send a friend request to yourself.' });
@@ -179,6 +188,102 @@ export async function getFriendRequests(req, res) {
         return res.status(200).json({ friendRequests });
     } catch (error) {
         console.error('Get friend requests error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function unfriendUser(req, res) {
+    try {
+        const user = req.user;
+        const { friendId } = req.params;
+        const friend = await User.findById(friendId);
+        if (!friend) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        const friendship = await Friend.findOne({
+            $or: [
+                { userA: user._id, userB: friend._id },
+                { userA: friend._id, userB: user._id }
+            ]
+        });
+        if (!friendship) {
+            return res.status(404).json({ message: 'Friendship not found.' });
+        }
+        const friendRequest = await FriendRequest.findOne({
+            $or: [
+                { from: user._id, to: friend._id },
+                { from: friend._id, to: user._id }
+            ]
+        });
+        if (friendRequest) {
+            await FriendRequest.deleteOne({ _id: friendRequest._id });
+        }
+        await Friend.deleteOne({ _id: friendship._id });
+        return res.status(200).json({ message: `You unfriended ${friend.displayName}.` });
+    } catch (error) {
+        console.error('Unfriend user error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function blockUser(req, res) {
+    try {
+        const user = req.user;
+        const { userIdBlocked } = req.params;
+        const userBlocked = await User.findById(userIdBlocked);
+        if (!userBlocked) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        const alreadyBlocked = await BlockUser.findOne({ from: user._id, to: userBlocked._id });
+        if (alreadyBlocked) {
+            return res.status(400).json({ message: `${userBlocked.displayName} is already blocked by you.` });
+        }
+        const friendship = await Friend.findOne({
+            $or: [
+                { userA: user._id, userB: userBlocked._id },
+                { userA: userBlocked._id, userB: user._id }
+            ]
+        });
+        if (friendship) {
+            await Friend.deleteOne({ _id: friendship._id });
+        }
+        const friendRequest = await FriendRequest.findOne({
+            $or: [
+                { from: user._id, to: userBlocked._id },
+                { from: userBlocked._id, to: user._id }
+            ]
+        });
+        if (friendRequest) {
+            await FriendRequest.deleteOne({ _id: friendRequest._id });
+        }
+        const blockEntry = new BlockUser({
+            from: user._id,
+            to: userBlocked._id
+        });
+        await blockEntry.save();
+        return res.status(200).json({ message: `You have blocked ${userBlocked.displayName}.` });
+    } catch (error) {
+        console.error('Block user error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function unblockUser(req, res) {
+    try {
+        const user = req.user;
+        const { userIdUnblocked } = req.params;
+        const userUnblocked = await User.findById(userIdUnblocked);
+        if (!userUnblocked) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        const blockEntry = await BlockUser.findOne({ from: user._id, to: userUnblocked._id });
+        if (!blockEntry) {
+            return res.status(400).json({ message: `${userUnblocked.displayName} is not blocked by you.` });
+        }
+        await BlockUser.deleteOne({ _id: blockEntry._id });
+        return res.status(200).json({ message: `You have unblocked ${userUnblocked.displayName}.` });
+    } catch (error) {
+        console.error('Unblock user error:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 }

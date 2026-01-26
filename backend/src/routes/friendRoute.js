@@ -1,6 +1,6 @@
 import express from 'express';
 import { sendFriendRequest, acceptFriendRequest, rejectFriendRequest, 
-    resendFriendRequest, getFriendRequests } from '../controllers/friendController.js';
+    resendFriendRequest, getFriendRequests, unfriendUser, blockUser, unblockUser } from '../controllers/friendController.js';
 
 const friendRouter = express.Router();
 
@@ -9,5 +9,8 @@ friendRouter.post('/accept-request/:requestId', acceptFriendRequest);
 friendRouter.post('/reject-request/:requestId', rejectFriendRequest);
 friendRouter.post('/resend-request/:requestId', resendFriendRequest);
 friendRouter.get('/requests', getFriendRequests);
+friendRouter.delete('/unfriend/:friendId', unfriendUser);
+friendRouter.post('/block/:userIdBlocked', blockUser);
+friendRouter.delete('/unblock/:userIdUnblocked', unblockUser);
 
 export default friendRouter;
