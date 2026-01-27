@@ -185,6 +185,9 @@ export async function getFriendRequests(req, res) {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ to: user._id, status: 'pending' })
             .populate('from', 'displayName email avatarUrl');
+        if (friendRequests.length === 0) {
+            return res.status(200).json({ friendRequests: [] });
+        }
         return res.status(200).json({ friendRequests });
     } catch (error) {
         console.error('Get friend requests error:', error);
@@ -284,6 +287,105 @@ export async function unblockUser(req, res) {
         return res.status(200).json({ message: `You have unblocked ${userUnblocked.displayName}.` });
     } catch (error) {
         console.error('Unblock user error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function getAllFriends(req, res) {
+    try {
+        const user = req.user;
+        const friends = await Friend.find({
+            $or: [
+                { userA: user._id },
+                { userB: user._id }
+            ]
+        }).populate([
+            { path: 'userA', select: 'displayName avatarUrl' },
+            { path: 'userB', select: 'displayName avatarUrl' }
+        ]).lean();
+        const listedFriends = friends.map(friend => {
+            const isUserA = friend.userA._id.toString() === user._id.toString();
+            return {
+                _id: friend._id,
+                friendId: isUserA ? friend.userB._id : friend.userA._id,
+                displayName: isUserA ? friend.userB.displayName : friend.userA.displayName,
+                avatarUrl: isUserA ? friend.userB.avatarUrl : friend.userA.avatarUrl,
+                nickname: isUserA ? friend.nicknameA : friend.nicknameB,
+                createdAt: friend.createdAt,
+                updatedAt: friend.updatedAt
+            };
+        });
+        return res.status(200).json({ listedFriends });
+    } catch (error) {
+        console.error('Get all friends error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function getFriendRequestsSended(req, res) {
+    try {
+        const user = req.user;
+        const friendRequests = await FriendRequest.find({ from: user._id, status: 'pending' })
+            .populate('to', 'displayName email avatarUrl');
+        if (friendRequests.length === 0) {
+            return res.status(200).json({ friendRequests: [] });
+        }
+        return res.status(200).json({ friendRequests });
+    } catch (error) {
+        console.error('Get sent friend requests error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function getUserBlockedList(req, res) {
+    try {
+        const user = req.user;
+        const blockedUsers = await BlockUser.find({ from: user._id })
+            .populate('to', 'displayName email avatarUrl');
+        if (blockedUsers.length === 0) {
+            return res.status(200).json({ blockedUsers: [] });
+        }
+        const listedBlockedUsers = blockedUsers.map(entry => ({
+            _id: entry.to._id,
+            displayName: entry.to.displayName,
+            email: entry.to.email,
+            avatarUrl: entry.to.avatarUrl,
+            blockedAt: entry.createdAt
+        }));
+        return res.status(200).json({ blockedUsers: listedBlockedUsers });
+    } catch (error) {
+        console.error('Get blocked users error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function setFriendNickname(req, res) {
+    try {
+        const user = req.user;
+        const { friendId } = req.params;
+        const { nickname } = req.body;
+        const friend = await User.findById(friendId);
+        if (!friend) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+        const friendship = await Friend.findOne({
+            $or: [
+                { userA: user._id, userB: friend._id },
+                { userA: friend._id, userB: user._id }
+            ]
+        });
+        if (!friendship) {
+            return res.status(404).json({ message: 'Friendship not found.' });
+        }
+        if (friendship.userA.toString() === user._id.toString()) {
+            friendship.nicknameB = nickname ? nickname.trim().slice(0, 50) : undefined;
+        } else {
+            friendship.nicknameA = nickname ? nickname.trim().slice(0, 50) : undefined;
+        }
+        await friendship.save();
+        return res.status(200).json({ message: `Nickname for ${friend.displayName} has been updated.` });
+    } catch (error) {
+        console.error('Set friend nickname error:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 }
