@@ -8,6 +8,7 @@ import { authMiddleware } from './middlewares/authMiddleware.js';
 import userRouter from './routes/userRoute.js';
 import otpRouter from './routes/otpRoute.js';
 import friendRouter from './routes/friendRoute.js';
+import messageRouter from './routes/messageRoute.js';
 
 const app = express();
 const PORT = process.env.PORT;
@@ -26,6 +27,7 @@ app.use('/api/otp', otpRouter);
 app.use(authMiddleware);
 app.use('/api/users', userRouter);
 app.use('/api/friends', friendRouter);
+app.use('/api/messages', messageRouter);
 
 connectDB().then(() => {
     app.listen(PORT, () => {
