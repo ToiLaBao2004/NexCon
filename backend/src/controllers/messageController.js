@@ -9,7 +9,8 @@ export async function sendDirectMessage(req, res) {
         if (!content) {
             return res.status(400).json({ message: 'Content are required' });
         }
-        let conversation = await Conversation.findById(conversationId);
+        let conversation = await Conversation.findOne({type: 'direct','participants.userId': { $all: [senderId, recipientId] }});
+
         if (!conversation) {
             // Create new conversation if it doesn't exist
             conversation = new Conversation({
@@ -19,16 +20,16 @@ export async function sendDirectMessage(req, res) {
                     { userId: recipientId, joinedAt: new Date() }
                 ]
             });
-            await Conversation.save(conversation);
+            conversation = await Conversation.create(conversation);
         }
         const message = new Message({
             conversationId: conversation._id,
             senderId: senderId,
             content: content
         });
-        await Message.save(message);
+        await Message.create(message);
         updateConversationLastMessage(conversation, message, senderId);
-        await Conversation.save(conversation);
+        await conversation.save()
         res.status(201).json({ message: 'Message sent successfully', message });
     } catch (error) {
         console.error('Error sending direct message:', error);
