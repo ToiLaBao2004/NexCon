@@ -14,7 +14,7 @@ friendRouter.get('/requests', getFriendRequests);
 friendRouter.delete('/unfriend/:friendId', unfriendUser);
 friendRouter.post('/block/:userIdBlocked', blockUser);
 friendRouter.delete('/unblock/:userIdUnblocked', unblockUser);
-friendRouter.get('/friends', getAllFriends);
+friendRouter.get('/get-friends', getAllFriends);
 friendRouter.get('/requests-sended', getFriendRequestsSended);
 friendRouter.get('/blocked-users', getUserBlockedList);
 friendRouter.post('/set-nickname/:friendId', setFriendNickname);
