@@ -9,6 +9,7 @@ import userRouter from './routes/userRoute.js';
 import otpRouter from './routes/otpRoute.js';
 import friendRouter from './routes/friendRoute.js';
 import messageRouter from './routes/messageRoute.js';
+import conversationRouter from './routes/conversationRoute.js';
 import { Server } from "socket.io";
 import { SocketServer } from "./socketHandle.js";
 
@@ -32,6 +33,7 @@ app.use(authMiddleware);
 app.use('/api/users', userRouter);
 app.use('/api/friends', friendRouter);
 app.use('/api/messages', messageRouter);
+app.use('/api/conversations', conversationRouter);
 
 /* connectDB().then(() => {
     app.listen(PORT, () => {
