@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { authService } from '@/services/authService';
 import type AuthState from '@/types/authState';
+import { persist } from 'zustand/middleware';
 
-export const useAuthStore = create<AuthState>((set, get) => ({
+export const useAuthStore = create<AuthState>()(
+  persist((set, get) => ({
   accessToken: null,
   user: null,
   loading: false,
@@ -14,11 +16,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearState: () => {
     set({ accessToken: null, user: null, loading: false });
+    localStorage.clear();
   },
 
   verifyValidFieldsSignUp: async (email, password) => {
     try {
       set({ loading: true });
+      localStorage.clear();
       // call API
       await authService.verifyValidFieldsSignUp(email, password);
     } catch (error: any) {
@@ -172,4 +176,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ loading: false });
     }
   },
-}));
+}), {
+  name: "auth-storage",
+  partialize: (state) => ({user: state.user}), // chỉ persist user 
+})
+);
