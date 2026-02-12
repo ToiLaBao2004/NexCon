@@ -13,7 +13,7 @@ const blockUserSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
-blockUserSchema.index({ from: 1, to: 1 });
+blockUserSchema.index({ from: 1, to: 1 }, { unique: true });
 
 const BlockUserModel = mongoose.models.BlockUser || mongoose.model('BlockUser', blockUserSchema);
 
