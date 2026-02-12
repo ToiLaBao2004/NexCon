@@ -36,3 +36,29 @@ export async function sendDirectMessage(req, res) {
         res.status(500).json({ message: 'Internal server error' });
     }
 }
+
+export async function sendGroupMessage(req, res) {
+    try {
+        const { conversationId, content } = req.body;
+        const senderId = req.user._id;
+        const conversation = req.conversation;
+
+    if (!content) {
+      return res.status(400).json("Missing content");
+    }
+
+    const message = await Message.create({
+        conversationId,
+        senderId,
+        content
+    });
+
+    updateConversationLastMessage(conversation, message, senderId);
+    await conversation.save();
+    return res.status(201).json({ message });
+
+  } catch (error) {
+        console.error("An error occurred while sending a group message", error);
+        return res.status(500).json({ message: "Internal server error" });
+  }
+}

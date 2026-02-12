@@ -8,8 +8,16 @@ import ResetPassPage from "./pages/ResetPassPage";
 import { Toaster } from "sonner";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import OAuthSuccess from "./components/auth/OAuthSuccess";
+import { useThemeStore } from "./stores/useThemeStore";
+import { useEffect } from "react";
 
 function App() {
+  const {isDark, setTheme} = useThemeStore();
+  
+  useEffect(() => {
+  setTheme(isDark);
+}, [isDark]);
+
   return (
     <>
       <Toaster richColors />
