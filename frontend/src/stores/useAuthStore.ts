@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { authService } from '@/services/authService';
 import type AuthState from '@/types/authState';
 import { persist } from 'zustand/middleware';
+import { useChatStore } from './useChatStore';
 
 export const useAuthStore = create<AuthState>()(
   persist((set, get) => ({
@@ -23,6 +24,7 @@ export const useAuthStore = create<AuthState>()(
     try {
       set({ loading: true });
       localStorage.clear();
+      useChatStore.getState().reset();
       // call API
       await authService.verifyValidFieldsSignUp(email, password);
     } catch (error: any) {
@@ -60,11 +62,14 @@ export const useAuthStore = create<AuthState>()(
   signIn: async (email, password) => {
     try {
       set({ loading: true });
+      localStorage.clear();
+      useChatStore.getState().reset();   
       // call API
       const { accessToken } = await authService.signIn(email, password);
       get().setAccessToken(accessToken);
       toast.success('Sign in successful!');
       await get().fetchMe();
+      useChatStore.getState().fetchConversations();
     } catch (error: any) {
       console.error('Sign in error:', error);
       if (error.response?.data?.message) {
