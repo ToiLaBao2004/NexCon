@@ -15,7 +15,7 @@ const DirectMessageCard = ({convo}: { convo: Conversation }) => {
 
     if (!user) return null;
 
-    const otherUser = convo.participants.find((p) => p._id !== user._id);
+    const otherUser = convo.participants.find((p) => p.userId?._id.toString() !== user._id.toString());
     if (!otherUser) return null;
 
     const unreadCount = convo.unreadCounts[user._id];
@@ -30,7 +30,7 @@ const DirectMessageCard = ({convo}: { convo: Conversation }) => {
 
     return <ChatCard
     convoId={convo._id}
-    name={otherUser.displayName ?? ""}
+    name={otherUser.userId?.displayName ?? ""}
     timestamp={
         convo.lastMessage?.createdAt ? new Date(convo.lastMessage.createdAt) : undefined
     }
@@ -39,11 +39,11 @@ const DirectMessageCard = ({convo}: { convo: Conversation }) => {
     unreadCount={unreadCount}
     leftSection={
         <>
-            <UserAvatar type="sidebar" name={otherUser.displayName ?? ""} 
-                avatarUrl={otherUser.avatarUrl ?? undefined}
+            <UserAvatar type="sidebar" name={otherUser.userId?.displayName ?? ""} 
+                avatarUrl={otherUser.userId?.avatarUrl ?? undefined}
             />
             { /* todo: socket io */}
-            {onlineUsers.includes(otherUser?._id ?? "") && (
+            {onlineUsers.includes(otherUser?.userId?._id ?? "") && (
                 <StatusBadge status="online" />)}
             {unreadCount > 0  && <UnreadCountBadge unreadCount={unreadCount} />}
         </>

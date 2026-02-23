@@ -1,6 +1,7 @@
 import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import Friend from '../models/friendModel.js';
+import { io } from '../socket/index.js';
 
 export async function createConversation(req, res) {
     try {
@@ -67,20 +68,11 @@ export async function getConversations(req, res) {
             select: "displayName avatarUrl",
         })
 
-        const formatted = conversations.map((convo) => {
-            const participants = (convo.participants || []).map((p) => ({
-                _id: p.userId?._id,
-                displayName: p.userId?.displayName,
-                avatarUrl: p.userId?.avatarUrl ?? null,
-                joinedAt: p.joinedAt,
-            }));
-            return {
+        const formatted = conversations.map((convo) => ({
             ...convo.toObject(),
             unreadCounts: convo.unreadCounts || {},
-            participants,
-            };
-        });
-
+        }));
+        
     return res.status(200).json({ conversations: formatted });
     } catch (error) {
         console.error("Error occurred while fetching conversations", error);
@@ -131,5 +123,52 @@ export async function getUserConversationsForSocketIO (userId) {
     } catch (error) {
         console.error("An error occurred while fetching conversations: ", error);
         return[];
+    }
+}
+
+export async function markAsSeen(req, res) {
+    try {
+        const {conversationId} = req.params;
+        const userId = req.user._id.toString();
+        const conversation = await Conversation.findById(conversationId).lean();
+        if (!conversation) {
+            return res.status(404).json({ message: "Conversation not found" });
+        }
+        const last = conversation.lastMessage;
+        if (!last) {
+            return res.status(200).json({ message: "No messages in conversation" });
+        }
+
+        if (last.senderId.toString() === userId) {
+            return res.status(200).json({ message: "Cannot mark own message as seen" });    
+        }
+
+        const updated = await Conversation.findByIdAndUpdate(conversationId, 
+            {
+                $addToSet: { seenBy: userId },
+                $set:{ [`unreadCounts.${userId}`]: 0 },
+
+            }, { new: true }
+        );
+
+        io.to(conversationId).emit("read-message", {
+            conversationId: updated,
+            lastMessage: {
+                _id: updated.lastMessage._id,
+                content: updated.lastMessage.content,
+                createdAt: updated.lastMessage.createdAt,
+                senderId: updated.lastMessage.senderId,
+            }
+        });
+
+        return res.status(200).json({ 
+            message: "Conversation marked as seen",
+            seenBy: updated?.seenBy,
+            myunreadCount: updated?.unreadCounts[userId] || 0,
+         });    
+
+    } catch (error) {
+        console.error("An error occurred while marking conversation as seen: ", error);
+        return res.status(500).json({ message: "Internal server error" });
     }
 }

@@ -21,7 +21,7 @@ const MessageItem = ({message, index, messages, selectedConvo, lastMessageStatus
         message.senderId !== prev?.senderId ||
         new Date(message.createdAt).getTime() - new Date(prev?.createdAt || 0).getTime() > 300000;
 
-    const participant = selectedConvo.participants.find((p: Participant) => p._id.toString() === message.senderId.toString())
+    const participant = selectedConvo.participants.find((p: Participant) => p.userId?._id?.toString() === message.senderId.toString())
 
   return (
     <div
@@ -34,8 +34,8 @@ const MessageItem = ({message, index, messages, selectedConvo, lastMessageStatus
                 {isGroupBreak &&(
                     <UserAvatar
                         type="chat"
-                        name={participant?.displayName ?? "Moji"}
-                        avatarUrl={participant?.avatarUrl ?? undefined}
+                        name={participant?.userId.displayName ?? "Moji"}
+                        avatarUrl={participant?.userId.avatarUrl ?? undefined}
                     />
                 )}
             </div>

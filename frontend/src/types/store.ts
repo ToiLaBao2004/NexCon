@@ -37,6 +37,7 @@ export interface ChatState {
 
   // update conversation
   updateConversation: (conversation: Conversation) => void;
+  markAsSeen: () => Promise<void>;
 }
 
 export interface SocketState {

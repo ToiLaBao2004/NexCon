@@ -51,10 +51,19 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             }       
             
             if (useChatStore.getState().activeConversationId === message.conversationId) {
-                // đánh dấu đã đọc
+                useChatStore.getState().markAsSeen();
             }
 
             useChatStore.getState().updateConversation(updatedConversation);
+        })
+
+        //read message
+        socket.on("read-message", ({conversations, lastMessage}) => {
+            const updated = {
+                ...conversations,
+                lastMessage
+            };
+            useChatStore.getState().updateConversation(updated);
         })
         
     },

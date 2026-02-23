@@ -24,8 +24,8 @@ const MessageInput = ({selectedConvo} : {selectedConvo: Conversation}) => {
         try {
             if(selectedConvo.type === "direct") {
                 const participants = selectedConvo.participants;
-                const otherUser = participants.filter((p) => p._id !== user._id)[0];
-                await sendDirectMessage(otherUser._id, currValue);
+                const otherUser = participants.filter((p) => p.userId?._id?.toString() !== user._id.toString())[0];
+                await sendDirectMessage(otherUser?.userId?._id, currValue);
             } else {
                 await sendGroupMessage(selectedConvo._id, currValue);
             }
