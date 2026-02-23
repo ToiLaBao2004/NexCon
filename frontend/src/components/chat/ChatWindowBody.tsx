@@ -1,11 +1,17 @@
 import { useChatStore } from "@/stores/useChatStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import MessageItem from "./MessageItem";
+import { useEffect, useRef } from "react";
 
 const ChatWindowBody = () => {
     const {activeConversationId, conversations, messages: allMessages} = useChatStore();
     const messages = allMessages[activeConversationId!]?.items ?? [];
     const selectedConvo = conversations.find((c) => c._id === activeConversationId);
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+     useEffect(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
 
     if(!selectedConvo) {
         return <ChatWelcomeScreen/>;
@@ -32,6 +38,7 @@ const ChatWindowBody = () => {
                     lastMessageStatus="delivered"
                 />
             ))}
+            <div ref={bottomRef} />
         </div>
        </div>
     );

@@ -1,7 +1,7 @@
 import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
-import { updateConversationLastMessage } from '../utils/messageHelper.js';
-
+import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
+import { io } from '../socket/index.js';
 export async function sendDirectMessage(req, res) {
     try {
         const senderId = req.user._id;
@@ -29,7 +29,8 @@ export async function sendDirectMessage(req, res) {
         });
         await Message.create(message);
         updateConversationLastMessage(conversation, message, senderId);
-        await conversation.save()
+        await conversation.save();
+        emitNewMessage(io, conversation, message);
         res.status(201).json({ message: 'Message sent successfully', message });
     } catch (error) {
         console.error('Error sending direct message:', error);
@@ -55,6 +56,7 @@ export async function sendGroupMessage(req, res) {
 
     updateConversationLastMessage(conversation, message, senderId);
     await conversation.save();
+    emitNewMessage(io, conversation, message);
     return res.status(201).json({ message });
 
   } catch (error) {
