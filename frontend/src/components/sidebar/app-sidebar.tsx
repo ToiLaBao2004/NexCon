@@ -37,7 +37,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild
-            className ="bg-gradient-primary"
+            className ="bg-gradient-to-r from-blue-600 to-blue-400"
             >
             <a href="#">
               <div className="flex w-full items-center px-2 justify-between">

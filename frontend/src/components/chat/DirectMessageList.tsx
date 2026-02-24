@@ -1,8 +1,14 @@
 import { useChatStore } from "@/stores/useChatStore";
 import DirectMessageCard from "./DirectMessageCard";
+import { useEffect } from "react";
 
 const DirectMessageList = () => {
-  const { conversations } = useChatStore();
+  const { conversations, fetchConversations } = useChatStore();
+
+  useEffect(() => {
+  fetchConversations();
+  }, []);
+  
   if (!conversations) return;
   const directConversations = conversations.filter((convo) => convo.type === 'direct');
   return (

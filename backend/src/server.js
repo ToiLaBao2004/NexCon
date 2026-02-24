@@ -10,11 +10,10 @@ import otpRouter from './routes/otpRoute.js';
 import friendRouter from './routes/friendRoute.js';
 import messageRouter from './routes/messageRoute.js';
 import conversationRouter from './routes/conversationRoute.js';
-import { Server } from "socket.io";
-import { SocketServer } from "./socketHandle.js";
+import { app,server } from './socket/index.js';
 
 
-const app = express();    
+// const app = express();    
 const PORT = process.env.PORT;
 
 
@@ -35,29 +34,10 @@ app.use('/api/friends', friendRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/conversations', conversationRouter);
 
-/* connectDB().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server is running on: http://localhost:${PORT}`);
-    })
-}); */
-
-let server;
-
 connectDB().then(() => {
-  server = app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-  });
-
-  const io = new Server(server, {
-    pingTimeout: 60000,
-    cors: {
-      origin: process.env.CLIENT_URL,
-      credentials: true
-    }
-  });
-
-  io.on('connection', (socket) => {
-    console.log('Socket io connected Successfully!":', socket.id);
-    SocketServer(socket, io);
+  server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
   });
 });
+
+
