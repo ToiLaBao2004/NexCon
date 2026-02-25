@@ -19,8 +19,8 @@ function App() {
   const {connectSocket, disconnectSocket} = useSocketStore();
 
   useEffect(() => {
-  setTheme(isDark);
-}, [isDark]);
+    setTheme(isDark);
+  }, [isDark]);
 
   useEffect(() => {
     if (accessToken) {

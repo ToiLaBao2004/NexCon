@@ -135,7 +135,7 @@ export const useChatStore = create<ChatState>()(
                     })
 
                 } catch (error) {
-                    console.error("An error occurred while adding the message");
+                    console.error(error, "An error occurred while adding the message");
                 }
             },
             updateConversation: (conversation) => {

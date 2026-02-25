@@ -1,4 +1,3 @@
-import { MoreHorizontal } from "lucide-react";
 import {Card} from "../ui/card";
 import { formatOnlineTime,cn  } from "@/lib/utils";
 
@@ -11,11 +10,12 @@ interface CharCardProps {
     unreadCount?: number;
     leftSection: React.ReactNode;
     subtitle: React.ReactNode;
+    rightSection?: React.ReactNode;
 }
 
 const ChatCard = (
     {
-        convoId, name, timestamp, isActive, onSelect, unreadCount, leftSection, subtitle,
+        convoId, name, timestamp, isActive, onSelect, unreadCount, leftSection, subtitle, rightSection
     }: CharCardProps) => {
     
     return (
@@ -46,10 +46,7 @@ const ChatCard = (
 
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1 flex-1 min-w-0">{subtitle}</div>
-                    <MoreHorizontal
-                        className="size-4 text-muted-foreground opacity-0 
-                        group-hover:opacity-100 hover:size-5 transition-smooth" 
-                    />
+                    {rightSection}
                 </div>
             </div>
         </div>
