@@ -29,7 +29,7 @@ import { useState } from "react";
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { activeConversationId, setActiveConversation, messages, fetchMessages } = useChatStore();
+  const { activeConversationId, setActiveConversation, messages, fetchMessages, fetchConversations } = useChatStore();
   const { onlineUsers } = useSocketStore();
   const { setNickName, loading } = useFriendStore();
 
@@ -40,6 +40,9 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   const otherUser = convo.participants.find((p) => p.userId?._id.toString() !== user._id.toString());
   if (!otherUser) return null;
+  const displayName = otherUser?.userId?.nickname?.trim()
+    ? otherUser.userId.nickname
+    : otherUser?.userId?.displayName ?? "";
 
   const unreadCount = convo.unreadCounts[user._id];
   const lastMessage = convo.lastMessage?.content ?? "";
@@ -66,6 +69,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
       console.log("Nickname updated successfully");
       setOpenRename(false);
       setNicknameValue("");
+      fetchConversations(); // Refresh conversations list to update nickname display
     } catch (error) {
       console.error("Set nickname failed:", error);
     }
@@ -137,7 +141,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   return <ChatCard
     convoId={convo._id}
-    name={otherUser.userId?.displayName ?? ""}
+    name={displayName}
     timestamp={
       convo.lastMessage?.createdAt ? new Date(convo.lastMessage.createdAt) : undefined
     }
@@ -147,7 +151,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     rightSection={menuNode}
     leftSection={
       <>
-        <UserAvatar type="sidebar" name={otherUser.userId?.displayName ?? ""}
+        <UserAvatar type="sidebar" name={displayName}
           avatarUrl={otherUser.userId?.avatarUrl ?? undefined}
         />
         { /* todo: socket io */}
