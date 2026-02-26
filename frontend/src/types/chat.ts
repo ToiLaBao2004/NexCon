@@ -3,6 +3,7 @@ export interface Participant {
     _id: string;
     displayName: string;
     avatarUrl?: string | null;
+    nickname?: string | null;
   };
   joinedAt: string;
 }

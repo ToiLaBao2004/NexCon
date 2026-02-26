@@ -11,11 +11,11 @@ const friendSchema = new mongoose.Schema({
         ref: 'User',
         required: true,
     },
-    nicknameA: { // userA's nickname for userB
+    nicknameA: { // userB sets this nickname for userA
         type: String,
         trim: true
     },
-    nicknameB: { // userB's nickname for userA
+    nicknameB: { // userA sets this nickname for userB
         type: String,
         trim: true
     }

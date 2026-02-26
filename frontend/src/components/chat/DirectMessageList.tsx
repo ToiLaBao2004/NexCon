@@ -6,9 +6,9 @@ const DirectMessageList = () => {
   const { conversations, fetchConversations } = useChatStore();
 
   useEffect(() => {
-  fetchConversations();
+    fetchConversations();
   }, []);
-  
+
   if (!conversations) return;
   const directConversations = conversations.filter((convo) => convo.type === 'direct');
   return (
