@@ -25,7 +25,7 @@ export function ResetPassForm({
   const navigate = useNavigate();
   const location = useLocation();
   const emailOTPResetPassData = location.state?.emailOTPResetPassData;
-  const {register, handleSubmit, formState: {errors, isSubmitting}, setError} = useForm<ResetPassFormValues>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm<ResetPassFormValues>({
     resolver: zodResolver(ResetPassSchema),
   });
   useEffect(() => {
@@ -55,76 +55,76 @@ export function ResetPassForm({
     <div className="items-center justify-center flex p-6 md:p-10">
       <div className={cn("flex flex-col gap-6 w-full max-w-md", className)} {...props}>
         <Card className="overflow-hidden border-border">
-            <CardContent className="p-6 md:p-8">
+          <CardContent className="p-6 md:p-8">
             <form className="flex flex-col gap-6" onSubmit={handleSubmit(onSubmit)}>
-                {/* header - logo */}
-                <div className="flex flex-col items-center text-center gap-2">
+              {/* header - logo */}
+              <div className="flex flex-col items-center text-center gap-2">
                 <a href="/" className="mx-auto block w-fit text-center">
-                    <img src="/logo.svg" alt="logo" />
+                  <img src="/logo.svg" alt="logo" />
                 </a>
-                <h1 className="text-2xl font-bold">Moji</h1>
+                <h1 className="text-2xl font-bold">NexCon</h1>
                 <p className="text-sm text-muted-foreground text-balance">
-                    Change your password.
+                  Change your password.
                 </p>
-                </div>
+              </div>
 
-                {/* new password */}
-                <div className="flex flex-col gap-2">
+              {/* new password */}
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="email" className="block text-sm">
-                    New Password
+                  New Password
                 </Label>
                 <Input
-                    id="email"
-                    type="password"
-                    placeholder="••••••••"
-                    {...register("newPassword")}
+                  id="email"
+                  type="password"
+                  placeholder="••••••••"
+                  {...register("newPassword")}
                 />
                 {errors.newPassword && (
-                    <p className="text-sm text-destructive">
+                  <p className="text-sm text-destructive">
                     {errors.newPassword.message}
-                    </p>
+                  </p>
                 )}
-                </div>
+              </div>
 
-                {/* confirm new password */}
-                <div className="flex flex-col gap-2">
+              {/* confirm new password */}
+              <div className="flex flex-col gap-2">
                 <Label htmlFor="password" className="text-sm">
-                    Confirm New Password
+                  Confirm New Password
                 </Label>
                 <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    {...register("confirmNewPassword")}
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  {...register("confirmNewPassword")}
                 />
                 {errors.confirmNewPassword && (
-                    <p className="text-sm text-destructive">
+                  <p className="text-sm text-destructive">
                     {errors.confirmNewPassword.message}
-                    </p>
+                  </p>
                 )}
-                </div>
+              </div>
 
-                {/* submit */}
-                <Button
+              {/* submit */}
+              <Button
                 type="submit"
                 className="w-full mt-3 cursor-pointer"
                 disabled={isSubmitting}
-                >
+              >
                 Submit
-                </Button>
+              </Button>
             </form>
-            </CardContent>
+          </CardContent>
         </Card>
 
         <div className="text-xs text-center px-6 text-muted-foreground [a]:underline [a]:underline-offset-4 [a]:hover:text-primary text-balance">
-            By clicking continue, you agree to our{" "}
-            <a href="#" className="underline underline-offset-4">
+          By clicking continue, you agree to our{" "}
+          <a href="#" className="underline underline-offset-4">
             Terms of Service
-            </a>{" "}
-            and{" "}
-            <a href="#" className="underline underline-offset-4">
+          </a>{" "}
+          and{" "}
+          <a href="#" className="underline underline-offset-4">
             Privacy Policy
-            </a>.
+          </a>.
         </div>
       </div>
     </div>

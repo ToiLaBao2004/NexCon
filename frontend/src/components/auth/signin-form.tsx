@@ -25,11 +25,11 @@ export function SigninForm({
   const { signIn, loginGoogle } = useAuthStore();
   const { sendOtpResetPassword } = useOTPStore();
   const navigate = useNavigate();
-  const {register, handleSubmit, formState: {errors, isSubmitting}, setError, watch} = useForm<SignInFormValues>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setError, watch } = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
   });
   const onSubmit = async (data: SignInFormValues) => {
-    const {email, password} = data;
+    const { email, password } = data;
     try {
       await signIn(email, password);
       navigate("/");
@@ -59,7 +59,7 @@ export function SigninForm({
     try {
       await sendOtpResetPassword(emailValue);
       navigate("/otp-resetpass", {
-        state: { 
+        state: {
           emailOTPResetPassData: { email: emailValue }
         }
       });
@@ -85,54 +85,54 @@ export function SigninForm({
         <CardContent className="grid p-0 md:grid-cols-2">
           <form className="p-6 md:p-8" onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-col gap-6"></div>
-              {/* header - logo */}
-              <div className="flex flex-col items-center text-center gap-2">
-                <a href="/" className="mx-auto block w-fit text-center">
-                  <img src="/logo.svg" alt="logo" />
-                </a>
-                <h1 className="text-2xl font-bold">Moji</h1>
-                <p className="text-sm text-muted-foreground text-balance">
-                  Login your Moji account to continue
-                </p>
-              </div>
-              {/* email */}
-              <div className="flex flex-col gap-2 mt-3">
-                <Label htmlFor="email" className="block text-sm">
-                  Email
+            {/* header - logo */}
+            <div className="flex flex-col items-center text-center gap-2">
+              <a href="/" className="mx-auto block w-fit text-center">
+                <img src="/logo.svg" alt="logo" />
+              </a>
+              <h1 className="text-2xl font-bold">NexCon</h1>
+              <p className="text-sm text-muted-foreground text-balance">
+                Login your NexCon account to continue
+              </p>
+            </div>
+            {/* email */}
+            <div className="flex flex-col gap-2 mt-3">
+              <Label htmlFor="email" className="block text-sm">
+                Email
+              </Label>
+              <Input id="email" type="text" placeholder="nexcon@gmail.com" {...register("email")} />
+              {/* todo: error message */}
+              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+            </div>
+            {/* password */}
+            <div className="flex flex-col gap-2 mt-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-sm">
+                  Password
                 </Label>
-                <Input id="email" type="text" placeholder="moji@gmail.com" {...register("email")} />
-                {/* todo: error message */}
-                {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                <a onClick={handleForgotPassword} className="text-center text-sm underline-offset-4 hover:underline cursor-pointer">
+                  Forgot password?
+                </a>
               </div>
-              {/* password */}
-              <div className="flex flex-col gap-2 mt-3">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-sm">
-                    Password
-                  </Label>
-                  <a onClick={handleForgotPassword} className="text-center text-sm underline-offset-4 hover:underline cursor-pointer">
-                    Forgot password?
-                  </a>
-                </div>
-                <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
-                {/* todo: error message */}
-                {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-              </div>
-              {/* submit button */}
-              <Button type="submit" className="w-full mt-5 cursor-pointer" disabled={isSubmitting}>
-                Submit
-              </Button>
-              <div className="flex items-center my-4">
-                <div className="flex-1 h-px bg-border" />
-                <span className="px-2 text-xs text-muted-foreground">Or continue with</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-              <Button type="button" variant="outline" className="w-full flex items-center justify-center gap-2 cursor-pointer" onClick={handleGoogleSignIn}>
-                <FcGoogle className="h-5 w-5" />Continue with Google
-              </Button>
-              <div className="text-center text-sm mt-3">
-                Don't have an account?{" "}<a href="/signup" className="underline underline-offset-4 hover:text-primary">Sign up</a>
-              </div>
+              <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
+              {/* todo: error message */}
+              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+            </div>
+            {/* submit button */}
+            <Button type="submit" className="w-full mt-5 cursor-pointer" disabled={isSubmitting}>
+              Submit
+            </Button>
+            <div className="flex items-center my-4">
+              <div className="flex-1 h-px bg-border" />
+              <span className="px-2 text-xs text-muted-foreground">Or continue with</span>
+              <div className="flex-1 h-px bg-border" />
+            </div>
+            <Button type="button" variant="outline" className="w-full flex items-center justify-center gap-2 cursor-pointer" onClick={handleGoogleSignIn}>
+              <FcGoogle className="h-5 w-5" />Continue with Google
+            </Button>
+            <div className="text-center text-sm mt-3">
+              Don't have an account?{" "}<a href="/signup" className="underline underline-offset-4 hover:text-primary">Sign up</a>
+            </div>
           </form>
           <div className="bg-muted relative hidden md:block">
             <img
