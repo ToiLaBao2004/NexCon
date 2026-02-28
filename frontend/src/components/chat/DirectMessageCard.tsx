@@ -73,7 +73,6 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   const onSubmitNickname = async () => {
     const value = nickname.trim()
-    if (!value) return
 
     if (value === currentNickname.trim()) {
       setOpenRename(false);
@@ -148,7 +147,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
           <Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>
             Hủy
           </Button>
-          <Button onClick={onSubmitNickname} disabled={!nickname.trim() || loading}>
+          <Button onClick={onSubmitNickname} disabled={loading}>
             {loading ? "Đang lưu..." : "Lưu"}
           </Button>
         </DialogFooter>
