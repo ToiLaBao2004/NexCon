@@ -377,6 +377,15 @@ export async function setFriendNickname(req, res) {
         if (!friendship) {
             return res.status(404).json({ message: 'Friendship not found.' });
         }
+        if (nickname === undefined || nickname.trim() === "") {
+            if (friendship.userA.toString() === user._id.toString()) {
+                friendship.nicknameB = undefined;
+            } else {
+                friendship.nicknameA = undefined;
+            }
+            await friendship.save();
+            return res.status(200).json({ message: `Nickname for ${friend.displayName} has been removed.` });
+        }
         if (friendship.userA.toString() === user._id.toString()) {
             friendship.nicknameB = nickname ? nickname.trim().slice(0, 50) : undefined;
         } else {
