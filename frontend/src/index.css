@@ -232,10 +232,31 @@
   }
 
   /* scrollbar */
-  .beautifull-scrollbar {
-    @apply scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent
-    dark:scrollbar-thumb-slate-600;
-  }
+  .beautiful-scrollbar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.beautiful-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.beautiful-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(215 20% 45% / 0.25);
+    border-radius: 999px;
+    backdrop-filter: blur(4px);
+}
+
+.beautiful-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(215 20% 45% / 0.5);
+}
+
+.dark .beautiful-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(215 20% 80% / 0.2);
+}
+
+.dark .beautiful-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(215 20% 80% / 0.4);
+}
   /* Animations */
   .transition-bounce {
     transition: var(--transition-bounce);
