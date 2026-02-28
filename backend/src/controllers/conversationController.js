@@ -221,3 +221,30 @@ export async function markAsSeen(req, res) {
 		return res.status(500).json({ message: "Internal server error" });
 	}
 }
+
+export async function updateGroupName(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const { name } = req.body;
+		const userId = req.user._id.toString();
+		if (!name || name.trim() === '') {
+			return res.status(400).json({ message: 'Group name is required.' });
+		}
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: "Conversation not found" });
+		}
+		if (conversation.type !== 'group') {
+			return res.status(400).json({ message: "Only group conversations can be renamed" });
+		}
+		if (!conversation.participants.some(p => p.userId.toString() === userId)) {
+			return res.status(403).json({ message: "Only group participants can rename the group" });
+		}
+		conversation.group.name = name;
+		await conversation.save();
+		return res.status(200).json({ message: "Group name updated successfully" });
+	} catch (error) {
+		console.error("An error occurred while updating group name: ", error);
+		return res.status(500).json({ message: "Internal server error" });
+	}
+}

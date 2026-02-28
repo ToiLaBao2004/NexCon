@@ -4,49 +4,182 @@ import type { Conversation } from "@/types/chat";
 import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
+import { MoreHorizontal } from "lucide-react";
+import {
+	DropdownMenu,
+	DropdownMenuTrigger,
+	DropdownMenuContent,
+	DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+	DialogFooter,
+} from "@/components/ui/dialog";
+import { useEffect, useMemo, useState } from "react";
+import { Input } from "../ui/input";
+import { Button } from "@/components/ui/button";
 
-const GroupChatCard = ({convo} : {convo: Conversation }) => {
-    const {user} = useAuthStore();
-    const {activeConversationId, setActiveConversation,messages,fetchMessages} = useChatStore();
+const GroupChatCard = ({ convo }: { convo: Conversation }) => {
+	const { user } = useAuthStore();
+	const {
+		activeConversationId,
+		setActiveConversation,
+		messages,
+		fetchMessages,
+		fetchConversations,
+		updateGroupName,
+	} = useChatStore();
 
-    if (!user) return null;
+	const [openRename, setOpenRename] = useState(false);
+	const [groupNameDraft, setGroupNameDraft] = useState("");
+	const [loading, setLoading] = useState(false);
 
-    const unreadCount = convo.unreadCounts[user._id];
-    const name = convo.group?.name ?? "";
-    const handleSelectConversation = async (id: string) => {
-        setActiveConversation(id);
-        if(!messages[id]) {
-            await fetchMessages();
-        }
-    }
+	const currentGroupName = useMemo(() => convo.group?.name ?? "", [convo.group?.name]);
 
-    return (
-        <ChatCard
-        convoId={convo._id}
-        name={name}
-        timestamp={
-            convo.lastMessage?.createdAt ? new Date(convo.lastMessage.createdAt)
-            : undefined
-        }
-        isActive={activeConversationId === convo._id}
-        onSelect={handleSelectConversation}
-        unreadCount={unreadCount}
-        leftSection={
-            <>
-            {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount}/>}
-            <GroupChatAvatar
-                participants={convo.participants}
-                type="chat"
-            />
-            </>
-        }
-        subtitle={
-            <p className="text-sm truncate text-muted-foreground">
-                {convo.participants.length} Thành Viên
-            </p>
-        }        
-        />
-    )
-}
+	// Prefill input mỗi lần mở dialog (và nếu convo đổi)
+	useEffect(() => {
+		if (openRename) {
+			setGroupNameDraft(currentGroupName);
+		}
+	}, [openRename, currentGroupName]);
+
+	if (!user) return null;
+
+	const unreadCount = convo.unreadCounts?.[user._id] ?? 0;
+
+	const handleSelectConversation = async (id: string) => {
+		setActiveConversation(id);
+
+		// Nếu store messages theo convoId, check theo id
+		if (!messages?.[id]) {
+			// Nếu fetchMessages nhận id thì dùng: await fetchMessages(id)
+			await fetchMessages();
+		}
+	};
+
+	const onOpenRename = () => {
+		setOpenRename(true);
+	};
+
+	const onSubmitGroupName = async () => {
+		const value = groupNameDraft.trim();
+		if (!value) return;
+
+		// Nếu không đổi gì thì đóng luôn cho gọn
+		if (value === currentGroupName.trim()) {
+			setOpenRename(false);
+			return;
+		}
+
+		try {
+			setLoading(true);
+			await updateGroupName(convo._id, value);
+
+			setOpenRename(false);
+
+			// Refresh list để UI update name (nếu store chưa tự update state)
+			await fetchConversations();
+		} catch (error) {
+			console.error("Update group name failed:", error);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const menuNode = (
+		<Dialog open={openRename} onOpenChange={setOpenRename}>
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<button
+						type="button"
+						className="p-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition"
+						aria-label="More actions"
+						onClick={(e) => e.stopPropagation()}
+						onPointerDown={(e) => e.stopPropagation()}
+					>
+						<MoreHorizontal className="size-4 text-muted-foreground" />
+					</button>
+				</DropdownMenuTrigger>
+
+				<DropdownMenuContent
+					align="end"
+					sideOffset={6}
+					onClick={(e) => e.stopPropagation()}
+					onPointerDown={(e) => e.stopPropagation()}
+				>
+					<DropdownMenuItem
+						onSelect={(e) => {
+							e.preventDefault();
+							onOpenRename();
+						}}
+					>
+						Đổi group name
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+
+			<DialogContent
+				onClick={(e) => e.stopPropagation()}
+				onPointerDown={(e) => e.stopPropagation()}
+			>
+				<DialogHeader>
+					<DialogTitle>Đổi group name</DialogTitle>
+					<DialogDescription>Tên mới sẽ hiển thị cho tất cả thành viên trong nhóm.</DialogDescription>
+				</DialogHeader>
+
+				<Input
+					value={groupNameDraft}
+					onChange={(e) => setGroupNameDraft(e.target.value)}
+					placeholder="Nhập tên nhóm mới"
+					autoFocus
+					onKeyDown={(e) => {
+						if (e.key === "Enter") onSubmitGroupName();
+					}}
+				/>
+
+				<DialogFooter className="gap-2">
+					<Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>
+						Hủy
+					</Button>
+					<Button
+						onClick={onSubmitGroupName}
+						disabled={!groupNameDraft.trim() || loading}
+					>
+						{loading ? "Đang lưu..." : "Lưu"}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
+	);
+
+	return (
+		<ChatCard
+			convoId={convo._id}
+			name={currentGroupName}
+			timestamp={
+				convo.lastMessage?.createdAt ? new Date(convo.lastMessage.createdAt) : undefined
+			}
+			isActive={activeConversationId === convo._id}
+			onSelect={handleSelectConversation}
+			unreadCount={unreadCount}
+			rightSection={menuNode}
+			leftSection={
+				<>
+					{unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
+					<GroupChatAvatar participants={convo.participants} type="chat" />
+				</>
+			}
+			subtitle={
+				<p className="text-sm truncate text-muted-foreground">
+					{convo.participants.length} Thành Viên
+				</p>
+			}
+		/>
+	);
+};
 
 export default GroupChatCard;
