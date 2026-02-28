@@ -58,10 +58,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         })
 
         //read message
-        socket.on("read-message", ({conversations, lastMessage}) => {
+        socket.on("read-message", ({conversationId, lastMessage}) => {
             const updated = {
-                ...conversations,
-                lastMessage
+                ...conversationId,
+                lastMessage,
             };
             useChatStore.getState().updateConversation(updated);
         })
