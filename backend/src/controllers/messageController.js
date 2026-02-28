@@ -9,7 +9,7 @@ export async function sendDirectMessage(req, res) {
         if (!content) {
             return res.status(400).json({ message: 'Content are required' });
         }
-        let conversation = await Conversation.findOne({type: 'direct','participants.userId': { $all: [senderId, recipientId] }});
+        let conversation = await Conversation.findOne({ type: 'direct', 'participants.userId': { $all: [senderId, recipientId] } });
 
         if (!conversation) {
             // Create new conversation if it doesn't exist
@@ -43,24 +43,20 @@ export async function sendGroupMessage(req, res) {
         const { conversationId, content } = req.body;
         const senderId = req.user._id;
         const conversation = req.conversation;
-
-    if (!content) {
-      return res.status(400).json("Missing content");
-    }
-
-    const message = await Message.create({
-        conversationId,
-        senderId,
-        content
-    });
-
-    updateConversationLastMessage(conversation, message, senderId);
-    await conversation.save();
-    emitNewMessage(io, conversation, message);
-    return res.status(201).json({ message });
-
-  } catch (error) {
+        if (!content) {
+            return res.status(400).json("Missing content");
+        }
+        const message = await Message.create({
+            conversationId,
+            senderId,
+            content
+        });
+        updateConversationLastMessage(conversation, message, senderId);
+        await conversation.save();
+        emitNewMessage(io, conversation, message);
+        return res.status(201).json({ message });
+    } catch (error) {
         console.error("An error occurred while sending a group message", error);
         return res.status(500).json({ message: "Internal server error" });
-  }
+    }
 }

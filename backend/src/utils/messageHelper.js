@@ -12,6 +12,7 @@ export const updateConversationLastMessage = async (conversation, message, sende
         const prevCount = conversation.unreadCounts?.get(memberId) || 0;
         conversation.unreadCounts.set(memberId, isSender ? 0 : prevCount + 1);
     });
+    conversation.seenBy = [senderId];
 };
 
 export const emitNewMessage = (io, conversation, message) => {
@@ -21,7 +22,6 @@ export const emitNewMessage = (io, conversation, message) => {
             _id: conversation._id,
             lastMessage: conversation.lastMessage,
             lastMessageAt: conversation.lastMessageAt,
-
         },
         unreadCounts: conversation.unreadCounts,
     });
