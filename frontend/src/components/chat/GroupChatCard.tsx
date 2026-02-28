@@ -37,6 +37,7 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 	const [openRename, setOpenRename] = useState(false);
 	const [groupNameDraft, setGroupNameDraft] = useState("");
 	const [loading, setLoading] = useState(false);
+	const [dropdownOpen, setDropdownOpen] = useState(false);
 
 	const currentGroupName = useMemo(() => convo.group?.name ?? "", [convo.group?.name]);
 
@@ -92,7 +93,7 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 
 	const menuNode = (
 		<Dialog open={openRename} onOpenChange={setOpenRename}>
-			<DropdownMenu>
+			<DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
 				<DropdownMenuTrigger asChild>
 					<button
 						type="button"
@@ -114,6 +115,7 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 					<DropdownMenuItem
 						onSelect={(e) => {
 							e.preventDefault();
+							setDropdownOpen(false);
 							onOpenRename();
 						}}
 					>

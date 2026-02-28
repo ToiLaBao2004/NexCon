@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
@@ -35,11 +35,24 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   const [openRename, setOpenRename] = useState(false);
   const [nickname, setNicknameValue] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const currentNickname = useMemo(() => {
+    const otherUser = convo.participants.find((p) => p.userId?._id?.toString() !== user?._id?.toString());
+    return otherUser?.userId?.nickname?.trim() ?? "";
+  }, [convo.participants, user?._id]);
+
+  useEffect(() => {
+    if (openRename) {
+      setNicknameValue(currentNickname);
+    }
+  }, [openRename, currentNickname]);
 
   if (!user) return null;
 
   const otherUser = convo.participants.find((p) => p.userId?._id?.toString() !== user._id.toString());
   if (!otherUser) return null;
+
   const displayName = otherUser?.userId?.nickname?.trim()
     ? otherUser.userId.nickname
     : otherUser?.userId?.displayName ?? "";
@@ -55,30 +68,33 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   }
 
   const onChangeNickname = () => {
-    setNicknameValue("")
     setOpenRename(true);
   };
+
   const onSubmitNickname = async () => {
     const value = nickname.trim()
     if (!value) return
+
+    if (value === currentNickname.trim()) {
+      setOpenRename(false);
+      return;
+    }
+
     const friendId = otherUser.userId?._id;
     if (!friendId) return;
 
     try {
       await setNickName(friendId, value);
-      console.log("Nickname updated successfully");
       setOpenRename(false);
-      setNicknameValue("");
-      fetchConversations(); // Refresh conversations list to update nickname display
+      fetchConversations();
     } catch (error) {
       console.error("Set nickname failed:", error);
     }
-    setOpenRename(false)
   }
 
   const menuNode = (
     <Dialog open={openRename} onOpenChange={setOpenRename}>
-      <DropdownMenu>
+      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <button
             type="button"
@@ -100,14 +116,15 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
           <DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault();
+              setDropdownOpen(false);
               onChangeNickname();
             }}
           >
             Đổi nickname
           </DropdownMenuItem>
-
         </DropdownMenuContent>
       </DropdownMenu>
+
       <DialogContent
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
@@ -123,12 +140,12 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
           placeholder="Nhập nickname mới"
           autoFocus
           onKeyDown={(e) => {
-            if (e.key === "Enter") onSubmitNickname()
+            if (e.key === "Enter" && !loading) onSubmitNickname()
           }}
         />
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setOpenRename(false)}>
+          <Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>
             Hủy
           </Button>
           <Button onClick={onSubmitNickname} disabled={!nickname.trim() || loading}>
@@ -139,39 +156,36 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     </Dialog>
   );
 
-  return <ChatCard
-    convoId={convo._id}
-    name={displayName}
-    timestamp={
-      convo.lastMessage?.createdAt ? new Date(convo.lastMessage.createdAt) : undefined
-    }
-    isActive={activeConversationId === convo._id}
-    onSelect={handleSelectConversation}
-    unreadCount={unreadCount}
-    rightSection={menuNode}
-    leftSection={
-      <>
-        <UserAvatar type="sidebar" name={displayName}
-          avatarUrl={otherUser.userId?.avatarUrl ?? undefined}
-        />
-        { /* todo: socket io */}
-        {onlineUsers.includes(otherUser?.userId?._id ?? "") && (
-          <StatusBadge status="online" />)}
-        {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
-      </>
-    }
-    subtitle={
-      <p className={cn(
-        "text-sm truncate",
-        unreadCount > 0 ? "font-medium text-foreground" : "text-muted-foreground"
-      )}
-      >
-        {lastMessage}
-      </p>
-
-    }
-
-  />;
+  return (
+    <ChatCard
+      convoId={convo._id}
+      name={displayName}
+      timestamp={convo.lastMessage?.createdAt ? new Date(convo.lastMessage.createdAt) : undefined}
+      isActive={activeConversationId === convo._id}
+      onSelect={handleSelectConversation}
+      unreadCount={unreadCount}
+      rightSection={menuNode}
+      leftSection={
+        <>
+          <UserAvatar
+            type="sidebar"
+            name={displayName}
+            avatarUrl={otherUser.userId?.avatarUrl ?? undefined}
+          />
+          {onlineUsers.includes(otherUser?.userId?._id ?? "") && <StatusBadge status="online" />}
+          {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
+        </>
+      }
+      subtitle={
+        <p className={cn(
+          "text-sm truncate",
+          unreadCount > 0 ? "font-medium text-foreground" : "text-muted-foreground"
+        )}>
+          {lastMessage}
+        </p>
+      }
+    />
+  );
 }
 
 export default DirectMessageCard
