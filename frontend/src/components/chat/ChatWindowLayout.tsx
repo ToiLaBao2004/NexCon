@@ -12,10 +12,13 @@ const ChatWindowLayout = () => {
     activeConversationId, 
     conversations, 
     messageLoading: loading, 
+    messages: allMessages,
     markAsSeen,
   } = useChatStore();
 
   const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
+
+  const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
 
   useEffect(() => {
     if(!selectedConvo) return;
@@ -34,7 +37,7 @@ const ChatWindowLayout = () => {
     return <ChatWelcomeScreen/>;
   }
 
-  if (loading) {
+  if (loading && !hasLoadedMessages) {
     return <ChatWindowSkeleton/>
   }
 return (
