@@ -78,7 +78,6 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 		try {
 			setLoading(true);
 			await updateGroupName(convo._id, value);
-			console.log(convo._id, value);
 
 			setOpenRename(false);
 
