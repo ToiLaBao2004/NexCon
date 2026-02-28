@@ -38,7 +38,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   if (!user) return null;
 
-  const otherUser = convo.participants.find((p) => p.userId?._id.toString() !== user._id.toString());
+  const otherUser = convo.participants.find((p) => p.userId?._id?.toString() !== user._id.toString());
   if (!otherUser) return null;
   const displayName = otherUser?.userId?.nickname?.trim()
     ? otherUser.userId.nickname

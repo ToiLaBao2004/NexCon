@@ -9,11 +9,11 @@ interface MessageItemProps {
     index: number;
     messages: Message[];
     selectedConvo: Conversation;
-    lastMessageStatus: "delivered" | "seen";
+    currentUserId: string;
 }
 
 
-const MessageItem = ({ message, index, messages, selectedConvo, lastMessageStatus }
+const MessageItem = ({ message, index, messages, selectedConvo, currentUserId }
     : MessageItemProps) => {
     const prev = messages[index - 1];
 
@@ -22,6 +22,10 @@ const MessageItem = ({ message, index, messages, selectedConvo, lastMessageStatu
         new Date(message.createdAt).getTime() - new Date(prev?.createdAt || 0).getTime() > 300000;
 
     const participant = selectedConvo.participants.find((p: Participant) => p.userId?._id?.toString() === message.senderId.toString())
+
+    const seenByOthers = selectedConvo.seenBy?.filter(
+        (s: any) => (typeof s === 'string' ? s : s._id?.toString()) !== currentUserId
+    ) ?? [];
 
     return (
         <div
@@ -63,17 +67,33 @@ const MessageItem = ({ message, index, messages, selectedConvo, lastMessageStatu
                 )}
 
                 {/* seen/delivered */}
-                {message.isOwn && message._id === selectedConvo.lastMessage?._id && (
-                    <Badge
-                        variant='outline'
-                        className={cn("text-xs px-1.5 py-0.5 h-4 border-0", lastMessageStatus === 'seen'
-                            ? "bg-primary/20 text-primary"
-                            : "bg-muted text-muted-foreground"
-                        )}
-                    >
-                        {lastMessageStatus}
-                    </Badge>
-                )}
+                {message.isOwn && index === messages.length - 1 && (
+                  <div className="flex items-center gap-1">
+                      {seenByOthers.length > 0 ? (
+                          seenByOthers.map((seenId) => {
+                              const seenUserId = typeof seenId === 'string' ? seenId : (seenId as any)._id?.toString();
+                              const seenParticipant = selectedConvo.participants.find(
+                                  (p) => p.userId?._id?.toString() === seenUserId
+                              );
+                              return seenParticipant ? (
+                                  <UserAvatar
+                                      key={seenUserId}
+                                      type="seen"
+                                      name={seenParticipant.userId.displayName ?? ""}
+                                      avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
+                                  />
+                              ) : null;
+                          })
+                      ) : (
+                          <Badge
+                              variant='outline'
+                              className="text-xs px-1.5 py-0.5 h-4 border-0 bg-muted text-muted-foreground"
+                          >
+                              delivered
+                          </Badge>
+                      )}
+                  </div>
+              )}
 
 
             </div>
