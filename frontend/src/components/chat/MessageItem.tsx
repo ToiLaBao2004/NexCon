@@ -48,7 +48,7 @@ const MessageItem = ({ message, index, messages, selectedConvo, currentUserId }
             {/* tin nhắn */}
             <div
                 className={cn("max-w-xs lg:max-w-md space-y-1 flex flex-col",
-                    message.isOwn ? "items-end" : "item-start"
+                    message.isOwn ? "items-end" : "items-start"
                 )}
             >
                 <Card className={cn("p-3", message.isOwn ? "chat-bubble-sent border-0"
@@ -61,7 +61,7 @@ const MessageItem = ({ message, index, messages, selectedConvo, currentUserId }
 
                 {/* time */}
                 {isGroupBreak && (
-                    <span className="text-xs text-mutd-foreground px-1">
+                    <span className="text-xs text-muted-foreground px-1">
                         {formatMessageTime(new Date(message.createdAt))}
                     </span>
                 )}
