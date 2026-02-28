@@ -59,9 +59,9 @@ const conversationSchema = new mongoose.Schema({
         ref: 'User'
     }],
     unreadCounts: {
-      type: Map,
-      of: Number,
-      default: () => new Map(),
+        type: Map,
+        of: Number,
+        default: () => new Map(),
     },
 }, { timestamps: true });
 
