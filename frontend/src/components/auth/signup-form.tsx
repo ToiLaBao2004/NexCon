@@ -26,11 +26,11 @@ export function SignupForm({
   const { verifyValidFieldsSignUp } = useAuthStore();
   const { sendOtpCreateUser } = useOTPStore();
   const navigate = useNavigate();
-  const {register, handleSubmit, formState: {errors, isSubmitting}, setError} = useForm<SignUpFormValues>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
   });
   const onSubmit = async (data: SignUpFormValues) => {
-    const {firstname, lastname, email, password} = data;
+    const { firstname, lastname, email, password } = data;
     try {
       await verifyValidFieldsSignUp(email, password);
       await sendOtpCreateUser(email);
@@ -58,62 +58,62 @@ export function SignupForm({
         <CardContent className="grid p-0 md:grid-cols-2">
           <form className="p-6 md:p-8" onSubmit={handleSubmit(onSubmit)}>
             <div className="flex flex-col gap-6"></div>
-              {/* header - logo */}
-              <div className="flex flex-col items-center text-center gap-2">
-                <a href="/" className="mx-auto block w-fit text-center">
-                  <img src="/logo.svg" alt="logo" />
-                </a>
-                <h1 className="text-2xl font-bold">Create a Moji account</h1>
-                <p className="text-sm text-muted-foreground text-balance">
-                  Start your journey with Moji today!
-                </p>
-              </div>
-              {/* name */}
-              <div className="grid grid-cols-2 gap-3 mt-3">
-                <div className="space-y-2">
-                  <Label htmlFor="lastname" className="block text-sm">
-                    Last Name
-                  </Label>
-                  <Input id="lastname" type="text" placeholder="Last Name" {...register("lastname")} />
-                  {/* todo: error message */}
-                  {errors.lastname && <p className="text-sm text-destructive">{errors.lastname.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="firstname" className="block text-sm">
-                    First Name
-                  </Label>
-                  <Input id="firstname" type="text" placeholder="First Name" {...register("firstname")} />
-                  {/* todo: error message */}
-                  {errors.firstname && <p className="text-sm text-destructive">{errors.firstname.message}</p>}
-                </div>
-              </div>
-              {/* email */}
-              <div className="flex flex-col gap-2 mt-3">
-                <Label htmlFor="email" className="block text-sm">
-                  Email
+            {/* header - logo */}
+            <div className="flex flex-col items-center text-center gap-2">
+              <a href="/" className="mx-auto block w-fit text-center">
+                <img src="/logo.svg" alt="logo" />
+              </a>
+              <h1 className="text-2xl font-bold">Create a NexCon account</h1>
+              <p className="text-sm text-muted-foreground text-balance">
+                Start your journey with NexCon today!
+              </p>
+            </div>
+            {/* name */}
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <div className="space-y-2">
+                <Label htmlFor="lastname" className="block text-sm">
+                  Last Name
                 </Label>
-                <Input id="email" type="text" placeholder="moji@gmail.com" {...register("email")} />
+                <Input id="lastname" type="text" placeholder="Last Name" {...register("lastname")} />
                 {/* todo: error message */}
-                {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+                {errors.lastname && <p className="text-sm text-destructive">{errors.lastname.message}</p>}
               </div>
-              {/* password */}
-              <div className="flex flex-col gap-2 mt-3">
-                <Label htmlFor="password" className="block text-sm">
-                  Password
+              <div className="space-y-2">
+                <Label htmlFor="firstname" className="block text-sm">
+                  First Name
                 </Label>
-                <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
+                <Input id="firstname" type="text" placeholder="First Name" {...register("firstname")} />
                 {/* todo: error message */}
-                {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+                {errors.firstname && <p className="text-sm text-destructive">{errors.firstname.message}</p>}
               </div>
-              {/* submit button */}
-              <Button type="submit" className="w-full mt-5" disabled={isSubmitting}>
-                Submit
-              </Button>
-              {/* global error message */}
-              {errors.root && <p className="text-sm text-destructive mt-2">{errors.root.message}</p>}
-              <div className="text-center text-sm mt-3">
-                Already have an account?{" "}<a href="/signin" className="underline underline-offset-4 hover:text-primary">Log in</a>
-              </div>
+            </div>
+            {/* email */}
+            <div className="flex flex-col gap-2 mt-3">
+              <Label htmlFor="email" className="block text-sm">
+                Email
+              </Label>
+              <Input id="email" type="text" placeholder="nexcon@gmail.com" {...register("email")} />
+              {/* todo: error message */}
+              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+            </div>
+            {/* password */}
+            <div className="flex flex-col gap-2 mt-3">
+              <Label htmlFor="password" className="block text-sm">
+                Password
+              </Label>
+              <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
+              {/* todo: error message */}
+              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+            </div>
+            {/* submit button */}
+            <Button type="submit" className="w-full mt-5" disabled={isSubmitting}>
+              Submit
+            </Button>
+            {/* global error message */}
+            {errors.root && <p className="text-sm text-destructive mt-2">{errors.root.message}</p>}
+            <div className="text-center text-sm mt-3">
+              Already have an account?{" "}<a href="/signin" className="underline underline-offset-4 hover:text-primary">Log in</a>
+            </div>
           </form>
           <div className="bg-muted relative hidden md:block">
             <img
