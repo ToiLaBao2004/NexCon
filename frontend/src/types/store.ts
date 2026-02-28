@@ -11,15 +11,15 @@ export interface ChatState {
   conversations: Conversation[];
   messages: Record<string, {
     items: Message[],
-    hasMore: boolean, 
+    hasMore: boolean,
     nextCursor?: string | null,
   }>;
-  activeConversationId: string | null; 
+  activeConversationId: string | null;
   convoLoading: boolean;
   messageLoading: boolean;
   reset: () => void;
 
-  setActiveConversation: (id:string | null ) => void;
+  setActiveConversation: (id: string | null) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
   sendDirectMessage: (
@@ -38,6 +38,7 @@ export interface ChatState {
   // update conversation
   updateConversation: (conversation: Conversation) => void;
   markAsSeen: () => Promise<void>;
+  updateGroupName: (conversationId: string, name: string) => Promise<void>;
 }
 
 export interface SocketState {
