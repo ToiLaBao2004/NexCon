@@ -140,7 +140,7 @@ export const useChatStore = create<ChatState>()(
             },
             updateConversation: (conversation) => {
                 set((state) => ({
-                    conversations: state.conversations.map((c) => c._id === conversation._id ? {...c, ...conversation}: c)
+                    conversations: state.conversations.map((c) => c._id === conversation._id ? {...c, ...conversation,participants: c.participants,}: c)
                 }));
             },
             markAsSeen: async () => {

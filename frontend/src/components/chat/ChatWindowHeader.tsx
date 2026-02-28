@@ -26,7 +26,7 @@ const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
 	}
 
 	if (chat?.type === "direct") {
-		const otherUsers = chat.participants.filter((p) => p.userId?._id.toString() !== user?._id.toString());
+		const otherUsers = chat.participants.filter((p) => p.userId?._id?.toString() !== user?._id.toString());
 		otherUser = otherUsers.length > 0 ? otherUsers[0] : null;
 
 		if (!user || !otherUser) return;
