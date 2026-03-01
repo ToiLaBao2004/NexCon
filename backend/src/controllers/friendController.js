@@ -180,6 +180,28 @@ export async function resendFriendRequest(req, res) {
     }
 }
 
+export async function cancelFriendRequest(req, res) {
+    try {
+        const sender = req.user;
+        const { requestId } = req.params;
+        const friendRequest = await FriendRequest.findById(requestId);
+        if (!friendRequest) {
+            return res.status(404).json({ message: 'Friend request not found.' });
+        }
+        if (friendRequest.from.toString() !== sender._id.toString()) {
+            return res.status(403).json({ message: 'You are not authorized to cancel this friend request.' });
+        }
+        if (friendRequest.status !== 'pending') {
+            return res.status(400).json({ message: 'This friend request is no longer pending.' });
+        }
+        await FriendRequest.deleteOne({ _id: requestId });
+        return res.status(200).json({ message: 'Friend request canceled successfully.' });
+    } catch (error) {
+        console.error('Cancel friend request error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
 export async function getFriendRequests(req, res) {
     try {
         const user = req.user;
