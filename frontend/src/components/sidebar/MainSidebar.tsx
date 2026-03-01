@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useThemeStore } from "@/stores/useThemeStore";
+import { useFriendStore } from "@/stores/useFriendStore";
 import { useNavigate, useLocation } from "react-router";
 import {
     Avatar,
@@ -33,8 +34,11 @@ import { cn } from "@/lib/utils";
 const MainSidebar = () => {
     const { user, signOut } = useAuthStore();
     const { isDark, toggleTheme } = useThemeStore();
+    const { incomingRequests } = useFriendStore();
     const navigate = useNavigate();
     const location = useLocation();
+
+    const notificationCount = incomingRequests.length;
 
     const handleLogout = async () => {
         try {
@@ -127,11 +131,12 @@ const MainSidebar = () => {
                                 )}
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans">Tin nhắn</TooltipContent>
+                        <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-white text-black">Chat</TooltipContent>
                     </Tooltip>
 
                     {navItems.map((item) => {
                         const active = isPathActive(item.path);
+                        const badgeCount = item.id === "notification" ? notificationCount : 0;
                         return (
                             <Tooltip key={item.id}>
                                 <TooltipTrigger asChild>
@@ -149,6 +154,11 @@ const MainSidebar = () => {
                                             "absolute -left-3 w-1 bg-primary rounded-r-full transition-all duration-300 top-1/2 -translate-y-1/2",
                                             active ? "h-6 opacity-100" : "h-0 opacity-0 group-hover:h-6 group-hover:opacity-100"
                                         )} />
+                                        {badgeCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold shadow-md border-2 border-card animate-in zoom-in duration-200">
+                                                {badgeCount > 99 ? "99+" : badgeCount}
+                                            </span>
+                                        )}
                                     </Button>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-popover text-popover-foreground shadow-soft border-border/50">

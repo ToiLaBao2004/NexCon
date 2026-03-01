@@ -3,6 +3,7 @@ import User from '../models/userModel.js';
 import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
+import { io, getReceiverSocketId } from "../socket/index.js";
 
 export async function sendFriendRequest(req, res) {
     try {
@@ -43,6 +44,33 @@ export async function sendFriendRequest(req, res) {
         if (existingRequest) {
             return res.status(400).json({ message: 'You already sent a friend request to this user.' });
         }
+        const rejectedRequest = await FriendRequest.findOne({
+            from: sender._id,
+            to: receiver._id,
+            status: 'rejected'
+        });
+        if (rejectedRequest) {
+            rejectedRequest.status = 'pending';
+            rejectedRequest.message = message ? message.trim().slice(0, 300) : undefined;
+            await rejectedRequest.save();
+            const notification = new Notification({
+                userId: receiver._id,
+                title: "New Friend Request",
+                content: `${sender.displayName} has sent you a friend request. ${message ? `"${message}"` : ""}`,
+                linkUrl: `${process.env.FRONTEND_URL}/friends/requests`,
+                isRead: false
+            });
+            await notification.save();
+            const populatedRequest = await FriendRequest.findById(rejectedRequest._id)
+                .populate('from', 'displayName email avatarUrl');
+            const receiverSocketId = getReceiverSocketId(receiver._id.toString());
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("new-friend-request", {
+                    friendRequest: populatedRequest
+                });
+            }
+            return res.status(201).json({ message: `You sent a friend request to ${receiver.displayName} successfully.` });
+        }
         const reverseRequest = await FriendRequest.findOne({
             from: receiver._id,
             to: sender._id,
@@ -63,6 +91,13 @@ export async function sendFriendRequest(req, res) {
                 isRead: false
             });
             await notification.save();
+            const receiverSocketId = getReceiverSocketId(receiver._id.toString());
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("friend-request-accepted", {
+                    from: { _id: sender._id, displayName: sender.displayName },
+                    message: `${sender.displayName} accepted your friend request.`
+                });
+            }
             return res.status(201).json({ message: `You and ${receiver.displayName} are now friends.` });
         }
         const friendRequest = new FriendRequest({
@@ -80,6 +115,14 @@ export async function sendFriendRequest(req, res) {
             isRead: false
         });
         await notification.save();
+        const populatedRequest = await FriendRequest.findById(friendRequest._id)
+            .populate('from', 'displayName email avatarUrl');
+        const receiverSocketId = getReceiverSocketId(receiver._id.toString());
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("new-friend-request", {
+                friendRequest: populatedRequest
+            });
+        }
         return res.status(201).json({ message: `You sent a friend request to ${receiver.displayName} successfully.` });
     } catch (error) {
         console.error('Send friend request error:', error);
@@ -117,7 +160,30 @@ export async function acceptFriendRequest(req, res) {
             isRead: false
         });
         await notification.save();
-        return res.status(200).json({ message: `You accepted the friend request from ${sender.displayName}.` });
+        const senderSocketId = getReceiverSocketId(sender._id.toString());
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("friend-request-accepted", {
+                from: { _id: receiver._id, displayName: receiver.displayName, avatarUrl: receiver.avatarUrl },
+                message: `${receiver.displayName} đã chấp nhận lời mời kết bạn của bạn!`,
+                newFriend: {
+                    _id: newFriend._id,
+                    friendId: receiver._id,
+                    displayName: receiver.displayName,
+                    avatarUrl: receiver.avatarUrl,
+                    createdAt: newFriend.createdAt
+                }
+            });
+        }
+        return res.status(200).json({
+            message: `You accepted the friend request from ${sender.displayName}.`,
+            newFriend: {
+                _id: newFriend._id,
+                friendId: sender._id,
+                displayName: sender.displayName,
+                avatarUrl: sender.avatarUrl,
+                createdAt: newFriend.createdAt
+            }
+        });
     } catch (error) {
         console.error('Accept friend request error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -141,6 +207,13 @@ export async function rejectFriendRequest(req, res) {
         const sender = await User.findById(friendRequest.from);
         friendRequest.status = 'rejected';
         await friendRequest.save();
+        const senderSocketId = getReceiverSocketId(sender._id.toString());
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("friend-request-rejected", {
+                from: { _id: receiver._id, displayName: receiver.displayName },
+                message: `${receiver.displayName} đã từ chối lời mời kết bạn của bạn.`
+            });
+        }
         return res.status(200).json({ message: `You rejected the friend request from ${sender.displayName}.` });
     } catch (error) {
         console.error('Reject friend request error:', error);
@@ -194,7 +267,14 @@ export async function cancelFriendRequest(req, res) {
         if (friendRequest.status !== 'pending') {
             return res.status(400).json({ message: 'This friend request is no longer pending.' });
         }
+        const receiverId = friendRequest.to.toString();
         await FriendRequest.deleteOne({ _id: requestId });
+        const receiverSocketId = getReceiverSocketId(receiverId);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("friend-request-cancelled", {
+                requestId
+            });
+        }
         return res.status(200).json({ message: 'Friend request canceled successfully.' });
     } catch (error) {
         console.error('Cancel friend request error:', error);

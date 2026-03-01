@@ -1,5 +1,6 @@
 import type { Socket } from "socket.io-client";
 import type { Conversation, Message } from "./chat";
+import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
 
 export interface ThemeState {
   isDark: boolean;
@@ -32,10 +33,7 @@ export interface ChatState {
     content: string,
     imgUrl?: string
   ) => Promise<void>;
-  // add message
   addMessage: (message: Message) => Promise<void>;
-
-  // update conversation
   updateConversation: (conversation: Conversation) => void;
   markAsSeen: () => Promise<void>;
   updateGroupName: (conversationId: string, name: string) => Promise<void>;
@@ -46,4 +44,25 @@ export interface SocketState {
   onlineUsers: string[];
   connectSocket: () => void;
   disconnectSocket: () => void;
+}
+
+export interface FriendState {
+  loading: boolean;
+  sendingRequest: boolean;
+  friends: FriendItem[];
+  incomingRequests: FriendRequest[];
+  sentRequests: SentFriendRequest[];
+  fetchFriends: () => Promise<void>;
+  fetchIncomingRequests: () => Promise<void>;
+  fetchSentRequests: () => Promise<void>;
+  setNickName: (friendId: string, nickName: string) => Promise<void>;
+  sendFriendRequest: (email: string, message?: string) => Promise<void>;
+  cancelFriendRequest: (requestId: string) => Promise<void>;
+  acceptFriendRequest: (requestId: string) => Promise<void>;
+  rejectFriendRequest: (requestId: string) => Promise<void>;
+  addIncomingRequest: (request: FriendRequest) => void;
+  removeIncomingRequest: (requestId: string) => void;
+  addSentRequest: (request: SentFriendRequest) => void;
+  removeSentRequest: (requestId: string) => void;
+  addFriend: (friend: FriendItem) => void;
 }

@@ -17,6 +17,7 @@ import { useThemeStore } from "./stores/useThemeStore";
 import { useEffect } from "react";
 import { useAuthStore } from "./stores/useAuthStore";
 import { useSocketStore } from "./stores/useSocketStore";
+import { useFriendStore } from "./stores/useFriendStore";
 
 function App() {
   const { isDark, setTheme } = useThemeStore();
@@ -30,6 +31,9 @@ function App() {
   useEffect(() => {
     if (accessToken) {
       connectSocket();
+      useFriendStore.getState().fetchIncomingRequests();
+      useFriendStore.getState().fetchFriends();
+      useFriendStore.getState().fetchSentRequests();
     }
 
     return () => disconnectSocket();

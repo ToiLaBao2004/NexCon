@@ -43,4 +43,8 @@ io.on("connection", async (socket) => {
     });
 })
 
-export { io, app, server };
+function getReceiverSocketId(userId) {
+    return onlineUsers.get(userId);
+}
+
+export { io, app, server, getReceiverSocketId };

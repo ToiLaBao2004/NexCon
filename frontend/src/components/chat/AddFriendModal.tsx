@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { UserPlus, Search, Loader2, X, UserX } from "lucide-react";
+import { UserPlus, Search, Loader2, X, UserX, UserMinus } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSocketStore } from "@/stores/useSocketStore";
+import { useFriendStore } from "@/stores/useFriendStore";
 
 interface SearchedUser {
   _id: string;
@@ -26,8 +27,15 @@ const AddFriendModal = () => {
   const [user, setUser] = useState<SearchedUser | null>(null);
   const [status, setStatus] = useState<SearchStatus>("idle");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socket = useSocketStore((state) => state.socket);
+  const { sendFriendRequest, cancelFriendRequest, sentRequests, fetchSentRequests } = useFriendStore();
+
+  const pendingRequest = user
+    ? sentRequests.find((r) => r.to._id === user._id)
+    : null;
+  const hasPendingRequest = !!pendingRequest;
 
   useEffect(() => {
     if (!socket) return;
@@ -74,6 +82,95 @@ const AddFriendModal = () => {
     setQuery("");
     setUser(null);
     setStatus("idle");
+  };
+
+  const handleSendRequest = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!user || actionLoading) return;
+    try {
+      setActionLoading(true);
+      await sendFriendRequest(user.email);
+      await fetchSentRequests();
+    } catch {
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelRequest = async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!pendingRequest || actionLoading) return;
+    try {
+      setActionLoading(true);
+      await cancelFriendRequest(pendingRequest._id);
+    } catch {
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDialogChange = (open: boolean) => {
+    setIsDialogOpen(open);
+  };
+
+  const renderRequestButton = () => {
+    if (actionLoading) {
+      return (
+        <Button disabled className="mt-6 w-full gap-2 rounded-xl h-12 font-semibold">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Đang xử lý...
+        </Button>
+      );
+    }
+
+    if (hasPendingRequest) {
+      return (
+        <Button
+          onClick={handleCancelRequest}
+          variant="outline"
+          className="mt-6 w-full gap-2 rounded-xl h-12 font-semibold border-destructive/30 text-destructive hover:bg-destructive/10 hover:border-destructive/50 transition-all active:scale-[0.98]"
+        >
+          <UserMinus className="h-4 w-4" />
+          Hủy lời mời kết bạn
+        </Button>
+      );
+    }
+
+    return (
+      <Button
+        onClick={handleSendRequest}
+        className="mt-6 w-full gap-2 rounded-xl h-12 shadow-glow hover:shadow-primary/20 transition-all active:scale-[0.98] font-semibold"
+      >
+        <UserPlus className="h-4 w-4 text-white" />
+        Gửi lời mời kết bạn
+      </Button>
+    );
+  };
+
+  const renderSmallIcon = () => {
+    if (actionLoading) {
+      return <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />;
+    }
+    if (hasPendingRequest) {
+      return (
+        <button
+          onClick={handleCancelRequest}
+          className="p-1 rounded-full hover:bg-destructive/10 transition-colors shrink-0"
+          title="Hủy lời mời"
+        >
+          <UserMinus className="h-4 w-4 text-destructive" />
+        </button>
+      );
+    }
+    return (
+      <button
+        onClick={handleSendRequest}
+        className="p-1 rounded-full hover:bg-primary/10 transition-colors shrink-0"
+        title="Gửi lời mời kết bạn"
+      >
+        <UserPlus className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+      </button>
+    );
   };
 
   return (
@@ -125,9 +222,9 @@ const AddFriendModal = () => {
 
       {status === "found" && user && (
         <>
-          <button
-            onClick={() => setIsDialogOpen(true)}
-            className="mt-2 w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border/60 bg-card hover:bg-muted/50 hover:border-primary/30 transition-all duration-150 animate-in fade-in slide-in-from-top-1 duration-200 group text-left"
+          <div
+            onClick={() => handleDialogChange(true)}
+            className="mt-2 w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border/60 bg-card hover:bg-muted/50 hover:border-primary/30 transition-all duration-150 animate-in fade-in slide-in-from-top-1 duration-200 group text-left cursor-pointer"
           >
             <Avatar className="h-8 w-8 shrink-0">
               <AvatarImage src={user.avatarUrl} />
@@ -139,10 +236,10 @@ const AddFriendModal = () => {
               <p className="text-sm font-semibold text-foreground truncate">{user.displayName}</p>
               <p className="text-xs text-muted-foreground truncate">{user.email}</p>
             </div>
-            <UserPlus className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-          </button>
+            {renderSmallIcon()}
+          </div>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
             <DialogContent className="sm:max-w-md border-primary/10 shadow-glow">
               <DialogHeader>
                 <DialogTitle className="text-xl font-bold flex items-center gap-2">
@@ -170,10 +267,7 @@ const AddFriendModal = () => {
                       <p className="text-xs text-muted-foreground/80 mt-0.5 font-medium">{user.phone}</p>
                     )}
                   </div>
-                  <Button className="mt-6 w-full gap-2 rounded-xl h-12 shadow-glow hover:shadow-primary/20 transition-all active:scale-[0.98] font-semibold">
-                    <UserPlus className="h-4 w-4 text-white" />
-                    Gửi lời mời kết bạn
-                  </Button>
+                  {renderRequestButton()}
                 </div>
               </div>
             </DialogContent>
