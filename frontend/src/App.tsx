@@ -1,5 +1,10 @@
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Route, Routes, Navigate } from "react-router";
+import AppLayout from "./layouts/AppLayout";
 import ChatAppPage from "./pages/ChatAppPage";
+import MeetPage from "./pages/MeetPage";
+import PeoplePage from "./pages/PeoplePage";
+import ReminderPage from "./pages/ReminderPage";
+import NotificationPage from "./pages/NotificationPage";
 import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
 import OtpPage from "./pages/OtpPage";
@@ -14,9 +19,9 @@ import { useAuthStore } from "./stores/useAuthStore";
 import { useSocketStore } from "./stores/useSocketStore";
 
 function App() {
-  const {isDark, setTheme} = useThemeStore();
-  const {accessToken} = useAuthStore();
-  const {connectSocket, disconnectSocket} = useSocketStore();
+  const { isDark, setTheme } = useThemeStore();
+  const { accessToken } = useAuthStore();
+  const { connectSocket, disconnectSocket } = useSocketStore();
 
   useEffect(() => {
     setTheme(isDark);
@@ -33,21 +38,26 @@ function App() {
   return (
     <>
       <Toaster richColors />
-        <BrowserRouter>
-          <Routes>
-            {/* public routes */}
-            <Route path="/signin" element={<SignInPage />} />
-            <Route path="/signup" element={<SignUpPage />} />
-            <Route path="/otp" element={<OtpPage />} />
-            <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
-            <Route path="/reset-password" element={<ResetPassPage />} />
-            <Route path="/oauth-success" element={<OAuthSuccess />} />
-            {/* private routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<ChatAppPage />} />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/signup" element={<SignUpPage />} />
+          <Route path="/otp" element={<OtpPage />} />
+          <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
+          <Route path="/reset-password" element={<ResetPassPage />} />
+          <Route path="/oauth-success" element={<OAuthSuccess />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppLayout />}>
+              <Route path="/chat" element={<ChatAppPage />} />
+              <Route path="/meet" element={<MeetPage />} />
+              <Route path="/people" element={<PeoplePage />} />
+              <Route path="/reminder" element={<ReminderPage />} />
+              <Route path="/notification" element={<NotificationPage />} />
+              <Route path="/" element={<Navigate to="/chat" replace />} />
             </Route>
-          </Routes>
-        </BrowserRouter>
+          </Route>
+        </Routes>
+      </BrowserRouter>
     </>
   );
 }
