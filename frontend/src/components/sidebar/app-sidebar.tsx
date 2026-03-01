@@ -20,6 +20,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarContent className="beautiful-scrollbar overflow-x-hidden">
+        <AddFriendModal />
         <SidebarGroup>
           <SidebarGroupContent>
             <CreateNewChat />
@@ -42,9 +43,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupLabel className="uppercase">
             bạn bè
           </SidebarGroupLabel>
-          <SidebarGroupAction title="Kết bạn" className="cursor-pointer">
-            <AddFriendModal />
-          </SidebarGroupAction>
           <SidebarGroupContent>
             <DirectMessageList />
           </SidebarGroupContent>
