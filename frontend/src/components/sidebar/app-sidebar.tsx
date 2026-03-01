@@ -60,7 +60,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       { /* Content */}
-      <SidebarContent className="beautiful-scrollbar">
+      <SidebarContent className="beautiful-scrollbar overflow-x-hidden">
         { /* New Chat */}
         <SidebarGroup>
           <SidebarGroupContent>
@@ -97,7 +97,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
 
       {/* Footer */}
-      <SidebarFooter>
+      <SidebarFooter className="border-t-2 border-border/50 pt-2">
         {user && <NavUser user={user} />}
       </SidebarFooter>
     </Sidebar>
