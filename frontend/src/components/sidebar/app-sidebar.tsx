@@ -16,10 +16,18 @@ import GroupChatList from "../chat/GroupChatList"
 import AddFriendModal from "../chat/AddFriendModal"
 import DirectMessageList from "../chat/DirectMessageList"
 
+import { cn } from "@/lib/utils"
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar variant="inset" {...props}>
-      <SidebarContent className="beautiful-scrollbar overflow-x-hidden bg-transparent">
+    <Sidebar
+      {...props}
+      className={cn(
+        "bg-card border border-border/40 rounded-2xl shadow-soft overflow-hidden",
+        props.className
+      )}
+    >
+      <SidebarContent className="beautiful-scrollbar overflow-x-hidden">
         <AddFriendModal />
         <SidebarGroup>
           <SidebarGroupContent>
