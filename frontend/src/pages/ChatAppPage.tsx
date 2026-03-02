@@ -4,11 +4,15 @@ import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
 
 const ChatAppPage = () => {
   return (
-    <SidebarProvider className="flex-1 w-full h-full relative">
+    <SidebarProvider
+      style={{ "--sidebar-width": "300px" } as React.CSSProperties}
+      className="flex h-full w-full relative min-h-0"
+    >
       <AppSidebar
-        className="md:left-[80px] top-2 bottom-2 h-[calc(100vh-16px)]"
+        collapsible="none"
+        className="h-full"
       />
-      <main className="flex-1 min-w-0 bg-card/20 rounded-2xl overflow-hidden shadow-soft border border-border/40 ml-0 md:ml-2">
+      <main className="flex-1 min-w-0 bg-card rounded-2xl overflow-hidden shadow-soft border border-border/40 ml-2 h-full">
         <ChatWindowLayout />
       </main>
     </SidebarProvider>
