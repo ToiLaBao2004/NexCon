@@ -19,7 +19,7 @@ import DirectMessageList from "../chat/DirectMessageList"
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar variant="inset" {...props}>
-      <SidebarContent className="beautiful-scrollbar overflow-x-hidden">
+      <SidebarContent className="beautiful-scrollbar overflow-x-hidden bg-transparent">
         <AddFriendModal />
         <SidebarGroup>
           <SidebarGroupContent>

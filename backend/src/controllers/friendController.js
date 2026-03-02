@@ -57,7 +57,7 @@ export async function sendFriendRequest(req, res) {
                 userId: receiver._id,
                 title: "New Friend Request",
                 content: `${sender.displayName} has sent you a friend request. ${message ? `"${message}"` : ""}`,
-                linkUrl: `${process.env.FRONTEND_URL}/friends/requests`,
+                linkUrl: `${process.env.FRONTEND_URL}/people`,
                 isRead: false
             });
             await notification.save();
@@ -87,7 +87,7 @@ export async function sendFriendRequest(req, res) {
                 userId: receiver._id,
                 title: "Friend Request Accepted",
                 content: `${sender.displayName} accepted your friend request.`,
-                linkUrl: `${process.env.FRONTEND_URL}/friends`,
+                linkUrl: `${process.env.FRONTEND_URL}/people`,
                 isRead: false
             });
             await notification.save();
@@ -111,7 +111,7 @@ export async function sendFriendRequest(req, res) {
             userId: receiver._id,
             title: "New Friend Request",
             content: `${sender.displayName} has sent you a friend request. ${message ? `"${message}"` : ""}`,
-            linkUrl: `${process.env.FRONTEND_URL}/friends/requests`,
+            linkUrl: `${process.env.FRONTEND_URL}/people`,
             isRead: false
         });
         await notification.save();
@@ -156,7 +156,7 @@ export async function acceptFriendRequest(req, res) {
             userId: sender._id,
             title: "Friend Request Accepted",
             content: `${receiver.displayName} accepted your friend request.`,
-            linkUrl: `${process.env.FRONTEND_URL}/friends`,
+            linkUrl: `${process.env.FRONTEND_URL}/people`,
             isRead: false
         });
         await notification.save();
@@ -242,7 +242,7 @@ export async function resendFriendRequest(req, res) {
             userId: receiver._id,
             title: "Friend Request Resent",
             content: `${sender.displayName} resent you friend request.`,
-            linkUrl: `${process.env.FRONTEND_URL}/friends/requests`,
+            linkUrl: `${process.env.FRONTEND_URL}/people`,
             isRead: false
         });
         await notification.save();
