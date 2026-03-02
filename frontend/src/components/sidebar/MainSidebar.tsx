@@ -136,7 +136,8 @@ const MainSidebar = () => {
 
                     {navItems.map((item) => {
                         const active = isPathActive(item.path);
-                        const badgeCount = item.id === "notification" ? notificationCount : 0;
+                                        // show incoming friend request count on the People tab instead of Notification
+                                        const badgeCount = item.id === "people" ? notificationCount : 0;
                         return (
                             <Tooltip key={item.id}>
                                 <TooltipTrigger asChild>

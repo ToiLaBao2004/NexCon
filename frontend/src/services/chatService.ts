@@ -38,4 +38,8 @@ export const chatService = {
 		const res = await api.put(`/conversations/${conversationId}/update-group-name`, { name });
 		return res.data;
 	},
+	async createConversation(type: 'direct' | 'group', memberIds: string[], name?: string) {
+		const res = await api.post('/conversations/create-conversation', { type, memberIds, name });
+		return res.data;
+	},
 };
