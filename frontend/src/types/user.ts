@@ -10,16 +10,38 @@ export interface User {
   updatedAt?: string;
 }
 
-export interface Friend {
+export interface FriendItem {
   _id: string;
-  username: string;
+  friendId: string;
   displayName: string;
   avatarUrl?: string;
+  nickname?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface FriendRequest {
-  id: string;
-  username: string;
-  displayName: string;
-  avatarUrl?: string;
+  _id: string;
+  from: {
+    _id: string;
+    displayName: string;
+    email: string;
+    avatarUrl: string;
+  };
+  message?: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface SentFriendRequest {
+  _id: string;
+  to: {
+    _id: string;
+    displayName: string;
+    email: string;
+    avatarUrl: string;
+  };
+  message?: string;
+  status: string;
+  createdAt: string;
 }

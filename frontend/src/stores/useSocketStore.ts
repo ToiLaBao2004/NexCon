@@ -1,8 +1,10 @@
-import {create} from 'zustand';
-import {io, type Socket} from 'socket.io-client';
-import {useAuthStore} from "./useAuthStore";
-import type {SocketState} from "@/types/store";
+import { create } from 'zustand';
+import { io, type Socket } from 'socket.io-client';
+import { useAuthStore } from "./useAuthStore";
+import type { SocketState } from "@/types/store";
 import { useChatStore } from './useChatStore';
+import { useFriendStore } from './useFriendStore';
+import { toast } from 'sonner';
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -16,23 +18,21 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         if (existingSocket) return;
 
         const socket: Socket = io(baseURL, {
-            auth: {token: accessToken},
+            auth: { token: accessToken },
             transports: ["websocket"]
         });
 
-        set({socket});
+        set({ socket });
 
         socket.on("connect", () => {
             console.log("Connected to Socket");
         });
 
-        // online Users
         socket.on("online-users", (userIds) => {
-            set ({onlineUsers: userIds});
+            set({ onlineUsers: userIds });
         });
 
-        // new message 
-        socket.on("new-message",({message, conversation, unreadCounts}) => {
+        socket.on("new-message", ({ message, conversation, unreadCounts }) => {
             useChatStore.getState().addMessage(message);
             const lastMessage = {
                 _id: conversation.lastMessage._id,
@@ -48,8 +48,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
                 ...conversation,
                 lastMessage,
                 unreadCounts
-            }       
-            
+            }
+
             if (useChatStore.getState().activeConversationId === message.conversationId) {
                 useChatStore.getState().markAsSeen();
             }
@@ -57,22 +57,46 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             useChatStore.getState().updateConversation(updatedConversation);
         })
 
-        //read message
-        socket.on("read-message", ({conversationId, lastMessage}) => {
+        socket.on("read-message", ({ conversationId, lastMessage }) => {
             const updated = {
                 ...conversationId,
                 lastMessage,
             };
             useChatStore.getState().updateConversation(updated);
         })
-        
+
+        socket.on("new-friend-request", ({ friendRequest }) => {
+            useFriendStore.getState().addIncomingRequest(friendRequest);
+            toast.info(`${friendRequest.from.displayName} đã gửi cho bạn một lời mời kết bạn!`, {
+                duration: 5000,
+            });
+        });
+
+        socket.on("friend-request-accepted", ({ from, message, newFriend }) => {
+            if (newFriend) {
+                useFriendStore.getState().addFriend(newFriend);
+            }
+            useFriendStore.getState().fetchSentRequests();
+            toast.success(message || `${from.displayName} đã chấp nhận lời mời kết bạn của bạn!`, {
+                duration: 5000,
+            });
+        });
+
+        socket.on("friend-request-rejected", () => {
+            useFriendStore.getState().fetchSentRequests();
+        });
+
+        socket.on("friend-request-cancelled", ({ requestId }) => {
+            useFriendStore.getState().removeIncomingRequest(requestId);
+        });
+
     },
 
     disconnectSocket() {
         const socket = get().socket;
-        if(socket) {
+        if (socket) {
             socket.disconnect();
-            set({socket:null});
+            set({ socket: null });
         }
     },
 }))
