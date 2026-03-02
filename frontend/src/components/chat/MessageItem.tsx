@@ -54,7 +54,7 @@ const MessageItem = ({ message, index, messages, selectedConvo, currentUserId }
                 <Card className={cn("p-3", message.isOwn ? "chat-bubble-sent border-0"
                     : "bg-chat-bubble-received"
                 )}>
-                    <p className="text-sm leading-relaxed break-words">
+                    <p className="text-sm leading-relaxed break-all">
                         {message.content}
                     </p>
                 </Card>
@@ -68,32 +68,32 @@ const MessageItem = ({ message, index, messages, selectedConvo, currentUserId }
 
                 {/* seen/delivered */}
                 {message.isOwn && index === messages.length - 1 && (
-                  <div className="flex items-center gap-1">
-                      {seenByOthers.length > 0 ? (
-                          seenByOthers.map((seenId) => {
-                              const seenUserId = typeof seenId === 'string' ? seenId : (seenId as any)._id?.toString();
-                              const seenParticipant = selectedConvo.participants.find(
-                                  (p) => p.userId?._id?.toString() === seenUserId
-                              );
-                              return seenParticipant ? (
-                                  <UserAvatar
-                                      key={seenUserId}
-                                      type="seen"
-                                      name={seenParticipant.userId.displayName ?? ""}
-                                      avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
-                                  />
-                              ) : null;
-                          })
-                      ) : (
-                          <Badge
-                              variant='outline'
-                              className="text-xs px-1.5 py-0.5 h-4 border-0 bg-muted text-muted-foreground"
-                          >
-                              delivered
-                          </Badge>
-                      )}
-                  </div>
-              )}
+                    <div className="flex items-center gap-1">
+                        {seenByOthers.length > 0 ? (
+                            seenByOthers.map((seenId) => {
+                                const seenUserId = typeof seenId === 'string' ? seenId : (seenId as any)._id?.toString();
+                                const seenParticipant = selectedConvo.participants.find(
+                                    (p) => p.userId?._id?.toString() === seenUserId
+                                );
+                                return seenParticipant ? (
+                                    <UserAvatar
+                                        key={seenUserId}
+                                        type="seen"
+                                        name={seenParticipant.userId.displayName ?? ""}
+                                        avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
+                                    />
+                                ) : null;
+                            })
+                        ) : (
+                            <Badge
+                                variant='outline'
+                                className="text-xs px-1.5 py-0.5 h-4 border-0 bg-muted text-muted-foreground"
+                            >
+                                delivered
+                            </Badge>
+                        )}
+                    </div>
+                )}
 
 
             </div>
