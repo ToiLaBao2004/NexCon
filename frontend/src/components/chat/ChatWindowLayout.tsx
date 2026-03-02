@@ -9,9 +9,9 @@ import { useEffect } from "react";
 
 const ChatWindowLayout = () => {
   const {
-    activeConversationId, 
-    conversations, 
-    messageLoading: loading, 
+    activeConversationId,
+    conversations,
+    messageLoading: loading,
     messages: allMessages,
     markAsSeen,
   } = useChatStore();
@@ -21,7 +21,7 @@ const ChatWindowLayout = () => {
   const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
 
   useEffect(() => {
-    if(!selectedConvo) return;
+    if (!selectedConvo) return;
     const markSeen = async () => {
       try {
         await markAsSeen();
@@ -33,32 +33,32 @@ const ChatWindowLayout = () => {
     markSeen();
   }, [markAsSeen, selectedConvo]);
 
-  if(!selectedConvo) {
-    return <ChatWelcomeScreen/>;
+  if (!selectedConvo) {
+    return <ChatWelcomeScreen />;
   }
 
   if (loading && !hasLoadedMessages) {
-    return <ChatWindowSkeleton/>
+    return <ChatWindowSkeleton />
   }
-return (
-  <SidebarInset className="flex flex-col h-full flex-1 overflow-hidden rounded-sm 
+  return (
+    <SidebarInset className="flex flex-col h-full flex-1 overflow-hidden rounded-sm 
   shadow-md">
-    {/* Header */}
-    <ChatWindowHeader chat={selectedConvo}/>
+      {/* Header */}
+      <ChatWindowHeader chat={selectedConvo} />
 
-    {/* Body */}
-    <div className="flex-1 overflow-y-auto 
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto 
     bg-priamry-foreground">
-      <ChatWindowBody/>
+        <ChatWindowBody />
 
-    </div>
+      </div>
 
-    {/* Footer */}
-    <MessageInput selectedConvo={selectedConvo}/>
+      {/* Footer */}
+      <MessageInput selectedConvo={selectedConvo} />
 
-  </SidebarInset>
-);
-  
+    </SidebarInset>
+  );
+
 };
 
 export default ChatWindowLayout;
