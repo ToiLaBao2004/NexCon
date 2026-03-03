@@ -10,13 +10,13 @@ export const socketAuthMiddleware = async (socket, next) => {
 
         const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
-        if(!decoded) {
+        if (!decoded) {
             return next(new Error("Unauthorized - Invalid or expired token"));
         }
 
         const user = await User.findById(decoded.userId).select("-password");
 
-        if(!user) {
+        if (!user) {
             return next(new Error("User does not exist"));
         }
 

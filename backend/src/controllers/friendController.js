@@ -4,6 +4,7 @@ import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
 import { io, getReceiverSocketId } from "../socket/index.js";
+import { createNotification } from "../services/notificationServices.js";
 
 export async function sendFriendRequest(req, res) {
     try {
@@ -53,14 +54,10 @@ export async function sendFriendRequest(req, res) {
             rejectedRequest.status = 'pending';
             rejectedRequest.message = message ? message.trim().slice(0, 300) : undefined;
             await rejectedRequest.save();
-            const notification = new Notification({
-                userId: receiver._id,
-                title: "New Friend Request",
-                content: `${sender.displayName} has sent you a friend request. ${message ? `"${message}"` : ""}`,
-                linkUrl: `${process.env.FRONTEND_URL}/people`,
-                isRead: false
-            });
-            await notification.save();
+            await createNotification(receiver._id,
+                "Friend Request Resent",
+                `${sender.displayName} đã gửi lời mời kết bạn.`,
+                `${process.env.FRONTEND_URL}/people`);
             const populatedRequest = await FriendRequest.findById(rejectedRequest._id)
                 .populate('from', 'displayName email avatarUrl');
             const receiverSocketId = getReceiverSocketId(receiver._id.toString());
@@ -78,24 +75,21 @@ export async function sendFriendRequest(req, res) {
         });
         if (reverseRequest) {
             reverseRequest.status = 'accepted';
+            await reverseRequest.save();
             const newFriend = new Friend({
                 userA: receiver._id,
                 userB: sender._id
             });
             await newFriend.save();
-            const notification = new Notification({
-                userId: receiver._id,
-                title: "Friend Request Accepted",
-                content: `${sender.displayName} accepted your friend request.`,
-                linkUrl: `${process.env.FRONTEND_URL}/people`,
-                isRead: false
-            });
-            await notification.save();
+            await createNotification(receiver._id,
+                "Friend Request Accepted",
+                `${sender.displayName} đã chấp nhận lời mời kết bạn của bạn.`,
+                `${process.env.FRONTEND_URL}/people`);
             const receiverSocketId = getReceiverSocketId(receiver._id.toString());
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit("friend-request-accepted", {
                     from: { _id: sender._id, displayName: sender.displayName },
-                    message: `${sender.displayName} accepted your friend request.`
+                    message: `${sender.displayName} đã chấp nhận lời mời kết bạn của bạn.`
                 });
             }
             return res.status(201).json({ message: `You and ${receiver.displayName} are now friends.` });
@@ -107,14 +101,10 @@ export async function sendFriendRequest(req, res) {
             status: 'pending'
         });
         await friendRequest.save();
-        const notification = new Notification({
-            userId: receiver._id,
-            title: "New Friend Request",
-            content: `${sender.displayName} has sent you a friend request. ${message ? `"${message}"` : ""}`,
-            linkUrl: `${process.env.FRONTEND_URL}/people`,
-            isRead: false
-        });
-        await notification.save();
+        await createNotification(receiver._id,
+            "New Friend Request",
+            `${sender.displayName} đã gửi lời mời kết bạn. ${message ? `"${message}"` : ""}`,
+            `${process.env.FRONTEND_URL}/people`);
         const populatedRequest = await FriendRequest.findById(friendRequest._id)
             .populate('from', 'displayName email avatarUrl');
         const receiverSocketId = getReceiverSocketId(receiver._id.toString());
@@ -152,14 +142,10 @@ export async function acceptFriendRequest(req, res) {
         await newFriend.save();
         friendRequest.status = 'accepted';
         await friendRequest.save();
-        const notification = new Notification({
-            userId: sender._id,
-            title: "Friend Request Accepted",
-            content: `${receiver.displayName} accepted your friend request.`,
-            linkUrl: `${process.env.FRONTEND_URL}/people`,
-            isRead: false
-        });
-        await notification.save();
+        await createNotification(sender._id,
+            "Friend Request Accepted",
+            `${receiver.displayName} đã chấp nhận lời mời kết bạn của bạn.`,
+            `${process.env.FRONTEND_URL}/people`);
         const senderSocketId = getReceiverSocketId(sender._id.toString());
         if (senderSocketId) {
             io.to(senderSocketId).emit("friend-request-accepted", {
@@ -238,14 +224,10 @@ export async function resendFriendRequest(req, res) {
         const receiver = await User.findById(friendRequest.to);
         friendRequest.status = 'pending';
         await friendRequest.save();
-        const notification = new Notification({
-            userId: receiver._id,
-            title: "Friend Request Resent",
-            content: `${sender.displayName} resent you friend request.`,
-            linkUrl: `${process.env.FRONTEND_URL}/people`,
-            isRead: false
-        });
-        await notification.save();
+        await createNotification(receiver._id,
+            "Friend Request Resent",
+            `${sender.displayName} đã gửi lại lời mời kết bạn.`,
+            `${process.env.FRONTEND_URL}/people`);
         return res.status(200).json({ message: `You resent the friend request to ${receiver.displayName}.` });
     } catch (error) {
         console.error('Accept friend request error:', error);
