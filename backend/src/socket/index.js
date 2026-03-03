@@ -4,6 +4,7 @@ import express from "express";
 import { socketAuthMiddleware } from "../middlewares/socketMiddleware.js";
 import { getUserConversationsForSocketIO } from "../controllers/conversationController.js";
 import { searchUserByEmailAndPhone } from "../controllers/userController.js";
+import Conversation from "../models/conversationModel.js";
 
 const app = express();
 
@@ -32,6 +33,14 @@ io.on("connection", async (socket) => {
     const conversationIds = await getUserConversationsForSocketIO(user._id);
     conversationIds.forEach((id) => {
         socket.join(id);
+    });
+
+    socket.on("join-conversation", async ({ conversationId }) => {
+        const conversation = await Conversation.findById(conversationId);
+        if (conversation && conversation.participants.some(p => p.userId.toString() === user._id.toString())) {
+            socket.join(conversationId);
+            console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
+        }
     });
 
     socket.on("search-user", (payload) => searchUserByEmailAndPhone(socket, payload));

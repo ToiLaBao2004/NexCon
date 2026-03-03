@@ -38,7 +38,7 @@ const MainSidebar = () => {
     const { isDark, toggleTheme } = useThemeStore();
     const { incomingRequests } = useFriendStore();
     const { unreadCount } = useNotificationStore();
-    const { conversations } = useChatStore();
+    const { conversations, setFocusedConversation } = useChatStore();
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -60,6 +60,10 @@ const MainSidebar = () => {
         }
     };
 
+    const handleSidebarClick = () => {
+        setFocusedConversation(null);
+    };
+
     const navItems = [
         { icon: Video, label: "Meet", id: "meet", path: "/meet" },
         { icon: Users, label: "People", id: "people", path: "/people" },
@@ -73,9 +77,15 @@ const MainSidebar = () => {
     };
 
     return (
-        <aside className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-card border border-border/40 rounded-2xl shadow-soft shrink-0">
+        <aside
+            onClick={handleSidebarClick}
+            className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-card border border-border/40 rounded-2xl shadow-soft shrink-0 cursor-default"
+        >
             <TooltipProvider delayDuration={0}>
-                <div className="flex flex-col items-center gap-3 w-full px-2">
+                <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex flex-col items-center gap-3 w-full px-2"
+                >
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" className="relative h-12 w-12 rounded-full p-0 hover:bg-primary/20 transition-all group border-primary/30 bg-primary/10 shadow-sm overflow-visible">
@@ -147,7 +157,7 @@ const MainSidebar = () => {
                                 )}
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-white text-black">Chat</TooltipContent>
+                        <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-popover text-popover-foreground shadow-soft border-border/50">Chat</TooltipContent>
                     </Tooltip>
 
                     {navItems.map((item) => {

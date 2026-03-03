@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 	const { user } = useAuthStore();
 	const {
-		activeConversationId,
+		focusedConversationId,
 		setActiveConversation,
 		messages,
 		fetchMessages,
@@ -55,10 +55,8 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 	const handleSelectConversation = async (id: string) => {
 		setActiveConversation(id);
 
-		// Nếu store messages theo convoId, check theo id
 		if (!messages?.[id]) {
-			// Nếu fetchMessages nhận id thì dùng: await fetchMessages(id)
-			await fetchMessages();
+			await fetchMessages(id);
 		}
 	};
 
@@ -165,7 +163,7 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 			timestamp={
 				convo.lastMessage?.createdAt ? new Date(convo.lastMessage.createdAt) : undefined
 			}
-			isActive={activeConversationId === convo._id}
+			isActive={focusedConversationId === convo._id}
 			onSelect={handleSelectConversation}
 			unreadCount={unreadCount}
 			rightSection={menuNode}

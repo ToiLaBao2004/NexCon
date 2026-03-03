@@ -1,4 +1,5 @@
 import { useChatStore } from "@/stores/useChatStore";
+import { useSocketStore } from "@/stores/useSocketStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import ChatWindowSkeleton from "./ChatWindowSkeleton";
 import { SidebarInset } from "../ui/sidebar";
@@ -10,6 +11,7 @@ import { useEffect } from "react";
 const ChatWindowLayout = () => {
   const {
     activeConversationId,
+    focusedConversationId,
     conversations,
     messageLoading: loading,
     messages: allMessages,
@@ -20,8 +22,16 @@ const ChatWindowLayout = () => {
 
   const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
 
+  const { joinConversation } = useSocketStore();
+
   useEffect(() => {
-    if (!selectedConvo) return;
+    if (activeConversationId) {
+      joinConversation(activeConversationId);
+    }
+  }, [activeConversationId, joinConversation]);
+
+  useEffect(() => {
+    if (!selectedConvo || activeConversationId !== focusedConversationId) return;
     const markSeen = async () => {
       try {
         await markAsSeen();
@@ -31,7 +41,7 @@ const ChatWindowLayout = () => {
     }
 
     markSeen();
-  }, [markAsSeen, selectedConvo]);
+  }, [markAsSeen, selectedConvo, activeConversationId, focusedConversationId]);
 
   if (!selectedConvo) {
     return <ChatWelcomeScreen />;

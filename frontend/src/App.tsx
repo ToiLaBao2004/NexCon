@@ -19,6 +19,7 @@ import { useAuthStore } from "./stores/useAuthStore";
 import { useSocketStore } from "./stores/useSocketStore";
 import { useFriendStore } from "./stores/useFriendStore";
 import { useNotificationStore } from "./stores/useNotificationStore";
+import { useChatStore } from "./stores/useChatStore";
 
 function App() {
   const { isDark, setTheme } = useThemeStore();
@@ -36,6 +37,7 @@ function App() {
       useFriendStore.getState().fetchFriends();
       useFriendStore.getState().fetchSentRequests();
       useNotificationStore.getState().fetchNotifications();
+      useChatStore.getState().fetchConversations();
     }
 
     return () => disconnectSocket();

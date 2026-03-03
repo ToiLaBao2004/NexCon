@@ -7,9 +7,11 @@ import UserAvatar from "./UserAvatar";
 import StatusBadge from "./StatusBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { useSocketStore } from "@/stores/useSocketStore";
+import { X } from "lucide-react";
+import { Button } from "../ui/button";
 
 const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
-	const { conversations, activeConversationId } = useChatStore();
+	const { conversations, activeConversationId, setActiveConversation } = useChatStore();
 	const { user } = useAuthStore();
 	const { onlineUsers } = useSocketStore();
 	let otherUser;
@@ -71,9 +73,18 @@ const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
 						}
 					</div>
 					{/* name */}
-					<h2 className="font-semibold text-foreground">
+					<h2 className="font-semibold text-foreground flex-1">
 						{displayName}
 					</h2>
+
+					<Button
+						variant="ghost"
+						size="icon"
+						className="rounded-full hover:bg-destructive/10 hover:text-destructive"
+						onClick={() => setActiveConversation(null)}
+					>
+						<X className="h-5 w-5" />
+					</Button>
 				</div>
 			</div>
 

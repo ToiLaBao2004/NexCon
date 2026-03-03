@@ -51,7 +51,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
                 unreadCounts
             }
 
-            if (useChatStore.getState().activeConversationId === message.conversationId) {
+            if (useChatStore.getState().focusedConversationId === message.conversationId) {
                 useChatStore.getState().markAsSeen();
             }
 
@@ -97,6 +97,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     },
 
+    joinConversation(conversationId: string) {
+        const socket = get().socket;
+        if (socket) {
+            socket.emit("join-conversation", { conversationId });
+        }
+    },
     disconnectSocket() {
         const socket = get().socket;
         if (socket) {

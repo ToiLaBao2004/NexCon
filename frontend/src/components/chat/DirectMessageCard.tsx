@@ -29,9 +29,10 @@ import { useEffect, useMemo, useState } from "react";
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { activeConversationId, setActiveConversation, messages, fetchMessages, fetchConversations } = useChatStore();
+  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations } = useChatStore();
   const { onlineUsers } = useSocketStore();
   const { setNickName, loading } = useFriendStore();
+  const active = focusedConversationId === convo._id;
 
   const [openRename, setOpenRename] = useState(false);
   const [nickname, setNicknameValue] = useState("");
@@ -62,11 +63,11 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   const handleSelectConversation = async (id: string) => {
     setActiveConversation(id);
-    if (!messages[id]) {
-      await fetchMessages();
-    }
-  }
 
+    if (!messages[id]) {
+      await fetchMessages(id);
+    }
+  };
   const onChangeNickname = () => {
     setOpenRename(true);
   };
@@ -160,7 +161,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
       convoId={convo._id}
       name={displayName}
       timestamp={convo.lastMessage?.createdAt ? new Date(convo.lastMessage.createdAt) : undefined}
-      isActive={activeConversationId === convo._id}
+      isActive={active}
       onSelect={handleSelectConversation}
       unreadCount={unreadCount}
       rightSection={menuNode}

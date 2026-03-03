@@ -16,11 +16,13 @@ export interface ChatState {
     nextCursor?: string | null,
   }>;
   activeConversationId: string | null;
+  focusedConversationId: string | null;
   convoLoading: boolean;
   messageLoading: boolean;
   reset: () => void;
 
   setActiveConversation: (id: string | null) => void;
+  setFocusedConversation: (id: string | null) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
   sendDirectMessage: (
@@ -43,6 +45,7 @@ export interface SocketState {
   socket: Socket | null;
   onlineUsers: string[];
   connectSocket: () => void;
+  joinConversation: (conversationId: string) => void;
   disconnectSocket: () => void;
 }
 
