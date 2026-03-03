@@ -4,6 +4,7 @@ import { useAuthStore } from "./useAuthStore";
 import type { SocketState } from "@/types/store";
 import { useChatStore } from './useChatStore';
 import { useFriendStore } from './useFriendStore';
+import { useNotificationStore } from './useNotificationStore';
 import { toast } from 'sonner';
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
@@ -88,6 +89,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
         socket.on("friend-request-cancelled", ({ requestId }) => {
             useFriendStore.getState().removeIncomingRequest(requestId);
+        });
+
+        socket.on("new-notification", ({ notification }) => {
+            useNotificationStore.getState().addNotification(notification);
         });
 
     },

@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Users, UserX, MessageSquare, UserPlus, X, Loader2, Search, UserMinus } from "lucide-react";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { chatService } from "@/services/chatService";
 import { useChatStore } from "@/stores/useChatStore";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,21 @@ const PeoplePage = () => {
 	const { conversations, fetchConversations, setActiveConversation, fetchMessages } = useChatStore();
 	const [processingId, setProcessingId] = useState<string | null>(null);
 	const navigate = useNavigate();
-	const [tab, setTab] = useState<'friends' | 'requests' | 'groups' | 'blocked'>('friends');
+	const [searchParams, setSearchParams] = useSearchParams();
+	const initialTab = searchParams.get("tab") as 'friends' | 'requests' | 'groups' | 'blocked' || 'friends';
+	const [tab, setTab] = useState<'friends' | 'requests' | 'groups' | 'blocked'>(initialTab);
+
+	useEffect(() => {
+		const urlTab = searchParams.get("tab") as any;
+		if (urlTab && ['friends', 'requests', 'groups', 'blocked'].includes(urlTab)) {
+			setTab(urlTab);
+		}
+	}, [searchParams]);
+
+	const handleTabChange = (newTab: 'friends' | 'requests' | 'groups' | 'blocked') => {
+		setTab(newTab);
+		setSearchParams({ tab: newTab });
+	};
 
 	// Search (copied from AddFriendModal)
 	const [query, setQuery] = useState("");
@@ -181,22 +195,22 @@ const PeoplePage = () => {
 			<div className="flex-1 overflow-hidden flex">
 				<aside className="w-64 border-r border-border/40 bg-card/10 p-4">
 					<div className="space-y-2">
-						<button onClick={() => setTab('friends')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'friends' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
+						<button onClick={() => handleTabChange('friends')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'friends' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
 							<Users className="h-4 w-4" />
 							Danh sách bạn bè
 						</button>
-						<button onClick={() => setTab('requests')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'requests' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
+						<button onClick={() => handleTabChange('requests')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'requests' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
 							<UserPlus className="h-4 w-4" />
 							<span className="flex-1">Lời mời kết bạn</span>
 							{incomingRequests.length > 0 && (
 								<span className="ml-auto text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{incomingRequests.length}</span>
 							)}
 						</button>
-						<button onClick={() => setTab('groups')} className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-muted/30">
+						<button onClick={() => handleTabChange('groups')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'groups' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
 							<MessageSquare className="h-4 w-4" />
 							Quản lý nhóm
 						</button>
-						<button onClick={() => setTab('blocked')} className="w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 hover:bg-muted/30">
+						<button onClick={() => handleTabChange('blocked')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'blocked' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
 							<UserX className="h-4 w-4" />
 							Danh sách bị chặn
 						</button>

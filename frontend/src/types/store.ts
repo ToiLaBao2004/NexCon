@@ -66,3 +66,26 @@ export interface FriendState {
   removeSentRequest: (requestId: string) => void;
   addFriend: (friend: FriendItem) => void;
 }
+
+export interface Notification {
+  _id: string;
+  userId: string;
+  title: string;
+  content: string;
+  linkUrl: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationState {
+  notifications: Notification[];
+  loading: boolean;
+  unreadCount: number;
+  fetchNotifications: () => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  addNotification: (notification: Notification) => void;
+  setUnreadCount: (count: number) => void;
+  reset: () => void;
+}

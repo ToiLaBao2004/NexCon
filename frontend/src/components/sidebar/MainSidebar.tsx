@@ -11,6 +11,8 @@ import {
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useThemeStore } from "@/stores/useThemeStore";
 import { useFriendStore } from "@/stores/useFriendStore";
+import { useNotificationStore } from "@/stores/useNotificationStore";
+import { useChatStore } from "@/stores/useChatStore";
 import { useNavigate, useLocation } from "react-router";
 import {
     Avatar,
@@ -35,10 +37,19 @@ const MainSidebar = () => {
     const { user, signOut } = useAuthStore();
     const { isDark, toggleTheme } = useThemeStore();
     const { incomingRequests } = useFriendStore();
+    const { unreadCount } = useNotificationStore();
+    const { conversations } = useChatStore();
     const navigate = useNavigate();
     const location = useLocation();
 
-    const notificationCount = incomingRequests.length;
+    const friendRequestCount = incomingRequests.length;
+
+    const unreadMessagesCount = conversations.reduce((acc, convo) => {
+        if (!user) return acc;
+        return acc + (convo.unreadCounts?.[user._id] ?? 0);
+    }, 0);
+
+    const totalNotificationCount = unreadCount;
 
     const handleLogout = async () => {
         try {
@@ -129,6 +140,11 @@ const MainSidebar = () => {
                                 {isPathActive("/chat") && (
                                     <div className="absolute -left-3 w-1 h-6 bg-primary rounded-r-full top-1/2 -translate-y-1/2" />
                                 )}
+                                {unreadMessagesCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold shadow-md border-2 border-card animate-in zoom-in duration-200">
+                                        {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                                    </span>
+                                )}
                             </Button>
                         </TooltipTrigger>
                         <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-white text-black">Chat</TooltipContent>
@@ -136,8 +152,11 @@ const MainSidebar = () => {
 
                     {navItems.map((item) => {
                         const active = isPathActive(item.path);
-                        // show incoming friend request count on the People tab instead of Notification
-                        const badgeCount = item.id === "people" ? notificationCount : 0;
+                        // friend requests on People, unreads on Notification
+                        let badgeCount = 0;
+                        if (item.id === "people") badgeCount = friendRequestCount;
+                        if (item.id === "notification") badgeCount = totalNotificationCount;
+
                         return (
                             <Tooltip key={item.id}>
                                 <TooltipTrigger asChild>
