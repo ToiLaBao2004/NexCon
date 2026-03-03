@@ -10,7 +10,8 @@ import otpRouter from './routes/otpRoute.js';
 import friendRouter from './routes/friendRoute.js';
 import messageRouter from './routes/messageRoute.js';
 import conversationRouter from './routes/conversationRoute.js';
-import { app,server } from './socket/index.js';
+import notificationRouter from './routes/notificationRoute.js';
+import { app, server } from './socket/index.js';
 
 
 // const app = express();    
@@ -18,7 +19,7 @@ const PORT = process.env.PORT;
 
 
 // middlewares
-app.use(cors({origin: process.env.CLIENT_URL, credentials: true}));
+app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -33,6 +34,7 @@ app.use('/api/users', userRouter);
 app.use('/api/friends', friendRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/conversations', conversationRouter);
+app.use('/api/notifications', notificationRouter);
 
 connectDB().then(() => {
   server.listen(PORT, () => {
