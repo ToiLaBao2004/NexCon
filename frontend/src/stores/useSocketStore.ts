@@ -4,6 +4,7 @@ import { useAuthStore } from "./useAuthStore";
 import type { SocketState } from "@/types/store";
 import { useChatStore } from './useChatStore';
 import { useFriendStore } from './useFriendStore';
+import { useNotificationStore } from './useNotificationStore';
 import { toast } from 'sonner';
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
@@ -50,7 +51,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
                 unreadCounts
             }
 
-            if (useChatStore.getState().activeConversationId === message.conversationId) {
+            if (useChatStore.getState().focusedConversationId === message.conversationId) {
                 useChatStore.getState().markAsSeen();
             }
 
@@ -90,8 +91,18 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             useFriendStore.getState().removeIncomingRequest(requestId);
         });
 
+        socket.on("new-notification", ({ notification }) => {
+            useNotificationStore.getState().addNotification(notification);
+        });
+
     },
 
+    joinConversation(conversationId: string) {
+        const socket = get().socket;
+        if (socket) {
+            socket.emit("join-conversation", { conversationId });
+        }
+    },
     disconnectSocket() {
         const socket = get().socket;
         if (socket) {

@@ -56,7 +56,7 @@ export async function sendFriendRequest(req, res) {
             await rejectedRequest.save();
             await createNotification(receiver._id,
                 "Friend Request Resent",
-                `${sender.displayName} đã gửi lời mời kết bạn.`,
+                `${sender.displayName} đã gửi cho bạn một lời mời kết bạn.`,
                 `${process.env.FRONTEND_URL}/people`);
             const populatedRequest = await FriendRequest.findById(rejectedRequest._id)
                 .populate('from', 'displayName email avatarUrl');
@@ -103,7 +103,7 @@ export async function sendFriendRequest(req, res) {
         await friendRequest.save();
         await createNotification(receiver._id,
             "New Friend Request",
-            `${sender.displayName} đã gửi lời mời kết bạn. ${message ? `"${message}"` : ""}`,
+            `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${message ? `"${message}"` : ""}`,
             `${process.env.FRONTEND_URL}/people`);
         const populatedRequest = await FriendRequest.findById(friendRequest._id)
             .populate('from', 'displayName email avatarUrl');

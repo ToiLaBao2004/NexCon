@@ -16,11 +16,13 @@ export interface ChatState {
     nextCursor?: string | null,
   }>;
   activeConversationId: string | null;
+  focusedConversationId: string | null;
   convoLoading: boolean;
   messageLoading: boolean;
   reset: () => void;
 
   setActiveConversation: (id: string | null) => void;
+  setFocusedConversation: (id: string | null) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
   sendDirectMessage: (
@@ -43,6 +45,7 @@ export interface SocketState {
   socket: Socket | null;
   onlineUsers: string[];
   connectSocket: () => void;
+  joinConversation: (conversationId: string) => void;
   disconnectSocket: () => void;
 }
 
@@ -65,4 +68,27 @@ export interface FriendState {
   addSentRequest: (request: SentFriendRequest) => void;
   removeSentRequest: (requestId: string) => void;
   addFriend: (friend: FriendItem) => void;
+}
+
+export interface Notification {
+  _id: string;
+  userId: string;
+  title: string;
+  content: string;
+  linkUrl: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationState {
+  notifications: Notification[];
+  loading: boolean;
+  unreadCount: number;
+  fetchNotifications: () => Promise<void>;
+  markAsRead: (id: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+  addNotification: (notification: Notification) => void;
+  setUnreadCount: (count: number) => void;
+  reset: () => void;
 }

@@ -10,15 +10,18 @@ export const useChatStore = create<ChatState>()(
             conversations: [],
             messages: {},
             activeConversationId: null,
+            focusedConversationId: null,
             convoLoading: false,
             messageLoading: false,
 
-            setActiveConversation: (id) => set({ activeConversationId: id }),
+            setActiveConversation: (id) => set({ activeConversationId: id, focusedConversationId: id }),
+            setFocusedConversation: (id) => set({ focusedConversationId: id }),
             reset: () => {
                 set({
                     conversations: [],
                     messages: {},
                     activeConversationId: null,
+                    focusedConversationId: null,
                     convoLoading: false,
                 });
             },
@@ -139,9 +142,20 @@ export const useChatStore = create<ChatState>()(
                 }
             },
             updateConversation: (conversation) => {
-                set((state) => ({
-                    conversations: state.conversations.map((c) => c._id === conversation._id ? { ...c, ...conversation, participants: c.participants, } : c)
-                }));
+                const { conversations, fetchConversations } = get();
+                const exists = conversations.some((c) => c._id === conversation._id);
+
+                if (!exists) {
+                    fetchConversations();
+                } else {
+                    set((state) => ({
+                        conversations: state.conversations.map((c) =>
+                            c._id === conversation._id
+                                ? { ...c, ...conversation, participants: c.participants }
+                                : c
+                        ),
+                    }));
+                }
             },
             markAsSeen: async () => {
                 try {

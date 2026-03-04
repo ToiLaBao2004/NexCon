@@ -11,6 +11,8 @@ import {
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useThemeStore } from "@/stores/useThemeStore";
 import { useFriendStore } from "@/stores/useFriendStore";
+import { useNotificationStore } from "@/stores/useNotificationStore";
+import { useChatStore } from "@/stores/useChatStore";
 import { useNavigate, useLocation } from "react-router";
 import {
     Avatar,
@@ -35,10 +37,19 @@ const MainSidebar = () => {
     const { user, signOut } = useAuthStore();
     const { isDark, toggleTheme } = useThemeStore();
     const { incomingRequests } = useFriendStore();
+    const { unreadCount } = useNotificationStore();
+    const { conversations, setFocusedConversation } = useChatStore();
     const navigate = useNavigate();
     const location = useLocation();
 
-    const notificationCount = incomingRequests.length;
+    const friendRequestCount = incomingRequests.length;
+
+    const unreadMessagesCount = conversations.reduce((acc, convo) => {
+        if (!user) return acc;
+        return acc + (convo.unreadCounts?.[user._id] ?? 0);
+    }, 0);
+
+    const totalNotificationCount = unreadCount;
 
     const handleLogout = async () => {
         try {
@@ -47,6 +58,10 @@ const MainSidebar = () => {
         } catch (error) {
             console.error("Logout failed:", error);
         }
+    };
+
+    const handleSidebarClick = () => {
+        setFocusedConversation(null);
     };
 
     const navItems = [
@@ -62,9 +77,15 @@ const MainSidebar = () => {
     };
 
     return (
-        <aside className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-card border border-border/40 rounded-2xl shadow-soft shrink-0">
+        <aside
+            onClick={handleSidebarClick}
+            className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-card border border-border/40 rounded-2xl shadow-soft shrink-0 cursor-default"
+        >
             <TooltipProvider delayDuration={0}>
-                <div className="flex flex-col items-center gap-3 w-full px-2">
+                <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex flex-col items-center gap-3 w-full px-2"
+                >
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" className="relative h-12 w-12 rounded-full p-0 hover:bg-primary/20 transition-all group border-primary/30 bg-primary/10 shadow-sm overflow-visible">
@@ -129,15 +150,23 @@ const MainSidebar = () => {
                                 {isPathActive("/chat") && (
                                     <div className="absolute -left-3 w-1 h-6 bg-primary rounded-r-full top-1/2 -translate-y-1/2" />
                                 )}
+                                {unreadMessagesCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold shadow-md border-2 border-card animate-in zoom-in duration-200">
+                                        {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
+                                    </span>
+                                )}
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-white text-black">Chat</TooltipContent>
+                        <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-popover text-popover-foreground shadow-soft border-border/50">Chat</TooltipContent>
                     </Tooltip>
 
                     {navItems.map((item) => {
                         const active = isPathActive(item.path);
-                        // show incoming friend request count on the People tab instead of Notification
-                        const badgeCount = item.id === "people" ? notificationCount : 0;
+                        // friend requests on People, unreads on Notification
+                        let badgeCount = 0;
+                        if (item.id === "people") badgeCount = friendRequestCount;
+                        if (item.id === "notification") badgeCount = totalNotificationCount;
+
                         return (
                             <Tooltip key={item.id}>
                                 <TooltipTrigger asChild>

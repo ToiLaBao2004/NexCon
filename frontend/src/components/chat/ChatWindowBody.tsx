@@ -84,10 +84,10 @@ const ChatWindowBody = () => {
         className="flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar"
       >
         {messageLoading && hasMore && (
-                    <div className="flex justify-center py-2 text-sm text-muted-foreground">
-                        Đang tải...
-                    </div>
-                )}
+          <div className="flex justify-center py-2 text-sm text-muted-foreground">
+            Đang tải...
+          </div>
+        )}
         {messages.map((message, index) => (
           <MessageItem
             key={message._id ?? index}
