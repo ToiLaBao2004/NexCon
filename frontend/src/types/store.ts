@@ -68,6 +68,8 @@ export interface FriendState {
   addSentRequest: (request: SentFriendRequest) => void;
   removeSentRequest: (requestId: string) => void;
   addFriend: (friend: FriendItem) => void;
+  removeFriend: (friendId: string) => void;
+  unfriendUser: (friendId: string) => Promise<void>;
 }
 
 export interface Notification {

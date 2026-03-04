@@ -22,6 +22,7 @@ const PeoplePage = () => {
 		acceptFriendRequest,
 		rejectFriendRequest,
 		cancelFriendRequest,
+		unfriendUser,
 	} = useFriendStore();
 
 	const { onlineUsers } = useSocketStore();
@@ -118,7 +119,12 @@ const PeoplePage = () => {
 
 					<div className="p-4">
 						{tab === 'friends' && (
-							<FriendsTab friends={friends} onlineUsers={onlineUsers} onOpenChat={handleOpenChat} />
+							<FriendsTab
+								friends={friends}
+								onlineUsers={onlineUsers}
+								onOpenChat={handleOpenChat}
+								onUnfriend={unfriendUser}
+							/>
 						)}
 
 						{tab === 'requests' && (

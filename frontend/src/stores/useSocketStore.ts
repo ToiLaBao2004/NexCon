@@ -91,6 +91,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             useFriendStore.getState().removeIncomingRequest(requestId);
         });
 
+        socket.on("unfriended", ({ friendId }) => {
+            useFriendStore.getState().removeFriend(friendId);
+        });
+
         socket.on("new-notification", ({ notification }) => {
             useNotificationStore.getState().addNotification(notification);
         });
