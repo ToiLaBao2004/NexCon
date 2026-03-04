@@ -33,6 +33,7 @@ const UserSearch = ({ className }: UserSearchProps) => {
     const [status, setStatus] = useState<SearchStatus>("idle");
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
+    const [requestMessage, setRequestMessage] = useState("");
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const socket = useSocketStore((state) => state.socket);
     const { sendFriendRequest, cancelFriendRequest, sentRequests, fetchSentRequests } = useFriendStore();
@@ -54,6 +55,7 @@ const UserSearch = ({ className }: UserSearchProps) => {
         }) => {
             setUser(user);
             setStatus(status);
+            setRequestMessage("");
         };
 
         socket.on("search-user-result", handleResult);
@@ -87,6 +89,7 @@ const UserSearch = ({ className }: UserSearchProps) => {
         setQuery("");
         setUser(null);
         setStatus("idle");
+        setRequestMessage("");
     };
 
     const handleSendRequest = async (e?: React.MouseEvent) => {
@@ -94,8 +97,9 @@ const UserSearch = ({ className }: UserSearchProps) => {
         if (!user || actionLoading) return;
         try {
             setActionLoading(true);
-            await sendFriendRequest(user.email);
+            await sendFriendRequest(user.email, requestMessage);
             await fetchSentRequests();
+            setRequestMessage("");
         } catch {
         } finally {
             setActionLoading(false);
@@ -229,19 +233,31 @@ const UserSearch = ({ className }: UserSearchProps) => {
                 <>
                     <div
                         onClick={() => handleDialogChange(true)}
-                        className="mt-2 w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border/60 bg-card hover:bg-muted/50 hover:border-primary/30 transition-all duration-150 animate-in fade-in slide-in-from-top-1 duration-200 group text-left cursor-pointer"
+                        className="mt-2 w-full flex flex-col gap-2 p-3 rounded-lg border border-border/60 bg-card hover:bg-muted/50 hover:border-primary/30 transition-all duration-150 animate-in fade-in slide-in-from-top-1 duration-200 group text-left cursor-pointer"
                     >
-                        <Avatar className="h-8 w-8 shrink-0">
-                            <AvatarImage src={user.avatarUrl} />
-                            <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
-                                {user.displayName.charAt(0)}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">{user.displayName}</p>
-                            <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <div className="flex items-center gap-3 w-full">
+                            <Avatar className="h-8 w-8 shrink-0">
+                                <AvatarImage src={user.avatarUrl} />
+                                <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+                                    {user.displayName.charAt(0)}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-foreground truncate">{user.displayName}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                            </div>
+                            {renderSmallIcon()}
                         </div>
-                        {renderSmallIcon()}
+                        {!hasPendingRequest && (
+                            <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                                <Input
+                                    placeholder="Nhập lời nhắn..."
+                                    value={requestMessage}
+                                    onChange={(e) => setRequestMessage(e.target.value)}
+                                    className="h-8 text-xs bg-muted/20 border-border/40 focus:bg-background"
+                                />
+                            </div>
+                        )}
                     </div>
 
                     <Dialog open={isDialogOpen} onOpenChange={handleDialogChange}>
@@ -272,6 +288,16 @@ const UserSearch = ({ className }: UserSearchProps) => {
                                             <p className="text-xs text-muted-foreground/80 mt-0.5 font-medium">{user.phone}</p>
                                         )}
                                     </div>
+                                    {!hasPendingRequest && (
+                                        <div className="w-full mt-4">
+                                            <Input
+                                                placeholder="Lời nhắn kết bạn..."
+                                                value={requestMessage}
+                                                onChange={(e) => setRequestMessage(e.target.value)}
+                                                className="bg-muted/30"
+                                            />
+                                        </div>
+                                    )}
                                     {renderRequestButton()}
                                 </div>
                             </div>
