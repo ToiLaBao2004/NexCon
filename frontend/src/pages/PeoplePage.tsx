@@ -2,7 +2,7 @@ import { useFriendStore } from "@/stores/useFriendStore";
 import { Users, UserX, MessageSquare, UserPlus } from "lucide-react";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router";
 import { chatService } from "@/services/chatService";
 import { useChatStore } from "@/stores/useChatStore";
 import FriendsTab from "@/components/people/FriendsTab";
