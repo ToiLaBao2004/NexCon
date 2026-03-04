@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { useNotificationStore } from '@/stores/useNotificationStore';
-import type { Notification } from '@/types/notification';
+import type { Notification } from '@/types/store';
 const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('vi-VN');
