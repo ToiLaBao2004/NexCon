@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '@/stores/useNotificationStore';
-import type { Notification } from '@/types/notification';
+import type { Notification } from '@/types/store';
 const formatTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('vi-VN');
@@ -29,12 +29,14 @@ const NotificationCard: React.FC<NotificationCardProps> = ({ notification }) => 
             await markAsRead(notification._id);
         }
 
-        // Nếu là lời mời kết bạn mới, chuyển đến tab requests
-        if (notification.title === 'New Friend Request') {
+        // Chuyển đến tab tương ứng dựa trên tiêu đề thông báo
+        const title = notification.title;
+        if (title === 'New Friend Request' || title === 'Friend Request Resent') {
             navigate('/people?tab=requests');
-        } else {
-            // Các loại thông báo khác (ví dụ: đã chấp nhận) thì về danh sách bạn bè
+        } else if (title === 'Friend Request Accepted') {
             navigate('/people?tab=friends');
+        } else {
+            navigate('/people');
         }
     };
 
