@@ -194,6 +194,37 @@ export const useChatStore = create<ChatState>()(
                 } catch (error) {
                     console.error("An error occurred while updating group name:", error);
                 }
+            },
+            openChat: async ({ userId, conversationId }: { userId?: string, conversationId?: string }) => {
+                const { conversations, setActiveConversation, fetchMessages, fetchConversations } = get();
+                let targetId = conversationId;
+
+                try {
+                    if (!targetId && userId) {
+                        const existing = conversations.find((c: any) =>
+                            c.type === 'direct' &&
+                            c.participants.some((p: any) => p.userId?._id === userId)
+                        );
+
+                        if (existing) {
+                            targetId = existing._id;
+                        } else {
+                            const res = await chatService.createConversation('direct', [userId]);
+                            const conv = res.conversation || res;
+                            await fetchConversations();
+                            targetId = conv?._id || conv;
+                        }
+                    }
+
+                    if (targetId) {
+                        setActiveConversation(targetId);
+                        await fetchMessages(targetId).catch(() => { });
+                    } else {
+                        throw new Error("Không thể xác định hội thoại để mở");
+                    }
+                } catch (error) {
+                    console.error('Failed to open chat:', error);
+                }
             }
         }),
         {

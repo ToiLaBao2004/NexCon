@@ -1,7 +1,8 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageSquare, UserMinus, UserX, Loader2 } from "lucide-react";
+import { UserX } from "lucide-react";
 import { useState } from "react";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { FriendActionButtons } from "@/components/people/FriendActionButtons";
 
 type Friend = {
     _id: string;
@@ -45,7 +46,7 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
     };
 
     return (
-        <div>
+        <div className="space-y-3">
             {friends.length > 0 ? (
                 <div className="flex flex-col gap-2">
                     {friends.map((friend) => {
@@ -74,27 +75,13 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                                     </p>
                                 </div>
 
-                                <div className="flex items-center gap-1 transition-opacity">
-                                    <button
-                                        title="Nhắn tin"
-                                        onClick={() => onOpenChat(friend)}
-                                        className="p-2.5 rounded-xl hover:bg-primary/10 hover:text-primary text-muted-foreground transition-all active:scale-95"
-                                    >
-                                        <MessageSquare className="h-5 w-5" />
-                                    </button>
-                                    <button
-                                        title="Hủy kết bạn"
-                                        onClick={() => handleOpenUnfriendModal(friend)}
-                                        disabled={isProcessing}
-                                        className="p-2.5 rounded-xl hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all active:scale-95 disabled:opacity-50"
-                                    >
-                                        {isProcessing ? (
-                                            <Loader2 className="h-5 w-5 animate-spin text-destructive" />
-                                        ) : (
-                                            <UserMinus className="h-5 w-5" />
-                                        )}
-                                    </button>
-                                </div>
+                                <FriendActionButtons
+                                    onChat={() => onOpenChat(friend)}
+                                    onUnfriend={() => handleOpenUnfriendModal(friend)}
+                                    isProcessing={isProcessing}
+                                    variant="icon"
+                                    className="opacity-100 transition-opacity"
+                                />
                             </div>
                         );
                     })}

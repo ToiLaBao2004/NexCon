@@ -39,6 +39,7 @@ export interface ChatState {
   updateConversation: (conversation: Conversation) => void;
   markAsSeen: () => Promise<void>;
   updateGroupName: (conversationId: string, name: string) => Promise<void>;
+  openChat: (params: { userId?: string; conversationId?: string }) => Promise<void>;
 }
 
 export interface SocketState {
