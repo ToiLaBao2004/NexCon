@@ -42,4 +42,8 @@ export const chatService = {
 		const res = await api.post('/conversations/create-conversation', { type, memberIds, name });
 		return res.data;
 	},
+	async recallMessage(messageId: string) {
+		const res = await api.put('/messages/recall', { messageId });
+		return res.data;
+	}
 };

@@ -2,104 +2,197 @@ import { cn, formatMessageTime } from "@/lib/utils";
 import type { Conversation, Message, Participant } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import { Card } from "../ui/card";
-import { Badge } from "../ui/badge";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useChatStore } from "@/stores/useChatStore";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { useState } from "react";
 
 interface MessageItemProps {
-    message: Message;
-    index: number;
-    messages: Message[];
-    selectedConvo: Conversation;
-    currentUserId: string;
+	message: Message;
+	index: number;
+	messages: Message[];
+	selectedConvo: Conversation;
+	currentUserId: string;
 }
 
+const MessageItem = ({
+	message,
+	index,
+	messages,
+	selectedConvo,
+	currentUserId,
+}: MessageItemProps) => {
+	const prev = messages[index - 1];
 
-const MessageItem = ({ message, index, messages, selectedConvo, currentUserId }
-    : MessageItemProps) => {
-    const prev = messages[index - 1];
+	const isGroupBreak =
+		index === 0 ||
+		message.senderId !== prev?.senderId ||
+		new Date(message.createdAt).getTime() - new Date(prev?.createdAt || 0).getTime() > 300000;
 
-    const isGroupBreak = index === 0 ||
-        message.senderId !== prev?.senderId ||
-        new Date(message.createdAt).getTime() - new Date(prev?.createdAt || 0).getTime() > 300000;
+	const participant = selectedConvo.participants.find(
+		(p: Participant) => p.userId?._id?.toString() === message.senderId?.toString()
+	);
 
-    const participant = selectedConvo.participants.find((p: Participant) => p.userId?._id?.toString() === message.senderId.toString())
+	const isOwn = message.senderId === currentUserId;
 
-    const seenByOthers = selectedConvo.seenBy?.filter(
-        (s: any) => (typeof s === 'string' ? s : s._id?.toString()) !== currentUserId
-    ) ?? [];
+	const seenByOthers = selectedConvo.seenBy?.filter(
+		(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
+	) ?? [];
 
-    return (
-        <div
-            className={cn("flex gap-2 message-bounce mt-1 mx-3", message.isOwn ? "justify-end" :
-                "justify-start")}
-        >
-            {/* avatar */}
-            {!message.isOwn && (
-                <div className="w-8">
-                    {isGroupBreak && (
-                        <UserAvatar
-                            type="chat"
-                            name={participant?.userId.displayName ?? "NexCon"}
-                            avatarUrl={participant?.userId.avatarUrl ?? undefined}
-                        />
-                    )}
-                </div>
-            )}
+	const { recallMessage } = useChatStore();
 
-            {/* tin nhắn */}
-            <div
-                className={cn("max-w-xs lg:max-w-md space-y-1 flex flex-col",
-                    message.isOwn ? "items-end" : "items-start"
-                )}
-            >
-                <Card className={cn("p-3", message.isOwn ? "chat-bubble-sent border-0"
-                    : "bg-chat-bubble-received"
-                )}>
-                    <p className="text-sm leading-relaxed break-all">
-                        {message.content}
-                    </p>
-                </Card>
+	const [showConfirmRecall, setShowConfirmRecall] = useState(false);
 
-                {/* time */}
-                {isGroupBreak && (
-                    <span className="text-xs text-muted-foreground px-1">
-                        {formatMessageTime(new Date(message.createdAt))}
-                    </span>
-                )}
+	const handleRecall = async () => {
+		try {
+			await recallMessage(message._id);
+		} catch (error) {
+			console.error("Thu hồi thất bại:", error);
+		} finally {
+			setShowConfirmRecall(false);
+		}
+	};
 
-                {/* seen/delivered */}
-                {message.isOwn && index === messages.length - 1 && (
-                    <div className="flex items-center gap-1">
-                        {seenByOthers.length > 0 ? (
-                            seenByOthers.map((seenId) => {
-                                const seenUserId = typeof seenId === 'string' ? seenId : (seenId as any)._id?.toString();
-                                const seenParticipant = selectedConvo.participants.find(
-                                    (p) => p.userId?._id?.toString() === seenUserId
-                                );
-                                return seenParticipant ? (
-                                    <UserAvatar
-                                        key={seenUserId}
-                                        type="seen"
-                                        name={seenParticipant.userId.displayName ?? ""}
-                                        avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
-                                    />
-                                ) : null;
-                            })
-                        ) : (
-                            <Badge
-                                variant='outline'
-                                className="text-xs px-1.5 py-0.5 h-4 border-0 bg-muted text-muted-foreground"
-                            >
-                                delivered
-                            </Badge>
-                        )}
-                    </div>
-                )}
+	return (
+		<>
+			<div
+				className={cn(
+					"group relative flex gap-2 mt-0.5 mx-2 px-1",
+					isOwn ? "justify-end" : "justify-start"
+				)}
+			>
+				{/* Avatar */}
+				{!isOwn && (
+					<div className="w-8 shrink-0 pt-0.5">
+						{isGroupBreak && (
+							<UserAvatar
+								type="chat"
+								name={participant?.userId.displayName ?? "User"}
+								avatarUrl={participant?.userId.avatarUrl ?? undefined}
+							/>
+						)}
+					</div>
+				)}
 
+				<div
+					className={cn(
+						"relative max-w-[75%] sm:max-w-[65%] md:max-w-[55%] flex flex-col",
+						isOwn ? "items-end" : "items-start"
+					)}
+				>
+					<div className="relative">
+						<Card
+							className={cn(
+								"px-3.5 py-2.5 text-sm leading-relaxed shadow-sm border-0",
+								isOwn
+									? "bg-blue-500 text-white rounded-2xl rounded-br-none"
+									: "bg-gray-100 dark:bg-gray-800 text-foreground rounded-2xl rounded-bl-none"
+							)}
+						>
+							{message.content}
+						</Card>
 
-            </div>
+						{/* Icon 3 chấm */}
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<button
+									className={cn(
+										"absolute top-1/2 -translate-y-1/2",
+										isOwn ? "-left-10 sm:-left-11" : "-right-10 sm:-right-11",
+										"opacity-0 group-hover:opacity-70 hover:opacity-100",
+										"transition-opacity duration-150 ease-in-out",
+										"text-muted-foreground hover:text-foreground",
+										"p-1.5 rounded-full hover:bg-accent/40",
+										"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+									)}
+									aria-label="Message actions"
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="18"
+										height="18"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										strokeWidth="2.2"
+										strokeLinecap="round"
+										strokeLinejoin="round"
+									>
+										<circle cx="12" cy="12" r="1" />
+										<circle cx="19" cy="12" r="1" />
+										<circle cx="5" cy="12" r="1" />
+									</svg>
+								</button>
+							</DropdownMenuTrigger>
 
-        </div>
-    );
-}
+							<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
+								<DropdownMenuItem>Trả lời</DropdownMenuItem>
+								<DropdownMenuItem>Sao chép</DropdownMenuItem>
 
-export default MessageItem
+								{isOwn && (
+									<DropdownMenuItem
+										className="text-destructive focus:text-destructive focus:bg-destructive/10"
+										onClick={() => setShowConfirmRecall(true)}
+									>
+										Thu hồi
+									</DropdownMenuItem>
+								)}
+							</DropdownMenuContent>
+						</DropdownMenu>
+					</div>
+
+					{/* Thời gian */}
+					{isGroupBreak && (
+						<span className="text-xs text-muted-foreground mt-0.5 px-1.5">
+							{formatMessageTime(new Date(message.createdAt))}
+						</span>
+					)}
+
+					{/* Seen */}
+					{isOwn && index === messages.length - 1 && (
+						<div className="flex items-center gap-1.5 mt-0.5 px-1.5">
+							{seenByOthers.length > 0 ? (
+								seenByOthers.map((seenId) => {
+									const seenUserId = typeof seenId === "string" ? seenId : seenId._id?.toString();
+									const seenParticipant = selectedConvo.participants.find(
+										(p) => p.userId?._id?.toString() === seenUserId
+									);
+									return seenParticipant ? (
+										<UserAvatar
+											key={seenUserId}
+											type="seen"
+											name={seenParticipant.userId.displayName ?? ""}
+											avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
+										/>
+									) : null;
+								})
+							) : (
+								<span className="text-xs text-muted-foreground">Đã gửi</span>
+							)}
+						</div>
+					)}
+				</div>
+			</div>
+
+			{/* Popup xác nhận thu hồi */}
+			<ConfirmationModal
+				isOpen={showConfirmRecall}
+				onClose={() => setShowConfirmRecall(false)}
+				onConfirm={handleRecall}
+				title="Thu hồi tin nhắn?"
+				description="Tin nhắn này sẽ bị xóa khỏi cuộc trò chuyện của bạn và những người khác. Hành động này không thể hoàn tác."
+				confirmText="Thu hồi"
+				variant="destructive"
+			// Nếu store có loading state, bạn có thể truyền isLoading={isRecalling}
+			// isLoading={isRecalling}
+			/>
+		</>
+	);
+};
+
+export default MessageItem;
