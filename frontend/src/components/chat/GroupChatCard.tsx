@@ -95,12 +95,12 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 				<DropdownMenuTrigger asChild>
 					<button
 						type="button"
-						className="p-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition"
+						className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground/60 hover:text-foreground"
 						aria-label="More actions"
 						onClick={(e) => e.stopPropagation()}
 						onPointerDown={(e) => e.stopPropagation()}
 					>
-						<MoreHorizontal className="size-4 text-muted-foreground" />
+						<MoreHorizontal className="size-4" />
 					</button>
 				</DropdownMenuTrigger>
 
@@ -170,7 +170,7 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 			leftSection={
 				<>
 					{unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
-					<GroupChatAvatar participants={convo.participants} type="chat" />
+					<GroupChatAvatar participants={convo.participants} type="sidebar" />
 				</>
 			}
 			subtitle={

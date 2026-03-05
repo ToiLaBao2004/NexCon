@@ -225,6 +225,21 @@ export const useChatStore = create<ChatState>()(
                 } catch (error) {
                     console.error('Failed to open chat:', error);
                 }
+            },
+            createGroup: async (name, members) => {
+                const { fetchConversations, setActiveConversation, fetchMessages } = get();
+                try {
+                    const res = await chatService.createConversation('group', members, name);
+                    const conv = res.conversation || res;
+                    await fetchConversations();
+                    if (conv?._id) {
+                        setActiveConversation(conv._id);
+                        await fetchMessages(conv._id).catch(() => { });
+                    }
+                } catch (error) {
+                    console.error('Failed to create group:', error);
+                    throw error;
+                }
             }
         }),
         {

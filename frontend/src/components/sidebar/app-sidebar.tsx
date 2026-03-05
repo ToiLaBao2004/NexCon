@@ -18,9 +18,11 @@ import DirectMessageList from "../chat/DirectMessageList"
 
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/useChatStore"
+import { Plus } from "lucide-react"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const setFocusedConversation = useChatStore((s) => s.setFocusedConversation);
+  const [isGroupModalOpen, setIsGroupModalOpen] = React.useState(false);
 
   return (
     <Sidebar
@@ -46,8 +48,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroupLabel className="uppercase">
               nhóm chat
             </SidebarGroupLabel>
-            <SidebarGroupAction title="Tạo Nhóm" className="cursor-pointer">
-              <NewGroupChatModal />
+            <SidebarGroupAction
+              title="Tạo Nhóm"
+              className="cursor-pointer"
+              onClick={() => setIsGroupModalOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
             </SidebarGroupAction>
             <SidebarGroupContent>
               <GroupChatList />
@@ -64,6 +70,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarGroup>
         </div>
       </SidebarContent>
+      <NewGroupChatModal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} />
     </Sidebar>
   )
 }

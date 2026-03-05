@@ -28,6 +28,17 @@ export const formatOnlineTime = (date: Date) => {
   }
 };
 
+export const removeAccents = (str: string) => {
+  if (!str) return "";
+  return str
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/\u031b/g, "")
+    .normalize("NFC");
+};
+
 export const formatMessageTime = (date: Date) => {
   const now = new Date();
 
@@ -56,8 +67,7 @@ export const formatMessageTime = (date: Date) => {
   } else if (date.getFullYear() === now.getFullYear()) {
     return `${date.getDate()}/${date.getMonth() + 1} ${timeStr}`; // ví dụ: "22/9 09:15"
   } else {
-    return `${date.getDate()}/${
-      date.getMonth() + 1
-    }/${date.getFullYear()} ${timeStr}`; // ví dụ: "15/12/2023 18:40"
+    return `${date.getDate()}/${date.getMonth() + 1
+      }/${date.getFullYear()} ${timeStr}`; // ví dụ: "15/12/2023 18:40"
   }
 };

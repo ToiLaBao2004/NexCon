@@ -10,7 +10,7 @@ import GroupsTab from "@/components/people/GroupsTab";
 import BlockedTab from "@/components/people/BlockedTab";
 import UserSearch from "@/components/shared/UserSearch";
 import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
-import { SidebarProvider, Sidebar, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
+import { SidebarProvider, Sidebar, SidebarTrigger } from "@/components/ui/sidebar";
 
 const PeoplePage = () => {
 	const {
@@ -27,7 +27,7 @@ const PeoplePage = () => {
 	} = useFriendStore();
 
 	const { onlineUsers } = useSocketStore();
-	const { openChat, activeConversationId, setActiveConversation } = useChatStore();
+	const { openChat, activeConversationId, setActiveConversation, conversations } = useChatStore();
 	const [processingId, setProcessingId] = useState<string | null>(null);
 	const [searchParams, setSearchParams] = useSearchParams();
 	const initialTab = searchParams.get("tab") as 'friends' | 'requests' | 'groups' | 'blocked' || 'friends';
@@ -88,7 +88,7 @@ const PeoplePage = () => {
 			groups: {
 				title: "Quản lý nhóm",
 				icon: <MessageSquare className="h-5 w-5 text-primary" />,
-				desc: "Quản lý các nhóm chat"
+				desc: `${conversations.filter(c => c.type === 'group').length} nhóm`
 			},
 			blocked: {
 				title: "Danh sách bị chặn",
@@ -151,7 +151,7 @@ const PeoplePage = () => {
 						</div>
 
 						<div className="flex flex-col">
-							<UserSearch className="p-4" onOpenChat={handleOpenChat} />
+							{tab !== 'groups' && <UserSearch className="p-4" onOpenChat={handleOpenChat} />}
 
 							<div className="p-4">
 								{tab === 'friends' && (

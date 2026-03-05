@@ -21,7 +21,7 @@ const ChatCard = (
 	return (
 		<Card
 			key={convoId}
-			className={cn("border-none p-3 cursor-pointer trasition-smooth glass hover:bg-slate-100 dark:hover:bg-slate-800",
+			className={cn("border-none p-3 cursor-pointer transition-smooth glass hover:bg-slate-100 dark:hover:bg-slate-800 group",
 				isActive &&
 				"ring-2 ring-blue-500/50 bg-linear-to-tr from-blue-500/10 to-blue-500/30"
 			)}
@@ -46,9 +46,14 @@ const ChatCard = (
 
 					<div className="flex items-center justify-between">
 						<div className="flex items-center gap-1 flex-1 min-w-0">{subtitle}</div>
-						{rightSection}
 					</div>
 				</div>
+
+				{rightSection && (
+					<div className="flex items-center shrink-0">
+						{rightSection}
+					</div>
+				)}
 			</div>
 
 		</Card>

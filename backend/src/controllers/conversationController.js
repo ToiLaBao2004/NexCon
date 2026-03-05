@@ -1,7 +1,7 @@
 import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import Friend from '../models/friendModel.js';
-import { io } from '../socket/index.js';
+import { io, getReceiverSocketId } from '../socket/index.js';
 
 export async function createConversation(req, res) {
 	try {
@@ -44,6 +44,15 @@ export async function createConversation(req, res) {
 			{ path: 'seenBy', select: 'displayName avatarUrl' },
 			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
 		]);
+
+		// Gửi socket cho tất cả thành viên trong nhóm/cuộc trò chuyện
+		conversation.participants.forEach(p => {
+			const receiverSocketId = getReceiverSocketId(p.userId._id.toString());
+			if (receiverSocketId) {
+				io.to(receiverSocketId).emit("new-conversation", { conversation });
+			}
+		});
+
 		res.status(201).json({ conversation });
 	} catch (error) {
 		console.error('Error creating conversation:', error);

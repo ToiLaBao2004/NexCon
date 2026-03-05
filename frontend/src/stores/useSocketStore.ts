@@ -99,6 +99,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             useNotificationStore.getState().addNotification(notification);
         });
 
+        socket.on("new-conversation", ({ conversation }) => {
+            useChatStore.getState().updateConversation(conversation);
+            get().joinConversation(conversation._id);
+        });
+
     },
 
     joinConversation(conversationId: string) {
