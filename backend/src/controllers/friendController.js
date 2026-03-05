@@ -402,7 +402,7 @@ export async function getAllFriends(req, res) {
                 friendId: isUserA ? friend.userB._id : friend.userA._id,
                 displayName: isUserA ? friend.userB.displayName : friend.userA.displayName,
                 avatarUrl: isUserA ? friend.userB.avatarUrl : friend.userA.avatarUrl,
-                nickname: isUserA ? friend.nicknameA : friend.nicknameB,
+                nickname: isUserA ? friend.nicknameB : friend.nicknameA,
                 createdAt: friend.createdAt,
                 updatedAt: friend.updatedAt
             };
