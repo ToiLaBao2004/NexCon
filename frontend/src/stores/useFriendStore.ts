@@ -162,4 +162,29 @@ export const useFriendStore = create<FriendState>((set) => ({
 			return { friends: [friend, ...state.friends] };
 		});
 	},
+
+	removeFriend: (friendId) => {
+		set((state) => ({
+			friends: state.friends.filter((f) => f.friendId !== friendId)
+		}));
+	},
+
+	unfriendUser: async (friendId) => {
+		try {
+			set({ loading: true });
+			const data = await friendService.unfriendUser(friendId);
+			set((state) => ({
+				friends: state.friends.filter((f) => f.friendId !== friendId)
+			}));
+			toast.success(data.message || 'Đã hủy kết bạn.');
+		} catch (error: any) {
+			console.error('Unfriend error:', error);
+			toast.error(
+				error.response?.data?.message || 'Hủy kết bạn thất bại.'
+			);
+			throw error;
+		} finally {
+			set({ loading: false });
+		}
+	},
 }));
