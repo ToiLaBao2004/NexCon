@@ -39,5 +39,10 @@ export const friendService = {
 	setNickName: async (friendId: string, nickname: string) => {
 		const response = await api.post(`/friends/set-nickname/${friendId}`, { nickname });
 		return response.data;
+	},
+
+	unfriendUser: async (friendId: string) => {
+		const response = await api.delete(`/friends/unfriend/${friendId}`);
+		return response.data;
 	}
 };

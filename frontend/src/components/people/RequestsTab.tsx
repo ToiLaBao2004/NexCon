@@ -1,7 +1,6 @@
-import React from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, Check, X } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 
 export default function RequestsTab({ sentRequests, incomingRequests, processingId, onCancel, onAccept, onReject }: { sentRequests: any[]; incomingRequests: any[]; processingId: string | null; onCancel: (id: string) => Promise<void>; onAccept: (id: string) => Promise<void>; onReject: (id: string) => Promise<void>; }) {
     return (

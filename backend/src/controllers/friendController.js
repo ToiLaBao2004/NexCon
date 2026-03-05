@@ -306,6 +306,14 @@ export async function unfriendUser(req, res) {
             await FriendRequest.deleteOne({ _id: friendRequest._id });
         }
         await Friend.deleteOne({ _id: friendship._id });
+
+        const friendSocketId = getReceiverSocketId(friendId);
+        if (friendSocketId) {
+            io.to(friendSocketId).emit("unfriended", {
+                friendId: user._id
+            });
+        }
+
         return res.status(200).json({ message: `You unfriended ${friend.displayName}.` });
     } catch (error) {
         console.error('Unfriend user error:', error);
