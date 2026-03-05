@@ -240,7 +240,45 @@ export const useChatStore = create<ChatState>()(
                     console.error('Failed to create group:', error);
                     throw error;
                 }
-            }
+            },
+            recallMessage: async (messageId: string) => {
+                try {
+                    await chatService.recallMessage(messageId);
+                    set((state) => {
+                        const convoId = state.activeConversationId;
+                        if (!convoId) return state;
+
+                        const convoMessages = state.messages[convoId];
+                        if (!convoMessages) return state;
+
+                        return {
+                            messages: {
+                                ...state.messages,
+                                [convoId]: {
+                                    ...convoMessages,
+                                    items: convoMessages.items.map((m) =>
+                                        m._id === messageId ? { ...m, recalled: true } : m
+                                    )
+                                }
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error("An error occurred while recalling the message:", error);
+                }
+            },
+            recallMessageLocal: (conversationId, messageId, patch) =>
+                set((state) => ({
+                    messages: {
+                        ...state.messages,
+                        [conversationId]: {
+                            ...state.messages[conversationId],
+                            items: (state.messages[conversationId]?.items ?? []).map((m) =>
+                                m._id === messageId ? { ...m, ...patch } : m
+                            ),
+                        },
+                    },
+                })),
         }),
         {
             name: "chat-storage",

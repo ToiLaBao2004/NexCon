@@ -41,6 +41,8 @@ export interface ChatState {
   updateGroupName: (conversationId: string, name: string) => Promise<void>;
   openChat: (params: { userId?: string; conversationId?: string }) => Promise<void>;
   createGroup: (name: string, members: string[]) => Promise<void>;
+  recallMessage: (messageId: string) => Promise<void>;
+  recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
 }
 
 export interface SocketState {
