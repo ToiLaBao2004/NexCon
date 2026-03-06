@@ -53,3 +53,18 @@ export async function markAsUnread(req, res) {
         res.status(500).json({ success: false, message: 'Failed to mark notification as unread' });
     }
 }
+
+export async function deleteNotification(req, res) {
+    try {
+        const notificationId = req.params.id;
+        const notification = await Notification.findById(notificationId);
+        if (!notification) {
+            return res.status(404).json({ success: false, message: 'Notification not found' });
+        }
+        await Notification.deleteOne({ _id: notificationId });
+        res.status(200).json({ success: true, message: 'Notification deleted' });
+    } catch (error) {
+        console.error('Error deleting notification:', error);
+        res.status(500).json({ success: false, message: 'Failed to delete notification' });
+    }
+}
