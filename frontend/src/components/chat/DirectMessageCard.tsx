@@ -8,7 +8,7 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, UserX } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { UserActionDropdown } from "../shared/UserActionDropdown";
 import { useEffect, useMemo, useState } from "react";
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
@@ -122,6 +123,22 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
           >
             Đổi nickname
           </DropdownMenuItem>
+          <UserActionDropdown
+            userId={otherUser.userId?._id}
+            displayName={displayName}
+            trigger={(isBlocked) => (
+              <DropdownMenuItem
+                className={cn(
+                  "gap-2",
+                  isBlocked ? "text-primary focus:text-primary" : "text-destructive focus:text-destructive"
+                )}
+                onSelect={(e) => e.preventDefault()}
+              >
+                <UserX className="h-4 w-4" />
+                {isBlocked ? "Bỏ chặn" : "Chặn"}
+              </DropdownMenuItem>
+            )}
+          />
         </DropdownMenuContent>
       </DropdownMenu>
 

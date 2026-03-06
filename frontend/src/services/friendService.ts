@@ -44,5 +44,20 @@ export const friendService = {
 	unfriendUser: async (friendId: string) => {
 		const response = await api.delete(`/friends/unfriend/${friendId}`);
 		return response.data;
+	},
+
+	fetchBlockedList: async () => {
+		const response = await api.get('/friends/blocked-users');
+		return response.data;
+	},
+
+	blockUser: async (userId: string) => {
+		const response = await api.post(`/friends/block/${userId}`);
+		return response.data;
+	},
+
+	unblockUser: async (userId: string) => {
+		const response = await api.delete(`/friends/unblock/${userId}`);
+		return response.data;
 	}
 };

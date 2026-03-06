@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { UserPlus, Search, Loader2, X, UserMinus } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { UserActionDropdown } from "./UserActionDropdown";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { useFriendStore } from "@/stores/useFriendStore";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { FriendActionButtons } from "@/components/people/FriendActionButtons";
 import { cn } from "@/lib/utils";
@@ -100,10 +102,16 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
         });
     };
 
+    const { user: currentUser } = useAuthStore();
+    const isSelf = currentUser?._id === user?._id;
+
     const renderSecondaryActions = (mode: "icon" | "full") => {
+        if (isSelf) return null;
         if (isFriend) {
             return (
                 <FriendActionButtons
+                    userId={user?._id || ""}
+                    displayName={user?.displayName || ""}
                     onChat={(e) => {
                         e.stopPropagation();
                         setIsDialogOpen(false);
@@ -120,31 +128,55 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
             );
         }
 
+        const blockAction = (
+            <UserActionDropdown
+                userId={user?._id || ""}
+                displayName={user?.displayName || ""}
+                variant={mode === "full" ? "outline" : "ghost"}
+                mode={mode === "full" ? "button" : "dropdown"}
+            />
+        );
+
         if (mode === "full") {
             return (
-                <Button
-                    onClick={pendingRequest ? onCancelRequest : onSendRequest}
-                    variant={pendingRequest ? "outline" : "default"}
-                    disabled={actionLoading}
-                    className={cn(
-                        "mt-5 w-full gap-2 rounded-xl h-10 font-semibold transition-all active:scale-[0.98]",
-                        pendingRequest ? "border-destructive/30 text-destructive hover:bg-destructive/10" : "shadow-glow"
-                    )}
-                >
-                    {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (pendingRequest ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />)}
-                    {pendingRequest ? "Hủy kết bạn" : "Gửi lời mời kết bạn"}
-                </Button>
+                <div className="w-full flex flex-col gap-2 mt-5">
+                    <Button
+                        onClick={pendingRequest ? onCancelRequest : onSendRequest}
+                        variant={pendingRequest ? "outline" : "default"}
+                        disabled={actionLoading}
+                        className={cn(
+                            "w-full gap-2 rounded-xl h-10 font-semibold transition-all active:scale-[0.98]",
+                            pendingRequest ? "border-destructive/30 text-destructive hover:bg-destructive/10" : "shadow-glow"
+                        )}
+                    >
+                        {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (pendingRequest ? <UserMinus className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />)}
+                        {pendingRequest ? "Hủy kết bạn" : "Gửi lời mời kết bạn"}
+                    </Button>
+                    {blockAction}
+                </div>
             );
         }
 
         return (
-            <button
-                onClick={pendingRequest ? onCancelRequest : onSendRequest}
-                className={cn("p-1.5 rounded-full transition-colors", pendingRequest ? "hover:bg-destructive/10" : "hover:bg-primary/10")}
-                title={pendingRequest ? "Hủy lời mời" : "Gửi lời mời kết bạn"}
-            >
-                {actionLoading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : (pendingRequest ? <UserMinus className="h-4 w-4 text-destructive" /> : <UserPlus className="h-4 w-4 text-muted-foreground group-hover:text-primary" />)}
-            </button>
+            <div className="flex items-center gap-1">
+                <button
+                    onClick={pendingRequest ? onCancelRequest : onSendRequest}
+                    className={cn(
+                        "h-9 w-9 flex items-center justify-center rounded-xl transition-all active:scale-95 disabled:opacity-50",
+                        pendingRequest ? "hover:bg-destructive/10 text-destructive" : "hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                    )}
+                    title={pendingRequest ? "Hủy lời mời" : "Gửi lời mời kết bạn"}
+                >
+                    {actionLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : pendingRequest ? (
+                        <UserMinus className="h-5 w-5" />
+                    ) : (
+                        <UserPlus className="h-5 w-5" />
+                    )}
+                </button>
+                {blockAction}
+            </div>
         );
     };
 
@@ -192,12 +224,14 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
                                 <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">{user.displayName.charAt(0)}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold truncate">{user.displayName}</p>
+                                <p className="text-sm font-medium truncate">{user.displayName} {isSelf && "(Bạn)"}</p>
                                 <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                             </div>
-                            {renderSecondaryActions("icon")}
+                            <div className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
+                                {renderSecondaryActions("icon")}
+                            </div>
                         </div>
-                        {!pendingRequest && !isFriend && (
+                        {!pendingRequest && !isFriend && !isSelf && (
                             <div className="mt-1" onClick={(e) => e.stopPropagation()}>
                                 <Input
                                     placeholder="Nhập lời nhắn..."
@@ -210,30 +244,28 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
                     </div>
 
                     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogContent className="sm:max-w-md border-primary/10 shadow-glow">
-                            <DialogHeader>
-                                <DialogTitle className="text-xl font-bold">{isFriend ? "Thông tin bạn bè" : "Thêm bạn bè"}</DialogTitle>
-                            </DialogHeader>
-                            <div className="py-2">
-                                <div className="flex flex-col items-center p-6 rounded-2xl bg-card border border-border/40 shadow-soft">
-                                    <Avatar className="h-24 w-24 ring-4 ring-primary/10 mb-4">
-                                        <AvatarImage src={user.avatarUrl} />
-                                        <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">{user.displayName.charAt(0)}</AvatarFallback>
-                                    </Avatar>
-                                    <h3 className="text-lg font-bold">{user.displayName}</h3>
-                                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                                    {!pendingRequest && !isFriend && (
-                                        <div className="w-full mt-4">
-                                            <Input
-                                                placeholder="Lời nhắn kết bạn..."
-                                                value={requestMessage}
-                                                onChange={(e) => setRequestMessage(e.target.value)}
-                                                className="bg-muted/30"
-                                            />
-                                        </div>
-                                    )}
-                                    {renderSecondaryActions("full")}
+                        <DialogContent className="sm:max-w-md border-primary/10 shadow-glow p-8 flex flex-col items-center justify-center">
+                            <Avatar className="h-28 w-28 ring-8 ring-primary/5 mb-6">
+                                <AvatarImage src={user.avatarUrl} />
+                                <AvatarFallback className="text-3xl font-bold bg-primary/10 text-primary">{user.displayName.charAt(0)}</AvatarFallback>
+                            </Avatar>
+
+                            <h3 className="text-2xl font-semibold text-foreground mb-1 text-center">{user.displayName} {isSelf && "(Bạn)"}</h3>
+                            <p className="text-sm text-muted-foreground mb-8 text-center">{user.email}</p>
+
+                            {!pendingRequest && !isFriend && !isSelf && (
+                                <div className="w-full mb-6">
+                                    <Input
+                                        placeholder="Lời nhắn kết bạn..."
+                                        value={requestMessage}
+                                        onChange={(e) => setRequestMessage(e.target.value)}
+                                        className="bg-muted/30 rounded-xl h-11"
+                                    />
                                 </div>
+                            )}
+
+                            <div className="w-full flex items-center justify-center">
+                                {renderSecondaryActions("full")}
                             </div>
                         </DialogContent>
                     </Dialog>

@@ -73,7 +73,7 @@ const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
 						}
 					</div>
 					{/* name */}
-					<h2 className="font-semibold text-foreground flex-1">
+					<h2 className="font-medium text-foreground flex-1">
 						{displayName}
 					</h2>
 

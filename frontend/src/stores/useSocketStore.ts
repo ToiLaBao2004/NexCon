@@ -6,7 +6,6 @@ import { useChatStore } from './useChatStore';
 import { useFriendStore } from './useFriendStore';
 import { useNotificationStore } from './useNotificationStore';
 import { toast } from 'sonner';
-import { use } from 'react';
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -108,6 +107,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         socket.on("recall-message", ({ conversationId, messageId, content, isRecalled }) => {
             useChatStore.getState().recallMessageLocal(conversationId, messageId, { content, isRecalled });
             useChatStore.getState().fetchConversations();
+        });
+
+        socket.on("user-blocked", ({ blockedBy }) => {
+            useFriendStore.getState().addBlockedBy(blockedBy);
+        });
+
+        socket.on("user-unblocked", ({ unblockedBy }) => {
+            useFriendStore.getState().removeBlockedBy(unblockedBy);
         });
 
     },

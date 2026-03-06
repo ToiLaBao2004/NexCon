@@ -74,6 +74,13 @@ export interface FriendState {
   addFriend: (friend: FriendItem) => void;
   removeFriend: (friendId: string) => void;
   unfriendUser: (friendId: string) => Promise<void>;
+  blockedUsers: any[];
+  blockedBy: string[];
+  fetchBlockedList: () => Promise<void>;
+  blockUser: (userId: string) => Promise<void>;
+  unblockUser: (userId: string) => Promise<void>;
+  addBlockedBy: (userId: string) => void;
+  removeBlockedBy: (userId: string) => void;
 }
 
 export interface Notification {

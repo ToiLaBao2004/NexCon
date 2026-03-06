@@ -66,7 +66,7 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
                                         {friend.nickname || friend.displayName}
                                     </p>
                                     <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -76,6 +76,8 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                                 </div>
 
                                 <FriendActionButtons
+                                    userId={friend.friendId}
+                                    displayName={friend.nickname || friend.displayName}
                                     onChat={() => onOpenChat(friend)}
                                     onUnfriend={() => handleOpenUnfriendModal(friend)}
                                     isProcessing={isProcessing}

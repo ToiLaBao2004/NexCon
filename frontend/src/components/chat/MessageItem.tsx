@@ -10,7 +10,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useChatStore } from "@/stores/useChatStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { UserActionDropdown } from "@/components/shared/UserActionDropdown";
 import { useState } from "react";
+import { UserX } from "lucide-react";
 
 interface MessageItemProps {
 	message: Message;
@@ -141,6 +143,25 @@ const MessageItem = ({
 									>
 										Thu hồi
 									</DropdownMenuItem>
+								)}
+
+								{!isOwn && participant && (
+									<UserActionDropdown
+										userId={participant.userId._id}
+										displayName={participant.userId.displayName}
+										trigger={(isBlocked) => (
+											<DropdownMenuItem
+												className={cn(
+													"gap-2",
+													isBlocked ? "text-primary focus:text-primary" : "text-destructive focus:text-destructive"
+												)}
+												onSelect={(e) => e.preventDefault()}
+											>
+												<UserX className="h-4 w-4" />
+												{isBlocked ? "Bỏ chặn" : "Chặn"}
+											</DropdownMenuItem>
+										)}
+									/>
 								)}
 							</DropdownMenuContent>
 						</DropdownMenu>
