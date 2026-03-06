@@ -12,6 +12,7 @@ import messageRouter from './routes/messageRoute.js';
 import conversationRouter from './routes/conversationRoute.js';
 import notificationRouter from './routes/notificationRoute.js';
 import { app, server } from './socket/index.js';
+import { v2 as cloudinary } from 'cloudinary';
 
 
 // const app = express();    
@@ -23,6 +24,12 @@ app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // public routes
 app.use('/api/auth', authRouter);
@@ -37,9 +44,9 @@ app.use('/api/conversations', conversationRouter);
 app.use('/api/notifications', notificationRouter);
 
 connectDB().then(() => {
-  server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
+    server.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
 });
 
 

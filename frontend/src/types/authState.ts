@@ -15,9 +15,9 @@ export default interface AuthState {
   ) => Promise<void>;
 
   signUp: (
-    email: string, 
-    password: string, 
-    firstName: string, 
+    email: string,
+    password: string,
+    firstName: string,
     lastName: string,
     otp: string
   ) => Promise<void>;
@@ -27,7 +27,7 @@ export default interface AuthState {
     password: string
   ) => Promise<void>;
 
-  updateNewPassword : (
+  updateNewPassword: (
     email: string,
     newPassword: string,
     confirmNewPassword: string
@@ -37,7 +37,7 @@ export default interface AuthState {
 
   loginGoogle: () => void;
 
-  fetchMe: () => Promise<void>;
+  fetchMe: (silent?: boolean) => Promise<void>;
 
   refreshToken: () => Promise<void>;
 

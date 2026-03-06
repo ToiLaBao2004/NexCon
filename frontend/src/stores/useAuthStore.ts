@@ -135,9 +135,9 @@ export const useAuthStore = create<AuthState>()(
       }
     },
 
-    fetchMe: async () => {
+    fetchMe: async (silent = false) => {
       try {
-        set({ loading: true });
+        if (!silent) set({ loading: true });
         const user = await authService.fetchMe();
         set({ user });
       } catch (error: any) {
@@ -150,7 +150,7 @@ export const useAuthStore = create<AuthState>()(
         }
         throw error;
       } finally {
-        set({ loading: false });
+        if (!silent) set({ loading: false });
       }
     },
 
