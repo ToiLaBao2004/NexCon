@@ -37,3 +37,19 @@ export async function markAllAsRead(req, res) {
         res.status(500).json({ success: false, message: 'Failed to mark all notifications as read' });
     }
 }
+
+export async function markAsUnread(req, res) {
+    try {
+        const notificationId = req.params.id;
+        const notification = await Notification.findById(notificationId);
+        if (!notification) {
+            return res.status(404).json({ success: false, message: 'Notification not found' });
+        }
+        notification.isRead = false;
+        await notification.save();
+        res.status(200).json({ success: true, message: 'Notification marked as unread' });
+    } catch (error) {
+        console.error('Error marking notification as unread:', error);
+        res.status(500).json({ success: false, message: 'Failed to mark notification as unread' });
+    }
+}
