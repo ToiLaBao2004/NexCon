@@ -7,14 +7,21 @@ import { Input } from "../ui/input";
 import EmojiPicker from "./EmojiPicker";
 
 import { useChatStore } from "@/stores/useChatStore";
+import { useFriendStore } from "@/stores/useFriendStore";
 import { toast } from "sonner";
 
 const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
     const { user } = useAuthStore();
     const { sendDirectMessage, sendGroupMessage } = useChatStore();
+    const { friends } = useFriendStore();
     const [value, setValue] = useState("");
 
-    if (!user) return;
+    if (!user) return null;
+
+    const participants = selectedConvo.participants;
+    const otherUser = participants.find((p) => p.userId?._id?.toString() !== user._id.toString());
+    const isFriend = selectedConvo.type === "group" ||
+        friends.some((f: any) => f.friendId === otherUser?.userId?._id);
 
     const sendMessage = async () => {
         if (!value.trim()) return;
@@ -23,15 +30,18 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
         try {
             if (selectedConvo.type === "direct") {
-                const participants = selectedConvo.participants;
-                const otherUser = participants.filter((p) => p.userId?._id?.toString() !== user._id.toString())[0];
-                await sendDirectMessage(otherUser?.userId?._id, currValue);
+                await sendDirectMessage(otherUser?.userId?._id as string, currValue);
             } else {
                 await sendGroupMessage(selectedConvo._id, currValue);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            toast.error("An error occurred while sending the message. Please try again!");
+            if (error.response?.status === 403) {
+                toast.error("Không thể nhắn tin khi chưa là bạn bè");
+            } else {
+                toast.error("An error occurred while sending the message. Please try again!");
+            }
+            setValue(currValue);
         }
     };
 
@@ -40,6 +50,16 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
             e.preventDefault();
             sendMessage();
         }
+    }
+
+    if (!isFriend) {
+        return (
+            <div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/50">
+                <p className="text-sm text-muted-foreground italic">
+                    Kết bạn để có thể gửi tin nhắn cho nhau.
+                </p>
+            </div>
+        );
     }
 
     return (

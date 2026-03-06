@@ -91,6 +91,7 @@ export const useChatStore = create<ChatState>()(
                     }));
                 } catch (error) {
                     console.error("An error occurred while sending direct message:", error);
+                    throw error;
                 }
             },
             sendGroupMessage: async (conversationId, content, imgUrl) => {
@@ -102,6 +103,7 @@ export const useChatStore = create<ChatState>()(
                     }))
                 } catch (error) {
                     console.error("An error occurred while sending group message:", error);
+                    throw error;
                 }
 
             },
