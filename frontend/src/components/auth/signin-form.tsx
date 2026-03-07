@@ -12,8 +12,8 @@ import { useAuthStore } from "@/stores/useAuthStore"
 import { useNavigate } from "react-router"
 
 const signInSchema = z.object({
-  email: z.email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  email: z.string().email("Địa chỉ email không hợp lệ"),
+  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
 })
 
 type SignInFormValues = z.infer<typeof signInSchema>
@@ -36,7 +36,7 @@ export function SigninForm({
     } catch (error: any) {
       console.error("Sign in failed:", error);
       // map backend error message to form fields
-      const backendMsg = error.response?.data?.message || "Sign in failed.";
+      const backendMsg = error.response?.data?.message || "Đăng nhập thất bại.";
       if (backendMsg.toLowerCase().includes("email")) {
         setError("email", { type: "server", message: backendMsg });
       } else if (backendMsg.toLowerCase().includes("password")) {
@@ -52,7 +52,7 @@ export function SigninForm({
     if (!emailValue) {
       setError("email", {
         type: "manual",
-        message: "Please enter your email to reset password",
+        message: "Vui lòng nhập email của bạn để đặt lại mật khẩu",
       });
       return;
     }
@@ -66,7 +66,7 @@ export function SigninForm({
     } catch (error: any) {
       console.error("Send OTP failed:", error);
       // map backend error message to form fields
-      const backendMsg = error.response?.data?.message || "Send OTP failed.";
+      const backendMsg = error.response?.data?.message || "Gửi mã OTP thất bại.";
       if (backendMsg.toLowerCase().includes("email")) {
         setError("email", { type: "server", message: backendMsg });
       } else if (backendMsg.toLowerCase().includes("password")) {
@@ -92,7 +92,7 @@ export function SigninForm({
               </a>
               <h1 className="text-2xl font-bold">NexCon</h1>
               <p className="text-sm text-muted-foreground text-balance">
-                Login your NexCon account to continue
+                Đăng nhập vào tài khoản NexCon của bạn để tiếp tục
               </p>
             </div>
             {/* email */}
@@ -108,10 +108,10 @@ export function SigninForm({
             <div className="flex flex-col gap-2 mt-3">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-sm">
-                  Password
+                  Mật khẩu
                 </Label>
                 <a onClick={handleForgotPassword} className="text-center text-sm underline-offset-4 hover:underline cursor-pointer">
-                  Forgot password?
+                  Quên mật khẩu?
                 </a>
               </div>
               <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
@@ -120,18 +120,18 @@ export function SigninForm({
             </div>
             {/* submit button */}
             <Button type="submit" className="w-full mt-5 cursor-pointer" disabled={isSubmitting}>
-              Submit
+              Đăng nhập
             </Button>
             <div className="flex items-center my-4">
               <div className="flex-1 h-px bg-border" />
-              <span className="px-2 text-xs text-muted-foreground">Or continue with</span>
+              <span className="px-2 text-xs text-muted-foreground">Hoặc tiếp tục với</span>
               <div className="flex-1 h-px bg-border" />
             </div>
             <Button type="button" variant="outline" className="w-full flex items-center justify-center gap-2 cursor-pointer" onClick={handleGoogleSignIn}>
-              <FcGoogle className="h-5 w-5" />Continue with Google
+              <FcGoogle className="h-5 w-5" />Tiếp tục với Google
             </Button>
             <div className="text-center text-sm mt-3">
-              Don't have an account?{" "}<a href="/signup" className="underline underline-offset-4 hover:text-primary">Sign up</a>
+              Bạn chưa có tài khoản?{" "}<a href="/signup" className="underline underline-offset-4 hover:text-primary">Đăng ký</a>
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
@@ -144,8 +144,8 @@ export function SigninForm({
         </CardContent>
       </Card>
       <div className="text-xs text-center px-6 text-muted-foreground [a]:underline [a]:underline-offset-4 [a]:hover:text-primary text-balance">
-        By clicking continue, you agree to our <a href="#" className="underline underline-offset-4">Terms of Service</a>{" "}
-        and <a href="#" className="underline underline-offset-4">Privacy Policy</a>.
+        Bằng cách nhấp vào tiếp tục, bạn đồng ý với của chúng tôi <a href="#" className="underline underline-offset-4">Điều khoản dịch vụ</a>{" "}
+        và <a href="#" className="underline underline-offset-4">Chính sách bảo mật</a>.
       </div>
     </div>
   )

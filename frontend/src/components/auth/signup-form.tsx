@@ -11,10 +11,10 @@ import { useOTPStore } from "@/stores/useOtpStore"
 import { useNavigate } from "react-router"
 
 const signUpSchema = z.object({
-  firstname: z.string().min(1, "First name is required"),
-  lastname: z.string().min(1, "Last name is required"),
-  email: z.email("Invalid email address"),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  firstname: z.string().min(1, "Tên là bắt buộc"),
+  lastname: z.string().min(1, "Họ là bắt buộc"),
+  email: z.string().email("Địa chỉ email không hợp lệ"),
+  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
 })
 
 type SignUpFormValues = z.infer<typeof signUpSchema>
@@ -42,7 +42,7 @@ export function SignupForm({
     } catch (error: any) {
       console.error("Sign up failed:", error);
       // map backend error message to form fields
-      const backendMsg = error.response?.data?.message || "Sign up failed.";
+      const backendMsg = error.response?.data?.message || "Đăng ký thất bại.";
       if (backendMsg.toLowerCase().includes("email")) {
         setError("email", { type: "server", message: backendMsg });
       } else if (backendMsg.toLowerCase().includes("password")) {
@@ -63,26 +63,26 @@ export function SignupForm({
               <a href="/" className="mx-auto block w-fit text-center">
                 <img src="/logo.svg" alt="logo" />
               </a>
-              <h1 className="text-2xl font-bold">Create a NexCon account</h1>
+              <h1 className="text-2xl font-bold">Tạo tài khoản NexCon</h1>
               <p className="text-sm text-muted-foreground text-balance">
-                Start your journey with NexCon today!
+                Bắt đầu hành trình của bạn với NexCon ngay hôm nay!
               </p>
             </div>
             {/* name */}
             <div className="grid grid-cols-2 gap-3 mt-3">
               <div className="space-y-2">
                 <Label htmlFor="lastname" className="block text-sm">
-                  Last Name
+                  Họ
                 </Label>
-                <Input id="lastname" type="text" placeholder="Last Name" {...register("lastname")} />
+                <Input id="lastname" type="text" placeholder="Họ" {...register("lastname")} />
                 {/* todo: error message */}
                 {errors.lastname && <p className="text-sm text-destructive">{errors.lastname.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="firstname" className="block text-sm">
-                  First Name
+                  Tên
                 </Label>
-                <Input id="firstname" type="text" placeholder="First Name" {...register("firstname")} />
+                <Input id="firstname" type="text" placeholder="Tên" {...register("firstname")} />
                 {/* todo: error message */}
                 {errors.firstname && <p className="text-sm text-destructive">{errors.firstname.message}</p>}
               </div>
@@ -99,7 +99,7 @@ export function SignupForm({
             {/* password */}
             <div className="flex flex-col gap-2 mt-3">
               <Label htmlFor="password" className="block text-sm">
-                Password
+                Mật khẩu
               </Label>
               <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
               {/* todo: error message */}
@@ -107,12 +107,12 @@ export function SignupForm({
             </div>
             {/* submit button */}
             <Button type="submit" className="w-full mt-5" disabled={isSubmitting}>
-              Submit
+              Đăng ký
             </Button>
             {/* global error message */}
             {errors.root && <p className="text-sm text-destructive mt-2">{errors.root.message}</p>}
             <div className="text-center text-sm mt-3">
-              Already have an account?{" "}<a href="/signin" className="underline underline-offset-4 hover:text-primary">Log in</a>
+              Bạn đã có tài khoản?{" "}<a href="/signin" className="underline underline-offset-4 hover:text-primary">Đăng nhập</a>
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
@@ -125,8 +125,8 @@ export function SignupForm({
         </CardContent>
       </Card>
       <div className="text-xs text-center px-6 text-muted-foreground [a]:underline [a]:underline-offset-4 [a]:hover:text-primary text-balance">
-        By clicking continue, you agree to our <a href="#" className="underline underline-offset-4">Terms of Service</a>{" "}
-        and <a href="#" className="underline underline-offset-4">Privacy Policy</a>.
+        Bằng cách nhấp vào tiếp tục, bạn đồng ý với của chúng tôi <a href="#" className="underline underline-offset-4">Điều khoản dịch vụ</a>{" "}
+        và <a href="#" className="underline underline-offset-4">Chính sách bảo mật</a>.
       </div>
     </div>
   )

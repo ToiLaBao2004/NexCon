@@ -59,7 +59,7 @@ const MainSidebar = () => {
             await signOut();
             navigate("/signin");
         } catch (error) {
-            console.error("Logout failed:", error);
+            console.error("Đăng xuất thất bại:", error);
         }
     };
 
@@ -68,10 +68,10 @@ const MainSidebar = () => {
     };
 
     const navItems = [
-        { icon: Video, label: "Meet", id: "meet", path: "/meet" },
-        { icon: Users, label: "People", id: "people", path: "/people" },
-        { icon: Calendar, label: "Reminder", id: "reminder", path: "/reminder" },
-        { icon: Bell, label: "Notification", id: "notification", path: "/notification" },
+        { icon: Video, label: "Cuộc họp", id: "meet", path: "/meet" },
+        { icon: Users, label: "Mọi người", id: "people", path: "/people" },
+        { icon: Calendar, label: "Lời nhắc", id: "reminder", path: "/reminder" },
+        { icon: Bell, label: "Thông báo", id: "notification", path: "/notification" },
     ];
 
     const isPathActive = (path: string) => {
@@ -170,7 +170,7 @@ const MainSidebar = () => {
                                 )}
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-popover text-popover-foreground shadow-soft border-border/50">Chat</TooltipContent>
+                        <TooltipContent side="right" sideOffset={15} className="font-semibold font-sans bg-popover text-popover-foreground shadow-soft border-border/50">Trò chuyện</TooltipContent>
                     </Tooltip>
 
                     {navItems.map((item) => {

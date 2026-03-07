@@ -17,7 +17,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			const data = await friendService.fetchFriends();
 			set({ friends: data.listedFriends || [] });
 		} catch (error) {
-			console.error('Fetch friends error:', error);
+			console.error('Lỗi khi tải danh sách bạn bè:', error);
 		}
 	},
 
@@ -26,7 +26,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			const data = await friendService.fetchIncomingRequests();
 			set({ incomingRequests: data.friendRequests || [] });
 		} catch (error) {
-			console.error('Fetch incoming requests error:', error);
+			console.error('Lỗi khi tải lời mời kết bạn đến:', error);
 		}
 	},
 
@@ -35,7 +35,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			const data = await friendService.fetchSentRequests();
 			set({ sentRequests: data.friendRequests || [] });
 		} catch (error) {
-			console.error('Fetch sent requests error:', error);
+			console.error('Lỗi khi tải lời mời kết bạn đi:', error);
 		}
 	},
 
@@ -45,9 +45,9 @@ export const useFriendStore = create<FriendState>((set) => ({
 			await friendService.setNickName(friendId, nickName);
 			toast.success('Biệt danh đã được cập nhật.');
 		} catch (error: any) {
-			console.error('Set nickname error:', error);
+			console.error('Lỗi khi đặt biệt danh:', error);
 			toast.error(
-				error.response?.data?.message || 'Failed to update nickname. Please try again.'
+				error.response?.data?.message || 'Cập nhật biệt danh thất bại. Vui lòng thử lại.'
 			);
 			throw error;
 		} finally {
@@ -65,7 +65,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 
 			toast.success(data.message || 'Đã gửi lời mời kết bạn!');
 		} catch (error: any) {
-			console.error('Send friend request error:', error);
+			console.error('Lỗi khi gửi lời mời kết bạn:', error);
 			toast.error(
 				error.response?.data?.message || 'Gửi lời mời kết bạn thất bại.'
 			);
@@ -84,7 +84,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			}));
 			toast.success(data.message || 'Đã hủy lời mời kết bạn.');
 		} catch (error: any) {
-			console.error('Cancel friend request error:', error);
+			console.error('Lỗi khi hủy lời mời kết bạn:', error);
 			toast.error(
 				error.response?.data?.message || 'Hủy lời mời thất bại.'
 			);
@@ -104,7 +104,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			}));
 			toast.success(data.message || 'Đã chấp nhận lời mời kết bạn!');
 		} catch (error: any) {
-			console.error('Accept friend request error:', error);
+			console.error('Lỗi khi chấp nhận kết bạn:', error);
 			toast.error(
 				error.response?.data?.message || 'Chấp nhận lời mời thất bại.'
 			);
@@ -123,7 +123,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			}));
 			toast.success(data.message || 'Đã từ chối lời mời kết bạn.');
 		} catch (error: any) {
-			console.error('Reject friend request error:', error);
+			console.error('Lỗi khi từ chối kết bạn:', error);
 			toast.error(
 				error.response?.data?.message || 'Từ chối lời mời thất bại.'
 			);
@@ -184,7 +184,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			}));
 			toast.success(data.message || 'Đã hủy kết bạn.');
 		} catch (error: any) {
-			console.error('Unfriend error:', error);
+			console.error('Lỗi khi hủy kết bạn:', error);
 			toast.error(
 				error.response?.data?.message || 'Hủy kết bạn thất bại.'
 			);
@@ -199,7 +199,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			const data = await friendService.fetchBlockedList();
 			set({ blockedUsers: data.blockedUsers || [] });
 		} catch (error) {
-			console.error('Fetch blocked list error:', error);
+			console.error('Lỗi khi tải danh sách chặn:', error);
 		}
 	},
 
@@ -213,7 +213,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			}));
 			toast.success(data.message || 'Đã chặn.');
 		} catch (error: any) {
-			console.error('Block user error:', error);
+			console.error('Lỗi khi chặn người dùng:', error);
 			toast.error(error.response?.data?.message || 'Chặn thất bại.');
 		} finally {
 			set({ loading: false });
@@ -229,7 +229,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 			}));
 			toast.success(data.message || 'Đã bỏ chặn.');
 		} catch (error: any) {
-			console.error('Unblock user error:', error);
+			console.error('Lỗi khi bỏ chặn người dùng:', error);
 			toast.error(error.response?.data?.message || 'Bỏ chặn thất bại.');
 		} finally {
 			set({ loading: false });

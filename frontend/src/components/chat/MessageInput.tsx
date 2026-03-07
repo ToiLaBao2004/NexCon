@@ -38,11 +38,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
                 await sendGroupMessage(selectedConvo._id, currValue);
             }
         } catch (error: any) {
-            console.error(error);
+            console.error("Lỗi gửi tin nhắn:", error);
             if (error.response?.status === 403) {
                 toast.error("Không thể nhắn tin cho người này");
             } else {
-                toast.error("An error occurred while sending the message. Please try again!");
+                toast.error("Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại!");
             }
             setValue(currValue);
         }

@@ -38,7 +38,7 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
             await onUnfriend(selectedFriend.friendId);
             setUnfriendModalOpen(false);
         } catch (error) {
-            console.error("Unfriend error:", error);
+            console.error("Lỗi khi hủy kết bạn:", error);
         } finally {
             setProcessingId(null);
             setSelectedFriend(null);
