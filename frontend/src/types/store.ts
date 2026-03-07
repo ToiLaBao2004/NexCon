@@ -51,6 +51,10 @@ export interface SocketState {
   connectSocket: () => void;
   joinConversation: (conversationId: string) => void;
   disconnectSocket: () => void;
+  typingUsers: Record<string, string[]>;
+  setTypingUser: (conversationId: string, userId: string, isTyping: boolean) => void;
+  emitTyping: (conversationId: string) => void;
+  emitStopTyping: (conversationId: string) => void;
 }
 
 export interface FriendState {

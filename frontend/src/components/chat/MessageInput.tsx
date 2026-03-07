@@ -1,6 +1,6 @@
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { Conversation } from "@/types/chat";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "../ui/button";
 import { ImagePlus, Send } from "lucide-react";
 import { Input } from "../ui/input";
@@ -8,13 +8,16 @@ import EmojiPicker from "./EmojiPicker";
 
 import { useChatStore } from "@/stores/useChatStore";
 import { useFriendStore } from "@/stores/useFriendStore";
+import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
 
 const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
     const { user } = useAuthStore();
+    const { emitTyping, emitStopTyping } = useSocketStore();
     const { sendDirectMessage, sendGroupMessage } = useChatStore();
     const { blockedUsers, blockedBy } = useFriendStore();
     const [value, setValue] = useState("");
+    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     if (!user) return null;
 
@@ -30,6 +33,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
         if (!value.trim()) return;
         const currValue = value;
         setValue("");
+
+        emitStopTyping(selectedConvo._id);
+        if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current);
+        }
 
         try {
             if (selectedConvo.type === "direct") {
@@ -54,6 +62,27 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
             sendMessage();
         }
     }
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setValue(e.target.value);
+
+        if (e.target.value.trim()) {
+            emitTyping(selectedConvo._id);
+
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
+
+            typingTimeoutRef.current = setTimeout(() => {
+                emitStopTyping(selectedConvo._id);
+            }, 2000);
+        } else {
+            emitStopTyping(selectedConvo._id);
+            if (typingTimeoutRef.current) {
+                clearTimeout(typingTimeoutRef.current);
+            }
+        }
+    };
 
     if (selectedConvo.type === "direct") {
         if (isBlockedByMe) {
@@ -87,7 +116,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
                 <Input
                     onKeyDown={handleKeyPress}
                     value={value}
-                    onChange={(e) => setValue(e.target.value)}
+                    onChange={handleInputChange}
                     placeholder="Soạn tin nhắn"
                     className="pr-20 h-9 bg-white border-border/50 focus:border-primary/50 transition-smooth resize-none"
                 ></Input>

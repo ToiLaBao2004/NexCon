@@ -13,6 +13,40 @@ const baseURL = import.meta.env.VITE_SOCKET_URL;
 export const useSocketStore = create<SocketState>((set, get) => ({
     socket: null,
     onlineUsers: [],
+    typingUsers: {},
+    setTypingUser: (conversationId, userId, isTyping) => {
+        set((state) => {
+            const currentTypingUsers = state.typingUsers[conversationId] || [];
+            if (isTyping && !currentTypingUsers.includes(userId)) {
+                return {
+                    typingUsers: {
+                        ...state.typingUsers,
+                        [conversationId]: [...currentTypingUsers, userId],
+                    },
+                };
+            } else if (!isTyping && currentTypingUsers.includes(userId)) {
+                return {
+                    typingUsers: {
+                        ...state.typingUsers,
+                        [conversationId]: currentTypingUsers.filter((id) => id !== userId),
+                    },
+                };
+            }
+            return state;
+        });
+    },
+    emitTyping: (conversationId) => {
+        const socket = get().socket;
+        if (socket) {
+            socket.emit("typing", { conversationId });
+        }
+    },
+    emitStopTyping: (conversationId) => {
+        const socket = get().socket;
+        if (socket) {
+            socket.emit("stop-typing", { conversationId });
+        }
+    },
     connectSocket() {
         const accessToken = useAuthStore.getState().accessToken;
         const existingSocket = get().socket;
@@ -129,6 +163,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
         socket.on("user-unblocked", ({ unblockedBy }) => {
             useFriendStore.getState().removeBlockedBy(unblockedBy);
+        });
+
+        socket.on("user-typing", ({ conversationId, userId }) => {
+            get().setTypingUser(conversationId, userId, true);
+        });
+
+        socket.on("user-stopped-typing", ({ conversationId, userId }) => {
+            get().setTypingUser(conversationId, userId, false);
         });
 
     },
