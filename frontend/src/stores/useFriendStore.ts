@@ -9,6 +9,8 @@ export const useFriendStore = create<FriendState>((set) => ({
 	friends: [],
 	incomingRequests: [],
 	sentRequests: [],
+	blockedUsers: [],
+	blockedBy: [],
 
 	fetchFriends: async () => {
 		try {
@@ -41,7 +43,7 @@ export const useFriendStore = create<FriendState>((set) => ({
 		try {
 			set({ loading: true });
 			await friendService.setNickName(friendId, nickName);
-			toast.success('Nickname updated.');
+			toast.success('Biệt danh đã được cập nhật.');
 		} catch (error: any) {
 			console.error('Set nickname error:', error);
 			toast.error(
@@ -57,6 +59,10 @@ export const useFriendStore = create<FriendState>((set) => ({
 		try {
 			set({ sendingRequest: true });
 			const data = await friendService.sendFriendRequest(email, message);
+			set((state) => ({
+				blockedUsers: state.blockedUsers.filter(u => u.email.toLowerCase() !== email.toLowerCase())
+			}));
+
 			toast.success(data.message || 'Đã gửi lời mời kết bạn!');
 		} catch (error: any) {
 			console.error('Send friend request error:', error);
@@ -186,5 +192,59 @@ export const useFriendStore = create<FriendState>((set) => ({
 		} finally {
 			set({ loading: false });
 		}
+	},
+
+	fetchBlockedList: async () => {
+		try {
+			const data = await friendService.fetchBlockedList();
+			set({ blockedUsers: data.blockedUsers || [] });
+		} catch (error) {
+			console.error('Fetch blocked list error:', error);
+		}
+	},
+
+	blockUser: async (userId) => {
+		try {
+			set({ loading: true });
+			const data = await friendService.blockUser(userId);
+			set((state) => ({
+				blockedUsers: [...state.blockedUsers, data.blockedUser],
+				friends: state.friends.filter(f => f.friendId !== userId)
+			}));
+			toast.success(data.message || 'Đã chặn.');
+		} catch (error: any) {
+			console.error('Block user error:', error);
+			toast.error(error.response?.data?.message || 'Chặn thất bại.');
+		} finally {
+			set({ loading: false });
+		}
+	},
+
+	unblockUser: async (userId) => {
+		try {
+			set({ loading: true });
+			const data = await friendService.unblockUser(userId);
+			set((state) => ({
+				blockedUsers: state.blockedUsers.filter(u => u._id !== userId)
+			}));
+			toast.success(data.message || 'Đã bỏ chặn.');
+		} catch (error: any) {
+			console.error('Unblock user error:', error);
+			toast.error(error.response?.data?.message || 'Bỏ chặn thất bại.');
+		} finally {
+			set({ loading: false });
+		}
+	},
+
+	addBlockedBy: (userId) => {
+		set((state) => ({
+			blockedBy: state.blockedBy.includes(userId) ? state.blockedBy : [...state.blockedBy, userId]
+		}));
+	},
+
+	removeBlockedBy: (userId) => {
+		set((state) => ({
+			blockedBy: state.blockedBy.filter(id => id !== userId)
+		}));
 	},
 }));

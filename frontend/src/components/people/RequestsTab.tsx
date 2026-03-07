@@ -13,10 +13,10 @@ export default function RequestsTab({ sentRequests, incomingRequests, processing
                             <div key={r._id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/40">
                                 <Avatar className="h-10 w-10"><AvatarImage src={r.to.avatarUrl} /><AvatarFallback>{r.to.displayName.charAt(0)}</AvatarFallback></Avatar>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-foreground truncate">{r.to.displayName}</p>
+                                    <p className="text-sm font-medium text-foreground truncate">{r.to.displayName}</p>
                                     <p className="text-xs text-muted-foreground truncate">{r.message || r.to.email}</p>
                                 </div>
-                                <div className="shrink-0">
+                                <div className="flex items-center gap-2">
                                     <Button size="sm" variant="outline" onClick={async () => { await onCancel(r._id); }}>Hủy</Button>
                                 </div>
                             </div>
@@ -37,7 +37,7 @@ export default function RequestsTab({ sentRequests, incomingRequests, processing
                                 <div key={request._id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/40">
                                     <Avatar className="h-10 w-10"><AvatarImage src={request.from.avatarUrl} /><AvatarFallback>{request.from.displayName.charAt(0)}</AvatarFallback></Avatar>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold text-foreground truncate">{request.from.displayName}</p>
+                                        <p className="text-sm font-medium text-foreground truncate">{request.from.displayName}</p>
                                         <p className="text-xs text-muted-foreground truncate">{request.message || request.from.email}</p>
                                     </div>
                                     <div className="flex items-center gap-2">

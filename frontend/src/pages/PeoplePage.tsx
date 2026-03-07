@@ -20,6 +20,7 @@ const PeoplePage = () => {
 		fetchIncomingRequests,
 		fetchSentRequests,
 		fetchFriends,
+		fetchBlockedList,
 		acceptFriendRequest,
 		rejectFriendRequest,
 		cancelFriendRequest,
@@ -39,6 +40,7 @@ const PeoplePage = () => {
 		fetchFriends();
 		fetchIncomingRequests();
 		fetchSentRequests();
+		fetchBlockedList();
 	}, []);
 
 	useEffect(() => {
@@ -143,7 +145,7 @@ const PeoplePage = () => {
 								{header.icon}
 							</div>
 							<div>
-								<h1 className="text-lg font-semibold text-foreground tracking-tight">{header.title}</h1>
+								<h1 className="text-lg font-medium text-foreground tracking-tight">{header.title}</h1>
 								<p className="text-xs text-muted-foreground">
 									{header.desc}
 								</p>

@@ -22,7 +22,7 @@ export const ChatActionButton = ({
             <Button
                 onClick={onClick}
                 className={cn(
-                    "flex-1 gap-2 rounded-xl h-10 font-semibold shadow-soft hover:bg-primary/90 transition-all active:scale-95",
+                    "flex-1 min-w-[120px] gap-2 rounded-xl h-10 font-medium shadow-soft hover:bg-primary/90 transition-all active:scale-95",
                     className
                 )}
             >

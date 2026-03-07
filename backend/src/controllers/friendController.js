@@ -24,6 +24,13 @@ export async function sendFriendRequest(req, res) {
         const blockedBySender = await BlockUser.findOne({ from: sender._id, to: receiver._id });
         if (blockedBySender) {
             await BlockUser.deleteOne({ _id: blockedBySender._id });
+            // Notify receiver that they are unblocked
+            const receiverSocketId = getReceiverSocketId(receiver._id.toString());
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("user-unblocked", {
+                    unblockedBy: sender._id.toString()
+                });
+            }
         }
         if (sender._id.toString() === receiver._id.toString()) {
             return res.status(400).json({ message: 'You cannot send a friend request to yourself.' });
@@ -66,7 +73,7 @@ export async function sendFriendRequest(req, res) {
                     friendRequest: populatedRequest
                 });
             }
-            return res.status(201).json({ message: `You sent a friend request to ${receiver.displayName} successfully.` });
+            return res.status(201).json({ message: `Đã gửi lời mời kết bạn đến ${receiver.displayName} thành công.` });
         }
         const reverseRequest = await FriendRequest.findOne({
             from: receiver._id,
@@ -92,7 +99,7 @@ export async function sendFriendRequest(req, res) {
                     message: `${sender.displayName} đã chấp nhận lời mời kết bạn của bạn.`
                 });
             }
-            return res.status(201).json({ message: `You and ${receiver.displayName} are now friends.` });
+            return res.status(201).json({ message: `Bạn và ${receiver.displayName} hiện đã là bạn bè.` });
         }
         const friendRequest = new FriendRequest({
             from: sender._id,
@@ -113,7 +120,7 @@ export async function sendFriendRequest(req, res) {
                 friendRequest: populatedRequest
             });
         }
-        return res.status(201).json({ message: `You sent a friend request to ${receiver.displayName} successfully.` });
+        return res.status(201).json({ message: `Đã gửi lời mời kết bạn đến ${receiver.displayName} thành công.` });
     } catch (error) {
         console.error('Send friend request error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -161,7 +168,7 @@ export async function acceptFriendRequest(req, res) {
             });
         }
         return res.status(200).json({
-            message: `You accepted the friend request from ${sender.displayName}.`,
+            message: `Bạn đã chấp nhận lời mời kết bạn từ ${sender.displayName}.`,
             newFriend: {
                 _id: newFriend._id,
                 friendId: sender._id,
@@ -200,7 +207,7 @@ export async function rejectFriendRequest(req, res) {
                 message: `${receiver.displayName} đã từ chối lời mời kết bạn của bạn.`
             });
         }
-        return res.status(200).json({ message: `You rejected the friend request from ${sender.displayName}.` });
+        return res.status(200).json({ message: `Bạn đã từ chối lời mời kết bạn từ ${sender.displayName}.` });
     } catch (error) {
         console.error('Reject friend request error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -228,7 +235,7 @@ export async function resendFriendRequest(req, res) {
             "Friend Request Resent",
             `${sender.displayName} đã gửi lại lời mời kết bạn.`,
             `${process.env.FRONTEND_URL}/people?tab=requests`);
-        return res.status(200).json({ message: `You resent the friend request to ${receiver.displayName}.` });
+        return res.status(200).json({ message: `Đã gửi lại lời mời kết bạn đến ${receiver.displayName}.` });
     } catch (error) {
         console.error('Accept friend request error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -257,7 +264,7 @@ export async function cancelFriendRequest(req, res) {
                 requestId
             });
         }
-        return res.status(200).json({ message: 'Friend request canceled successfully.' });
+        return res.status(200).json({ message: 'Đã hủy lời mời kết bạn thành công.' });
     } catch (error) {
         console.error('Cancel friend request error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -314,7 +321,7 @@ export async function unfriendUser(req, res) {
             });
         }
 
-        return res.status(200).json({ message: `You unfriended ${friend.displayName}.` });
+        return res.status(200).json({ message: `Bạn đã hủy kết bạn với ${friend.displayName}.` });
     } catch (error) {
         console.error('Unfriend user error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -356,7 +363,24 @@ export async function blockUser(req, res) {
             to: userBlocked._id
         });
         await blockEntry.save();
-        return res.status(200).json({ message: `You have blocked ${userBlocked.displayName}.` });
+
+        const receiverSocketId = getReceiverSocketId(userIdBlocked);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("user-blocked", {
+                blockedBy: user._id.toString()
+            });
+        }
+
+        return res.status(200).json({
+            message: `Bạn đã chặn ${userBlocked.displayName}.`,
+            blockedUser: {
+                _id: userBlocked._id,
+                displayName: userBlocked.displayName,
+                email: userBlocked.email,
+                avatarUrl: userBlocked.avatarUrl,
+                blockedAt: blockEntry.createdAt
+            }
+        });
     } catch (error) {
         console.error('Block user error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -376,7 +400,15 @@ export async function unblockUser(req, res) {
             return res.status(400).json({ message: `${userUnblocked.displayName} is not blocked by you.` });
         }
         await BlockUser.deleteOne({ _id: blockEntry._id });
-        return res.status(200).json({ message: `You have unblocked ${userUnblocked.displayName}.` });
+
+        const receiverSocketId = getReceiverSocketId(userIdUnblocked);
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit("user-unblocked", {
+                unblockedBy: user._id.toString()
+            });
+        }
+
+        return res.status(200).json({ message: `Bạn đã bỏ chặn ${userUnblocked.displayName}.` });
     } catch (error) {
         console.error('Unblock user error:', error);
         return res.status(500).json({ message: 'Server error' });

@@ -32,6 +32,8 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "../ui/switch";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { ProfileEditDialog } from "./ProfileEditDialog";
 
 const MainSidebar = () => {
     const { user, signOut } = useAuthStore();
@@ -41,6 +43,7 @@ const MainSidebar = () => {
     const { conversations, setFocusedConversation } = useChatStore();
     const navigate = useNavigate();
     const location = useLocation();
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     const friendRequestCount = incomingRequests.length;
 
@@ -98,7 +101,7 @@ const MainSidebar = () => {
                                 <div className="absolute bottom-1 right-1 h-3 w-3 rounded-full bg-green-500 border-2 border-card shadow-glow" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-64 ml-2" align="start" side="right" sideOffset={15}>
+                        <DropdownMenuContent className="w-80 ml-2" align="start" side="right" sideOffset={15}>
                             <DropdownMenuLabel className="font-normal px-2 py-3">
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-10 w-10 rounded-lg">
@@ -107,10 +110,20 @@ const MainSidebar = () => {
                                     </Avatar>
                                     <div className="flex flex-col space-y-0.5">
                                         <p className="text-sm font-semibold leading-none">{user?.displayName}</p>
-                                        <p className="text-xs text-muted-foreground truncate w-40">{user?.email}</p>
+                                        <p className="text-xs text-muted-foreground truncate w-60">{user?.email}</p>
                                     </div>
                                 </div>
                             </DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuGroup>
+                                <DropdownMenuItem
+                                    className="cursor-pointer py-2"
+                                    onSelect={() => setIsProfileOpen(true)}
+                                >
+                                    <Users className="mr-2 h-4 w-4" />
+                                    <span>Hồ sơ của tôi</span>
+                                </DropdownMenuItem>
+                            </DropdownMenuGroup>
                             <DropdownMenuSeparator />
                             <DropdownMenuGroup>
                                 <DropdownMenuItem
@@ -200,7 +213,7 @@ const MainSidebar = () => {
                 </div>
             </TooltipProvider>
 
-            <div className="mt-auto" />
+            <ProfileEditDialog open={isProfileOpen} onOpenChange={setIsProfileOpen} />
         </aside>
     );
 };

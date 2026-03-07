@@ -1,9 +1,12 @@
 import { UserMinus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChatActionButton } from "@/components/people/ChatActionButton";
+import { UserActionDropdown } from "@/components/shared/UserActionDropdown";
 import { cn } from "@/lib/utils";
 
 interface FriendActionButtonsProps {
+    userId: string;
+    displayName: string;
     onChat: (e: React.MouseEvent) => void;
     onUnfriend: (e: React.MouseEvent) => void;
     isProcessing?: boolean;
@@ -12,6 +15,8 @@ interface FriendActionButtonsProps {
 }
 
 export const FriendActionButtons = ({
+    userId,
+    displayName,
     onChat,
     onUnfriend,
     isProcessing = false,
@@ -24,7 +29,7 @@ export const FriendActionButtons = ({
             onClick={onUnfriend}
             variant="outline"
             disabled={isProcessing}
-            className="flex-1 gap-2 rounded-xl h-10 font-semibold border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/40 transition-all active:scale-95"
+            className="flex-1 min-w-[120px] gap-2 rounded-xl h-10 font-medium border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/40 transition-all active:scale-95"
         >
             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}
             Hủy kết bạn
@@ -41,9 +46,18 @@ export const FriendActionButtons = ({
     );
 
     return (
-        <div className={cn("flex items-center gap-1 shrink-0", variant === "full" && "w-full gap-2", className)}>
+        <div className={cn(
+            "flex items-center gap-1 shrink-0",
+            variant === "full" && "w-full gap-3 justify-center flex-wrap sm:flex-nowrap",
+            className
+        )}>
             <ChatActionButton onClick={onChat} variant={variant} />
             {UnfriendAction}
+            <UserActionDropdown
+                userId={userId}
+                displayName={displayName}
+                mode={variant === "full" ? "button" : "dropdown"}
+            />
         </div>
     );
 };

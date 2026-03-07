@@ -36,6 +36,7 @@ function App() {
       useFriendStore.getState().fetchIncomingRequests();
       useFriendStore.getState().fetchFriends();
       useFriendStore.getState().fetchSentRequests();
+      useFriendStore.getState().fetchBlockedList();
       useNotificationStore.getState().fetchNotifications();
       useChatStore.getState().fetchConversations();
     }
