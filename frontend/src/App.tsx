@@ -23,7 +23,7 @@ import { useChatStore } from "./stores/useChatStore";
 
 function App() {
   const { isDark, setTheme } = useThemeStore();
-  const { accessToken } = useAuthStore();
+  const { accessToken, fetchMe } = useAuthStore();
   const { connectSocket, disconnectSocket } = useSocketStore();
 
   useEffect(() => {
@@ -32,6 +32,7 @@ function App() {
 
   useEffect(() => {
     if (accessToken) {
+      fetchMe();
       connectSocket();
       useFriendStore.getState().fetchIncomingRequests();
       useFriendStore.getState().fetchFriends();

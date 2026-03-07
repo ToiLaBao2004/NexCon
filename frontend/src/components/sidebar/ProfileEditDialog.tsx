@@ -57,6 +57,8 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             setLoading(true);
             await userService.updateProfile(formData);
             await fetchMe(true);
+            // ẩn popup
+            onOpenChange(false);
             toast.success("Cập nhật thông tin thành công");
         } catch (error: any) {
             console.error("Update profile error:", error);

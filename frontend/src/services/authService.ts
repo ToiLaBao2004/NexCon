@@ -1,6 +1,6 @@
 import api from '@/lib/axios';
 
-const BACKEND_URL="http://localhost:5001";
+const BACKEND_URL = "http://localhost:5001";
 
 export const authService = {
   verifyValidFieldsSignUp: async (
@@ -32,8 +32,8 @@ export const authService = {
     email: string,
     password: string
   ) => {
-    const response = await api.post('/auth/signin', 
-      { email, password }, 
+    const response = await api.post('/auth/signin',
+      { email, password },
       { withCredentials: true }
     );
     return response.data;
@@ -50,7 +50,7 @@ export const authService = {
     );
     return response.data;
   },
-  
+
   signOut: async () => {
     return await api.post('/auth/signout', {}, { withCredentials: true });
   },
@@ -60,7 +60,7 @@ export const authService = {
   },
 
   fetchMe: async () => {
-    const response =  await api.get('/users/me', { withCredentials: true });
+    const response = await api.get('/users/me', { withCredentials: true });
     return response.data.user;
   },
 
