@@ -6,6 +6,7 @@ import { useChatStore } from './useChatStore';
 import { useFriendStore } from './useFriendStore';
 import { useNotificationStore } from './useNotificationStore';
 import { toast } from 'sonner';
+import { playMessageSound } from '@/utils/sound';
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -34,7 +35,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         });
 
         socket.on("new-message", ({ message, conversation, unreadCounts }) => {
+            const chatState = useChatStore.getState();
+            const currentUserId = useAuthStore.getState().user?._id;
+
             useChatStore.getState().addMessage(message);
+
             const lastMessage = {
                 _id: conversation.lastMessage._id,
                 content: conversation.lastMessage.content,
@@ -45,18 +50,27 @@ export const useSocketStore = create<SocketState>((set, get) => ({
                     avatarUrl: null
                 }
             };
+
             const updatedConversation = {
                 ...conversation,
                 lastMessage,
                 unreadCounts
+            };
+
+            const isFocused = chatState.focusedConversationId === message.conversationId;
+            const senderId = message.senderId || message.sender?._id;
+            const isMine = String(senderId) === String(currentUserId);
+
+            if (isFocused) {
+                chatState.markAsSeen();
             }
 
-            if (useChatStore.getState().focusedConversationId === message.conversationId) {
-                useChatStore.getState().markAsSeen();
-            }
+            chatState.updateConversation(updatedConversation);
 
-            useChatStore.getState().updateConversation(updatedConversation);
-        })
+            if (!isMine) {
+                playMessageSound();
+            }
+        });
 
         socket.on("read-message", ({ conversationId, lastMessage }) => {
             const updated = {
