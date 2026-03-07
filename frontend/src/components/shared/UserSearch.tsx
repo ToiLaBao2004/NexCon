@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from "react";
-import { UserPlus, Search, Loader2, X, UserMinus } from "lucide-react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Search, Loader2, X, UserMinus, UserPlus } from "lucide-react";
 import { UserActionDropdown } from "./UserActionDropdown";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { FriendActionButtons } from "@/components/people/FriendActionButtons";
+import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import { cn } from "@/lib/utils";
 
 interface SearchedUser {
@@ -18,6 +18,7 @@ interface SearchedUser {
     email: string;
     avatarUrl: string;
     phone?: string;
+    bio?: string;
 }
 
 type SearchStatus = "idle" | "searching" | "found" | "not-found" | "error" | "empty";
@@ -243,32 +244,22 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
                         )}
                     </div>
 
-                    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                        <DialogContent className="sm:max-w-md border-primary/10 shadow-glow p-8 flex flex-col items-center justify-center">
-                            <Avatar className="h-28 w-28 ring-8 ring-primary/5 mb-6">
-                                <AvatarImage src={user.avatarUrl} />
-                                <AvatarFallback className="text-3xl font-bold bg-primary/10 text-primary">{user.displayName.charAt(0)}</AvatarFallback>
-                            </Avatar>
-
-                            <h3 className="text-2xl font-semibold text-foreground mb-1 text-center">{user.displayName} {isSelf && "(Bạn)"}</h3>
-                            <p className="text-sm text-muted-foreground mb-8 text-center">{user.email}</p>
-
-                            {!pendingRequest && !isFriend && !isSelf && (
-                                <div className="w-full mb-6">
-                                    <Input
-                                        placeholder="Lời nhắn kết bạn..."
-                                        value={requestMessage}
-                                        onChange={(e) => setRequestMessage(e.target.value)}
-                                        className="bg-muted/30 rounded-xl h-11"
-                                    />
-                                </div>
-                            )}
-
-                            <div className="w-full flex items-center justify-center">
-                                {renderSecondaryActions("full")}
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                    <UserProfileDialog
+                        open={isDialogOpen}
+                        onOpenChange={setIsDialogOpen}
+                        user={user ? {
+                            _id: user._id,
+                            displayName: user.displayName,
+                            email: user.email,
+                            avatarUrl: user.avatarUrl,
+                            bio: user.bio,
+                            phone: user.phone,
+                        } : null}
+                        onOpenChat={(friend) => {
+                            setIsDialogOpen(false);
+                            onOpenChat?.(friend);
+                        }}
+                    />
                 </>
             )}
 

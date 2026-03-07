@@ -9,11 +9,15 @@ import GroupChatAvatar from "./GroupChatAvatar";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { X } from "lucide-react";
 import { Button } from "../ui/button";
+import { UserProfileDialog } from "../shared/UserProfileDialog";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
 	const { conversations, activeConversationId, setActiveConversation } = useChatStore();
 	const { user } = useAuthStore();
 	const { onlineUsers } = useSocketStore();
+	const [isProfileOpen, setIsProfileOpen] = useState(false);
 	let otherUser;
 
 	chat = chat ?? conversations.find((c) => c._id === activeConversationId);
@@ -51,7 +55,10 @@ const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
 				/>
 				<div className="p-2 w-full flex items-center gap-3">
 					{/* avatar */}
-					<div className="relative">
+					<div
+						className="relative cursor-pointer hover:opacity-80 transition-opacity"
+						onClick={() => chat?.type === "direct" && setIsProfileOpen(true)}
+					>
 						{
 							chat.type === "direct" ? (
 								<>
@@ -60,7 +67,6 @@ const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
 										name={displayName}
 										avatarUrl={otherUser?.userId?.avatarUrl || undefined}
 									/>
-									{/* todo: socket io */}
 									{onlineUsers.includes(otherUser?.userId?._id ?? "") && (
 										<StatusBadge status="online" />)}
 								</>
@@ -73,7 +79,13 @@ const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
 						}
 					</div>
 					{/* name */}
-					<h2 className="font-medium text-foreground flex-1">
+					<h2
+						className={cn(
+							"font-medium text-foreground flex-1",
+							chat.type === "direct" && "cursor-pointer hover:text-primary transition-colors"
+						)}
+						onClick={() => chat?.type === "direct" && setIsProfileOpen(true)}
+					>
 						{displayName}
 					</h2>
 
@@ -87,6 +99,22 @@ const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
 					</Button>
 				</div>
 			</div>
+
+			{chat.type === "direct" && otherUser && (
+				<UserProfileDialog
+					open={isProfileOpen}
+					onOpenChange={setIsProfileOpen}
+					user={{
+						_id: otherUser.userId._id,
+						displayName: otherUser.userId.displayName,
+						email: otherUser.userId.email || "",
+						avatarUrl: otherUser.userId.avatarUrl || undefined,
+						bio: otherUser.userId.bio,
+						phone: otherUser.userId.phone,
+					}}
+					onOpenChat={() => setIsProfileOpen(false)}
+				/>
+			)}
 
 		</header>
 	);

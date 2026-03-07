@@ -113,7 +113,7 @@ export async function sendFriendRequest(req, res) {
             `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${message ? `"${message}"` : ""}`,
             `${process.env.FRONTEND_URL}/people?tab=requests`);
         const populatedRequest = await FriendRequest.findById(friendRequest._id)
-            .populate('from', 'displayName email avatarUrl');
+            .populate('from', 'displayName email avatarUrl bio phone');
         const receiverSocketId = getReceiverSocketId(receiver._id.toString());
         if (receiverSocketId) {
             io.to(receiverSocketId).emit("new-friend-request", {
@@ -275,7 +275,7 @@ export async function getFriendRequests(req, res) {
     try {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ to: user._id, status: 'pending' })
-            .populate('from', 'displayName email avatarUrl');
+            .populate('from', 'displayName email avatarUrl bio phone');
         if (friendRequests.length === 0) {
             return res.status(200).json({ friendRequests: [] });
         }
@@ -424,16 +424,20 @@ export async function getAllFriends(req, res) {
                 { userB: user._id }
             ]
         }).populate([
-            { path: 'userA', select: 'displayName avatarUrl' },
-            { path: 'userB', select: 'displayName avatarUrl' }
+            { path: 'userA', select: 'displayName avatarUrl email bio phone' },
+            { path: 'userB', select: 'displayName avatarUrl email bio phone' }
         ]).lean();
         const listedFriends = friends.map(friend => {
             const isUserA = friend.userA._id.toString() === user._id.toString();
+            const friendUser = isUserA ? friend.userB : friend.userA;
             return {
                 _id: friend._id,
-                friendId: isUserA ? friend.userB._id : friend.userA._id,
-                displayName: isUserA ? friend.userB.displayName : friend.userA.displayName,
-                avatarUrl: isUserA ? friend.userB.avatarUrl : friend.userA.avatarUrl,
+                friendId: friendUser._id,
+                displayName: friendUser.displayName,
+                avatarUrl: friendUser.avatarUrl,
+                email: friendUser.email,
+                bio: friendUser.bio,
+                phone: friendUser.phone,
                 nickname: isUserA ? friend.nicknameB : friend.nicknameA,
                 createdAt: friend.createdAt,
                 updatedAt: friend.updatedAt
@@ -450,7 +454,7 @@ export async function getFriendRequestsSended(req, res) {
     try {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ from: user._id, status: 'pending' })
-            .populate('to', 'displayName email avatarUrl');
+            .populate('to', 'displayName email avatarUrl bio phone');
         if (friendRequests.length === 0) {
             return res.status(200).json({ friendRequests: [] });
         }

@@ -4,6 +4,9 @@ export interface Participant {
     displayName: string;
     avatarUrl?: string | null;
     nickname?: string | null;
+    email: string;
+    bio?: string;
+    phone?: string;
   };
   joinedAt: string;
 }
