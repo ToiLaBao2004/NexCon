@@ -8,7 +8,7 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, UserX } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -121,6 +121,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
               onChangeNickname();
             }}
           >
+            <PencilLine className="h-4 w-4" />
             Đổi nickname
           </DropdownMenuItem>
           <UserActionDropdown

@@ -41,10 +41,12 @@ const MessageItem = ({
 	);
 
 	const isOwn = message.senderId === currentUserId;
+	const isRecalled = message.isRecalled === true;
 
-	const seenByOthers = selectedConvo.seenBy?.filter(
-		(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
-	) ?? [];
+	const seenByOthers =
+		selectedConvo.seenBy?.filter(
+			(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
+		) ?? [];
 
 	const { recallMessage } = useChatStore();
 
@@ -60,6 +62,12 @@ const MessageItem = ({
 		}
 	};
 
+	const displayContent = isRecalled
+		? isOwn
+			? "Bạn đã thu hồi một tin nhắn"
+			: "Tin nhắn đã được thu hồi"
+		: message.content;
+
 	return (
 		<>
 			<div
@@ -68,7 +76,6 @@ const MessageItem = ({
 					isOwn ? "justify-end" : "justify-start"
 				)}
 			>
-				{/* Avatar */}
 				{!isOwn && (
 					<div className="w-8 shrink-0 pt-0.5">
 						{isGroupBreak && (
@@ -90,99 +97,104 @@ const MessageItem = ({
 					<div className="relative">
 						<Card
 							className={cn(
-								"px-3.5 py-2.5 text-sm leading-relaxed shadow-sm border-0",
-								isOwn
-									? "bg-blue-500 text-white rounded-2xl rounded-br-none"
-									: "bg-gray-100 dark:bg-gray-800 text-foreground rounded-2xl rounded-bl-none"
+								"px-3.5 py-2.5 text-sm leading-relaxed shadow-sm",
+								isRecalled
+									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
+									: isOwn
+										? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
+										: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
 							)}
 						>
-							{message.content}
+							{displayContent}
 						</Card>
 
-						{/* Icon 3 chấm */}
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<button
-									className={cn(
-										"absolute top-1/2 -translate-y-1/2",
-										isOwn ? "-left-10 sm:-left-11" : "-right-10 sm:-right-11",
-										"opacity-0 group-hover:opacity-70 hover:opacity-100",
-										"transition-opacity duration-150 ease-in-out",
-										"text-muted-foreground hover:text-foreground",
-										"p-1.5 rounded-full hover:bg-accent/40",
-										"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-									)}
-									aria-label="Message actions"
-								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="18"
-										height="18"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										strokeWidth="2.2"
-										strokeLinecap="round"
-										strokeLinejoin="round"
-									>
-										<circle cx="12" cy="12" r="1" />
-										<circle cx="19" cy="12" r="1" />
-										<circle cx="5" cy="12" r="1" />
-									</svg>
-								</button>
-							</DropdownMenuTrigger>
-
-							<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
-								<DropdownMenuItem>Trả lời</DropdownMenuItem>
-								<DropdownMenuItem>Sao chép</DropdownMenuItem>
-
-								{isOwn && (
-									<DropdownMenuItem
-										className="text-destructive focus:text-destructive focus:bg-destructive/10"
-										onClick={() => setShowConfirmRecall(true)}
-									>
-										Thu hồi
-									</DropdownMenuItem>
-								)}
-
-								{!isOwn && participant && (
-									<UserActionDropdown
-										userId={participant.userId._id}
-										displayName={participant.userId.displayName}
-										trigger={(isBlocked) => (
-											<DropdownMenuItem
-												className={cn(
-													"gap-2",
-													isBlocked ? "text-primary focus:text-primary" : "text-destructive focus:text-destructive"
-												)}
-												onSelect={(e) => e.preventDefault()}
-											>
-												<UserX className="h-4 w-4" />
-												{isBlocked ? "Bỏ chặn" : "Chặn"}
-											</DropdownMenuItem>
+						{!isRecalled && (
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<button
+										className={cn(
+											"absolute top-1/2 -translate-y-1/2",
+											isOwn ? "-left-10 sm:-left-11" : "-right-10 sm:-right-11",
+											"opacity-0 group-hover:opacity-70 hover:opacity-100",
+											"transition-opacity duration-150 ease-in-out",
+											"text-muted-foreground hover:text-foreground",
+											"p-1.5 rounded-full hover:bg-accent/40",
+											"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
 										)}
-									/>
-								)}
-							</DropdownMenuContent>
-						</DropdownMenu>
+										aria-label="Message actions"
+									>
+										<svg
+											xmlns="http://www.w3.org/2000/svg"
+											width="18"
+											height="18"
+											viewBox="0 0 24 24"
+											fill="none"
+											stroke="currentColor"
+											strokeWidth="2.2"
+											strokeLinecap="round"
+											strokeLinejoin="round"
+										>
+											<circle cx="12" cy="12" r="1" />
+											<circle cx="19" cy="12" r="1" />
+											<circle cx="5" cy="12" r="1" />
+										</svg>
+									</button>
+								</DropdownMenuTrigger>
+
+								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
+									<DropdownMenuItem>Trả lời</DropdownMenuItem>
+									<DropdownMenuItem>Sao chép</DropdownMenuItem>
+
+									{isOwn && (
+										<DropdownMenuItem
+											className="text-destructive focus:text-destructive focus:bg-destructive/10"
+											onClick={() => setShowConfirmRecall(true)}
+										>
+											Thu hồi
+										</DropdownMenuItem>
+									)}
+
+									{!isOwn && participant && (
+										<UserActionDropdown
+											userId={participant.userId._id}
+											displayName={participant.userId.displayName}
+											trigger={(isBlocked) => (
+												<DropdownMenuItem
+													className={cn(
+														"gap-2",
+														isBlocked
+															? "text-primary focus:text-primary"
+															: "text-destructive focus:text-destructive"
+													)}
+													onSelect={(e) => e.preventDefault()}
+												>
+													<UserX className="h-4 w-4" />
+													{isBlocked ? "Bỏ chặn" : "Chặn"}
+												</DropdownMenuItem>
+											)}
+										/>
+									)}
+								</DropdownMenuContent>
+							</DropdownMenu>
+						)}
 					</div>
 
-					{/* Thời gian */}
 					{isGroupBreak && (
 						<span className="text-xs text-muted-foreground mt-0.5 px-1.5">
 							{formatMessageTime(new Date(message.createdAt))}
 						</span>
 					)}
 
-					{/* Seen */}
 					{isOwn && index === messages.length - 1 && (
 						<div className="flex items-center gap-1.5 mt-0.5 px-1.5">
 							{seenByOthers.length > 0 ? (
 								seenByOthers.map((seenId) => {
-									const seenUserId = typeof seenId === "string" ? seenId : seenId._id?.toString();
+									const seenUserId =
+										typeof seenId === "string" ? seenId : seenId._id?.toString();
 									const seenParticipant = selectedConvo.participants.find(
 										(p) => p.userId?._id?.toString() === seenUserId
 									);
+
 									return seenParticipant ? (
 										<UserAvatar
 											key={seenUserId}
@@ -200,7 +212,6 @@ const MessageItem = ({
 				</div>
 			</div>
 
-			{/* Popup xác nhận thu hồi */}
 			<ConfirmationModal
 				isOpen={showConfirmRecall}
 				onClose={() => setShowConfirmRecall(false)}
@@ -209,8 +220,6 @@ const MessageItem = ({
 				description="Tin nhắn này sẽ bị xóa khỏi cuộc trò chuyện của bạn và những người khác. Hành động này không thể hoàn tác."
 				confirmText="Thu hồi"
 				variant="destructive"
-			// Nếu store có loading state, bạn có thể truyền isLoading={isRecalling}
-			// isLoading={isRecalling}
 			/>
 		</>
 	);

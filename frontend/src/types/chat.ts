@@ -55,6 +55,7 @@ export interface Message {
   conversationId: string;
   senderId: string;
   content: string | null;
+  isRecalled: boolean | null;
   imgUrl?: string | null;
   updatedAt?: string | null;
   createdAt: string;

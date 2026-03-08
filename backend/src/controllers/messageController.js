@@ -80,11 +80,11 @@ export async function recallMessagge(req, res) {
         }
         const conversation = await Conversation.findById(message.conversationId);
         if (conversation.lastMessage.content === message.content && conversation.lastMessage.createdAt.getTime() === message.createdAt.getTime()) {
-            message.content = 'Tin nhắn này đã được thu hồi';
-            updateConversationLastMessage(conversation, message, senderId);
+            const recalledContent = 'Tin nhắn này đã được thu hồi';
+            const createdAt = new Date();
+            updateConversationLastMessage(conversation, { ...message, content: recalledContent, createdAt }, senderId);
             await conversation.save();
         }
-        message.content = 'Tin nhắn này đã được thu hồi';
         message.isRecalled = true;
         await message.save();
         conversation.participants.forEach(p => {
