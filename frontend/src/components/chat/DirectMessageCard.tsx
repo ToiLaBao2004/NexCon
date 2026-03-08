@@ -174,6 +174,32 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     </Dialog>
   );
 
+  const lastMessageObj = convo.lastMessage as any;
+  const lastMessageSenderId = lastMessageObj?.sender?._id || lastMessageObj?.senderId?._id || lastMessageObj?.senderId;
+  const isMyLastMessage = lastMessageSenderId?.toString() === user._id.toString();
+
+  const seenByOthers = convo.seenBy?.filter(
+    (s: any) => (typeof s === "string" ? s : s._id?.toString()) !== user._id.toString()
+  ) ?? [];
+
+  let statusIcon = null;
+  if (isMyLastMessage && seenByOthers.length > 0) {
+    const seenId = seenByOthers[0];
+    const seenUserId = typeof seenId === "string" ? seenId : seenId._id?.toString();
+    const seenParticipant = convo.participants.find(
+      (p) => p.userId?._id?.toString() === seenUserId
+    );
+    if (seenParticipant) {
+      statusIcon = (
+        <UserAvatar
+          type="seen"
+          name={seenParticipant.userId.displayName ?? ""}
+          avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
+        />
+      );
+    }
+  }
+
   return (
     <ChatCard
       convoId={convo._id}
@@ -183,6 +209,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
       onSelect={handleSelectConversation}
       unreadCount={unreadCount}
       rightSection={menuNode}
+      statusIcon={statusIcon}
       leftSection={
         <>
           <UserAvatar
@@ -199,7 +226,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
           "text-sm truncate",
           unreadCount > 0 ? "font-medium text-foreground" : "text-muted-foreground"
         )}>
-          {lastMessage}
+          {lastMessage ? (isMyLastMessage ? "Bạn: " : "") + lastMessage : ""}
         </p>
       }
     />

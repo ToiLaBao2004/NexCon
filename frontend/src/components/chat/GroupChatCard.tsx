@@ -22,8 +22,9 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "../ui/input";
 import { Button } from "@/components/ui/button";
+import UserAvatar from "./UserAvatar";
 
-const GroupChatCard = ({ convo }: { convo: Conversation }) => {
+const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideStatusIcon?: boolean }) => {
 	const { user } = useAuthStore();
 	const {
 		focusedConversationId,
@@ -156,6 +157,45 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 		</Dialog>
 	);
 
+	const lastMessageObj = convo.lastMessage as any;
+	const lastMessageSenderId = lastMessageObj?.sender?._id || lastMessageObj?.senderId?._id || lastMessageObj?.senderId;
+	const isMyLastMessage = lastMessageSenderId?.toString() === user._id.toString();
+
+	const seenByOthers = convo.seenBy?.filter(
+		(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== user._id.toString()
+	) ?? [];
+
+	let statusIcon = null;
+	if (!hideStatusIcon && isMyLastMessage && seenByOthers.length > 0) {
+		statusIcon = (
+			<div className="flex -space-x-1">
+				{[...seenByOthers].reverse().slice(0, 3).map((seenId) => {
+					const seenUserId = typeof seenId === "string" ? seenId : seenId._id?.toString();
+					const seenParticipant = convo.participants.find(
+						(p) => p.userId?._id?.toString() === seenUserId
+					);
+					if (!seenParticipant) return null;
+					return (
+						<UserAvatar
+							key={seenUserId}
+							type="seen"
+							name={seenParticipant.userId.displayName ?? ""}
+							avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
+							className="border-[1px] border-background"
+						/>
+					);
+				}).reverse()}
+			</div>
+		);
+	}
+
+	const senderParticipant = convo.participants.find(p => p.userId?._id?.toString() === lastMessageSenderId?.toString());
+	const senderName = lastMessageObj?.sender?.displayName || lastMessageObj?.senderId?.displayName || senderParticipant?.userId?.displayName || senderParticipant?.userId?.nickname || "Ai đó";
+
+	const lastMessageText = convo.lastMessage?.content
+		? (isMyLastMessage ? "Bạn: " : `${senderName}: `) + convo.lastMessage.content
+		: `${convo.participants.length} Thành Viên`;
+
 	return (
 		<ChatCard
 			convoId={convo._id}
@@ -167,6 +207,7 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 			onSelect={handleSelectConversation}
 			unreadCount={unreadCount}
 			rightSection={menuNode}
+			statusIcon={statusIcon}
 			leftSection={
 				<>
 					{unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
@@ -174,8 +215,8 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 				</>
 			}
 			subtitle={
-				<p className="text-sm truncate text-muted-foreground">
-					{convo.participants.length} Thành Viên
+				<p className={`text-sm truncate ${unreadCount > 0 ? "font-medium text-foreground" : "text-muted-foreground"}`}>
+					{lastMessageText}
 				</p>
 			}
 		/>

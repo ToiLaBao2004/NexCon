@@ -63,7 +63,7 @@ export default function GroupsTab() {
                 {groups.length > 0 ? (
                     groups.map((group) => (
                         <div key={group._id} className="w-full">
-                            <GroupChatCard convo={group as any} />
+                            <GroupChatCard convo={group as any} hideStatusIcon={true} />
                         </div>
                     ))
                 ) : (
