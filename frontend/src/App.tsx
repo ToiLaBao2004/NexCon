@@ -20,6 +20,7 @@ import { useSocketStore } from "./stores/useSocketStore";
 import { useFriendStore } from "./stores/useFriendStore";
 import { useNotificationStore } from "./stores/useNotificationStore";
 import { useChatStore } from "./stores/useChatStore";
+import { unlockMessageSound, unlockNotificationSound } from "./utils/sound";
 
 function App() {
   const { isDark, setTheme } = useThemeStore();
@@ -28,7 +29,22 @@ function App() {
 
   useEffect(() => {
     setTheme(isDark);
-  }, [isDark]);
+  }, [isDark, setTheme]);
+
+  useEffect(() => {
+    const unlockAudio = async () => {
+      await unlockMessageSound();
+      await unlockNotificationSound();
+    };
+
+    window.addEventListener("pointerdown", unlockAudio, { once: true });
+    window.addEventListener("keydown", unlockAudio, { once: true });
+
+    return () => {
+      window.removeEventListener("pointerdown", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
 
   useEffect(() => {
     if (accessToken) {
@@ -42,7 +58,7 @@ function App() {
     }
 
     return () => disconnectSocket();
-  }, [accessToken]);
+  }, [accessToken, connectSocket, disconnectSocket]);
 
   return (
     <>

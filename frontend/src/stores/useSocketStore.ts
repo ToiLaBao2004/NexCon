@@ -6,7 +6,7 @@ import { useChatStore } from './useChatStore';
 import { useFriendStore } from './useFriendStore';
 import { useNotificationStore } from './useNotificationStore';
 import { toast } from 'sonner';
-import { playMessageSound } from '@/utils/sound';
+import { playMessageSound, playNotificationSound } from '@/utils/sound';
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -102,7 +102,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             chatState.updateConversation(updatedConversation);
 
             if (!isMine) {
-                playMessageSound();
+                void playMessageSound();
             }
         });
 
@@ -145,6 +145,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
         socket.on("new-notification", ({ notification }) => {
             useNotificationStore.getState().addNotification(notification);
+            void playNotificationSound();
         });
 
         socket.on("new-conversation", ({ conversation }) => {
