@@ -32,11 +32,11 @@ export const useAuthStore = create<AuthState>()(
         // call API
         await authService.verifyValidFieldsSignUp(email, password);
       } catch (error: any) {
-        console.error('Verify error:', error);
+        console.error('Lỗi khi xác định tính hợp lệ:', error);
         if (error.response?.data?.message) {
           toast.error(error.response.data.message);
         } else {
-          toast.error('Sign up failed. Please try again.');
+          toast.error('Đăng ký thất bại. Vui lòng thử lại.');
         }
         throw error;
       } finally {
@@ -49,13 +49,13 @@ export const useAuthStore = create<AuthState>()(
         set({ loading: true });
         // call API
         await authService.signUp(email, password, firstname, lastname, otp);
-        toast.success('Sign up successful! You can now log in.');
+        toast.success('Đăng ký thành công! Bây giờ bạn có thể đăng nhập.');
       } catch (error: any) {
-        console.error('Sign up error:', error);
+        console.error('Lỗi khi đăng ký:', error);
         if (error.response?.data?.message) {
           toast.error(error.response.data.message);
         } else {
-          toast.error('Sign up failed. Please try again.');
+          toast.error('Đăng ký thất bại. Vui lòng thử lại.');
         }
         throw error;
       } finally {
@@ -72,16 +72,16 @@ export const useAuthStore = create<AuthState>()(
         // call API
         const { accessToken } = await authService.signIn(email, password);
         get().setAccessToken(accessToken);
-        toast.success('Sign in successful!');
+        toast.success('Đăng nhập thành công!');
         await get().fetchMe();
         useChatStore.getState().fetchConversations();
         useNotificationStore.getState().fetchNotifications();
       } catch (error: any) {
-        console.error('Sign in error:', error);
+        console.error('Lỗi khi đăng nhập:', error);
         if (error.response?.data?.message) {
           toast.error(error.response.data.message);
         } else {
-          toast.error('Sign in failed. Please try again.');
+          toast.error('Đăng nhập thất bại. Vui lòng thử lại.');
         }
         throw error;
       } finally {
@@ -93,13 +93,13 @@ export const useAuthStore = create<AuthState>()(
       try {
         set({ loading: true });
         await authService.updateNewPassword(email, newPassword, confirmNewPassword);
-        toast.success('Password updated successfully! You can now log in with your new password.');
+        toast.success('Cập nhật mật khẩu thành công! Bây giờ bạn có thể đăng nhập với mật khẩu mới.');
       } catch (error: any) {
-        console.error('Update password error:', error);
+        console.error('Lỗi khi cập nhật mật khẩu:', error);
         if (error.response?.data?.message) {
           toast.error(error.response.data.message);
         } else {
-          toast.error('Failed to update password. Please try again.');
+          toast.error('Cập nhật mật khẩu thất bại. Vui lòng thử lại.');
         }
         throw error;
       } finally {
@@ -112,13 +112,13 @@ export const useAuthStore = create<AuthState>()(
         set({ loading: true });
         get().clearState();
         await authService.signOut();
-        toast.success('Signed out successfully!');
+        toast.success('Đăng xuất thành công!');
       } catch (error: any) {
-        console.error('Sign Out error:', error);
+        console.error('Lỗi khi đăng xuất:', error);
         if (error.response?.data?.message) {
           toast.error(error.response.data.message);
         } else {
-          toast.error('Failed to sign out. Please try again.');
+          toast.error('Đăng xuất thất bại. Vui lòng thử lại.');
         }
         throw error;
       } finally {
@@ -130,8 +130,8 @@ export const useAuthStore = create<AuthState>()(
       try {
         authService.loginGoogle();
       } catch (error) {
-        console.error('Google login error:', error);
-        toast.error('Google login failed.');
+        console.error('Lỗi khi đăng nhập bằng Google:', error);
+        toast.error('Đăng nhập bằng Google thất bại.');
       }
     },
 
@@ -141,12 +141,12 @@ export const useAuthStore = create<AuthState>()(
         const user = await authService.fetchMe();
         set({ user });
       } catch (error: any) {
-        console.error('Fetch me error:', error);
+        console.error('Lỗi khi lấy thông tin người dùng hiện tại:', error);
         set({ user: null, accessToken: null });
         if (error.response?.data?.message) {
           toast.error(error.response.data.message);
         } else {
-          toast.error('Failed to fetch user data. Please sign in again.');
+          toast.error('Không thể lấy thông tin người dùng. Vui lòng đăng nhập lại.');
         }
         throw error;
       } finally {
@@ -164,8 +164,8 @@ export const useAuthStore = create<AuthState>()(
           await fetchMe();
         }
       } catch (error) {
-        console.error('Refresh token error:', error);
-        toast.error('Session expired. Please sign in again.');
+        console.error('Lỗi khi làm mới token:', error);
+        toast.error('Hết phiên làm việc. Vui lòng đăng nhập lại.');
         get().clearState();
         throw error;
       } finally {
@@ -179,7 +179,7 @@ export const useAuthStore = create<AuthState>()(
         const accessToken = await authService.googleSuccess();
         get().setAccessToken(accessToken);
         await get().fetchMe();
-        toast.success('Signed in with Google successfully!');
+        toast.success('Đăng nhập bằng Google thành công!');
       } catch (err) {
         get().clearState();
         throw err;

@@ -61,7 +61,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             onOpenChange(false);
             toast.success("Cập nhật thông tin thành công");
         } catch (error: any) {
-            console.error("Update profile error:", error);
+            console.error("Lỗi cập nhật hồ sơ:", error);
             toast.error(error.response?.data?.message || "Cập nhật thất bại");
         } finally {
             setLoading(false);
@@ -88,7 +88,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             await fetchMe(true);
             toast.success("Cập nhật ảnh đại diện thành Công!");
         } catch (error: any) {
-            console.error("Upload avatar error:", error);
+            console.error("Lỗi tải lên ảnh đại diện:", error);
             toast.error(error.response?.data?.message || "Upload ảnh thất bại");
         } finally {
             setUploading(false);

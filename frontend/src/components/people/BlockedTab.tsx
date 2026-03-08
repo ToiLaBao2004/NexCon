@@ -21,7 +21,7 @@ export default function BlockedTab() {
             await unblockUser(selectedUser._id);
             setShowUnblockConfirm(false);
         } catch (error) {
-            console.error("Unblock error:", error);
+            console.error("Lỗi khi bỏ chặn:", error);
         } finally {
             setSelectedUser(null);
         }

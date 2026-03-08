@@ -11,13 +11,13 @@ const Logout = () => {
 			await signOut();
 			navigate("/signin")
 		} catch (error: any) {
-			console.error("Log out failed:", error);
+			console.error("Đăng xuất thất bại:", error);
 		}
 	}
-  return <Button variant="completeGhost" onClick={handleLogout}>
-	<LogOut className="text-destructive"/>
-	Log out
-  </Button>;
+	return <Button variant="completeGhost" onClick={handleLogout}>
+		<LogOut className="text-destructive" />
+		Đăng xuất
+	</Button>;
 }
 
 export default Logout;

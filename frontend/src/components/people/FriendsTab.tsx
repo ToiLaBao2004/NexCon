@@ -3,6 +3,7 @@ import { UserX } from "lucide-react";
 import { useState } from "react";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { FriendActionButtons } from "@/components/people/FriendActionButtons";
+import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 
 type Friend = {
     _id: string;
@@ -10,6 +11,9 @@ type Friend = {
     displayName: string;
     avatarUrl?: string;
     nickname?: string;
+    email?: string;
+    bio?: string;
+    phone?: string;
     [key: string]: any;
 };
 
@@ -24,10 +28,17 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [unfriendModalOpen, setUnfriendModalOpen] = useState(false);
     const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     const handleOpenUnfriendModal = (friend: Friend) => {
+        setProcessingId(null);
         setSelectedFriend(friend);
         setUnfriendModalOpen(true);
+    };
+
+    const handleOpenProfile = (friend: Friend) => {
+        setSelectedFriend(friend);
+        setIsProfileOpen(true);
     };
 
     const handleConfirmUnfriend = async () => {
@@ -38,7 +49,7 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
             await onUnfriend(selectedFriend.friendId);
             setUnfriendModalOpen(false);
         } catch (error) {
-            console.error("Unfriend error:", error);
+            console.error("Lỗi khi hủy kết bạn:", error);
         } finally {
             setProcessingId(null);
             setSelectedFriend(null);
@@ -55,7 +66,7 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
 
                         return (
                             <div key={friend._id} className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-card border border-border/40 hover:border-primary/30 hover:shadow-md transition-all duration-300 group">
-                                <div className="relative">
+                                <div className="relative cursor-pointer" onClick={() => handleOpenProfile(friend)}>
                                     <Avatar className="h-12 w-12 shrink-0 border-2 border-transparent group-hover:border-primary/20 transition-all">
                                         <AvatarImage src={friend.avatarUrl} />
                                         <AvatarFallback className="text-base font-bold bg-primary/10 text-primary">
@@ -65,7 +76,7 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                                     <div className={`absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card ${isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-muted-foreground/30'}`} />
                                 </div>
 
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProfile(friend)}>
                                     <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
                                         {friend.nickname || friend.displayName}
                                     </p>
@@ -109,6 +120,23 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                 confirmText="Hủy kết bạn"
                 variant="destructive"
                 isLoading={!!processingId}
+            />
+
+            <UserProfileDialog
+                open={isProfileOpen}
+                onOpenChange={setIsProfileOpen}
+                user={selectedFriend ? {
+                    _id: selectedFriend.friendId,
+                    displayName: selectedFriend.displayName,
+                    email: selectedFriend.email || "",
+                    avatarUrl: selectedFriend.avatarUrl,
+                    bio: selectedFriend.bio,
+                    phone: selectedFriend.phone,
+                } : null}
+                onOpenChat={(friend) => {
+                    setIsProfileOpen(false);
+                    onOpenChat(friend);
+                }}
             />
         </div>
     );

@@ -89,7 +89,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
       setOpenRename(false);
       fetchConversations();
     } catch (error) {
-      console.error("Set nickname failed:", error);
+      console.error("Đặt biệt danh thất bại:", error);
     }
   }
 

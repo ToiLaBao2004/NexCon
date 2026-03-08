@@ -31,7 +31,7 @@ export const UserActionDropdown = ({
             await blockUser(userId);
             setShowBlockConfirm(false);
         } catch (error) {
-            console.error("Block failed:", error);
+            console.error("Chặn thất bại:", error);
         }
     };
 
@@ -40,7 +40,7 @@ export const UserActionDropdown = ({
             await unblockUser(userId);
             setShowUnblockConfirm(false);
         } catch (error) {
-            console.error("Unblock failed:", error);
+            console.error("Bỏ chặn thất bại:", error);
         }
     };
 

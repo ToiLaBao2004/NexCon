@@ -36,7 +36,7 @@ const ChatWindowLayout = () => {
       try {
         await markAsSeen();
       } catch (error) {
-        console.error("An error occurred while marking conversation as seen: ", error);
+        console.error("Lỗi xảy ra khi đánh dấu cuộc trò chuyện đã xem: ", error);
       }
     }
 

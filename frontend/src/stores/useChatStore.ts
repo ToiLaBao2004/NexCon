@@ -32,7 +32,7 @@ export const useChatStore = create<ChatState>()(
 
                     set({ conversations, convoLoading: false });
                 } catch (error) {
-                    console.error("Error occurred while fetching conversations:", error);
+                    console.error("Lỗi khi tải danh sách cuộc trò chuyện:", error);
                     set({ convoLoading: false });
                 }
             },
@@ -74,7 +74,7 @@ export const useChatStore = create<ChatState>()(
                     });
 
                 } catch (error) {
-                    console.error("An error occurred while fetching messages:", error);
+                    console.error("Lỗi khi tải tin nhắn:", error);
                 } finally {
                     set({ messageLoading: false });
                 }
@@ -90,7 +90,7 @@ export const useChatStore = create<ChatState>()(
                         ),
                     }));
                 } catch (error) {
-                    console.error("An error occurred while sending direct message:", error);
+                    console.error("Lỗi khi gửi tin nhắn trực tiếp:", error);
                     throw error;
                 }
             },
@@ -102,7 +102,7 @@ export const useChatStore = create<ChatState>()(
                         ),
                     }))
                 } catch (error) {
-                    console.error("An error occurred while sending group message:", error);
+                    console.error("Lỗi khi gửi tin nhắn nhóm:", error);
                     throw error;
                 }
 
@@ -140,7 +140,7 @@ export const useChatStore = create<ChatState>()(
                     })
 
                 } catch (error) {
-                    console.error(error, "An error occurred while adding the message");
+                    console.error(error, "Lỗi khi thêm tin nhắn");
                 }
             },
             updateConversation: (conversation) => {
@@ -184,7 +184,7 @@ export const useChatStore = create<ChatState>()(
                     }));
 
                 } catch (error) {
-                    console.error("An error occurred while marking conversation as seen:", error);
+                    console.error("Lỗi khi đánh dấu cuộc trò chuyện đã xem:", error);
                 }
             },
             updateGroupName: async (conversationId: string, name: string) => {
@@ -194,7 +194,7 @@ export const useChatStore = create<ChatState>()(
                         conversations: state.conversations.map((c) => c._id === conversationId ? { ...c, group: { ...c.group, name } } : c)
                     }))
                 } catch (error) {
-                    console.error("An error occurred while updating group name:", error);
+                    console.error("Lỗi khi cập nhật tên nhóm:", error);
                 }
             },
             openChat: async ({ userId, conversationId }: { userId?: string, conversationId?: string }) => {
@@ -225,7 +225,7 @@ export const useChatStore = create<ChatState>()(
                         throw new Error("Không thể xác định hội thoại để mở");
                     }
                 } catch (error) {
-                    console.error('Failed to open chat:', error);
+                    console.error('Lỗi khi mở cuộc trò chuyện:', error);
                 }
             },
             createGroup: async (name, members) => {
@@ -239,7 +239,7 @@ export const useChatStore = create<ChatState>()(
                         await fetchMessages(conv._id).catch(() => { });
                     }
                 } catch (error) {
-                    console.error('Failed to create group:', error);
+                    console.error('Lỗi khi tạo nhóm:', error);
                     throw error;
                 }
             },
@@ -266,7 +266,7 @@ export const useChatStore = create<ChatState>()(
                         }
                     });
                 } catch (error) {
-                    console.error("An error occurred while recalling the message:", error);
+                    console.error("Lỗi khi thu hồi tin nhắn:", error);
                 }
             },
             recallMessageLocal: (conversationId, messageId, patch) =>

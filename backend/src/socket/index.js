@@ -45,6 +45,14 @@ io.on("connection", async (socket) => {
 
     socket.on("search-user", (payload) => searchUserByEmailAndPhone(socket, payload));
 
+    socket.on("typing", ({ conversationId }) => {
+        socket.to(conversationId).emit("user-typing", { conversationId, userId: user._id.toString() });
+    });
+
+    socket.on("stop-typing", ({ conversationId }) => {
+        socket.to(conversationId).emit("user-stopped-typing", { conversationId, userId: user._id.toString() });
+    });
+
     socket.on("disconnect", () => {
         onlineUsers.delete(user._id.toString());
         io.emit("online-users", Array.from(onlineUsers.keys()));

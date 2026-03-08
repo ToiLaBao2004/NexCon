@@ -83,7 +83,7 @@ const GroupChatCard = ({ convo }: { convo: Conversation }) => {
 			// Refresh list để UI update name (nếu store chưa tự update state)
 			await fetchConversations();
 		} catch (error) {
-			console.error("Update group name failed:", error);
+			console.error("Cập nhật tên nhóm thất bại:", error);
 		} finally {
 			setLoading(false);
 		}

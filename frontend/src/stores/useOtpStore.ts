@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { otpService } from '@/services/otpService';
 import type OTPState from '@/types/otpState';
 
-export const useOTPStore = create<OTPState>((set, get) => ({
+export const useOTPStore = create<OTPState>((set) => ({
   loading: false,
 
   sendOtpCreateUser: async (email: string) => {
@@ -11,13 +11,13 @@ export const useOTPStore = create<OTPState>((set, get) => ({
       set({ loading: true });
       // call API
       await otpService.sendOtp(email);
-      toast.success('OTP sent to your email.');
+      toast.success('Mã OTP đã được gửi đến email của bạn.');
     } catch (error: any) {
-      console.error('Send OTP error:', error);
+      console.error('Lỗi khi gửi mã OTP:', error);
       if (error.response?.data?.message) {
-        toast.error(error.response.data.message);            
+        toast.error(error.response.data.message);
       } else {
-        toast.error('Failed to send OTP. Please try again.');
+        toast.error('Gửi mã OTP thất bại. Vui lòng thử lại.');
       }
       throw error;
     } finally {
@@ -30,13 +30,13 @@ export const useOTPStore = create<OTPState>((set, get) => ({
       set({ loading: true });
       // call API
       await otpService.sendOtpResetPassword(email);
-      toast.success('OTP sent to your email.');
+      toast.success('Mã OTP đã được gửi đến email của bạn.');
     } catch (error: any) {
-      console.error('Send OTP error:', error);
+      console.error('Lỗi khi gửi mã OTP:', error);
       if (error.response?.data?.message) {
-        toast.error(error.response.data.message);            
+        toast.error(error.response.data.message);
       } else {
-        toast.error('Failed to send OTP. Please try again.');
+        toast.error('Gửi mã OTP thất bại. Vui lòng thử lại.');
       }
       throw error;
     } finally {
@@ -49,13 +49,13 @@ export const useOTPStore = create<OTPState>((set, get) => ({
       set({ loading: true });
       // call API
       await otpService.verifyOtpResetPassword(email, otp);
-      toast.success('OTP verified successfully.');
+      toast.success('Xác thực mã OTP thành công.');
     } catch (error: any) {
-      console.error('Verify OTP error:', error);
+      console.error('Lỗi khi xác thực mã OTP:', error);
       if (error.response?.data?.message) {
-        toast.error(error.response.data.message);            
+        toast.error(error.response.data.message);
       } else {
-        toast.error('Failed to verify OTP. Please try again.');
+        toast.error('Xác thực mã OTP thất bại. Vui lòng thử lại.');
       }
       throw error;
     } finally {

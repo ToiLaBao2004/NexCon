@@ -1,18 +1,28 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Loader2, Check } from "lucide-react";
+import { UserProfileDialog } from "../shared/UserProfileDialog";
+import { useState } from "react";
 
-export default function RequestsTab({ sentRequests, incomingRequests, processingId, onCancel, onAccept, onReject }: { sentRequests: any[]; incomingRequests: any[]; processingId: string | null; onCancel: (id: string) => Promise<void>; onAccept: (id: string) => Promise<void>; onReject: (id: string) => Promise<void>; }) {
+export default function RequestsTab({ sentRequests, incomingRequests, processingId, onCancel, onAccept, onReject, onOpenChat }: { sentRequests: any[]; incomingRequests: any[]; processingId: string | null; onCancel: (id: string) => Promise<void>; onAccept: (id: string) => Promise<void>; onReject: (id: string) => Promise<void>; onOpenChat: (user: any) => void; }) {
+    const [selectedUser, setSelectedUser] = useState<any | null>(null);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+    const handleOpenProfile = (user: any) => {
+        setSelectedUser(user);
+        setIsProfileOpen(true);
+    };
+
     return (
-        <div className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 gap-6 relative">
             <div>
                 <h4 className="text-sm font-semibold text-foreground mb-3">LỜI MỜI ĐÃ GỬI</h4>
                 {sentRequests.length > 0 ? (
                     <div className="space-y-2">
                         {sentRequests.map((r) => (
                             <div key={r._id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/40">
-                                <Avatar className="h-10 w-10"><AvatarImage src={r.to.avatarUrl} /><AvatarFallback>{r.to.displayName.charAt(0)}</AvatarFallback></Avatar>
-                                <div className="flex-1 min-w-0">
+                                <Avatar className="h-10 w-10 cursor-pointer" onClick={() => handleOpenProfile(r.to)}><AvatarImage src={r.to.avatarUrl} /><AvatarFallback>{r.to.displayName.charAt(0)}</AvatarFallback></Avatar>
+                                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProfile(r.to)}>
                                     <p className="text-sm font-medium text-foreground truncate">{r.to.displayName}</p>
                                     <p className="text-xs text-muted-foreground truncate">{r.message || r.to.email}</p>
                                 </div>
@@ -35,8 +45,8 @@ export default function RequestsTab({ sentRequests, incomingRequests, processing
                             const isProcessing = processingId === request._id;
                             return (
                                 <div key={request._id} className="flex items-center gap-3 p-3 rounded-xl bg-card border border-border/40">
-                                    <Avatar className="h-10 w-10"><AvatarImage src={request.from.avatarUrl} /><AvatarFallback>{request.from.displayName.charAt(0)}</AvatarFallback></Avatar>
-                                    <div className="flex-1 min-w-0">
+                                    <Avatar className="h-10 w-10 cursor-pointer" onClick={() => handleOpenProfile(request.from)}><AvatarImage src={request.from.avatarUrl} /><AvatarFallback>{request.from.displayName.charAt(0)}</AvatarFallback></Avatar>
+                                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProfile(request.from)}>
                                         <p className="text-sm font-medium text-foreground truncate">{request.from.displayName}</p>
                                         <p className="text-xs text-muted-foreground truncate">{request.message || request.from.email}</p>
                                     </div>
@@ -52,6 +62,23 @@ export default function RequestsTab({ sentRequests, incomingRequests, processing
                     <div className="h-40 flex items-center justify-center text-muted-foreground">Không có lời mời đến</div>
                 )}
             </div>
+
+            <UserProfileDialog
+                open={isProfileOpen}
+                onOpenChange={setIsProfileOpen}
+                user={selectedUser ? {
+                    _id: selectedUser._id,
+                    displayName: selectedUser.displayName,
+                    email: selectedUser.email || "",
+                    avatarUrl: selectedUser.avatarUrl,
+                    bio: selectedUser.bio,
+                    phone: selectedUser.phone,
+                } : null}
+                onOpenChat={(user) => {
+                    setIsProfileOpen(false);
+                    onOpenChat(user);
+                }}
+            />
         </div>
     );
 }

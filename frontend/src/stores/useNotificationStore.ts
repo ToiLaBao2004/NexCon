@@ -23,8 +23,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             const unreadCount = notifications.filter((n: Notification) => !n.isRead).length;
             set({ notifications, unreadCount });
         } catch (error: any) {
-            console.error('Fetch notifications error:', error);
-            toast.error('Failed to fetch notifications');
+            console.error('Lỗi khi tải thông báo:', error);
+            toast.error('Không thể lấy thông báo');
         } finally {
             set({ loading: false });
         }
@@ -42,8 +42,8 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
                 unreadCount: Math.max(0, unreadCount - 1)
             });
         } catch (error: any) {
-            console.error('Mark as read error:', error);
-            toast.error('Failed to mark notification as read');
+            console.error('Lỗi khi đánh dấu là đã đọc:', error);
+            toast.error('Không thể đánh dấu thông báo là đã đọc');
         }
     },
 
@@ -53,10 +53,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             const { notifications } = get();
             const updatedNotifications = notifications.map((n) => ({ ...n, isRead: true }));
             set({ notifications: updatedNotifications, unreadCount: 0 });
-            toast.success('All notifications marked as read');
+            toast.success('Đã đánh dấu tất cả thông báo là đã đọc');
         } catch (error: any) {
-            console.error('Mark all as read error:', error);
-            toast.error('Failed to mark all notifications as read');
+            console.error('Lỗi khi đánh dấu tất cả là đã đọc:', error);
+            toast.error('Không thể đánh dấu tất cả thông báo là đã đọc');
         }
     },
 

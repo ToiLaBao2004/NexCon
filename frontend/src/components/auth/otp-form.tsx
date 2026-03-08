@@ -43,7 +43,7 @@ export function OTPForm() {
     e.preventDefault();
 
     if (otp.length < 6) {
-      setError("OTP must be 6 digits");
+      setError("Mã OTP phải có 6 chữ số");
       return;
     }
 
@@ -61,18 +61,18 @@ export function OTPForm() {
 
       navigate("/signin");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Invalid OTP.");
+      setError(err.response?.data?.message || "Mã OTP không hợp lệ.");
     } finally {
       setLoading(false);
     }
   };
-  
+
   const handleResend = async () => {
     if (countdown > 0) return;
     try {
       await sendOtpCreateUser(signupData.email);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to resend OTP.");
+      setError(err.response?.data?.message || "Gửi lại mã OTP thất bại.");
       return;
     }
     setCountdown(60);
@@ -88,9 +88,9 @@ export function OTPForm() {
             <a href="/" className="mx-auto block w-fit text-center">
               <img src="/logo.svg" alt="logo" className="h-10" />
             </a>
-            <h1 className="text-xl font-bold">Email Verification</h1>
+            <h1 className="text-xl font-bold">Xác thực Email</h1>
             <p className="text-sm text-muted-foreground text-balance">
-              Enter the 6-digit code sent to{" "}
+              Nhập mã 6 chữ số đã được gửi đến{" "}
               <span className="font-medium">{signupData?.email}</span>
             </p>
           </div>
@@ -114,16 +114,16 @@ export function OTPForm() {
               disabled={loading || otp.length < 6}
               className="w-full"
             >
-              {loading ? "Verifying..." : "Verify"}
+              {loading ? "Đang xác thực..." : "Xác thực"}
             </Button>
 
             <p className="text-xs text-center text-muted-foreground">
-              Didn’t receive the code?{" "}
+              Bạn không nhận được mã?{" "}
               {countdown > 0 ? (
-                <span className="text-muted-foreground"> Resend in {countdown}s</span>
+                <span className="text-muted-foreground"> Gửi lại sau {countdown}s</span>
               ) : (
                 <span className="text-primary underline underline-offset-2 cursor-pointer" onClick={handleResend}>
-                  Resend
+                  Gửi lại
                 </span>
               )}
             </p>

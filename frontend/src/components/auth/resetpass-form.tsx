@@ -11,8 +11,8 @@ import { useNavigate, useLocation } from "react-router"
 import { useEffect } from "react"
 
 const ResetPassSchema = z.object({
-  newPassword: z.string().min(8, "Password must be at least 8 characters"),
-  confirmNewPassword: z.string().min(8, "Password must be at least 8 characters")
+  newPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
+  confirmNewPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự")
 })
 
 type ResetPassFormValues = z.infer<typeof ResetPassSchema>
@@ -41,7 +41,7 @@ export function ResetPassForm({
     } catch (error: any) {
       console.error("Update Password failed:", error);
       // map backend error message to form fields
-      const backendMsg = error.response?.data?.message || "Update Password failed.";
+      const backendMsg = error.response?.data?.message || "Cập nhật mật khẩu thất bại.";
       if (backendMsg.toLowerCase().includes("newPassword")) {
         setError("newPassword", { type: "server", message: backendMsg });
       } else if (backendMsg.toLowerCase().includes("confirmNewPassword")) {
@@ -64,14 +64,14 @@ export function ResetPassForm({
                 </a>
                 <h1 className="text-2xl font-bold">NexCon</h1>
                 <p className="text-sm text-muted-foreground text-balance">
-                  Change your password.
+                  Thay đổi mật khẩu của bạn.
                 </p>
               </div>
 
               {/* new password */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="email" className="block text-sm">
-                  New Password
+                  Mật khẩu mới
                 </Label>
                 <Input
                   id="email"
@@ -89,7 +89,7 @@ export function ResetPassForm({
               {/* confirm new password */}
               <div className="flex flex-col gap-2">
                 <Label htmlFor="password" className="text-sm">
-                  Confirm New Password
+                  Xác nhận mật khẩu mới
                 </Label>
                 <Input
                   id="password"
@@ -110,20 +110,20 @@ export function ResetPassForm({
                 className="w-full mt-3 cursor-pointer"
                 disabled={isSubmitting}
               >
-                Submit
+                Xác nhận
               </Button>
             </form>
           </CardContent>
         </Card>
 
         <div className="text-xs text-center px-6 text-muted-foreground [a]:underline [a]:underline-offset-4 [a]:hover:text-primary text-balance">
-          By clicking continue, you agree to our{" "}
+          Bằng cách nhấp vào tiếp tục, bạn đồng ý với của chúng tôi{" "}
           <a href="#" className="underline underline-offset-4">
-            Terms of Service
+            Điều khoản dịch vụ
           </a>{" "}
-          and{" "}
+          và{" "}
           <a href="#" className="underline underline-offset-4">
-            Privacy Policy
+            Chính sách bảo mật
           </a>.
         </div>
       </div>

@@ -40,7 +40,7 @@ export async function createConversation(req, res) {
 			return res.status(400).json({ message: 'Failed to create conversation.' });
 		}
 		await conversation.populate([
-			{ path: 'participants.userId', select: 'displayName avatarUrl' },
+			{ path: 'participants.userId', select: 'displayName avatarUrl email bio phone' },
 			{ path: 'seenBy', select: 'displayName avatarUrl' },
 			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
 		]);
@@ -66,7 +66,7 @@ export async function getConversations(req, res) {
 
 		const conversations = await Conversation.find({ "participants.userId": myId })
 			.sort({ updatedAt: -1 })
-			.populate("participants.userId", "displayName avatarUrl")
+			.populate("participants.userId", "displayName avatarUrl email bio phone")
 			.populate("lastMessage.senderId", "displayName avatarUrl")
 			.populate("seenBy", "displayName avatarUrl")
 			.lean();
