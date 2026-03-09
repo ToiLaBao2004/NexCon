@@ -20,7 +20,8 @@ import { useSocketStore } from "./stores/useSocketStore";
 import { useFriendStore } from "./stores/useFriendStore";
 import { useNotificationStore } from "./stores/useNotificationStore";
 import { useChatStore } from "./stores/useChatStore";
-import { unlockMessageSound, unlockNotificationSound } from "./utils/sound";
+import { unlockMessageSound, unlockNotificationSound, unlockRingtone } from "./utils/sound";
+import CallManager from "./components/call/CallManager";
 
 function App() {
   const { isDark, setTheme } = useThemeStore();
@@ -33,8 +34,17 @@ function App() {
 
   useEffect(() => {
     const unlockAudio = async () => {
-      await unlockMessageSound();
-      await unlockNotificationSound();
+      console.log("[App] User interaction detected, unlocking audio...");
+      try {
+        await Promise.all([
+          unlockMessageSound(),
+          unlockNotificationSound(),
+          unlockRingtone(),
+        ]);
+        console.log("[App] All audio unlocked successfully");
+      } catch (err) {
+        console.error("[App] Failed to unlock some audio:", err);
+      }
     };
 
     window.addEventListener("pointerdown", unlockAudio, { once: true });
@@ -63,6 +73,7 @@ function App() {
   return (
     <>
       <Toaster richColors />
+      <CallManager />
       <BrowserRouter>
         <Routes>
           <Route path="/signin" element={<SignInPage />} />

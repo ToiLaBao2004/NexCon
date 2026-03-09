@@ -98,6 +98,41 @@ export interface Notification {
   updatedAt: string;
 }
 
+export type CallStatus = 'idle' | 'outgoing' | 'incoming' | 'active';
+export type CallType = 'voice' | 'video';
+
+export interface RemoteUser {
+  _id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+}
+
+export interface CallState {
+  status: CallStatus;
+  callType: CallType | null;
+  remoteUser: RemoteUser | null;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  isMuted: boolean;
+  isVideoOff: boolean;
+  _peerConnection: RTCPeerConnection | null;
+  _pendingOffer: RTCSessionDescriptionInit | null;
+  _iceCandidateQueue: RTCIceCandidateInit[];
+  _callTimeout: ReturnType<typeof setTimeout> | null;
+  startCall: (toUser: RemoteUser, callType: CallType) => Promise<void>;
+  acceptCall: () => Promise<void>;
+  rejectCall: () => void;
+  endCall: () => void;
+  toggleMute: () => void;
+  toggleVideo: () => void;
+  handleIncomingCall: (from: RemoteUser, offer: RTCSessionDescriptionInit, callType: CallType) => void;
+  handleCallAnswered: (answer: RTCSessionDescriptionInit) => Promise<void>;
+  handleCallRejected: () => void;
+  handleCallEnded: () => void;
+  handleCallFailed: (reason: 'offline' | 'busy') => void;
+  handleIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
+}
+
 export interface NotificationState {
   notifications: Notification[];
   loading: boolean;
