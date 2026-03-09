@@ -99,7 +99,6 @@ export const useCallStore = create<CallState>((set, get) => ({
         if (get().status === "outgoing") {
           emitCallEvent("call-ended", { toUserId: toUser._id });
           get().endCall();
-          toast.info("Không có người trả lời.");
         }
       }, 30_000);
 
@@ -116,6 +115,9 @@ export const useCallStore = create<CallState>((set, get) => ({
       });
 
       emitCallEvent("call-offer", { toUserId: toUser._id, offer, callType });
+      // Refresh sidebar
+      const { useChatStore } = await import("./useChatStore");
+      useChatStore.getState().fetchConversations();
     } catch (error) {
       console.error("Start call failed:", error);
       stream?.getTracks().forEach((t) => t.stop());
@@ -273,15 +275,12 @@ export const useCallStore = create<CallState>((set, get) => ({
   handleCallRejected() {
     cleanup(get);
     stopRingtone();
-    toast.info("Cuộc gọi đã bị từ chối.");
     set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
   },
 
   handleCallEnded() {
-    const wasActive = get().status === "active";
     cleanup(get);
     stopRingtone();
-    if (wasActive) toast.info("Cuộc gọi đã kết thúc.");
     set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
   },
 

@@ -215,7 +215,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 				</>
 			}
 			subtitle={
-				<p className={`text-sm truncate ${unreadCount > 0 ? "font-medium text-foreground" : "text-muted-foreground"}`}>
+				<p className={`text-sm truncate ${unreadCount > 0 ? "font-bold text-foreground" : "text-muted-foreground"}`}>
 					{lastMessageText}
 				</p>
 			}

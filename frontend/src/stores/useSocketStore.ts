@@ -6,6 +6,7 @@ import { useChatStore } from "./useChatStore";
 import { useFriendStore } from "./useFriendStore";
 import { useNotificationStore } from "./useNotificationStore";
 import { useCallStore } from "./useCallStore";
+import { useCallHistoryStore } from "./useCallHistoryStore";
 import { toast } from "sonner";
 import { playMessageSound, playNotificationSound } from "@/utils/sound";
 
@@ -190,10 +191,21 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       get().setTypingUser(conversationId, userId, false);
     });
 
-    // ── CALL EVENTS ──────────────────────────────────────────────────
+
+    const refreshCallHistory = () => {
+      const activeConvoId = useChatStore.getState().activeConversationId;
+      if (activeConvoId) {
+        // Gọi refresh với flag isRefresh=true để cập nhật data mà không làm trống list (gây giật UI)
+        useCallHistoryStore.getState().fetchCallsByConversation(activeConvoId, true);
+      }
+      // Refresh sidebar để cập nhật lastMessage (ví dụ: Cuộc gọi thoại)
+      useChatStore.getState().fetchConversations();
+    };
 
     socket.on("incoming-call", ({ from, offer, callType }) => {
       useCallStore.getState().handleIncomingCall(from, offer, callType);
+      // Refresh sidebar ngay khi có cuộc gọi đến
+      useChatStore.getState().fetchConversations();
     });
 
     socket.on("call-answered", ({ answer }) => {
@@ -202,14 +214,17 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("call-rejected", () => {
       useCallStore.getState().handleCallRejected();
+      refreshCallHistory();
     });
 
     socket.on("call-ended", () => {
       useCallStore.getState().handleCallEnded();
+      refreshCallHistory();
     });
 
     socket.on("call-failed", ({ reason }) => {
       useCallStore.getState().handleCallFailed(reason);
+      refreshCallHistory();
     });
 
     socket.on("ice-candidate", ({ candidate }) => {

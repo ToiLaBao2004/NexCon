@@ -224,7 +224,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
       subtitle={
         <p className={cn(
           "text-sm truncate",
-          unreadCount > 0 ? "font-medium text-foreground" : "text-muted-foreground"
+          unreadCount > 0 ? "font-bold text-foreground" : "text-muted-foreground"
         )}>
           {lastMessage ? (isMyLastMessage ? "Bạn: " : "") + lastMessage : ""}
         </p>

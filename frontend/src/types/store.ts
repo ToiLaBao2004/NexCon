@@ -1,6 +1,7 @@
 import type { Socket } from "socket.io-client";
 import type { Conversation, Message } from "./chat";
 import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
+import type { CallRecord } from "./call";
 
 export interface ThemeState {
   isDark: boolean;
@@ -131,6 +132,19 @@ export interface CallState {
   handleCallEnded: () => void;
   handleCallFailed: (reason: 'offline' | 'busy') => void;
   handleIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
+}
+
+export interface CallHistoryState {
+  callsByConversation: Record<string, {
+    items: CallRecord[];
+    hasMore: boolean;
+    nextCursor?: string | null;
+  }>;
+  loading: boolean;
+
+  fetchCallsByConversation: (conversationId: string, isRefresh?: boolean) => Promise<void>;
+  addCallRecord: (conversationId: string, call: CallRecord) => void;
+  reset: () => void;
 }
 
 export interface NotificationState {
