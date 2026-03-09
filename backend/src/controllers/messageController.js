@@ -107,3 +107,30 @@ export async function recallMessagge(req, res) {
         res.status(500).json({ message: 'Internal server error' });
     }
 }
+
+export async function pinMessage(req, res) {
+    try {
+        const { messageId } = req.body;
+        const senderId = req.user._id;
+        const message = await Message.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ message: 'Message not found' });
+        }
+        const conversation = await Conversation.findById(message.conversationId);
+        const pinnedMessages = await Message.find({ conversationId: conversation._id, isPinned: true }).sort({ createdAt: 1 });
+        if (pinnedMessages.length >= 3) {
+            const oldestPinnedMessage = pinnedMessages[0];
+            oldestPinnedMessage.isPinned = false;
+            await oldestPinnedMessage.save();
+        }
+        if (message.senderId.toString() !== senderId.toString()) {
+            return res.status(403).json({ message: 'You can only pin your own messages' });
+        }
+        message.isPinned = true;
+        await message.save();
+        return res.status(200).json({ message: 'Message pinned successfully' });
+    } catch (error) {
+        console.error('Error pinning message:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+}

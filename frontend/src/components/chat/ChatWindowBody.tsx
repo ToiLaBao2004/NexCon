@@ -22,7 +22,10 @@ const ChatWindowBody = () => {
     fetchMessages,
     messageLoading,
   } = useChatStore();
-  const messages = allMessages[activeConversationId!]?.items ?? [];
+  const messages = useMemo(
+    () => allMessages[activeConversationId!]?.items ?? [],
+    [allMessages, activeConversationId]
+  );
   const messageData = allMessages[activeConversationId!];
   const hasMore = messageData?.hasMore ?? false;
   const selectedConvo = conversations.find(
@@ -38,7 +41,10 @@ const ChatWindowBody = () => {
 
   // Call history
   const { callsByConversation, fetchCallsByConversation } = useCallHistoryStore();
-  const calls = callsByConversation[activeConversationId!]?.items ?? [];
+  const calls = useMemo(
+    () => callsByConversation[activeConversationId!]?.items ?? [],
+    [callsByConversation, activeConversationId]
+  );
 
   // Fetch call history when conversation changes
   useEffect(() => {
