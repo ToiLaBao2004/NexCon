@@ -1,8 +1,6 @@
 import { useAuthStore } from '@/stores/useAuthStore';
 import axios from 'axios';
 
-const BACKEND_URL="http://localhost:5001";
-
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
     withCredentials: true, // Include cookies in requests
@@ -31,7 +29,7 @@ api.interceptors.response.use(
             originalRequest.url.includes('/auth/verify-valid-fields-signup') ||
             originalRequest.url.includes('/auth/update-new-password') ||
             originalRequest.url.includes('/auth/google/callback') ||
-            originalRequest.url.includes('/auth/google') || 
+            originalRequest.url.includes('/auth/google') ||
             originalRequest.url.includes('/otp/otp-create-user') ||
             originalRequest.url.includes('/otp/otp-reset-password') ||
             originalRequest.url.includes('/otp/otp-verify-reset-password')

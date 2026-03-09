@@ -120,7 +120,7 @@ const CallMessageBubble = ({ call, currentUserId, isOwn }: CallMessageBubbleProp
   return (
     <Card
       className={cn(
-        "px-3 py-2 text-sm shadow-sm border border-slate-200/80 rounded-[0.6rem] w-[175px] h-[117px] flex flex-col justify-between",
+        "px-3 py-2 text-sm shadow-sm border border-slate-200/80 rounded-[0.6rem] w-[185px] h-[117px] flex flex-col justify-between",
         "bg-white dark:bg-zinc-900 shadow-slate-100/50 dark:shadow-none",
         isOwn ? "rounded-br-none" : "rounded-bl-none"
       )}
@@ -134,7 +134,7 @@ const CallMessageBubble = ({ call, currentUserId, isOwn }: CallMessageBubbleProp
 
         {/* Thông tin loại cuộc gọi + Icon */}
         <div className="flex items-center gap-1.5">
-          <div className="relative flex-shrink-0">
+          <div className="relative shrink-0">
             <CallTypeIcon className="h-[15px] w-[15px] text-slate-500/70" strokeWidth={1.5} />
             {(statusType === "rejected" || statusType === "missed") && (
               <div className="absolute -top-0.5 -right-0.5 bg-white dark:bg-zinc-900 rounded-full">
@@ -165,7 +165,7 @@ const CallMessageBubble = ({ call, currentUserId, isOwn }: CallMessageBubbleProp
 
       {/* Bottom: separator + button */}
       <div>
-        <div className="h-[1px] bg-slate-100 dark:bg-zinc-800 -mx-3" />
+        <div className="h-px bg-slate-100 dark:bg-zinc-800 -mx-3" />
         <button
           onClick={handleCallBack}
           disabled={!canCallBack}
