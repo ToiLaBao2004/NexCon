@@ -11,11 +11,12 @@ interface CharCardProps {
 	leftSection: React.ReactNode;
 	subtitle: React.ReactNode;
 	rightSection?: React.ReactNode;
+	statusIcon?: React.ReactNode;
 }
 
 const ChatCard = (
 	{
-		convoId, name, timestamp, isActive, onSelect, unreadCount, leftSection, subtitle, rightSection
+		convoId, name, timestamp, isActive, onSelect, unreadCount, leftSection, subtitle, rightSection, statusIcon
 	}: CharCardProps) => {
 
 	return (
@@ -32,8 +33,8 @@ const ChatCard = (
 
 				<div className="flex-1 min-w-0">
 					<div className="flex items-center justify-between mb-1">
-						<h3 className={cn("font-medium text-sm truncate",
-							unreadCount && unreadCount > 0 && "text-foreground"
+						<h3 className={cn("text-sm truncate",
+							unreadCount && unreadCount > 0 ? "font-bold text-foreground" : "font-semibold text-slate-800 dark:text-zinc-200"
 						)}
 						>
 							{name}
@@ -44,13 +45,18 @@ const ChatCard = (
 						>{timestamp ? formatOnlineTime(timestamp) : ""}</span>
 					</div>
 
-					<div className="flex items-center justify-between">
+					<div className="flex items-center justify-between mt-0.5">
 						<div className="flex items-center gap-1 flex-1 min-w-0">{subtitle}</div>
+						{statusIcon && (
+							<div className="ml-2 flex-shrink-0">
+								{statusIcon}
+							</div>
+						)}
 					</div>
 				</div>
 
 				{rightSection && (
-					<div className="flex items-center shrink-0">
+					<div className="flex items-center shrink-0 ml-1">
 						{rightSection}
 					</div>
 				)}

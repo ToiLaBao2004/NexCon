@@ -20,20 +20,23 @@ const GroupChatAvatar = ({ participants, type }: GroupChatAvatarProps) => {
                 type={type}
                 name={member.userId?.displayName ?? ""}
                 avatarUrl={member.userId?.avatarUrl ?? undefined}
+                className={cn(
+                    type === "sidebar" && "!size-8 !text-sm",
+                    type === "chat" && "!size-6 !text-xs"
+                )}
             />
         );
     }
 
     return (
-        <div className="relative flex -space-x-2 *:data-[slot=avatar]:ring-background
-    *:data-[slot=avatar]:ring-2">
+        <div className="relative flex -space-x-2 *:data-[slot=avatar]:ring-background *:data-[slot=avatar]:ring-2 shrink-0">
             {avatars}
             {participants.length > limit && (
                 <div className={cn(
                     "flex items-center z-10 justify-center rounded-full bg-muted ring-2 ring-background text-muted-foreground",
-                    type === "sidebar" ? "size-12" : "size-8"
+                    type === "sidebar" ? "size-8" : "size-6"
                 )}>
-                    <Ellipsis className={type === "sidebar" ? "size-6" : "size-4"} />
+                    <Ellipsis className={type === "sidebar" ? "size-4" : "size-3"} />
                 </div>
             )}
         </div>

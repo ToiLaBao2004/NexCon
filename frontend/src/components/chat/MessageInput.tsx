@@ -14,7 +14,7 @@ import { toast } from "sonner";
 const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
     const { user } = useAuthStore();
     const { emitTyping, emitStopTyping } = useSocketStore();
-    const { sendDirectMessage, sendGroupMessage } = useChatStore();
+    const { sendDirectMessage, sendGroupMessage, markAsSeen } = useChatStore();
     const { blockedUsers, blockedBy } = useFriendStore();
     const [value, setValue] = useState("");
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,6 +84,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
         }
     };
 
+    const handleFocus = () => {
+        markAsSeen();
+    };
+
     if (selectedConvo.type === "direct") {
         if (isBlockedByMe) {
             return (
@@ -117,6 +121,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
                     onKeyDown={handleKeyPress}
                     value={value}
                     onChange={handleInputChange}
+                    onFocus={handleFocus}
                     placeholder="Soạn tin nhắn"
                     className="pr-20 h-9 bg-white border-border/50 focus:border-primary/50 transition-smooth resize-none"
                 ></Input>

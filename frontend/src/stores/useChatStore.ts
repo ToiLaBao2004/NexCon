@@ -166,9 +166,17 @@ export const useChatStore = create<ChatState>()(
                     if (!activeConversationId || !user)
                         return;
                     const convo = conversations.find((c) => c._id === activeConversationId);
-                    if (!convo) return;
-                    if ((convo.unreadCounts?.[user._id] ?? 0) === 0)
-                        return;
+                    if (!convo || !convo.lastMessage) return;
+
+                    const isUnread = (convo.unreadCounts?.[user._id] ?? 0) > 0;
+                    const isSeen = convo.seenBy?.some((s: any) => {
+                        const id = typeof s === "string" ? s : s._id?.toString();
+                        return id === user._id;
+                    });
+
+                    // Nếu đã hết tin nhắn chưa đọc VÀ đã có tên trong danh sách seenBy thì không cần gọi API
+                    if (!isUnread && isSeen) return;
+
                     await chatService.markAsSeen(activeConversationId);
                     set((state) => ({
                         conversations: state.conversations.map((c) => (

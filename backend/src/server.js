@@ -11,6 +11,7 @@ import friendRouter from './routes/friendRoute.js';
 import messageRouter from './routes/messageRoute.js';
 import conversationRouter from './routes/conversationRoute.js';
 import notificationRouter from './routes/notificationRoute.js';
+import callRouter from './routes/callRoute.js';
 import { app, server } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -42,6 +43,7 @@ app.use('/api/friends', friendRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/conversations', conversationRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/calls', callRouter);
 
 connectDB().then(() => {
     server.listen(PORT, () => {

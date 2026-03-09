@@ -5,6 +5,7 @@ import { socketAuthMiddleware } from "../middlewares/socketMiddleware.js";
 import { getUserConversationsForSocketIO } from "../controllers/conversationController.js";
 import { searchUserByEmailAndPhone } from "../controllers/userController.js";
 import Conversation from "../models/conversationModel.js";
+import { registerCallHandlers, handleCallDisconnect } from "./callHandler.js";
 
 const app = express();
 
@@ -21,6 +22,13 @@ io.use(socketAuthMiddleware);
 
 const onlineUsers = new Map();
 
+// Track active calls: callerId -> { callerId, receiverId, callId, conversationId, status }
+const activeCalls = new Map();
+
+function getReceiverSocketId(userId) {
+    return onlineUsers.get(userId);
+}
+
 io.on("connection", async (socket) => {
     const user = socket.user;
 
@@ -30,11 +38,13 @@ io.on("connection", async (socket) => {
 
     io.emit("online-users", Array.from(onlineUsers.keys()));
 
+    // Join tất cả conversation rooms
     const conversationIds = await getUserConversationsForSocketIO(user._id);
     conversationIds.forEach((id) => {
         socket.join(id);
     });
 
+    // Join conversation theo yêu cầu
     socket.on("join-conversation", async ({ conversationId }) => {
         const conversation = await Conversation.findById(conversationId);
         if (conversation && conversation.participants.some(p => p.userId.toString() === user._id.toString())) {
@@ -43,8 +53,10 @@ io.on("connection", async (socket) => {
         }
     });
 
+    // Search user
     socket.on("search-user", (payload) => searchUserByEmailAndPhone(socket, payload));
 
+    // Typing indicators
     socket.on("typing", ({ conversationId }) => {
         socket.to(conversationId).emit("user-typing", { conversationId, userId: user._id.toString() });
     });
@@ -53,15 +65,20 @@ io.on("connection", async (socket) => {
         socket.to(conversationId).emit("user-stopped-typing", { conversationId, userId: user._id.toString() });
     });
 
-    socket.on("disconnect", () => {
-        onlineUsers.delete(user._id.toString());
+    // Call handlers (tách riêng)
+    registerCallHandlers(socket, user, activeCalls, onlineUsers, io, getReceiverSocketId);
+
+    // Disconnect
+    socket.on("disconnect", async () => {
+        const userId = user._id.toString();
+
+        // Xử lý cuộc gọi đang active (lưu DB + thông báo đối phương)
+        await handleCallDisconnect(userId, activeCalls, io, getReceiverSocketId);
+
+        onlineUsers.delete(userId);
         io.emit("online-users", Array.from(onlineUsers.keys()));
         console.log(`Socket Disconnected: ${socket.id}`);
     });
-})
-
-function getReceiverSocketId(userId) {
-    return onlineUsers.get(userId);
-}
+});
 
 export { io, app, server, getReceiverSocketId };

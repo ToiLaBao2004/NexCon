@@ -1,6 +1,7 @@
 import type { Socket } from "socket.io-client";
 import type { Conversation, Message } from "./chat";
 import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
+import type { CallRecord } from "./call";
 
 export interface ThemeState {
   isDark: boolean;
@@ -96,6 +97,54 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export type CallStatus = 'idle' | 'outgoing' | 'incoming' | 'active';
+export type CallType = 'voice' | 'video';
+
+export interface RemoteUser {
+  _id: string;
+  displayName: string;
+  avatarUrl?: string | null;
+}
+
+export interface CallState {
+  status: CallStatus;
+  callType: CallType | null;
+  remoteUser: RemoteUser | null;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+  isMuted: boolean;
+  isVideoOff: boolean;
+  _peerConnection: RTCPeerConnection | null;
+  _pendingOffer: RTCSessionDescriptionInit | null;
+  _iceCandidateQueue: RTCIceCandidateInit[];
+  _callTimeout: ReturnType<typeof setTimeout> | null;
+  startCall: (toUser: RemoteUser, callType: CallType) => Promise<void>;
+  acceptCall: () => Promise<void>;
+  rejectCall: () => void;
+  endCall: () => void;
+  toggleMute: () => void;
+  toggleVideo: () => void;
+  handleIncomingCall: (from: RemoteUser, offer: RTCSessionDescriptionInit, callType: CallType) => void;
+  handleCallAnswered: (answer: RTCSessionDescriptionInit) => Promise<void>;
+  handleCallRejected: () => void;
+  handleCallEnded: () => void;
+  handleCallFailed: (reason: 'offline' | 'busy') => void;
+  handleIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
+}
+
+export interface CallHistoryState {
+  callsByConversation: Record<string, {
+    items: CallRecord[];
+    hasMore: boolean;
+    nextCursor?: string | null;
+  }>;
+  loading: boolean;
+
+  fetchCallsByConversation: (conversationId: string, isRefresh?: boolean) => Promise<void>;
+  addCallRecord: (conversationId: string, call: CallRecord) => void;
+  reset: () => void;
 }
 
 export interface NotificationState {
