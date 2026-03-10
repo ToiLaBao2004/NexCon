@@ -46,9 +46,19 @@ const MessageItem = ({
 			(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
 		) ?? [];
 
-	const { recallMessage } = useChatStore();
+	const { recallMessage, pinMessage } = useChatStore();
 
 	const [showConfirmRecall, setShowConfirmRecall] = useState(false);
+	const [showPinOptions, setShowPinOptions] = useState(false);
+	const handlePin = async () => {
+		try {
+			await pinMessage(message._id);
+		} catch (error) {
+			console.error("Ghim tin nhắn thất bại:", error);
+		} finally {
+			setShowPinOptions(false);
+		}
+	};
 
 	const handleRecall = async () => {
 		try {
@@ -142,6 +152,9 @@ const MessageItem = ({
 								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
 									<DropdownMenuItem>Trả lời</DropdownMenuItem>
 									<DropdownMenuItem>Sao chép</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => setShowPinOptions(true)}>
+										Ghim Tin Nhắn
+									</DropdownMenuItem>
 
 									{isOwn && (
 										<DropdownMenuItem
@@ -187,7 +200,7 @@ const MessageItem = ({
 						</div>
 					)}
 				</div>
-			</div>
+			</div >
 
 			<ConfirmationModal
 				isOpen={showConfirmRecall}
@@ -197,6 +210,14 @@ const MessageItem = ({
 				description="Tin nhắn này sẽ bị xóa khỏi cuộc trò chuyện của bạn và những người khác. Hành động này không thể hoàn tác."
 				confirmText="Thu hồi"
 				variant="destructive"
+			/>
+			<ConfirmationModal
+				isOpen={showPinOptions}
+				onClose={() => setShowPinOptions(false)}
+				onConfirm={handlePin}
+				title="Ghim tin nhắn?"
+				description="Tin nhắn này sẽ được ghim vào đầu cuộc trò chuyện."
+				confirmText="Ghim"
 			/>
 		</>
 	);

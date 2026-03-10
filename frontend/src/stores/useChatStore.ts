@@ -51,26 +51,35 @@ export const useChatStore = create<ChatState>()(
                 set({ messageLoading: true });
 
                 try {
-                    const { messages: fetched, cursor } = await chatService.fetchMessages(convoId, nextCursor);
+                    const { messages: fetched, cursor, pinnedMessages } = await chatService.fetchMessages(convoId, nextCursor);
                     const processed = fetched.map((m) => ({
                         ...m,
                         isOwn: m.senderId === user?._id,
                     }));
 
                     set((state) => {
-                        const prev = state.messages[convoId]?.items ?? [];
-                        const merged = prev.length > 0 ? [...processed, ...prev] : processed;
+                        const prevState = state.messages[convoId] ?? {
+                            items: [],
+                            hasMore: false,
+                            nextCursor: "",
+                            pinnedMessages: [],
+                        };
+
+                        const prevItems = prevState.items ?? [];
+                        const merged = prevItems.length > 0 ? [...processed, ...prevItems] : processed;
 
                         return {
                             messages: {
                                 ...state.messages,
                                 [convoId]: {
+                                    ...prevState,
                                     items: merged,
                                     hasMore: !!cursor,
                                     nextCursor: cursor ?? null,
-                                }
-                            }
-                        }
+                                    pinnedMessages: pinnedMessages ?? prevState.pinnedMessages ?? [],
+                                },
+                            },
+                        };
                     });
 
                 } catch (error) {
@@ -124,21 +133,28 @@ export const useChatStore = create<ChatState>()(
                     }
 
                     set((state) => {
-                        if (prevItems.some((m) => m._id === message._id)) {
+                        const prevState = state.messages[convoId] ?? {
+                            items: [],
+                            hasMore: false,
+                            nextCursor: "",
+                            pinnedMessages: [],
+                        };
+
+                        if (prevState.items.some((m) => m._id === message._id)) {
                             return state;
                         }
+
                         return {
                             messages: {
                                 ...state.messages,
                                 [convoId]: {
-                                    items: [...prevItems, message],
-                                    hasMore: state.messages[convoId].hasMore,
-                                    nextCursor: state.messages[convoId].nextCursor ?? undefined
-                                }
-                            }
-                        }
-                    })
-
+                                    ...prevState,
+                                    items: [...prevState.items, message],
+                                    pinnedMessages: prevState.pinnedMessages ?? [],
+                                },
+                            },
+                        };
+                    });
                 } catch (error) {
                     console.error(error, "Lỗi khi thêm tin nhắn");
                 }
@@ -277,18 +293,93 @@ export const useChatStore = create<ChatState>()(
                     console.error("Lỗi khi thu hồi tin nhắn:", error);
                 }
             },
-            recallMessageLocal: (conversationId, messageId, patch) =>
-                set((state) => ({
-                    messages: {
-                        ...state.messages,
-                        [conversationId]: {
-                            ...state.messages[conversationId],
-                            items: (state.messages[conversationId]?.items ?? []).map((m) =>
-                                m._id === messageId ? { ...m, ...patch } : m
-                            ),
+            pinMessage: async (messageId: string) => {
+                try {
+                    const res = await chatService.pinMessage(messageId);
+                    const payload = res.data;
+
+                    const { pinMessageLocal } = get();
+
+                    if (payload?.unpinnedMessageId) {
+                        pinMessageLocal(payload.conversationId, payload.unpinnedMessageId, {
+                            isPinned: false,
+                            pinnedAt: null,
+                        });
+                    }
+
+                    if (payload?.pinnedMessageId) {
+                        pinMessageLocal(payload.conversationId, payload.pinnedMessageId, {
+                            isPinned: true,
+                            pinnedAt: payload.pinnedAt,
+                        });
+                    }
+                } catch (error) {
+                    console.error("Lỗi khi ghim tin nhắn:", error);
+                }
+            },
+            pinMessageLocal: (conversationId, messageId, patch) =>
+                set((state) => {
+                    const prevState = state.messages[conversationId] ?? {
+                        items: [],
+                        hasMore: false,
+                        nextCursor: "",
+                        pinnedMessages: [],
+                    };
+
+                    const updatedItems = prevState.items.map((m) =>
+                        m._id === messageId ? { ...m, ...patch } : m
+                    );
+
+                    const updatedMessage = updatedItems.find((m) => m._id === messageId);
+                    let nextPinned = prevState.pinnedMessages ?? [];
+
+                    if (updatedMessage?.isPinned) {
+                        nextPinned = nextPinned.some((m) => m._id === messageId)
+                            ? nextPinned.map((m) => (m._id === messageId ? updatedMessage : m))
+                            : [updatedMessage, ...nextPinned];
+                    } else {
+                        nextPinned = nextPinned.filter((m) => m._id !== messageId);
+                    }
+
+                    return {
+                        messages: {
+                            ...state.messages,
+                            [conversationId]: {
+                                ...prevState,
+                                items: updatedItems,
+                                pinnedMessages: nextPinned,
+                            },
                         },
-                    },
-                })),
+                    };
+                }),
+            recallMessageLocal: (conversationId, messageId, patch) =>
+                set((state) => {
+                    const prevState = state.messages[conversationId] ?? {
+                        items: [],
+                        hasMore: false,
+                        nextCursor: "",
+                        pinnedMessages: [],
+                    };
+
+                    const updatedItems = prevState.items.map((m) =>
+                        m._id === messageId ? { ...m, ...patch } : m
+                    );
+
+                    const updatedPinned = (prevState.pinnedMessages ?? []).map((m) =>
+                        m._id === messageId ? { ...m, ...patch } : m
+                    );
+
+                    return {
+                        messages: {
+                            ...state.messages,
+                            [conversationId]: {
+                                ...prevState,
+                                items: updatedItems,
+                                pinnedMessages: updatedPinned,
+                            },
+                        },
+                    };
+                }),
         }),
         {
             name: "chat-storage",

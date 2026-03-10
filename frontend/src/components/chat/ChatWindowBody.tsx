@@ -2,6 +2,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import MessageItem from "./MessageItem";
 import CallMessageItem from "./CallMessageItem";
+import { PinnedMessagesBanner } from "@/components/chat/PinnedMessagesBanner";
 import { useEffect, useMemo, useRef } from "react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSocketStore } from "@/stores/useSocketStore";
@@ -9,7 +10,6 @@ import { useCallHistoryStore } from "@/stores/useCallHistoryStore";
 import type { Message } from "@/types/chat";
 import type { CallRecord } from "@/types/call";
 
-// Unified timeline item: either a message or a call record
 type TimelineItem =
   | { kind: "message"; data: Message }
   | { kind: "call"; data: CallRecord };
@@ -22,15 +22,20 @@ const ChatWindowBody = () => {
     fetchMessages,
     messageLoading,
   } = useChatStore();
+
+  // Tránh crash khi activeConversationId là null
+  const convoId = activeConversationId ?? null;
+
   const messages = useMemo(
-    () => allMessages[activeConversationId!]?.items ?? [],
-    [allMessages, activeConversationId]
+    () => (convoId ? allMessages[convoId]?.items ?? [] : []),
+    [allMessages, convoId]
   );
-  const messageData = allMessages[activeConversationId!];
+
+  const messageData = convoId ? allMessages[convoId] : null;
   const hasMore = messageData?.hasMore ?? false;
-  const selectedConvo = conversations.find(
-    (c) => c._id === activeConversationId,
-  );
+
+  const selectedConvo = conversations.find((c) => c._id === convoId);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
   const { typingUsers } = useSocketStore();
@@ -42,32 +47,34 @@ const ChatWindowBody = () => {
   // Call history
   const { callsByConversation, fetchCallsByConversation } = useCallHistoryStore();
   const calls = useMemo(
-    () => callsByConversation[activeConversationId!]?.items ?? [],
-    [callsByConversation, activeConversationId]
+    () => (convoId ? callsByConversation[convoId]?.items ?? [] : []),
+    [callsByConversation, convoId]
   );
 
-  // Fetch call history when conversation changes
   useEffect(() => {
-    if (activeConversationId) {
-      fetchCallsByConversation(activeConversationId);
+    if (convoId) {
+      fetchCallsByConversation(convoId);
     }
-  }, [activeConversationId, fetchCallsByConversation]);
+  }, [convoId, fetchCallsByConversation]);
 
-  // Build merged timeline sorted by createdAt
   const timeline: TimelineItem[] = useMemo(() => {
     const messageItems: TimelineItem[] = messages.map(msg => ({ kind: "message", data: msg }));
     const callItems: TimelineItem[] = calls.map(call => ({ kind: "call", data: call }));
-
     return [...messageItems, ...callItems].sort(
-      (a, b) =>
-        new Date(a.data.createdAt).getTime() - new Date(b.data.createdAt).getTime()
+      (a, b) => new Date(a.data.createdAt).getTime() - new Date(b.data.createdAt).getTime()
     );
   }, [messages, calls]);
 
   const lastItemId = timeline[timeline.length - 1]?.data._id;
   const firstItemId = timeline[0]?.data._id;
-  const activeTypingUserIds = typingUsers[activeConversationId!]?.filter(id => id !== user?._id) || [];
-  const activeTypingParticipants = activeTypingUserIds.map(id => selectedConvo?.participants.find(p => p.userId?._id?.toString() === id));
+
+  const activeTypingUserIds = convoId
+    ? (typingUsers[convoId]?.filter(id => id !== user?._id) || [])
+    : [];
+
+  const activeTypingParticipants = activeTypingUserIds.map(id =>
+    selectedConvo?.participants.find(p => p.userId?._id?.toString() === id)
+  );
 
   const prevFirstItemId = useRef<string | undefined>(undefined);
 
@@ -86,20 +93,20 @@ const ChatWindowBody = () => {
         });
         isFirstLoad.current = false;
       }
-    } else {
+    } else if (convoId) {
       scrollToBottom();
     }
-  }, [lastItemId, activeTypingUserIds.length, timeline.length]);
+  }, [lastItemId, activeTypingUserIds.length, timeline.length, convoId]);
 
   useEffect(() => {
     isFirstLoad.current = true;
     prevFirstItemId.current = undefined;
     prevMessageCount.current = 0;
-  }, [activeConversationId]);
+  }, [convoId]);
 
   useEffect(() => {
     const container = scrollRef.current;
-    if (!container) return;
+    if (!container || !convoId) return;
 
     const loadedOlderMessages =
       timeline.length > prevMessageCount.current &&
@@ -108,23 +115,21 @@ const ChatWindowBody = () => {
 
     if (loadedOlderMessages) {
       const newScrollHeight = container.scrollHeight;
-      // Giữ nguyên vị trí cuộn khi tin nhắn cũ được nhúng lên đầu
       container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
     }
 
     prevMessageCount.current = timeline.length;
     prevFirstItemId.current = firstItemId;
-  }, [timeline.length, firstItemId]);
+  }, [timeline.length, firstItemId, convoId]);
 
   const { loading: callHistoryLoading } = useCallHistoryStore();
-  const callData = callsByConversation[activeConversationId!];
+  const callData = convoId ? callsByConversation[convoId] : null;
   const hasMoreCalls = callData?.hasMore ?? false;
 
   const handleScroll = () => {
     const container = scrollRef.current;
-    if (!container) return;
+    if (!container || !convoId) return;
 
-    // Unified infinite scroll: load more if either messages or calls have more items
     const canFetchMoreMessages = hasMore && !messageLoading;
     const canFetchMoreCalls = hasMoreCalls && !callHistoryLoading;
 
@@ -136,16 +141,17 @@ const ChatWindowBody = () => {
       }
 
       if (canFetchMoreCalls) {
-        fetchCallsByConversation(activeConversationId!);
+        fetchCallsByConversation(convoId);
       }
     }
   };
 
-  if (!selectedConvo) {
+  // Guard clause: nếu chưa có conversation được chọn → render welcome
+  if (!convoId || !selectedConvo) {
     return <ChatWelcomeScreen />;
   }
 
-  if (!timeline.length && activeTypingUserIds.length === 0) {
+  if (timeline.length === 0 && activeTypingUserIds.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
         Chưa có tin nhắn nào trong cuộc trò chuyện này!
@@ -154,42 +160,50 @@ const ChatWindowBody = () => {
   }
 
   return (
-    <div className="p-4 bg-primary-foreground h-full flex flex-col overflow-hidden">
+    <div className="flex flex-col h-full bg-primary-foreground overflow-hidden">
+      <PinnedMessagesBanner />
+
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar"
+        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4"
       >
         {messageLoading && hasMore && (
-          <div className="flex justify-center py-2 text-sm text-muted-foreground">
-            Đang tải...
+          <div className="flex justify-center py-4 text-sm text-muted-foreground">
+            Đang tải tin nhắn cũ...
           </div>
         )}
+
         {timeline.map((item, index) => {
           if (item.kind === "message") {
-            // Find message index within the original messages array for group-break logic
             const msgIdx = messages.indexOf(item.data);
             return (
-              <MessageItem
+              <div
                 key={`msg-${item.data._id ?? index}`}
-                message={item.data}
-                index={msgIdx >= 0 ? msgIdx : index}
-                messages={messages}
-                selectedConvo={selectedConvo}
-                currentUserId={user?._id ?? ""}
-              />
+                id={`msg-${item.data._id}`}
+              >
+                <MessageItem
+                  message={item.data}
+                  index={msgIdx >= 0 ? msgIdx : index}
+                  messages={messages}
+                  selectedConvo={selectedConvo}
+                  currentUserId={user?._id ?? ""}
+                />
+              </div>
             );
           }
+
           return (
             <CallMessageItem
               key={`call-${item.data._id}`}
               call={item.data as CallRecord}
               currentUserId={user?._id ?? ""}
-              selectedConvo={selectedConvo!}
+              selectedConvo={selectedConvo}
               isLast={item.data._id === lastItemId}
             />
           );
         })}
+
         {activeTypingParticipants.length > 0 && (
           <div className="flex gap-2 mx-2 px-1 mt-0.5 justify-start">
             <div className="w-8 shrink-0 pt-0.5" />
@@ -205,6 +219,7 @@ const ChatWindowBody = () => {
             </div>
           </div>
         )}
+
         <div ref={bottomRef} />
       </div>
     </div>

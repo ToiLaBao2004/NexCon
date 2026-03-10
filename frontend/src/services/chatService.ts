@@ -4,6 +4,7 @@ import type { ConversationResponse, Message } from '@/types/chat';
 interface FetchMessageProps {
 	messages: Message[];
 	cursor?: string;
+	pinnedMessages: Message[];
 }
 
 const pageLimit = 20;
@@ -16,7 +17,7 @@ export const chatService = {
 	async fetchMessages(id: string, cursor?: string): Promise<FetchMessageProps> {
 		const res = await api.get(`/conversations/${id}/messages?limit=${pageLimit}&cursor=${cursor}`);
 
-		return { messages: res.data.messages, cursor: res.data.nextCursor };
+		return { messages: res.data.messages, cursor: res.data.nextCursor, pinnedMessages: res.data.pinnedMessages };
 	},
 	async sendDirectMessage(recipientId: string, content: string = "", imgUrl?: string, conversationId?: string) {
 		const res = await api.post("/messages/send-direct", {
@@ -44,6 +45,10 @@ export const chatService = {
 	},
 	async recallMessage(messageId: string) {
 		const res = await api.put('/messages/recall', { messageId });
+		return res.data;
+	},
+	async pinMessage(messageId: string) {
+		const res = await api.put('/messages/pin', { messageId });
 		return res.data;
 	}
 };

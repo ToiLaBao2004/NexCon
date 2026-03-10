@@ -56,6 +56,8 @@ export interface Message {
   senderId: string;
   content: string | null;
   isRecalled: boolean | null;
+  isPinned: boolean | null;
+  pinnedAt?: string | null;
   imgUrl?: string | null;
   updatedAt?: string | null;
   createdAt: string;

@@ -334,3 +334,48 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes pinMessageFlashLight {
+  0% {
+    background-color: transparent;
+  }
+  18% {
+    background-color: rgba(2, 120, 255, 0.14);
+  }
+  38% {
+    background-color: transparent;
+  }
+  58% {
+    background-color: rgba(2, 120, 255, 0.14);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes pinMessageFlashDark {
+  0% {
+    background-color: transparent;
+  }
+  18% {
+    background-color: rgba(2, 120, 255, 0.2);
+  }
+  38% {
+    background-color: transparent;
+  }
+  58% {
+    background-color: rgba(2, 120, 255, 0.14);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.pin-message-flash {
+  border-radius: 16px;
+  animation: pinMessageFlashLight 1.8s ease-in-out;
+}
+
+.dark .pin-message-flash {
+  animation: pinMessageFlashDark 1.8s ease-in-out;
+}

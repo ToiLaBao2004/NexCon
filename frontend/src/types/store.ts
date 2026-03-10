@@ -15,6 +15,7 @@ export interface ChatState {
     items: Message[],
     hasMore: boolean,
     nextCursor?: string | null,
+    pinnedMessages: Message[];
   }>;
   activeConversationId: string | null;
   focusedConversationId: string | null;
@@ -43,6 +44,8 @@ export interface ChatState {
   openChat: (params: { userId?: string; conversationId?: string }) => Promise<void>;
   createGroup: (name: string, members: string[]) => Promise<void>;
   recallMessage: (messageId: string) => Promise<void>;
+  pinMessage: (messageId: string) => Promise<void>;
+  pinMessageLocal: (conversationId: string, messageId: string, patch: { isPinned: boolean, pinnedAt: string | null }) => void;
   recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
 }
 

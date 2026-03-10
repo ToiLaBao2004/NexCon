@@ -18,6 +18,9 @@ const messageSchema = new mongoose.Schema({
     isPinned: {
         type: Boolean
     },
+    pinnedAt: {
+        type: Date
+    },
     isRecalled: {
         type: Boolean
     },
