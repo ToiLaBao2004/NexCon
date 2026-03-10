@@ -56,7 +56,7 @@ export const authService = {
   },
 
   loginGoogle: () => {
-    window.location.href = `${BACKEND_URL}/api/auth/google`;
+    window.location.href = `${BACKEND_URL}/auth/google`;
   },
 
   fetchMe: async () => {
