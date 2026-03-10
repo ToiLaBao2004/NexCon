@@ -147,6 +147,14 @@ export async function getMessages(req, res) {
 			query.createdAt = { $lt: new Date(cursor) }
 		}
 
+		const pinnedMessages = await Message.find({
+			conversationId: query.conversationId,
+			isPinned: true,
+		})
+			.sort({ pinnedAt: -1, createdAt: -1 })
+			.populate('senderId', 'displayName avatarUrl')
+			.lean();
+
 		let messages = await Message.find(query)
 			.sort({ createdAt: -1 })
 			.limit(Number(limit) + 1);
@@ -164,6 +172,7 @@ export async function getMessages(req, res) {
 		return res.status(200).json({
 			messages,
 			nextCursor,
+			pinnedMessages,
 		});
 
 	} catch (error) {

@@ -1,6 +1,6 @@
 import api from '@/lib/axios';
 
-const BACKEND_URL = "http://localhost:5001";
+const BACKEND_URL = import.meta.env.VITE_API_URL;
 
 export const authService = {
   verifyValidFieldsSignUp: async (
@@ -56,7 +56,7 @@ export const authService = {
   },
 
   loginGoogle: () => {
-    window.location.href = `${BACKEND_URL}/api/auth/google`;
+    window.location.href = `${BACKEND_URL}/auth/google`;
   },
 
   fetchMe: async () => {

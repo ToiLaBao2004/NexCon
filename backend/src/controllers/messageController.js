@@ -86,6 +86,9 @@ export async function recallMessagge(req, res) {
             await conversation.save();
         }
         message.isRecalled = true;
+        if (message.isPinned === true) {
+            message.isPinned = false;
+        }
         await message.save();
         conversation.participants.forEach(p => {
             const receiverSocketId = getReceiverSocketId(p.userId._id.toString());
@@ -111,26 +114,74 @@ export async function recallMessagge(req, res) {
 export async function pinMessage(req, res) {
     try {
         const { messageId } = req.body;
-        const senderId = req.user._id;
+
         const message = await Message.findById(messageId);
         if (!message) {
-            return res.status(404).json({ message: 'Message not found' });
+            return res.status(404).json({ message: "Message not found" });
         }
+
         const conversation = await Conversation.findById(message.conversationId);
-        const pinnedMessages = await Message.find({ conversationId: conversation._id, isPinned: true }).sort({ createdAt: 1 });
+        if (!conversation) {
+            return res.status(404).json({ message: "Conversation not found" });
+        }
+
+        // Nếu tin này đã được ghim rồi thì không xử lý lại
+        if (message.isPinned) {
+            return res.status(200).json({
+                message: "Message already pinned",
+                data: {
+                    conversationId: message.conversationId.toString(),
+                    pinnedMessageId: message._id.toString(),
+                    unpinnedMessageId: null,
+                    pinnedAt: message.pinnedAt,
+                },
+            });
+        }
+
+        // Lấy danh sách pin hiện tại, ưu tiên sort theo thời điểm ghim
+        const pinnedMessages = await Message.find({
+            conversationId: conversation._id,
+            isPinned: true,
+        }).sort({ pinnedAt: 1, createdAt: 1 });
+
+        let unpinnedMessageId = null;
+
+        // Nếu đã đủ 3 thì bỏ ghim tin cũ nhất theo pinnedAt
         if (pinnedMessages.length >= 3) {
             const oldestPinnedMessage = pinnedMessages[0];
+
             oldestPinnedMessage.isPinned = false;
+            oldestPinnedMessage.pinnedAt = null;
             await oldestPinnedMessage.save();
+
+            unpinnedMessageId = oldestPinnedMessage._id.toString();
         }
-        if (message.senderId.toString() !== senderId.toString()) {
-            return res.status(403).json({ message: 'You can only pin your own messages' });
-        }
+
         message.isPinned = true;
+        message.pinnedAt = new Date();
         await message.save();
-        return res.status(200).json({ message: 'Message pinned successfully' });
+
+        const payload = {
+            conversationId: message.conversationId.toString(),
+            pinnedMessageId: message._id.toString(),
+            unpinnedMessageId,
+            isPinned: true,
+            pinnedAt: message.pinnedAt,
+        };
+
+        conversation.participants.forEach((p) => {
+            const receiverSocketId = getReceiverSocketId(p.userId._id.toString());
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("pin-message", payload);
+            }
+        });
+
+        return res.status(200).json({
+            message: "Message pinned successfully",
+            data: payload,
+        });
     } catch (error) {
-        console.error('Error pinning message:', error);
-        res.status(500).json({ message: 'Internal server error' });
+        console.error("Error pinning message:", error);
+        return res.status(500).json({ message: "Internal server error" });
     }
 }

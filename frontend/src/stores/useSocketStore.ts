@@ -175,6 +175,24 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       },
     );
 
+    socket.on("pin-message", (payload) => {
+      const { pinMessageLocal } = useChatStore.getState();
+
+      if (payload.unpinnedMessageId) {
+        pinMessageLocal(payload.conversationId, payload.unpinnedMessageId, {
+          isPinned: false,
+          pinnedAt: null,
+        });
+      }
+
+      if (payload.pinnedMessageId) {
+        pinMessageLocal(payload.conversationId, payload.pinnedMessageId, {
+          isPinned: true,
+          pinnedAt: payload.pinnedAt,
+        });
+      }
+    });
+
     socket.on("user-blocked", ({ blockedBy }) => {
       useFriendStore.getState().addBlockedBy(blockedBy);
     });
