@@ -1,5 +1,6 @@
 import { useChatStore } from "@/stores/useChatStore";
 import { useSocketStore } from "@/stores/useSocketStore";
+import { useCallHistoryStore } from "@/stores/useCallHistoryStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import ChatWindowSkeleton from "./ChatWindowSkeleton";
 import { SidebarInset } from "../ui/sidebar";
@@ -13,22 +14,41 @@ const ChatWindowLayout = () => {
     activeConversationId,
     focusedConversationId,
     conversations,
-    messageLoading: loading,
+    messageLoading,
     messages: allMessages,
     markAsSeen,
+    fetchMessages,
   } = useChatStore();
+
+  const {
+    loading: callHistoryLoading,
+    callsByConversation,
+    fetchCallsByConversation,
+  } = useCallHistoryStore();
 
   const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
 
   const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
+  const hasLoadedCalls = (callsByConversation[activeConversationId!]?.items?.length ?? 0) > 0;
 
   const { joinConversation } = useSocketStore();
 
+  // Unified data fetching when active conversation changes
   useEffect(() => {
     if (activeConversationId) {
       joinConversation(activeConversationId);
+
+      // Trigger message fetch if not already loaded and not currently loading
+      if (!allMessages[activeConversationId] && !messageLoading) {
+        fetchMessages(activeConversationId);
+      }
+
+      // Trigger call history fetch if not already loaded and not currently loading
+      if (!callsByConversation[activeConversationId] && !callHistoryLoading) {
+        fetchCallsByConversation(activeConversationId);
+      }
     }
-  }, [activeConversationId, joinConversation]);
+  }, [activeConversationId, joinConversation, fetchMessages, fetchCallsByConversation, messageLoading, callHistoryLoading]);
 
   useEffect(() => {
     if (!selectedConvo || activeConversationId !== focusedConversationId) return;
@@ -47,7 +67,16 @@ const ChatWindowLayout = () => {
     return <ChatWelcomeScreen />;
   }
 
-  if (loading && !hasLoadedMessages) {
+  // Show skeleton if we have a conversation but either messages or calls are not loaded yet
+  const messageData = allMessages[activeConversationId!];
+  const callData = callsByConversation[activeConversationId!];
+
+  const isInitialLoading = selectedConvo && (
+    (!hasLoadedMessages && (messageLoading || !messageData)) ||
+    (!hasLoadedCalls && (callHistoryLoading || !callData))
+  );
+
+  if (isInitialLoading) {
     return <ChatWindowSkeleton />
   }
   return (

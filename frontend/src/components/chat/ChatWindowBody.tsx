@@ -51,11 +51,7 @@ const ChatWindowBody = () => {
     [callsByConversation, convoId]
   );
 
-  useEffect(() => {
-    if (convoId) {
-      fetchCallsByConversation(convoId);
-    }
-  }, [convoId, fetchCallsByConversation]);
+  // Fetch call history handles in ChatWindowLayout to synchronize with messages
 
   const timeline: TimelineItem[] = useMemo(() => {
     const messageItems: TimelineItem[] = messages.map(msg => ({ kind: "message", data: msg }));
@@ -188,6 +184,7 @@ const ChatWindowBody = () => {
                   messages={messages}
                   selectedConvo={selectedConvo}
                   currentUserId={user?._id ?? ""}
+                  isLast={item.data._id === lastItemId}
                 />
               </div>
             );

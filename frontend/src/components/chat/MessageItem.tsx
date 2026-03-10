@@ -18,6 +18,7 @@ interface MessageItemProps {
 	messages: Message[];
 	selectedConvo: Conversation;
 	currentUserId: string;
+	isLast?: boolean;
 }
 
 const MessageItem = ({
@@ -26,6 +27,7 @@ const MessageItem = ({
 	messages,
 	selectedConvo,
 	currentUserId,
+	isLast,
 }: MessageItemProps) => {
 	const prev = messages[index - 1];
 
@@ -175,7 +177,7 @@ const MessageItem = ({
 						</span>
 					)}
 
-					{isOwn && index === messages.length - 1 && (
+					{isOwn && isLast && (
 						<div className="flex items-center gap-1.5 mt-0.5 px-1.5">
 							{seenByOthers.length > 0 ? (
 								seenByOthers.map((seenId) => {
