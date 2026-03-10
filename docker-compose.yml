@@ -1,0 +1,79 @@
+version: "3.9"
+
+# NexCon – Docker Compose
+# Cấu trúc: backend (Node/Express/Socket.io) + frontend (Nginx)
+# Database: MongoDB Atlas (external – không cần container)
+#
+
+services:
+
+  # BACKEND
+  server:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: nexcon_server
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      # Server
+      PORT: 5001
+
+      # MongoDB Atlas (external)
+      MONGODB_CONNECTION_STRING: ${MONGODB_CONNECTION_STRING}
+
+      # JWT
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
+
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+
+      # URLs
+      BACKEND_URL: ${BACKEND_URL:-http://localhost:5001}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:5173}
+
+      # Email
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+
+      # Cloudinary
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+
+    healthcheck:
+      test: [ "CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5001/api/auth/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+    networks:
+      - nexcon_net
+
+  # FRONTEND 
+  client:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Vite nhúng env vào JS tại BUILD TIME nên phải truyền qua build args
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5001/api}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:5001/}
+    container_name: nexcon_client
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      server:
+        condition: service_started
+    networks:
+      - nexcon_net
+
+# NETWORKS
+networks:
+  nexcon_net:
+    driver: bridge
