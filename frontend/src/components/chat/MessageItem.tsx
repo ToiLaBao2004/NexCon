@@ -11,6 +11,7 @@ import {
 import { useChatStore } from "@/stores/useChatStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { useState } from "react";
+import { toast } from "sonner";
 
 interface MessageItemProps {
 	message: Message;
@@ -59,6 +60,13 @@ const MessageItem = ({
 			console.error("Ghim tin nhắn thất bại:", error);
 		} finally {
 			setShowPinOptions(false);
+		}
+	};
+
+	const handleCopy = () => {
+		if (message.content) {
+			navigator.clipboard.writeText(message.content);
+			toast.success("Đã sao chép vào bộ nhớ tạm");
 		}
 	};
 
@@ -153,7 +161,7 @@ const MessageItem = ({
 
 								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
 									<DropdownMenuItem>Trả lời</DropdownMenuItem>
-									<DropdownMenuItem>Sao chép</DropdownMenuItem>
+									<DropdownMenuItem onClick={handleCopy}>Sao chép</DropdownMenuItem>
 									<DropdownMenuItem onClick={() => setShowPinOptions(true)}>
 										Ghim Tin Nhắn
 									</DropdownMenuItem>
