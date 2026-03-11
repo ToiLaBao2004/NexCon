@@ -1,35 +1,78 @@
-import multer from "multer";
+import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
+
+export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+export const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 export const upload = multer({
     storage: multer.memoryStorage(),
-    limits: {
-        fileSize: 1024 * 1024 * 2, // 2MB
-    },
+    limits: { fileSize: MAX_FILE_SIZE },
 });
 
-export const upLoadImageFromBuffer = (buffer, folder = "NexCon/avatars") => {
+export const handleUploadError = (err, req, res, next) => {
+    if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(413).json({
+                message: `File quá lớn. Kích thước tối đa là ${MAX_FILE_SIZE / 1024 / 1024}MB.`,
+            });
+        }
+        return res.status(400).json({ message: `Upload error: ${err.message}` });
+    }
+    next(err);
+};
+
+export const uploadImageFromBuffer = (buffer, folder = 'NexCon/avatars') => {
     return new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
+        const stream = cloudinary.uploader.upload_stream(
             {
-                folder: folder,
-                resource_type: "image",
-                transformation: [{ width: 200, height: 200, crop: "fill" }],
+                folder,
+                resource_type: 'image',
+                transformation: [{ width: 200, height: 200, crop: 'fill' }],
             },
-            (error, result) => {
-                if (error) reject(error);
-                else resolve(result);
-            }
+            (error, result) => (error ? reject(error) : resolve(result))
         );
-        uploadStream.end(buffer);
+        stream.end(buffer);
     });
 };
 
-export const deleteImage = (publicId) => {
+export const uploadChatImageFromBuffer = (buffer, folder = 'NexCon/messages/images') => {
     return new Promise((resolve, reject) => {
-        cloudinary.uploader.destroy(publicId, (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-        });
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: 'image',
+            },
+            (error, result) => (error ? reject(error) : resolve(result))
+        );
+        stream.end(buffer);
     });
 };
+
+export const uploadRawFileFromBuffer = (buffer, originalName, folder = 'NexCon/messages/files') => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: 'raw',
+                public_id: `${Date.now()}_${originalName}`,
+                use_filename: false,
+            },
+            (error, result) => (error ? reject(error) : resolve(result))
+        );
+        stream.end(buffer);
+    });
+};
+
+export const deleteCloudinaryResource = (publicId, resourceType = 'image') => {
+    return new Promise((resolve, reject) => {
+        cloudinary.uploader.destroy(
+            publicId,
+            { resource_type: resourceType },
+            (error, result) => (error ? reject(error) : resolve(result))
+        );
+    });
+};
+
+// Alias cũ
+export const upLoadImageFromBuffer = uploadImageFromBuffer;
+export const deleteImage = (publicId) => deleteCloudinaryResource(publicId, 'image');

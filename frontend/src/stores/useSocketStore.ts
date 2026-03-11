@@ -79,6 +79,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const lastMessage = {
         _id: conversation.lastMessage._id,
         content: conversation.lastMessage.content,
+        type: conversation.lastMessage.type,
         createdAt: conversation.lastMessage.createdAt,
         sender: {
           _id: conversation.lastMessage.senderId,
@@ -214,16 +215,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     const refreshCallHistory = () => {
       const activeConvoId = useChatStore.getState().activeConversationId;
       if (activeConvoId) {
-        // Gọi refresh với flag isRefresh=true để cập nhật data mà không làm trống list (gây giật UI)
         useCallHistoryStore.getState().fetchCallsByConversation(activeConvoId, true);
       }
-      // Refresh sidebar để cập nhật lastMessage (ví dụ: Cuộc gọi thoại)
       useChatStore.getState().fetchConversations();
     };
 
     socket.on("incoming-call", ({ from, offer, callType }) => {
       useCallStore.getState().handleIncomingCall(from, offer, callType);
-      // Refresh sidebar ngay khi có cuộc gọi đến
       useChatStore.getState().fetchConversations();
     });
 

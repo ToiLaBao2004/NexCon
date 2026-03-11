@@ -1,23 +1,63 @@
 import { useAuthStore } from "@/stores/useAuthStore";
-import type { Conversation } from "@/types/chat";
+import type { Conversation, MessageType } from "@/types/chat";
 import React, { useState, useRef } from "react";
 import { Button } from "../ui/button";
-import { ImagePlus, Send } from "lucide-react";
 import { Input } from "../ui/input";
 import EmojiPicker from "./EmojiPicker";
-
 import { useChatStore } from "@/stores/useChatStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
+import { Paperclip, ImagePlus, Send, X, FileText } from "lucide-react";
+import { isUrl } from "@/services/chatService";
+
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+function formatBytes(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+interface Attachment {
+    type: "image" | "file";
+    file: File;
+    preview?: string;
+}
+
+function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: number, label?: string }) {
+    return (
+        <div className="px-3 pb-2">
+            <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <span>{label}</span>
+                <span>{Math.round(percent)}%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                <div
+                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-200"
+                    style={{ width: `${percent}%` }}
+                />
+            </div>
+        </div>
+    );
+}
 
 const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
     const { user } = useAuthStore();
     const { emitTyping, emitStopTyping } = useSocketStore();
-    const { sendDirectMessage, sendGroupMessage, markAsSeen } = useChatStore();
+    const { sendMessage, markAsSeen } = useChatStore();
     const { blockedUsers, blockedBy } = useFriendStore();
+
     const [value, setValue] = useState("");
+    const [attachment, setAttachment] = useState<Attachment | null>(null);
+    const [sending, setSending] = useState(false);
+    const [loadingLocal, setLoadingLocal] = useState(false);
+
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const imageInputRef = useRef<HTMLInputElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!user) return null;
 
@@ -25,125 +65,232 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
     const otherUser = participants.find((p) => p.userId?._id?.toString() !== user._id.toString());
     const otherUserId = otherUser?.userId?._id;
 
-    // Check if I blocked them or they blocked me
-    const isBlockedByMe = blockedUsers.some(u => u._id === otherUserId);
+    const isBlockedByMe = blockedUsers.some((u) => u._id === otherUserId);
     const isBlockedByOther = otherUserId && blockedBy.includes(otherUserId);
 
-    const sendMessage = async () => {
-        if (!value.trim()) return;
-        const currValue = value;
-        setValue("");
+    const resolveType = (text: string): MessageType => {
+        if (attachment) return attachment.type;
+        if (text && isUrl(text)) return "link";
+        return "text";
+    };
 
+    const handleSend = async () => {
+        const trimmed = value.trim();
+        const type = resolveType(trimmed);
+
+        if (type === "text" && !trimmed && !attachment) return;
+        if ((type === "image" || type === "file") && !attachment?.file) return;
+
+        const currValue = trimmed;
+        const prevAttachment = attachment;
+        setValue("");
+        setAttachment(null);
         emitStopTyping(selectedConvo._id);
-        if (typingTimeoutRef.current) {
-            clearTimeout(typingTimeoutRef.current);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+        const payload: Parameters<typeof sendMessage>[0] = { type };
+
+        if (selectedConvo.type === "direct") {
+            payload.recipientId = otherUserId as string;
+        } else {
+            payload.conversationId = selectedConvo._id;
         }
 
+        if (currValue) payload.content = currValue;
+        if (attachment?.file) payload.file = attachment.file;
+
+        setSending(true);
+
         try {
-            if (selectedConvo.type === "direct") {
-                await sendDirectMessage(otherUserId as string, currValue);
-            } else {
-                await sendGroupMessage(selectedConvo._id, currValue);
-            }
+            await sendMessage(payload, (_pct) => {
+                // Progress is now handled by the bubble in the store
+            });
         } catch (error: any) {
-            console.error("Lỗi gửi tin nhắn:", error);
-            if (error.response?.status === 403) {
-                toast.error("Không thể nhắn tin cho người này");
-            } else {
-                toast.error("Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại!");
-            }
             setValue(currValue);
+            setAttachment(prevAttachment);
+            toast.error(error?.message ?? "Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại!");
+        } finally {
+            setSending(false);
         }
     };
 
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter") {
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            sendMessage();
+            handleSend();
         }
-    }
+    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setValue(e.target.value);
-
         if (e.target.value.trim()) {
             emitTyping(selectedConvo._id);
-
-            if (typingTimeoutRef.current) {
-                clearTimeout(typingTimeoutRef.current);
-            }
-
-            typingTimeoutRef.current = setTimeout(() => {
-                emitStopTyping(selectedConvo._id);
-            }, 2000);
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+            typingTimeoutRef.current = setTimeout(() => emitStopTyping(selectedConvo._id), 2000);
         } else {
             emitStopTyping(selectedConvo._id);
-            if (typingTimeoutRef.current) {
-                clearTimeout(typingTimeoutRef.current);
-            }
+            if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
         }
     };
 
-    const handleFocus = () => {
-        markAsSeen();
+    const attachImage = (file: File) => {
+        if (!file.type.startsWith("image/")) {
+            toast.error("Chỉ hỗ trợ file ảnh (jpg, png, gif, webp…)");
+            return;
+        }
+        if (file.size > MAX_IMAGE_SIZE) {
+            toast.error(`Ảnh quá lớn — tối đa ${formatBytes(MAX_IMAGE_SIZE)}`);
+            return;
+        }
+
+        setLoadingLocal(true);
+        setTimeout(() => {
+            setAttachment({ type: "image", file, preview: URL.createObjectURL(file) });
+            setLoadingLocal(false);
+        }, 400);
+    };
+
+    const attachFile = (file: File) => {
+        if (file.type.startsWith("image/")) {
+            return attachImage(file);
+        }
+
+        if (file.size > MAX_FILE_SIZE) {
+            toast.error(`File quá lớn! Tối đa ${formatBytes(MAX_FILE_SIZE)}, file của bạn: ${formatBytes(file.size)}`);
+            return;
+        }
+
+        setLoadingLocal(true);
+        setTimeout(() => {
+            setAttachment({ type: "file", file });
+            setLoadingLocal(false);
+        }, 400);
+    };
+
+    const removeAttachment = () => {
+        if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
+        setAttachment(null);
     };
 
     if (selectedConvo.type === "direct") {
         if (isBlockedByMe) {
             return (
                 <div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/50">
-                    <p className="text-sm text-muted-foreground italic">
-                        Bạn đã chặn người dùng này.
-                    </p>
+                    <p className="text-sm text-muted-foreground italic">Bạn đã chặn người dùng này.</p>
                 </div>
             );
         }
-
         if (isBlockedByOther) {
             return (
                 <div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/50">
-                    <p className="text-sm text-muted-foreground italic">
-                        Bạn không thể gửi tin nhắn cho người này.
-                    </p>
+                    <p className="text-sm text-muted-foreground italic">Bạn không thể gửi tin nhắn cho người này.</p>
                 </div>
             );
         }
     }
 
-    return (
-        <div className="flex items-center gap-2 p-3 min-h-[56px] bg-background">
-            <Button variant="ghost" size="icon" className="hover:bg-primary/10 transition-smooth">
-                <ImagePlus className="size-4" />
-            </Button>
+    const canSend = !sending && (attachment !== null || value.trim().length > 0);
 
-            <div className="flex-1 relative">
-                <Input
-                    onKeyDown={handleKeyPress}
-                    value={value}
-                    onChange={handleInputChange}
-                    onFocus={handleFocus}
-                    placeholder="Soạn tin nhắn"
-                    className="pr-20 h-9 bg-white border-border/50 focus:border-primary/50 transition-smooth resize-none"
-                ></Input>
-                <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
-                    <Button
-                        asChild
-                        variant="ghost"
-                        size="icon"
-                        className="size-9 hover:bg-primary/10 transition-smooth"
-                    >
-                        <div>
-                            <EmojiPicker onChange={(emoji: string) => setValue(`${value}${emoji}`)} />
+    return (
+        <div className="flex flex-col bg-background border-t border-border/50">
+
+            {loadingLocal && <ProgressBar percent={100} label="Đang tải" />}
+
+            {attachment && (
+                <div className="flex items-center gap-2 px-3 pt-2.5">
+                    {attachment.type === "image" && attachment.preview ? (
+                        <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/50 shrink-0">
+                            <img src={attachment.preview} alt="preview" className="w-full h-full object-cover" />
+                            <button
+                                onClick={removeAttachment}
+                                className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 hover:bg-black/80 transition-colors"
+                            >
+                                <X className="size-3 text-white" />
+                            </button>
                         </div>
-                    </Button>
+                    ) : (
+                        <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 text-sm max-w-xs">
+                            <FileText className="size-4 text-primary shrink-0" />
+                            <div className="flex flex-col min-w-0">
+                                <span className="truncate font-medium text-foreground">{attachment.file.name}</span>
+                                <span className="text-xs text-muted-foreground">{formatBytes(attachment.file.size)}</span>
+                            </div>
+                            <button onClick={removeAttachment} className="ml-1 hover:text-destructive transition-colors shrink-0">
+                                <X className="size-4" />
+                            </button>
+                        </div>
+                    )}
                 </div>
+            )}
+
+            <div className="flex items-center gap-1.5 p-2 bg-background border-t border-border/40 relative z-10">
+
+                <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) attachImage(f); e.target.value = ""; }}
+                />
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) attachFile(f); e.target.value = ""; }}
+                />
+
+                <Button
+                    variant="ghost" size="icon"
+                    className="size-9 shrink-0 hover:bg-primary/10 transition-colors"
+                    title="Gửi ảnh"
+                    onClick={() => imageInputRef.current?.click()}
+                    disabled={sending}
+                >
+                    <ImagePlus className="size-4" />
+                </Button>
+
+                <Button
+                    variant="ghost" size="icon"
+                    className="size-9 shrink-0 hover:bg-primary/10 transition-colors"
+                    title="Gửi file"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={sending}
+                >
+                    <Paperclip className="size-4" />
+                </Button>
+
+                <div className="flex-1 relative">
+                    <Input
+                        onKeyDown={handleKeyDown}
+                        value={value}
+                        onChange={handleInputChange}
+                        onFocus={markAsSeen}
+                        placeholder={
+                            attachment
+                                ? "Thêm chú thích (tuỳ chọn)…"
+                                : "Soạn tin nhắn"
+                        }
+                        className="pr-12 h-9 bg-white dark:bg-muted border-border/50 focus:border-primary/50 transition-colors"
+                        disabled={sending}
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <Button asChild variant="ghost" size="icon" className="size-8 hover:bg-primary/10">
+                            <div>
+                                <EmojiPicker onChange={(emoji: string) => setValue(`${value}${emoji}`)} />
+                            </div>
+                        </Button>
+                    </div>
+                </div>
+
+                <Button
+                    onClick={handleSend}
+                    className="bg-gradient-chat hover:shadow-glow transition-all hover:scale-105 shrink-0"
+                    disabled={!canSend}
+                    size="icon"
+                >
+                    <Send className="size-4 text-white" />
+                </Button>
             </div>
-            <Button
-                onClick={sendMessage}
-                className="bg-gradient-chat hover:shadow-glow transition-smooth hover:scale-105"
-                disabled={!value.trim()}>
-                <Send className="size-4 text-white" />
-            </Button>
         </div>
     );
 };

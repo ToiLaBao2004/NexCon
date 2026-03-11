@@ -23,7 +23,6 @@ const ChatWindowBody = () => {
     messageLoading,
   } = useChatStore();
 
-  // Tránh crash khi activeConversationId là null
   const convoId = activeConversationId ?? null;
 
   const messages = useMemo(
@@ -44,14 +43,11 @@ const ChatWindowBody = () => {
   const prevMessageCount = useRef(0);
   const isFirstLoad = useRef(true);
 
-  // Call history
   const { callsByConversation, fetchCallsByConversation } = useCallHistoryStore();
   const calls = useMemo(
     () => (convoId ? callsByConversation[convoId]?.items ?? [] : []),
     [callsByConversation, convoId]
   );
-
-  // Fetch call history handles in ChatWindowLayout to synchronize with messages
 
   const timeline: TimelineItem[] = useMemo(() => {
     const messageItems: TimelineItem[] = messages.map(msg => ({ kind: "message", data: msg }));
@@ -75,24 +71,45 @@ const ChatWindowBody = () => {
   const prevFirstItemId = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    const scrollToBottom = () => {
+    const scrollToBottom = (instant = false) => {
       if (scrollRef.current) {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        scrollRef.current.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: instant ? "auto" : "smooth"
+        });
       }
     };
 
     if (isFirstLoad.current) {
       if (timeline.length > 0) {
         requestAnimationFrame(() => {
-          scrollToBottom();
-          setTimeout(scrollToBottom, 50);
+          scrollToBottom(true);
+          setTimeout(() => scrollToBottom(true), 100);
         });
         isFirstLoad.current = false;
       }
     } else if (convoId) {
-      scrollToBottom();
+      const isStatusUpdate = timeline.length === prevMessageCount.current;
+      scrollToBottom(isStatusUpdate);
     }
   }, [lastItemId, activeTypingUserIds.length, timeline.length, convoId]);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 500;
+        if (isNearBottom && !isFirstLoad.current) {
+            container.scrollTop = container.scrollHeight;
+        }
+    });
+
+    const content = container.firstElementChild;
+    if (content) resizeObserver.observe(content);
+
+    return () => resizeObserver.disconnect();
+  }, [convoId]);
 
   useEffect(() => {
     isFirstLoad.current = true;
@@ -142,7 +159,6 @@ const ChatWindowBody = () => {
     }
   };
 
-  // Guard clause: nếu chưa có conversation được chọn → render welcome
   if (!convoId || !selectedConvo) {
     return <ChatWelcomeScreen />;
   }
@@ -162,7 +178,7 @@ const ChatWindowBody = () => {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4"
+        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4 pb-2"
       >
         {messageLoading && hasMore && (
           <div className="flex justify-center py-4 text-sm text-muted-foreground">
