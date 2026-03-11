@@ -20,5 +20,10 @@ export const userService = {
     fetchMe: async () => {
         const response = await api.get('/users/me');
         return response.data.user;
+    },
+
+    changePassword: async (data: { currentPassword?: string; newPassword?: string }) => {
+        const response = await api.put('/users/change-password', data);
+        return response.data;
     }
 };

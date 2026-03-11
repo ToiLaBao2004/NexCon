@@ -6,7 +6,8 @@ import {
     Moon,
     Sun,
     LogOut,
-    MessageSquare
+    MessageSquare,
+    Settings
 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useThemeStore } from "@/stores/useThemeStore";
@@ -34,6 +35,7 @@ import { Switch } from "../ui/switch";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ProfileEditDialog } from "./ProfileEditDialog";
+import { SettingsDialog } from "./SettingsDialog";
 
 const MainSidebar = () => {
     const { user, signOut } = useAuthStore();
@@ -44,6 +46,7 @@ const MainSidebar = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     const friendRequestCount = incomingRequests.length;
 
@@ -122,6 +125,13 @@ const MainSidebar = () => {
                                 >
                                     <Users className="mr-2 h-4 w-4" />
                                     <span>Hồ sơ của tôi</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    className="cursor-pointer py-2"
+                                    onSelect={() => setIsSettingsOpen(true)}
+                                >
+                                    <Settings className="mr-2 h-4 w-4" />
+                                    <span>Cài đặt</span>
                                 </DropdownMenuItem>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
@@ -214,6 +224,7 @@ const MainSidebar = () => {
             </TooltipProvider>
 
             <ProfileEditDialog open={isProfileOpen} onOpenChange={setIsProfileOpen} />
+            <SettingsDialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
         </aside>
     );
 };

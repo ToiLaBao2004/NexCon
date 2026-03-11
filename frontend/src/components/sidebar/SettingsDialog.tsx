@@ -1,0 +1,257 @@
+import { useState, useEffect } from "react";
+import {
+    Dialog,
+    DialogContent,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { NotificationTab } from "./NotificationTab";
+import { SecurityTab } from "./SecurityTab";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { useOTPStore } from "@/stores/useOtpStore";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Bell, Shield } from "lucide-react";
+
+const resetPassSchema = z.object({
+    newPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
+    confirmNewPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự")
+}).refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: "Mật khẩu không khớp",
+    path: ["confirmNewPassword"],
+});
+
+type ResetPassFormValues = z.infer<typeof resetPassSchema>;
+
+interface SettingsDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}
+
+type TabType = "notifications" | "security";
+
+export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
+    const [activeTab, setActiveTab] = useState<TabType>("notifications");
+    const [forgotPassStep, setForgotPassStep] = useState<"none" | "otp" | "reset">("none");
+    const [otp, setOtp] = useState("");
+    const [otpError, setOtpError] = useState<string | null>(null);
+    const [otpLoading, setOtpLoading] = useState(false);
+    const [countdown, setCountdown] = useState(60);
+
+    const { user, updateNewPassword } = useAuthStore();
+    const { sendOtpResetPassword, verifyOtpResetPassword } = useOTPStore();
+
+    useEffect(() => {
+        if (forgotPassStep !== "otp" || countdown <= 0) return;
+        const timer = setInterval(() => {
+            setCountdown((prev) => prev - 1);
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [countdown, forgotPassStep]);
+
+    const { register: registerReset, handleSubmit: handleSubmitReset, formState: { errors: errorsReset, isSubmitting: isSubmittingReset }, setError: setErrorReset, reset: resetResetForm } = useForm<ResetPassFormValues>({
+        resolver: zodResolver(resetPassSchema),
+    });
+
+    const handleForgotPassword = async () => {
+        if (!user?.email) {
+            toast.error("Không tìm thấy email người dùng");
+            return;
+        }
+        try {
+            await sendOtpResetPassword(user.email);
+            setForgotPassStep("otp");
+            setCountdown(60);
+            setOtp("");
+            setOtpError(null);
+            resetResetForm();
+        } catch (error: any) {
+            console.error("Lỗi gửi OTP:", error);
+            const backendMsg = error.response?.data?.message || "Gửi mã OTP thất bại.";
+            toast.error(backendMsg);
+        }
+    };
+
+    const handleOtpSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (otp.length < 6) return;
+        setOtpError(null);
+        setOtpLoading(true);
+        try {
+            await verifyOtpResetPassword(user!.email, otp);
+            setForgotPassStep("reset");
+        } catch (err: any) {
+            setOtpError(err.response?.data?.message || "Mã OTP không hợp lệ.");
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    const handleResendOtp = async () => {
+        if (countdown > 0) return;
+        try {
+            await sendOtpResetPassword(user!.email);
+            setCountdown(60);
+            setOtpError(null);
+        } catch (err: any) {
+            setOtpError(err.response?.data?.message || "Gửi lại mã OTP thất bại.");
+        }
+    };
+
+    const onResetSubmit = async (data: ResetPassFormValues) => {
+        try {
+            await updateNewPassword(user!.email, data.newPassword, data.confirmNewPassword);
+            onOpenChange(false);
+        } catch (error: any) {
+            const backendMsg = error.response?.data?.message || "Cập nhật mật khẩu thất bại.";
+            if (backendMsg.toLowerCase().includes("mới") || backendMsg.toLowerCase().includes("new")) {
+                setErrorReset("newPassword", { type: "server", message: backendMsg });
+            } else {
+                setErrorReset("root", { type: "server", message: backendMsg });
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (!open) {
+            const timer = setTimeout(() => {
+                setActiveTab("notifications");
+                setForgotPassStep("none");
+                setOtpError(null);
+                setOtp("");
+                resetResetForm();
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [open, resetResetForm]);
+
+    const handleOpenChange = (isOpen: boolean) => {
+        onOpenChange(isOpen);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogContent className={cn(
+                "p-0 overflow-hidden gap-0 border-border/40",
+                forgotPassStep === "none" ? "max-w-[700px]" : "sm:max-w-md p-6"
+            )}>
+                {forgotPassStep === "none" ? (
+                    <div className="flex h-[500px]">
+                        {/* Sidebar */}
+                        <div className="w-[220px] bg-muted/40 border-r border-border/50 flex flex-col p-4">
+                            <h2 className="text-xl font-bold mb-6 px-2">Cài đặt</h2>
+                            <div className="flex flex-col gap-1">
+                                <button
+                                    onClick={() => setActiveTab("notifications")}
+                                    className={cn(
+                                        "flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                                        (activeTab === "notifications") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Bell className="w-4 h-4" />
+                                    Thông báo
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("security")}
+                                    className={cn(
+                                        "flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                                        (activeTab === "security") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Shield className="w-4 h-4" />
+                                    Bảo mật
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto">
+                            <div className="p-6 h-full relative">
+                                {activeTab === "notifications" && <NotificationTab />}
+                                {activeTab === "security" && <SecurityTab onForgotPassword={handleForgotPassword} />}
+                            </div>
+                        </div>
+                    </div>
+                ) : forgotPassStep === "otp" ? (
+                    <div className="animate-in fade-in zoom-in-95 duration-300">
+                        <div className="flex flex-col items-center gap-2 mb-4">
+                            <h2 className="text-xl font-bold">Nhập mã OTP</h2>
+                            <p className="text-sm text-muted-foreground text-center">
+                                Mã đã được gửi đến <span className="font-medium">{user?.email}</span>
+                            </p>
+                        </div>
+                        <form onSubmit={handleOtpSubmit} className="space-y-4">
+                            <InputOTP value={otp} onChange={setOtp} maxLength={6}>
+                                <InputOTPGroup className="gap-2 mx-auto mt-2">
+                                    {[0, 1, 2, 3, 4, 5].map((i) => (
+                                        <InputOTPSlot key={i} index={i} />
+                                    ))}
+                                </InputOTPGroup>
+                            </InputOTP>
+                            {otpError && <p className="text-destructive text-sm text-center">{otpError}</p>}
+                            <Button type="submit" disabled={otpLoading || otp.length < 6} className="w-full">
+                                {otpLoading ? "Đang xác thực..." : "Xác thực"}
+                            </Button>
+                            <p className="text-xs text-center text-muted-foreground mt-2">
+                                Bạn không nhận được mã?{" "}
+                                {countdown > 0 ? (
+                                    <span className="text-muted-foreground">Gửi lại sau {countdown}s</span>
+                                ) : (
+                                    <span className="text-primary cursor-pointer hover:underline underline-offset-2" onClick={handleResendOtp}>
+                                        Gửi lại
+                                    </span>
+                                )}
+                            </p>
+                        </form>
+                    </div>
+                ) : (
+                    <div className="animate-in fade-in zoom-in-95 duration-300">
+                        <div className="flex flex-col items-center gap-2 mb-4">
+                            <h2 className="text-xl font-bold">Mật khẩu mới</h2>
+                            <p className="text-sm text-muted-foreground text-center">
+                                Nhập mật khẩu mới cho tài khoản của bạn.
+                            </p>
+                        </div>
+                        <form onSubmit={handleSubmitReset(onResetSubmit)} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="resetNewPassword">Mật khẩu mới</Label>
+                                <Input
+                                    id="resetNewPassword"
+                                    type="password"
+                                    {...registerReset("newPassword")}
+                                    placeholder="••••••••"
+                                />
+                                {errorsReset.newPassword && (
+                                    <p className="text-sm text-destructive">{errorsReset.newPassword.message}</p>
+                                )}
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="resetConfirmNewPassword">Xác nhận mật khẩu mới</Label>
+                                <Input
+                                    id="resetConfirmNewPassword"
+                                    type="password"
+                                    {...registerReset("confirmNewPassword")}
+                                    placeholder="••••••••"
+                                />
+                                {errorsReset.confirmNewPassword && (
+                                    <p className="text-sm text-destructive">{errorsReset.confirmNewPassword.message}</p>
+                                )}
+                            </div>
+                            {errorsReset.root && (
+                                <p className="text-sm text-destructive mt-2">{errorsReset.root.message}</p>
+                            )}
+                            <Button type="submit" disabled={isSubmittingReset} className="w-full mt-4">
+                                Lưu mật khẩu mới
+                            </Button>
+                        </form>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}

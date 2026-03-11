@@ -8,11 +8,13 @@ import {
 } from "@/components/ui/input-otp";
 import { Card, CardContent } from "@/components/ui/card";
 import { useOTPStore } from "@/stores/useOtpStore";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 export function OTPForm() {
   const navigate = useNavigate();
   const location = useLocation();
   const { sendOtpResetPassword, verifyOtpResetPassword } = useOTPStore();
+  const { user } = useAuthStore();
 
   const emailOTPResetPassData = location.state?.emailOTPResetPassData;
 
@@ -23,9 +25,9 @@ export function OTPForm() {
 
   useEffect(() => {
     if (!emailOTPResetPassData) {
-      navigate("/signin");
+      navigate(user ? "/" : "/signin");
     }
-  }, [emailOTPResetPassData, navigate]);
+  }, [emailOTPResetPassData, navigate, user]);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -82,7 +84,7 @@ export function OTPForm() {
       <Card className="w-full max-w-sm p-0 border-border shadow-sm">
         <CardContent className="p-6 flex flex-col gap-6">
 
-          {/* logo + header */}
+          {/* Header */}
           <div className="flex flex-col items-center text-center gap-2">
             <a href="/" className="mx-auto block w-fit text-center">
               <img src="/logo.svg" alt="logo" className="h-10" />
@@ -94,7 +96,7 @@ export function OTPForm() {
             </p>
           </div>
 
-          {/* form */}
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <InputOTP value={otp} onChange={setOtp} maxLength={6}>
               <InputOTPGroup className="gap-2 mx-auto">
