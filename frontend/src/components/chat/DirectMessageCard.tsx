@@ -9,7 +9,7 @@ import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
 import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2 } from "lucide-react";
-import { isUrl } from "@/services/chatService";
+import { isUrl } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuTrigger,

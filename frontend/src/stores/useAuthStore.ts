@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { authService } from '@/services/authService';
 import type AuthState from '@/types/authState';
+import { userService } from '@/services/userService';
 import { persist } from 'zustand/middleware';
 import { useChatStore } from './useChatStore';
 import { useNotificationStore } from './useNotificationStore';
@@ -185,6 +186,26 @@ export const useAuthStore = create<AuthState>()(
         throw err;
       } finally {
         set({ loading: false });
+      }
+    },
+
+    updateProfile: async (data) => {
+      try {
+        await userService.updateProfile(data);
+        await get().fetchMe(true);
+      } catch (error: any) {
+        console.error('Lỗi khi cập nhật hồ sơ:', error);
+        throw error;
+      }
+    },
+
+    updateAvatar: async (file) => {
+      try {
+        await userService.updateAvatar(file);
+        await get().fetchMe(true);
+      } catch (error: any) {
+        console.error('Lỗi khi tải lên ảnh đại diện:', error);
+        throw error;
       }
     },
   }), {

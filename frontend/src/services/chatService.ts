@@ -10,8 +10,6 @@ interface FetchMessageProps {
 
 const pageLimit = 20;
 
-const URL_REGEX = /^(https?:\/\/)([\w-]+(\.[\w-]+)+)(\/[\w\-./?%&=+#]*)?$/i;
-export const isUrl = (text: string) => URL_REGEX.test(text.trim());
 
 function resolveErrorMessage(error: any): string {
 	const status = error?.response?.status;

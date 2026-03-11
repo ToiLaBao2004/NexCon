@@ -185,7 +185,6 @@ const MainSidebar = () => {
 
                     {navItems.map((item) => {
                         const active = isPathActive(item.path);
-                        // friend requests on People, unreads on Notification
                         let badgeCount = 0;
                         if (item.id === "people") badgeCount = friendRequestCount;
                         if (item.id === "notification") badgeCount = totalNotificationCount;

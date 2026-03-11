@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { userService } from "@/services/userService";
 import { toast } from "sonner";
 import {
     Dialog,
@@ -22,7 +21,7 @@ interface ProfileEditDialogProps {
 }
 
 export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps) {
-    const { user, fetchMe } = useAuthStore();
+    const { user, updateProfile, updateAvatar } = useAuthStore();
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,13 +54,10 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     const handleSave = async () => {
         try {
             setLoading(true);
-            await userService.updateProfile(formData);
-            await fetchMe(true);
-            // ẩn popup
+            await updateProfile(formData);
             onOpenChange(false);
             toast.success("Cập nhật thông tin thành công");
         } catch (error: any) {
-            console.error("Lỗi cập nhật hồ sơ:", error);
             toast.error(error.response?.data?.message || "Cập nhật thất bại");
         } finally {
             setLoading(false);
@@ -84,11 +80,9 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
 
         try {
             setUploading(true);
-            await userService.updateAvatar(file);
-            await fetchMe(true);
+            await updateAvatar(file);
             toast.success("Cập nhật ảnh đại diện thành Công!");
         } catch (error: any) {
-            console.error("Lỗi tải lên ảnh đại diện:", error);
             toast.error(error.response?.data?.message || "Upload ảnh thất bại");
         } finally {
             setUploading(false);

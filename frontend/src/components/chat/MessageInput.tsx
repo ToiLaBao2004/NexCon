@@ -9,17 +9,13 @@ import { useFriendStore } from "@/stores/useFriendStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText } from "lucide-react";
-import { isUrl } from "@/services/chatService";
+import { isUrl, formatBytes } from "@/lib/utils";
 
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-function formatBytes(bytes: number) {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
+
 
 interface Attachment {
     type: "image" | "file";

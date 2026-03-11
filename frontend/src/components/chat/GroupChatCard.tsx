@@ -5,7 +5,7 @@ import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2 } from "lucide-react";
-import { isUrl } from "@/services/chatService";
+import { isUrl } from "@/lib/utils";
 import {
 	DropdownMenu,
 	DropdownMenuTrigger,

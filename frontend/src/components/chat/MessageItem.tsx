@@ -1,4 +1,4 @@
-import { cn, formatMessageTime } from "@/lib/utils";
+import { cn, formatMessageTime, formatBytes } from "@/lib/utils";
 import type { Conversation, Message, MessageType, Participant } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import { Card } from "../ui/card";
@@ -23,11 +23,6 @@ interface MessageItemProps {
 	isLast?: boolean;
 }
 
-function formatBytes(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 // ── Content renderer ──────────────────────────────────────────────────────────
 function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }) {

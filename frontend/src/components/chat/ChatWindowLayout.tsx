@@ -33,17 +33,14 @@ const ChatWindowLayout = () => {
 
   const { joinConversation } = useSocketStore();
 
-  // Unified data fetching when active conversation changes
   useEffect(() => {
     if (activeConversationId) {
       joinConversation(activeConversationId);
 
-      // Trigger message fetch if not already loaded and not currently loading
       if (!allMessages[activeConversationId] && !messageLoading) {
         fetchMessages(activeConversationId);
       }
 
-      // Trigger call history fetch if not already loaded and not currently loading
       if (!callsByConversation[activeConversationId] && !callHistoryLoading) {
         fetchCallsByConversation(activeConversationId);
       }
@@ -67,7 +64,6 @@ const ChatWindowLayout = () => {
     return <ChatWelcomeScreen />;
   }
 
-  // Show skeleton if we have a conversation but either messages or calls are not loaded yet
   const messageData = allMessages[activeConversationId!];
   const callData = callsByConversation[activeConversationId!];
 
