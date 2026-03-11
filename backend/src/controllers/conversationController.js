@@ -65,7 +65,7 @@ export async function getConversations(req, res) {
 		const myId = req.user._id.toString();
 
 		const conversations = await Conversation.find({ "participants.userId": myId })
-			.sort({ updatedAt: -1 })
+			.sort({ "lastMessage.createdAt": -1, updatedAt: -1 })
 			.populate("participants.userId", "displayName avatarUrl email bio phone")
 			.populate("lastMessage.senderId", "displayName avatarUrl")
 			.populate("seenBy", "displayName avatarUrl")
@@ -219,7 +219,8 @@ export async function markAsSeen(req, res) {
 		);
 
 		io.to(conversationId).emit("read-message", {
-			conversationId: updated,
+			conversationId: conversationId,
+			seenBy: updated.seenBy,
 			lastMessage: {
 				_id: updated.lastMessage._id,
 				content: updated.lastMessage.content,

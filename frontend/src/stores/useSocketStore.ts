@@ -109,12 +109,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       }
     });
 
-    socket.on("read-message", ({ conversationId, lastMessage }) => {
+    socket.on("read-message", ({ conversationId, lastMessage, seenBy }) => {
       const updated = {
-        ...conversationId,
+        _id: typeof conversationId === 'object' ? conversationId._id : conversationId,
         lastMessage,
+        seenBy,
       };
-      useChatStore.getState().updateConversation(updated);
+      useChatStore.getState().updateConversation(updated as any);
     });
 
     socket.on("new-friend-request", ({ friendRequest }) => {

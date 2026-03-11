@@ -166,13 +166,24 @@ export const useChatStore = create<ChatState>()(
                 if (!exists) {
                     fetchConversations();
                 } else {
-                    set((state) => ({
-                        conversations: state.conversations.map((c) =>
-                            c._id === conversation._id
-                                ? { ...c, ...conversation, participants: c.participants }
-                                : c
-                        ),
-                    }));
+                    set((state) => {
+                        const existingConv = state.conversations.find((c) => c._id === conversation._id);
+                        if (!existingConv) return state;
+
+                        const updatedConv = { ...existingConv, ...conversation, participants: existingConv.participants };
+                        
+                        const updatedConversations = state.conversations.map((c) =>
+                            c._id === conversation._id ? updatedConv : c
+                        );
+
+                        updatedConversations.sort((a, b) => {
+                            const dateA = new Date(a.lastMessage?.createdAt || a.createdAt || 0).getTime();
+                            const dateB = new Date(b.lastMessage?.createdAt || b.createdAt || 0).getTime();
+                            return dateB - dateA;
+                        });
+
+                        return { conversations: updatedConversations };
+                    });
                 }
             },
             markAsSeen: async () => {
