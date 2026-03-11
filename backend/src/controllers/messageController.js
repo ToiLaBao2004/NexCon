@@ -151,16 +151,16 @@ export async function recallMessage(req, res) {
 
         const message = await Message.findById(messageId);
         if (!message) {
-            return res.status(404).json({ message: 'Message not found.' });
+            return res.status(404).json({ message: 'Không tìm thấy tin nhắn.' });
         }
         if (message.senderId.toString() !== senderId.toString()) {
-            return res.status(403).json({ message: 'You can only recall your own messages.' });
+            return res.status(403).json({ message: 'Bạn chỉ có thể thu hồi tin nhắn của chính mình.' });
         }
         if (message.isRecalled) {
-            return res.status(400).json({ message: 'Message already recalled.' });
+            return res.status(400).json({ message: 'Tin nhắn đã được thu hồi.' });
         }
         if (message.createdAt.getTime() < Date.now() - 60 * 60 * 1000) {
-            return res.status(400).json({ message: 'You can only recall messages within 1 hour.' });
+            return res.status(400).json({ message: 'Bạn chỉ có thể thu hồi tin nhắn trong vòng 1 giờ.' });
         }
 
         const conversation = await Conversation.findById(message.conversationId);
@@ -220,17 +220,17 @@ export async function pinMessage(req, res) {
 
         const message = await Message.findById(messageId);
         if (!message) {
-            return res.status(404).json({ message: 'Message not found.' });
+            return res.status(404).json({ message: 'Không tìm thấy tin nhắn.' });
         }
 
         const conversation = await Conversation.findById(message.conversationId);
         if (!conversation) {
-            return res.status(404).json({ message: 'Conversation not found.' });
+            return res.status(404).json({ message: 'Không tìm thấy cuộc trò chuyện.' });
         }
 
         if (message.isPinned) {
             return res.status(200).json({
-                message: 'Message already pinned.',
+                message: 'Tin nhắn đã được ghim.',
                 data: {
                     conversationId: message.conversationId.toString(),
                     pinnedMessageId: message._id.toString(),
@@ -274,7 +274,7 @@ export async function pinMessage(req, res) {
             }
         });
 
-        return res.status(200).json({ message: 'Message pinned successfully.', data: payload });
+        return res.status(200).json({ message: 'Ghim tin nhắn thành công.', data: payload });
     } catch (error) {
         console.error('Error pinning message:', error);
         return res.status(500).json({ message: 'Internal server error.' });

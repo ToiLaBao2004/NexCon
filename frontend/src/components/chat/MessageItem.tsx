@@ -146,7 +146,7 @@ const MessageItem = ({
 
 	const handleRecall = async () => {
 		try { await recallMessage(message._id); }
-		catch (e) { console.error("Thu hồi thất bại:", e); }
+		catch (e: any) { toast.error(e.message || "Thu hồi thất bại"); }
 		finally { setShowConfirmRecall(false); }
 	};
 

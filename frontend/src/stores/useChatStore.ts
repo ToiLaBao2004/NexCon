@@ -389,7 +389,7 @@ export const useChatStore = create<ChatState>()(
                                 [convoId]: {
                                     ...convoMessages,
                                     items: convoMessages.items.map((m) =>
-                                        m._id === messageId ? { ...m, recalled: true } : m
+                                        m._id === messageId ? { ...m, isRecalled: true, content: 'Tin nhắn này đã được thu hồi' } : m
                                     )
                                 }
                             }
@@ -397,6 +397,7 @@ export const useChatStore = create<ChatState>()(
                     });
                 } catch (error) {
                     console.error("Lỗi khi thu hồi tin nhắn:", error);
+                    throw error;
                 }
             },
             pinMessage: async (messageId: string) => {

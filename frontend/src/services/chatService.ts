@@ -80,12 +80,20 @@ export const chatService = {
 	},
 
 	async recallMessage(messageId: string) {
-		const res = await api.put('/messages/recall', { messageId });
-		return res.data;
+		try {
+			const res = await api.put('/messages/recall', { messageId });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
 	},
 
 	async pinMessage(messageId: string) {
-		const res = await api.put('/messages/pin', { messageId });
-		return res.data;
+		try {
+			const res = await api.put('/messages/pin', { messageId });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
 	},
 };
