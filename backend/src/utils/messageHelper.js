@@ -40,3 +40,17 @@ export const emitNewMessage = (io, conversation, message) => {
         unreadCounts: conversation.unreadCounts,
     });
 };
+
+export async function safeUpload(uploadFn, ...args) {
+    try {
+        return await uploadFn(...args);
+    } catch (err) {
+        const msg = err?.message ?? '';
+        if (msg.includes('File size too large') || msg.includes('exceeds') || err?.http_code === 400) {
+            const e = new Error('File quá lớn để upload lên cloud. Vui lòng chọn file nhỏ hơn.');
+            e.statusCode = 413;
+            throw e;
+        }
+        throw err;
+    }
+}

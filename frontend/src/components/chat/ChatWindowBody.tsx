@@ -1,3 +1,4 @@
+import React from "react";
 import { useChatStore } from "@/stores/useChatStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import MessageItem from "./MessageItem";
@@ -14,7 +15,7 @@ type TimelineItem =
   | { kind: "message"; data: Message }
   | { kind: "call"; data: CallRecord };
 
-const ChatWindowBody = () => {
+const ChatWindowBody: React.FC = () => {
   const {
     activeConversationId,
     conversations,
@@ -69,6 +70,7 @@ const ChatWindowBody = () => {
   );
 
   const prevFirstItemId = useRef<string | undefined>(undefined);
+  const loadingOlderRef = useRef(false);
 
   useEffect(() => {
     const scrollToBottom = (instant = false) => {
@@ -79,6 +81,8 @@ const ChatWindowBody = () => {
         });
       }
     };
+    // if we're currently loading older messages, skip auto-scrolling to bottom
+    if (loadingOlderRef.current) return;
 
     if (isFirstLoad.current) {
       if (timeline.length > 0) {
@@ -129,6 +133,8 @@ const ChatWindowBody = () => {
     if (loadedOlderMessages) {
       const newScrollHeight = container.scrollHeight;
       container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
+      // restored position, stop blocking auto-scroll behavior
+      loadingOlderRef.current = false;
     }
 
     prevMessageCount.current = timeline.length;
@@ -150,10 +156,12 @@ const ChatWindowBody = () => {
       prevScrollHeightRef.current = container.scrollHeight;
 
       if (canFetchMoreMessages) {
+        loadingOlderRef.current = true;
         fetchMessages();
       }
 
       if (canFetchMoreCalls) {
+        loadingOlderRef.current = true;
         fetchCallsByConversation(convoId);
       }
     }

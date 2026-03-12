@@ -1,4 +1,4 @@
-import { cn, formatMessageTime, formatBytes } from "@/lib/utils";
+import { cn, formatMessageTime, formatBytes, normalizeUrl } from "@/lib/utils";
 import type { Conversation, Message, MessageType, Participant } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import { Card } from "../ui/card";
@@ -74,10 +74,10 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
 		);
 	}
 
-	if (type === "link" && message.content) {
+		if (type === "link" && message.content) {
 		return (
 			<a
-				href={message.content}
+						href={normalizeUrl(message.content)}
 				target="_blank"
 				rel="noopener noreferrer"
 				className={cn(

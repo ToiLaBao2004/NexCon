@@ -87,5 +87,55 @@ export function formatDuration(seconds: number): string | null {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-const URL_REGEX = /^(https?:\/\/)([\w-]+(\.[\w-]+)+)(\/[\w\-./?%&=+#]*)?$/i;
+const URL_REGEX = /^(?:https?:\/\/)?([\w-]+(\.[\w-]+)+)(\/[-\w\-.\/?%&=+#]*)?$/i;
 export const isUrl = (text: string) => URL_REGEX.test(text.trim());
+
+export const normalizeUrl = (raw: string) => {
+  if (!raw) return raw;
+  const t = raw.trim();
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+};
+
+/** Date string → "ngày/tháng/năm, giờ:phút:giây" (vi-VN locale) */
+export function formatLocaleTime(dateString: string): string {
+  return new Date(dateString).toLocaleString("vi-VN");
+}
+
+/**
+ * Live call timer: seconds → "mm:ss" or "h:mm:ss" with zero-padded minutes.
+ * Always returns a valid string (0 → "00:00").
+ */
+export function formatCallTimer(s: number): string {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  }
+  return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+}
+
+/** Extract lowercase file extension from a filename. e.g. "foo.PDF" → "pdf" */
+export function getFileExt(fileName: string = ""): string {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+/** Return YouTube hqdefault thumbnail URL, or null if not a YouTube link. */
+export function getYouTubeThumbnail(url: string): string | null {
+  try {
+    let u: URL;
+    try {
+      u = new URL(url);
+    } catch {
+      u = new URL("https://" + url);
+    }
+    if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
+      const id = u.hostname.includes("youtu.be")
+        ? u.pathname.slice(1)
+        : u.searchParams.get("v") ?? "";
+      if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+    }
+  } catch {}
+  return null;
+}

@@ -9,20 +9,9 @@ import {
     MAX_FILE_SIZE,
     MAX_IMAGE_SIZE,
 } from '../middlewares/uploadMiddleware.js';
+import { safeUpload } from '../utils/messageHelper.js';
 
-async function safeUpload(uploadFn, ...args) {
-    try {
-        return await uploadFn(...args);
-    } catch (err) {
-        const msg = err?.message ?? '';
-        if (msg.includes('File size too large') || msg.includes('exceeds') || err?.http_code === 400) {
-            const e = new Error('File quá lớn để upload lên cloud. Vui lòng chọn file nhỏ hơn.');
-            e.statusCode = 413;
-            throw e;
-        }
-        throw err;
-    }
-}
+
 
 export async function sendMessage(req, res) {
     try {
@@ -69,7 +58,11 @@ export async function sendMessage(req, res) {
                     return res.status(400).json({ message: 'URL is required for link messages.' });
                 }
                 try {
-                    new URL(content.trim());
+                    try {
+                        new URL(content.trim());
+                    } catch {
+                        new URL('https://' + content.trim());
+                    }
                 } catch {
                     return res.status(400).json({ message: 'Invalid URL format.' });
                 }

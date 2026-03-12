@@ -9,7 +9,12 @@ import ChatWindowBody from "./ChatWindowBody";
 import MessageInput from "./MessageInput";
 import { useEffect } from "react";
 
-const ChatWindowLayout = () => {
+interface ChatWindowLayoutProps {
+  showInfo?: boolean;
+  onToggleInfo?: () => void;
+}
+
+const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => {
   const {
     activeConversationId,
     focusedConversationId,
@@ -77,7 +82,11 @@ const ChatWindowLayout = () => {
   }
   return (
     <SidebarInset className="flex flex-col h-full flex-1 overflow-hidden bg-transparent shadow-none border-none">
-      <ChatWindowHeader chat={selectedConvo} />
+      <ChatWindowHeader
+        chat={selectedConvo}
+        showInfo={showInfo}
+        onToggleInfo={onToggleInfo}
+      />
 
       <div className="flex-1 min-h-0 bg-primary-foreground">
         <ChatWindowBody />
