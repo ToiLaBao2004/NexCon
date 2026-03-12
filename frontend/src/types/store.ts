@@ -17,6 +17,12 @@ export interface ThemeState {
   setTheme: (dark: boolean) => void;
 }
 
+export interface MediaState {
+  images: Message[];
+  files: Message[];
+  links: Message[];
+}
+
 export interface ChatState {
   conversations: Conversation[];
   messages: Record<string, {
@@ -25,6 +31,7 @@ export interface ChatState {
     nextCursor?: string | null,
     pinnedMessages: Message[];
   }>;
+  media: Record<string, MediaState>;
   activeConversationId: string | null;
   focusedConversationId: string | null;
   convoLoading: boolean;
@@ -46,6 +53,7 @@ export interface ChatState {
   pinMessage: (messageId: string) => Promise<void>;
   pinMessageLocal: (conversationId: string, messageId: string, patch: { isPinned: boolean, pinnedAt: string | null }) => void;
   recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
+  fetchMedia: (conversationId: string) => Promise<void>;
 }
 
 export interface SocketState {

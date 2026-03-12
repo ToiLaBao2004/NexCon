@@ -237,6 +237,52 @@ export async function markAsSeen(req, res) {
 	}
 }
 
+export async function getMediaByType(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const { type, limit = 8, cursor } = req.query;
+
+		const allowedTypes = ['image', 'file', 'link'];
+		if (!type || !allowedTypes.includes(type)) {
+			return res.status(400).json({ message: 'Invalid type. Must be one of: image, file, link' });
+		}
+
+		const query = { conversationId, isRecalled: { $ne: true } };
+
+		if (type === 'image') {
+			query.type = 'image';
+			query.fileUrl = { $ne: null };
+		} else if (type === 'file') {
+			query.type = 'file';
+			query.fileUrl = { $ne: null };
+		} else if (type === 'link') {
+			query.type = 'link';
+			query.content = { $ne: null };
+		}
+
+		if (cursor) {
+			query.createdAt = { $lt: new Date(cursor) };
+		}
+
+		const numLimit = Number(limit);
+		let messages = await Message.find(query)
+			.sort({ createdAt: -1 })
+			.limit(numLimit + 1)
+			.lean();
+
+		let nextCursor = null;
+		if (messages.length > numLimit) {
+			nextCursor = messages[messages.length - 1].createdAt;
+			messages.pop();
+		}
+
+		return res.status(200).json({ messages, nextCursor });
+	} catch (error) {
+		console.error("Error fetching media by type:", error);
+		return res.status(500).json({ message: "Internal server error" });
+	}
+}
+
 export async function updateGroupName(req, res) {
 	try {
 		const { conversationId } = req.params;
