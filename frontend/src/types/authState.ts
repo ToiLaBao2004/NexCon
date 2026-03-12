@@ -42,4 +42,8 @@ export default interface AuthState {
   refreshToken: () => Promise<void>;
 
   handleGoogleCallback: () => Promise<void>;
+
+  updateProfile: (data: { displayName?: string; bio?: string; phone?: string }) => Promise<void>;
+
+  updateAvatar: (file: File) => Promise<void>;
 }

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { authService } from '@/services/authService';
 import type AuthState from '@/types/authState';
+import { userService } from '@/services/userService';
 import { persist } from 'zustand/middleware';
 import { useChatStore } from './useChatStore';
 import { useNotificationStore } from './useNotificationStore';
@@ -29,7 +30,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.clear();
         useChatStore.getState().reset();
         useNotificationStore.getState().reset();
-        // call API
+        // API Call
         await authService.verifyValidFieldsSignUp(email, password);
       } catch (error: any) {
         console.error('Lỗi khi xác định tính hợp lệ:', error);
@@ -47,7 +48,7 @@ export const useAuthStore = create<AuthState>()(
     signUp: async (email, password, firstname, lastname, otp) => {
       try {
         set({ loading: true });
-        // call API
+        // API Call
         await authService.signUp(email, password, firstname, lastname, otp);
         toast.success('Đăng ký thành công! Bây giờ bạn có thể đăng nhập.');
       } catch (error: any) {
@@ -69,7 +70,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.clear();
         useChatStore.getState().reset();
         useNotificationStore.getState().reset();
-        // call API
+        // API Call
         const { accessToken } = await authService.signIn(email, password);
         get().setAccessToken(accessToken);
         toast.success('Đăng nhập thành công!');
@@ -93,7 +94,7 @@ export const useAuthStore = create<AuthState>()(
       try {
         set({ loading: true });
         await authService.updateNewPassword(email, newPassword, confirmNewPassword);
-        toast.success('Cập nhật mật khẩu thành công! Bây giờ bạn có thể đăng nhập với mật khẩu mới.');
+        toast.success('Cập nhật mật khẩu thành công!');
       } catch (error: any) {
         console.error('Lỗi khi cập nhật mật khẩu:', error);
         if (error.response?.data?.message) {
@@ -185,6 +186,26 @@ export const useAuthStore = create<AuthState>()(
         throw err;
       } finally {
         set({ loading: false });
+      }
+    },
+
+    updateProfile: async (data) => {
+      try {
+        await userService.updateProfile(data);
+        await get().fetchMe(true);
+      } catch (error: any) {
+        console.error('Lỗi khi cập nhật hồ sơ:', error);
+        throw error;
+      }
+    },
+
+    updateAvatar: async (file) => {
+      try {
+        await userService.updateAvatar(file);
+        await get().fetchMe(true);
+      } catch (error: any) {
+        console.error('Lỗi khi tải lên ảnh đại diện:', error);
+        throw error;
       }
     },
   }), {

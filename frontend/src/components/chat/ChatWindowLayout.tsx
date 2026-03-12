@@ -1,5 +1,6 @@
 import { useChatStore } from "@/stores/useChatStore";
 import { useSocketStore } from "@/stores/useSocketStore";
+import { useCallHistoryStore } from "@/stores/useCallHistoryStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import ChatWindowSkeleton from "./ChatWindowSkeleton";
 import { SidebarInset } from "../ui/sidebar";
@@ -8,27 +9,48 @@ import ChatWindowBody from "./ChatWindowBody";
 import MessageInput from "./MessageInput";
 import { useEffect } from "react";
 
-const ChatWindowLayout = () => {
+interface ChatWindowLayoutProps {
+  showInfo?: boolean;
+  onToggleInfo?: () => void;
+}
+
+const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => {
   const {
     activeConversationId,
     focusedConversationId,
     conversations,
-    messageLoading: loading,
+    messageLoading,
     messages: allMessages,
     markAsSeen,
+    fetchMessages,
   } = useChatStore();
+
+  const {
+    loading: callHistoryLoading,
+    callsByConversation,
+    fetchCallsByConversation,
+  } = useCallHistoryStore();
 
   const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
 
   const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
+  const hasLoadedCalls = (callsByConversation[activeConversationId!]?.items?.length ?? 0) > 0;
 
   const { joinConversation } = useSocketStore();
 
   useEffect(() => {
     if (activeConversationId) {
       joinConversation(activeConversationId);
+
+      if (!allMessages[activeConversationId] && !messageLoading) {
+        fetchMessages(activeConversationId);
+      }
+
+      if (!callsByConversation[activeConversationId] && !callHistoryLoading) {
+        fetchCallsByConversation(activeConversationId);
+      }
     }
-  }, [activeConversationId, joinConversation]);
+  }, [activeConversationId, joinConversation, fetchMessages, fetchCallsByConversation, messageLoading, callHistoryLoading]);
 
   useEffect(() => {
     if (!selectedConvo || activeConversationId !== focusedConversationId) return;
@@ -47,12 +69,24 @@ const ChatWindowLayout = () => {
     return <ChatWelcomeScreen />;
   }
 
-  if (loading && !hasLoadedMessages) {
+  const messageData = allMessages[activeConversationId!];
+  const callData = callsByConversation[activeConversationId!];
+
+  const isInitialLoading = selectedConvo && (
+    (!hasLoadedMessages && (messageLoading || !messageData)) ||
+    (!hasLoadedCalls && (callHistoryLoading || !callData))
+  );
+
+  if (isInitialLoading) {
     return <ChatWindowSkeleton />
   }
   return (
     <SidebarInset className="flex flex-col h-full flex-1 overflow-hidden bg-transparent shadow-none border-none">
-      <ChatWindowHeader chat={selectedConvo} />
+      <ChatWindowHeader
+        chat={selectedConvo}
+        showInfo={showInfo}
+        onToggleInfo={onToggleInfo}
+      />
 
       <div className="flex-1 min-h-0 bg-primary-foreground">
         <ChatWindowBody />

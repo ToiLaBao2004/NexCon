@@ -8,7 +8,8 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2 } from "lucide-react";
+import { isUrl } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -60,7 +61,6 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     : otherUser?.userId?.displayName ?? "";
 
   const unreadCount = convo.unreadCounts[user._id];
-  const lastMessage = convo.lastMessage?.content ?? "";
 
   const handleSelectConversation = async (id: string) => {
     setActiveConversation(id);
@@ -222,12 +222,36 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
         </>
       }
       subtitle={
-        <p className={cn(
-          "text-sm truncate",
+        <div className={cn(
+          "flex items-center text-sm truncate w-full",
           unreadCount > 0 ? "font-bold text-foreground" : "text-muted-foreground"
         )}>
-          {lastMessage ? (isMyLastMessage ? "Bạn: " : "") + lastMessage : ""}
-        </p>
+          {(() => {
+            if (!convo.lastMessage) return "";
+            const msgObj = convo.lastMessage as any;
+            const content = msgObj.content ?? "";
+            const type = msgObj.type ?? "text";
+            const prefix = isMyLastMessage ? "Bạn: " : "";
+
+            let cleanMsg = content;
+            if (cleanMsg.startsWith("📎 ")) cleanMsg = cleanMsg.replace("📎 ", "");
+            else if (cleanMsg.startsWith("📷 ")) cleanMsg = cleanMsg.replace("📷 ", "");
+            else if (cleanMsg.startsWith("🔗 ")) cleanMsg = cleanMsg.replace("🔗 ", "");
+
+            let Icon = null;
+            if (type === "image" || content.includes("Đã gửi một ảnh")) Icon = ImageIcon;
+            else if (type === "file" || content.startsWith("📎 ")) Icon = Paperclip;
+            else if (type === "link" || content.includes("Đã gửi một liên kết") || isUrl(cleanMsg)) Icon = Link2;
+
+            return (
+              <span className="flex items-center gap-1 w-full truncate">
+                {prefix && <span className="shrink-0">{prefix.trim()}:</span>}
+                {Icon && <Icon className="size-3.5 shrink-0" />}
+                <span className="truncate">{cleanMsg}</span>
+              </span>
+            );
+          })()}
+        </div>
       }
     />
   );

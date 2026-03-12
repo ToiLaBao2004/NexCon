@@ -45,7 +45,6 @@ export async function createConversation(req, res) {
 			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
 		]);
 
-		// Gửi socket cho tất cả thành viên trong nhóm/cuộc trò chuyện
 		conversation.participants.forEach(p => {
 			const receiverSocketId = getReceiverSocketId(p.userId._id.toString());
 			if (receiverSocketId) {
@@ -65,13 +64,12 @@ export async function getConversations(req, res) {
 		const myId = req.user._id.toString();
 
 		const conversations = await Conversation.find({ "participants.userId": myId })
-			.sort({ updatedAt: -1 })
+			.sort({ "lastMessage.createdAt": -1, updatedAt: -1 })
 			.populate("participants.userId", "displayName avatarUrl email bio phone")
 			.populate("lastMessage.senderId", "displayName avatarUrl")
 			.populate("seenBy", "displayName avatarUrl")
 			.lean();
 
-		// gom tất cả userId xuất hiện trong participants (trừ mình)
 		const allOtherIds = [
 			...new Set(
 				conversations
@@ -80,7 +78,6 @@ export async function getConversations(req, res) {
 			),
 		];
 
-		// map otherId -> nickname (nickname của mình đặt cho người đó)
 		const nickMap = new Map();
 
 		if (allOtherIds.length) {
@@ -113,7 +110,6 @@ export async function getConversations(req, res) {
 			}
 		}
 
-		// nhét nickname vào userId trong participant
 		const formatted = conversations.map((c) => ({
 			...c,
 			participants: c.participants.map((p) => {
@@ -124,7 +120,7 @@ export async function getConversations(req, res) {
 					...p,
 					userId: {
 						...p.userId,
-						nickname, // <-- thêm tại đây (cùng cấp displayName)
+						nickname,
 					},
 				};
 			}),
@@ -219,7 +215,8 @@ export async function markAsSeen(req, res) {
 		);
 
 		io.to(conversationId).emit("read-message", {
-			conversationId: updated,
+			conversationId: conversationId,
+			seenBy: updated.seenBy,
 			lastMessage: {
 				_id: updated.lastMessage._id,
 				content: updated.lastMessage.content,

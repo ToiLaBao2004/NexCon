@@ -25,6 +25,7 @@ export interface Group {
 export interface LastMessage {
   _id: string;
   content: string;
+  type?: MessageType;
   createdAt: string;
   sender: {
     _id: string;
@@ -41,7 +42,7 @@ export interface Conversation {
   lastMessageAt: string;
   seenBy: SeenUser[];
   lastMessage: LastMessage | null;
-  unreadCounts: Record<string, number>; // key = userId, value = unread count
+  unreadCounts: Record<string, number>;
   createdAt: string;
   updatedAt: string;
 }
@@ -50,16 +51,26 @@ export interface ConversationResponse {
   conversations: Conversation[];
 }
 
+export type MessageType = 'text' | 'image' | 'file' | 'link';
+
 export interface Message {
   _id: string;
   conversationId: string;
   senderId: string;
-  content: string | null;
+  type: MessageType;
+  content?: string | null;
+  fileUrl?: string | null;
+  filePublicId?: string | null;
+  fileName?: string | null;
+  fileSize?: number | null;
+  mimeType?: string | null;
   isRecalled: boolean | null;
   isPinned: boolean | null;
   pinnedAt?: string | null;
-  imgUrl?: string | null;
   updatedAt?: string | null;
   createdAt: string;
   isOwn?: boolean;
+  status?: 'sending' | 'sent' | 'error';
+  progress?: number;
 }
+

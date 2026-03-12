@@ -1,28 +1,56 @@
-export const updateConversationLastMessage = async (conversation, message, senderId) => {
+const resolveLastMessagePreview = (message) => {
+    if (message.content?.trim()) return message.content.trim();
+
+    switch (message.type) {
+        case 'image': return 'Đã gửi một ảnh';
+        case 'file':  return message.fileName ?? 'Tệp đính kèm';
+        case 'link':  return 'Đã gửi một liên kết';
+        default:      return '';
+    }
+};
+
+export const updateConversationLastMessage = (conversation, message, senderId) => {
     conversation.set({
         lastMessage: {
-            content: message.content,
-            senderId: senderId,
-            createdAt: message.createdAt
-        }
+            content:   resolveLastMessagePreview(message),
+            type:      message.type ?? 'text',
+            senderId:  senderId,
+            createdAt: message.createdAt,
+        },
     });
-    conversation.participants.forEach(participant => {
-        const memberId = participant.userId.toString();
-        const isSender = memberId === senderId.toString();
+
+    conversation.participants.forEach((participant) => {
+        const memberId  = participant.userId.toString();
+        const isSender  = memberId === senderId.toString();
         const prevCount = conversation.unreadCounts?.get(memberId) || 0;
         conversation.unreadCounts.set(memberId, isSender ? 0 : prevCount + 1);
     });
+
     conversation.seenBy = [senderId];
 };
 
 export const emitNewMessage = (io, conversation, message) => {
-    io.to(conversation._id.toString()).emit("new-message", {
+    io.to(conversation._id.toString()).emit('new-message', {
         message,
         conversation: {
-            _id: conversation._id,
-            lastMessage: conversation.lastMessage,
+            _id:           conversation._id,
+            lastMessage:   conversation.lastMessage,
             lastMessageAt: conversation.lastMessageAt,
         },
         unreadCounts: conversation.unreadCounts,
     });
+};
+
+export async function safeUpload(uploadFn, ...args) {
+    try {
+        return await uploadFn(...args);
+    } catch (err) {
+        const msg = err?.message ?? '';
+        if (msg.includes('File size too large') || msg.includes('exceeds') || err?.http_code === 400) {
+            const e = new Error('File quá lớn để upload lên cloud. Vui lòng chọn file nhỏ hơn.');
+            e.statusCode = 413;
+            throw e;
+        }
+        throw err;
+    }
 }

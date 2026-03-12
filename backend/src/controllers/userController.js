@@ -1,5 +1,6 @@
 import User from '../models/userModel.js';
 import { upLoadImageFromBuffer, deleteImage } from '../middlewares/uploadMiddleware.js';
+import bcrypt from 'bcrypt';
 
 export async function getCurrentUser(req, res) {
     try {
@@ -45,7 +46,7 @@ export async function updateProfile(req, res) {
         const userId = req.user._id;
         const { displayName, bio, phone } = req.body;
 
-        // Backend Validation
+        // Validation
         if (bio && bio.length > 150) {
             return res.status(400).json({ message: 'Tiểu sử không được quá 150 ký tự' });
         }
@@ -88,19 +89,19 @@ export async function updateAvatar(req, res) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
-        // Tìm user hiện tại để lấy avatarId cũ
+        // Get old avatar info
         const user = await User.findById(userId);
         if (user && user.avatarId) {
             try {
-                // Xóa ảnh cũ trên Cloudinary
+                // Delete from Cloudinary
                 await deleteImage(user.avatarId);
             } catch (deleteError) {
                 console.error("Lỗi khi xóa ảnh cũ trên Cloudinary:", deleteError);
-                // Vẫn tiếp tục upload ảnh mới kể cả khi xóa ảnh cũ gặp lỗi
+                // Ignore delete error
             }
         }
 
-        // Upload ảnh mới lên Cloudinary
+        // Upload new avatar
         const result = await upLoadImageFromBuffer(req.file.buffer, "NexCon/avatars");
 
         const avatarUrl = result.secure_url;
@@ -128,5 +129,39 @@ export async function updateAvatar(req, res) {
     } catch (error) {
         console.error('Update avatar error:', error);
         return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function changePassword(req, res) {
+    try {
+        const userId = req.user._id;
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: 'Vui lòng nhập đầy đủ mật khẩu cũ và mới' });
+        }
+
+        if (newPassword.length < 8) {
+            return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: 'Người dùng không tồn tại' });
+        }
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Mật khẩu hiện tại không chính xác' });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        user.password = hashedPassword;
+        await user.save();
+
+        return res.status(200).json({ message: 'Đổi mật khẩu thành công' });
+    } catch (error) {
+        console.error('Change password error:', error);
+        return res.status(500).json({ message: 'Lỗi máy chủ nội bộ' });
     }
 }

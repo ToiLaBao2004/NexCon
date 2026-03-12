@@ -7,15 +7,39 @@ import UserAvatar from "./UserAvatar";
 import StatusBadge from "./StatusBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { useSocketStore } from "@/stores/useSocketStore";
-import { Phone, Video, X } from "lucide-react";
+import { Phone, Video, Search } from "lucide-react";
 import { Button } from "../ui/button";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useCallStore } from "@/stores/useCallStore";
 
-const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
-  const { conversations, activeConversationId, setActiveConversation } =
+const PanelRightIcon = ({ className, filled }: { className?: string; filled?: boolean }) => (
+  <svg
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+  >
+    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+    {filled ? (
+      <path d="M15 3V21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3H15Z" fill="currentColor" />
+    ) : (
+      <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" strokeWidth="2" />
+    )}
+  </svg>
+);
+
+interface ChatWindowHeaderProps {
+  chat?: Conversation;
+  showInfo?: boolean;
+  onToggleInfo?: () => void;
+}
+
+const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProps) => {
+  const { conversations, activeConversationId } =
     useChatStore();
   const { user } = useAuthStore();
   const { onlineUsers } = useSocketStore();
@@ -121,40 +145,60 @@ const ChatWindowHeader = ({ chat }: { chat?: Conversation }) => {
           >
             {displayName}
           </h2>
-          {/* call buttons */}
-          {chat.type === "direct" && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full hover:bg-primary/10 hover:text-primary"
-                disabled={!canCall}
-                title="Gọi thoại"
-                onClick={handleVoiceCall}
-              >
-                <Phone className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full hover:bg-primary/10 hover:text-primary"
-                disabled={!canCall}
-                title="Gọi video"
-                onClick={handleVideoCall}
-              >
-                <Video className="h-5 w-5" />
-              </Button>
-            </>
-          )}
+          <div className="flex items-center gap-1 ml-2">
+            {/* call buttons */}
+            {chat.type === "direct" && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-9 w-9"
+                  disabled={!canCall}
+                  title="Gọi thoại"
+                  onClick={handleVoiceCall}
+                >
+                  <Phone className="h-[20px] w-[20px]" strokeWidth={1.5} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-9 w-9"
+                  disabled={!canCall}
+                  title="Gọi video"
+                  onClick={handleVideoCall}
+                >
+                  <Video className="h-[22px] w-[22px]" strokeWidth={1.5} />
+                </Button>
+              </>
+            )}
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => setActiveConversation(null)}
-          >
-            <X className="h-5 w-5" />
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-md hover:bg-muted hover:text-foreground transition-colors h-9 w-9"
+              title="Tìm kiếm"
+            >
+              <Search className="h-[20px] w-[20px]" strokeWidth={1.5} />
+            </Button>
+
+            {/* info toggle button */}
+            {onToggleInfo && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "rounded-md transition-colors h-9 w-9",
+                  showInfo
+                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                    : "hover:bg-muted hover:text-foreground"
+                )}
+                onClick={onToggleInfo}
+                title={showInfo ? "Ẩn thông tin" : "Thông tin hội thoại"}
+              >
+                <PanelRightIcon className="h-5 w-5" filled={showInfo} />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

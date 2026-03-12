@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useChatStore } from '@/stores/useChatStore';
 import { useFriendStore } from '@/stores/useFriendStore';
 import { Button } from '@/components/ui/button';
@@ -19,9 +19,10 @@ import EmojiPicker from './EmojiPicker';
 interface NewGroupModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialSelected?: string[];
 }
 
-const NewGroupModal = ({ isOpen, onClose }: NewGroupModalProps) => {
+const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps) => {
   const [groupName, setGroupName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
@@ -57,6 +58,13 @@ const NewGroupModal = ({ isOpen, onClose }: NewGroupModalProps) => {
         : [...prev, friendId]
     );
   };
+
+  // when opened with initial selected members, preload them
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedFriends(initialSelected ?? []);
+    }
+  }, [isOpen, initialSelected]);
 
   const handleCreateGroup = async () => {
     if (!groupName.trim()) {

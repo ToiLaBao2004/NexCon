@@ -73,7 +73,9 @@ export function PinnedMessagesBanner({
 	const getPreview = (msg: Message) => {
 		if (msg.isRecalled) return "[Tin nhắn đã thu hồi]";
 		if (msg.content?.trim()) return msg.content.trim();
-		if (msg.imgUrl) return "[Hình ảnh]";
+		if (msg.type === 'image') return "[Hình ảnh]";
+		if (msg.type === 'file')  return `[File: ${msg.fileName ?? 'Tệp đính kèm'}]`;
+		if (msg.type === 'link')  return "[Liên kết]";
 		return "[Tin nhắn]";
 	};
 

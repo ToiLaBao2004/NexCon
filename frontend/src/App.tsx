@@ -34,16 +34,14 @@ function App() {
 
   useEffect(() => {
     const unlockAudio = async () => {
-      console.log("[App] User interaction detected, unlocking audio...");
       try {
         await Promise.all([
           unlockMessageSound(),
           unlockNotificationSound(),
           unlockRingtone(),
         ]);
-        console.log("[App] All audio unlocked successfully");
       } catch (err) {
-        console.error("[App] Failed to unlock some audio:", err);
+        console.error("[App] Failed to unlock audio:", err);
       }
     };
 

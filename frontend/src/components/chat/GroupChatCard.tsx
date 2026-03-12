@@ -4,7 +4,8 @@ import type { Conversation } from "@/types/chat";
 import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2 } from "lucide-react";
+import { isUrl } from "@/lib/utils";
 import {
 	DropdownMenu,
 	DropdownMenuTrigger,
@@ -42,7 +43,6 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 
 	const currentGroupName = useMemo(() => convo.group?.name ?? "", [convo.group?.name]);
 
-	// Prefill input mỗi lần mở dialog (và nếu convo đổi)
 	useEffect(() => {
 		if (openRename) {
 			setGroupNameDraft(currentGroupName);
@@ -69,7 +69,6 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 		const value = groupNameDraft.trim();
 		if (!value) return;
 
-		// Nếu không đổi gì thì đóng luôn cho gọn
 		if (value === currentGroupName.trim()) {
 			setOpenRename(false);
 			return;
@@ -81,7 +80,6 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 
 			setOpenRename(false);
 
-			// Refresh list để UI update name (nếu store chưa tự update state)
 			await fetchConversations();
 		} catch (error) {
 			console.error("Cập nhật tên nhóm thất bại:", error);
@@ -192,10 +190,6 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 	const senderParticipant = convo.participants.find(p => p.userId?._id?.toString() === lastMessageSenderId?.toString());
 	const senderName = lastMessageObj?.sender?.displayName || lastMessageObj?.senderId?.displayName || senderParticipant?.userId?.displayName || senderParticipant?.userId?.nickname || "Ai đó";
 
-	const lastMessageText = convo.lastMessage?.content
-		? (isMyLastMessage ? "Bạn: " : `${senderName}: `) + convo.lastMessage.content
-		: `${convo.participants.length} Thành Viên`;
-
 	return (
 		<ChatCard
 			convoId={convo._id}
@@ -215,9 +209,33 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 				</>
 			}
 			subtitle={
-				<p className={`text-sm truncate ${unreadCount > 0 ? "font-bold text-foreground" : "text-muted-foreground"}`}>
-					{lastMessageText}
-				</p>
+				<div className={`flex items-center text-sm truncate w-full ${unreadCount > 0 ? "font-bold text-foreground" : "text-muted-foreground"}`}>
+					{(() => {
+						if (!convo.lastMessage) return <span className="truncate">{convo.participants.length} Thành Viên</span>;
+						const msgObj = convo.lastMessage as any;
+						const content = msgObj.content ?? "";
+						const type = msgObj.type ?? "text";
+						const prefix = isMyLastMessage ? "Bạn: " : `${senderName}: `;
+
+						let cleanMsg = content;
+						if (cleanMsg.startsWith("📎 ")) cleanMsg = cleanMsg.replace("📎 ", "");
+						else if (cleanMsg.startsWith("📷 ")) cleanMsg = cleanMsg.replace("📷 ", "");
+						else if (cleanMsg.startsWith("🔗 ")) cleanMsg = cleanMsg.replace("🔗 ", "");
+
+						let Icon = null;
+						if (type === "image" || content.includes("Đã gửi một ảnh")) Icon = ImageIcon;
+						else if (type === "file" || content.startsWith("📎 ")) Icon = Paperclip;
+						else if (type === "link" || content.includes("Đã gửi một liên kết") || isUrl(cleanMsg)) Icon = Link2;
+
+						return (
+							<span className="flex items-center gap-1 w-full truncate">
+								{prefix && <span className="shrink-0">{prefix.trim()}:</span>}
+								{Icon && <Icon className="size-3.5 shrink-0" />}
+								<span className="truncate">{cleanMsg}</span>
+							</span>
+						);
+					})()}
+				</div>
 			}
 		/>
 	);

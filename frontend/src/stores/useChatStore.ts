@@ -1,5 +1,5 @@
 import { chatService } from '@/services/chatService';
-import type { ChatState } from '@/types/store';
+import type { ChatState, SendMessagePayload } from '@/types/store';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
@@ -89,33 +89,129 @@ export const useChatStore = create<ChatState>()(
                 }
 
             },
-            sendDirectMessage: async (recipientId, content, imgUrl) => {
+            sendMessage: async (payload: SendMessagePayload, onProgress?: (pct: number) => void) => {
+                const { activeConversationId } = get();
+                const { user } = useAuthStore.getState();
+
+                const finalPayload: SendMessagePayload = {
+                    ...payload,
+                    conversationId: payload.conversationId ?? (!payload.recipientId ? (activeConversationId ?? undefined) : undefined),
+                };
+
+                const convoId = finalPayload.conversationId ?? activeConversationId;
+                const isFileUpload = !!payload.file;
+
+                let tempId: string | null = null;
+                let tempBlobUrl: string | null = null;
+
+                if (convoId && user) {
+                    tempId = `temp_${Date.now()}`;
+
+                    if (isFileUpload && payload.file) {
+                        tempBlobUrl = URL.createObjectURL(payload.file);
+                    }
+
+                    const optimistic = {
+                        _id: tempId,
+                        conversationId: convoId,
+                        senderId: user._id,
+                        type: payload.type,
+                        content: payload.content ?? null,
+                        fileName: payload.file?.name,
+                        fileSize: payload.file?.size,
+                        fileUrl: tempBlobUrl,
+                        isRecalled: false,
+                        isPinned: false,
+                        createdAt: new Date().toISOString(),
+                        isOwn: true,
+                        status: 'sending' as const,
+                    };
+
+                    set((state) => {
+                        const prev = state.messages[convoId] ?? {
+                            items: [], hasMore: false, nextCursor: '', pinnedMessages: [],
+                        };
+                        return {
+                            messages: {
+                                ...state.messages,
+                                [convoId]: { ...prev, items: [...prev.items, optimistic] },
+                            },
+                        };
+                    });
+                }
+
                 try {
-                    const { activeConversationId } = get();
-                    await chatService.sendDirectMessage(recipientId, content, imgUrl, activeConversationId || undefined);
+                    const realMsg = await chatService.sendMessage(finalPayload, (pct) => {
+                        if (tempId && convoId) {
+                            set((state) => {
+                                const prev = state.messages[convoId];
+                                if (!prev) return state;
+
+                                return {
+                                    messages: {
+                                        ...state.messages,
+                                        [convoId]: {
+                                            ...prev,
+                                            items: prev.items.map((m) =>
+                                                m._id === tempId ? { ...m, progress: pct } : m
+                                            ),
+                                        },
+                                    },
+                                };
+                            });
+                        }
+                        onProgress?.(pct);
+                    });
+
+                    if (tempId && convoId) {
+                        set((state) => {
+                            const prev = state.messages[convoId];
+                            if (!prev) return state;
+
+                            const alreadyExists = prev.items.some((m) => m._id === realMsg._id);
+                            const items = alreadyExists
+                                ? prev.items.filter((m) => m._id !== tempId)
+                                : prev.items.map((m) =>
+                                    m._id === tempId
+                                        ? { ...realMsg, isOwn: true, status: 'sent' as const }
+                                        : m
+                                );
+
+                            return {
+                                messages: { ...state.messages, [convoId]: { ...prev, items } },
+                            };
+                        });
+                    }
 
                     set((state) => ({
-                        conversations: state.conversations.map((c) => c._id === activeConversationId ? { ...c, seenBy: [] } : c
+                        conversations: state.conversations.map((c) =>
+                            c._id === activeConversationId ? { ...c, seenBy: [] } : c
                         ),
                     }));
                 } catch (error) {
-                    console.error("Lỗi khi gửi tin nhắn trực tiếp:", error);
+                    if (tempId && convoId) {
+                        set((state) => {
+                            const prev = state.messages[convoId];
+                            if (!prev) return state;
+                            return {
+                                messages: {
+                                    ...state.messages,
+                                    [convoId]: {
+                                        ...prev,
+                                        items: prev.items.map((m) =>
+                                            m._id === tempId ? { ...m, status: 'error' as const } : m
+                                        ),
+                                    },
+                                },
+                            };
+                        });
+                    }
                     throw error;
                 }
             },
-            sendGroupMessage: async (conversationId, content, imgUrl) => {
-                try {
-                    await chatService.sendGroupMessage(conversationId, content, imgUrl);
-                    set((state) => ({
-                        conversations: state.conversations.map((c) => c._id === get().activeConversationId ? { ...c, seenBy: [] } : c
-                        ),
-                    }))
-                } catch (error) {
-                    console.error("Lỗi khi gửi tin nhắn nhóm:", error);
-                    throw error;
-                }
 
-            },
+
+
             addMessage: async (message) => {
                 try {
                     const { user } = useAuthStore.getState();
@@ -166,13 +262,24 @@ export const useChatStore = create<ChatState>()(
                 if (!exists) {
                     fetchConversations();
                 } else {
-                    set((state) => ({
-                        conversations: state.conversations.map((c) =>
-                            c._id === conversation._id
-                                ? { ...c, ...conversation, participants: c.participants }
-                                : c
-                        ),
-                    }));
+                    set((state) => {
+                        const existingConv = state.conversations.find((c) => c._id === conversation._id);
+                        if (!existingConv) return state;
+
+                        const updatedConv = { ...existingConv, ...conversation, participants: existingConv.participants };
+
+                        const updatedConversations = state.conversations.map((c) =>
+                            c._id === conversation._id ? updatedConv : c
+                        );
+
+                        updatedConversations.sort((a, b) => {
+                            const dateA = new Date(a.lastMessage?.createdAt || a.createdAt || 0).getTime();
+                            const dateB = new Date(b.lastMessage?.createdAt || b.createdAt || 0).getTime();
+                            return dateB - dateA;
+                        });
+
+                        return { conversations: updatedConversations };
+                    });
                 }
             },
             markAsSeen: async () => {
@@ -190,7 +297,6 @@ export const useChatStore = create<ChatState>()(
                         return id === user._id;
                     });
 
-                    // Nếu đã hết tin nhắn chưa đọc VÀ đã có tên trong danh sách seenBy thì không cần gọi API
                     if (!isUnread && isSeen) return;
 
                     await chatService.markAsSeen(activeConversationId);
@@ -283,7 +389,7 @@ export const useChatStore = create<ChatState>()(
                                 [convoId]: {
                                     ...convoMessages,
                                     items: convoMessages.items.map((m) =>
-                                        m._id === messageId ? { ...m, recalled: true } : m
+                                        m._id === messageId ? { ...m, isRecalled: true, content: 'Tin nhắn này đã được thu hồi' } : m
                                     )
                                 }
                             }
@@ -291,6 +397,7 @@ export const useChatStore = create<ChatState>()(
                     });
                 } catch (error) {
                     console.error("Lỗi khi thu hồi tin nhắn:", error);
+                    throw error;
                 }
             },
             pinMessage: async (messageId: string) => {

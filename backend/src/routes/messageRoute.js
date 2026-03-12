@@ -1,12 +1,12 @@
 import express from 'express';
-import { sendDirectMessage, sendGroupMessage, recallMessagge, pinMessage } from '../controllers/messageController.js';
-import { checkFriendship } from '../middlewares/friendMiddleware.js';
-import { checkGroupMembership } from '../middlewares/groupMiddleware.js';
+import { sendMessage, recallMessage, pinMessage } from '../controllers/messageController.js';
+import { checkMessagePermission } from '../middlewares/messageMiddleware.js';
+import { upload, handleUploadError } from '../middlewares/uploadMiddleware.js';
+
 const messageRouter = express.Router();
 
-messageRouter.post('/send-direct', checkFriendship, sendDirectMessage);
-messageRouter.post('/send-group', checkGroupMembership, sendGroupMessage);
-messageRouter.put('/recall', recallMessagge);
+messageRouter.post('/send', upload.single('file'), handleUploadError, checkMessagePermission, sendMessage);
+messageRouter.put('/recall', recallMessage);
 messageRouter.put('/pin', pinMessage);
 
 export default messageRouter;

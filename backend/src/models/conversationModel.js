@@ -28,6 +28,10 @@ const lastMessageSchema = new mongoose.Schema({
         type: String,
         default: null
     },
+    type: {
+        type: String,
+        default: 'text'
+    },
     senderId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'

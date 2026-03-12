@@ -1,7 +1,15 @@
 import type { Socket } from "socket.io-client";
-import type { Conversation, Message } from "./chat";
+import type { Conversation, Message, MessageType } from "./chat";
 import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
 import type { CallRecord } from "./call";
+
+export interface SendMessagePayload {
+  type: MessageType;
+  recipientId?: string;
+  conversationId?: string;
+  content?: string;
+  file?: File;
+}
 
 export interface ThemeState {
   isDark: boolean;
@@ -27,16 +35,7 @@ export interface ChatState {
   setFocusedConversation: (id: string | null) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
-  sendDirectMessage: (
-    recipientId: string,
-    content: string,
-    imgUrl?: string
-  ) => Promise<void>;
-  sendGroupMessage: (
-    conversationId: string,
-    content: string,
-    imgUrl?: string
-  ) => Promise<void>;
+  sendMessage: (payload: SendMessagePayload, onProgress?: (pct: number) => void) => Promise<void>;
   addMessage: (message: Message) => Promise<void>;
   updateConversation: (conversation: Conversation) => void;
   markAsSeen: () => Promise<void>;

@@ -71,3 +71,71 @@ export const formatMessageTime = (date: Date) => {
       }/${date.getFullYear()} ${timeStr}`; // ví dụ: "15/12/2023 18:40"
   }
 };
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function formatDuration(seconds: number): string | null {
+  if (seconds <= 0) return null;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+const URL_REGEX = /^(?:https?:\/\/)?([\w-]+(\.[\w-]+)+)(\/[-\w\-.\/?%&=+#]*)?$/i;
+export const isUrl = (text: string) => URL_REGEX.test(text.trim());
+
+export const normalizeUrl = (raw: string) => {
+  if (!raw) return raw;
+  const t = raw.trim();
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+};
+
+/** Date string → "ngày/tháng/năm, giờ:phút:giây" (vi-VN locale) */
+export function formatLocaleTime(dateString: string): string {
+  return new Date(dateString).toLocaleString("vi-VN");
+}
+
+/**
+ * Live call timer: seconds → "mm:ss" or "h:mm:ss" with zero-padded minutes.
+ * Always returns a valid string (0 → "00:00").
+ */
+export function formatCallTimer(s: number): string {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) {
+    return `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+  }
+  return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
+}
+
+/** Extract lowercase file extension from a filename. e.g. "foo.PDF" → "pdf" */
+export function getFileExt(fileName: string = ""): string {
+  return fileName.split(".").pop()?.toLowerCase() ?? "";
+}
+
+/** Return YouTube hqdefault thumbnail URL, or null if not a YouTube link. */
+export function getYouTubeThumbnail(url: string): string | null {
+  try {
+    let u: URL;
+    try {
+      u = new URL(url);
+    } catch {
+      u = new URL("https://" + url);
+    }
+    if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
+      const id = u.hostname.includes("youtu.be")
+        ? u.pathname.slice(1)
+        : u.searchParams.get("v") ?? "";
+      if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+    }
+  } catch {}
+  return null;
+}
