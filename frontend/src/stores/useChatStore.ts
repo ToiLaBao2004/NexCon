@@ -9,6 +9,7 @@ export const useChatStore = create<ChatState>()(
         (set, get) => ({
             conversations: [],
             messages: {},
+            media: {},
             activeConversationId: null,
             focusedConversationId: null,
             convoLoading: false,
@@ -20,6 +21,7 @@ export const useChatStore = create<ChatState>()(
                 set({
                     conversations: [],
                     messages: {},
+                    media: {},
                     activeConversationId: null,
                     focusedConversationId: null,
                     convoLoading: false,
@@ -240,6 +242,28 @@ export const useChatStore = create<ChatState>()(
                             return state;
                         }
 
+                        const prevMedia = state.media[convoId];
+                        let nextMedia = prevMedia;
+                        if (prevMedia) {
+                            const mediaType = message.type;
+                            if (mediaType === 'image' && message.fileUrl) {
+                                const alreadyExists = prevMedia.images.some((m) => m._id === message._id);
+                                if (!alreadyExists) {
+                                    nextMedia = { ...prevMedia, images: [message, ...prevMedia.images].slice(0, 8) };
+                                }
+                            } else if (mediaType === 'file' && message.fileUrl) {
+                                const alreadyExists = prevMedia.files.some((m) => m._id === message._id);
+                                if (!alreadyExists) {
+                                    nextMedia = { ...prevMedia, files: [message, ...prevMedia.files].slice(0, 3) };
+                                }
+                            } else if (mediaType === 'link' && message.content) {
+                                const alreadyExists = prevMedia.links.some((m) => m._id === message._id);
+                                if (!alreadyExists) {
+                                    nextMedia = { ...prevMedia, links: [message, ...prevMedia.links].slice(0, 3) };
+                                }
+                            }
+                        }
+
                         return {
                             messages: {
                                 ...state.messages,
@@ -249,6 +273,7 @@ export const useChatStore = create<ChatState>()(
                                     pinnedMessages: prevState.pinnedMessages ?? [],
                                 },
                             },
+                            ...(nextMedia !== prevMedia ? { media: { ...state.media, [convoId]: nextMedia } } : {}),
                         };
                     });
                 } catch (error) {
@@ -476,6 +501,20 @@ export const useChatStore = create<ChatState>()(
                         m._id === messageId ? { ...m, ...patch } : m
                     );
 
+                    // Also remove from media state if recalled
+                    const prevMedia = state.media[conversationId];
+                    let nextMediaState = state.media;
+                    if (prevMedia && patch.isRecalled) {
+                        nextMediaState = {
+                            ...state.media,
+                            [conversationId]: {
+                                images: prevMedia.images.filter((m) => m._id !== messageId),
+                                files: prevMedia.files.filter((m) => m._id !== messageId),
+                                links: prevMedia.links.filter((m) => m._id !== messageId),
+                            },
+                        };
+                    }
+
                     return {
                         messages: {
                             ...state.messages,
@@ -485,8 +524,30 @@ export const useChatStore = create<ChatState>()(
                                 pinnedMessages: updatedPinned,
                             },
                         },
+                        media: nextMediaState,
                     };
                 }),
+            fetchMedia: async (conversationId: string) => {
+                try {
+                    const [imgRes, fileRes, linkRes] = await Promise.all([
+                        chatService.fetchMedia(conversationId, 'image', 8),
+                        chatService.fetchMedia(conversationId, 'file', 3),
+                        chatService.fetchMedia(conversationId, 'link', 3),
+                    ]);
+                    set((state) => ({
+                        media: {
+                            ...state.media,
+                            [conversationId]: {
+                                images: imgRes.messages,
+                                files: fileRes.messages,
+                                links: linkRes.messages,
+                            },
+                        },
+                    }));
+                } catch (error) {
+                    console.error('Failed to fetch media:', error);
+                }
+            },
         }),
         {
             name: "chat-storage",

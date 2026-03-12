@@ -1,33 +1,21 @@
 import { Image as ImageIcon, CheckCircle2, Link2, FileText, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Conversation } from "@/types/chat";
 import { useChatStore } from "@/stores/useChatStore";
 import { formatBytes, formatMessageTime } from "@/lib/utils";
 
 export function SidebarMediaLinks({ conversation }: { conversation: Conversation }) {
-  const { messages } = useChatStore();
+  const mediaState = useChatStore((s) => s.media[conversation._id]);
+  const fetchMedia = useChatStore((s) => s.fetchMedia);
 
-  // Get messages for this conversation
-  const convoMessages = messages[conversation._id]?.items || [];
+  useEffect(() => {
+    fetchMedia(conversation._id);
+  }, [conversation._id, fetchMedia]);
 
-  // Images (show up to 8 recent)
-  const imageMessages = [...convoMessages]
-    .filter((msg: any) => msg.type === "image" && msg.fileUrl)
-    .reverse()
-    .slice(0, 8);
+  const imageMessages = mediaState?.images ?? [];
+  const fileMessages = mediaState?.files ?? [];
+  const linkMessages = mediaState?.links ?? [];
   const placeholdersCount = Math.max(0, 8 - imageMessages.length);
-
-  // Files (type === 'file') - show recent 3 ("Xem tất cả" will show more)
-  const fileMessages = [...convoMessages]
-    .filter((msg: any) => msg.type === "file" && msg.fileUrl)
-    .reverse()
-    .slice(0, 3);
-
-  // Links (type === 'link' and content) - show recent 3 ("Xem tất cả" will show more)
-  const linkMessages = [...convoMessages]
-    .filter((msg: any) => msg.type === "link" && msg.content)
-    .reverse()
-    .slice(0, 3);
 
   // helpers for thumbnails
   const getExt = (name: string = "") => name.split(".").pop()?.toLowerCase() || "";

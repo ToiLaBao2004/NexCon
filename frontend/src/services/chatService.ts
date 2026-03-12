@@ -62,6 +62,13 @@ export const chatService = {
 		}
 	},
 
+	async fetchMedia(conversationId: string, type: 'image' | 'file' | 'link', limit = 8, cursor?: string) {
+		const params = new URLSearchParams({ type, limit: String(limit) });
+		if (cursor) params.append('cursor', cursor);
+		const res = await api.get(`/conversations/${conversationId}/media?${params}`);
+		return res.data as { messages: Message[]; nextCursor: string | null };
+	},
+
 	async markAsSeen(conversationId: string) {
 		const res = await api.patch(`/conversations/${conversationId}/mark-seen`);
 		return res.data;
