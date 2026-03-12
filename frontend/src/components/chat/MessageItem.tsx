@@ -12,7 +12,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { useState } from "react";
 import { toast } from "sonner";
-import { FileText, Link2, ExternalLink, Clock, AlertCircle } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2 } from "lucide-react";
 
 interface MessageItemProps {
 	message: Message;
@@ -74,10 +74,10 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
 		);
 	}
 
-		if (type === "link" && message.content) {
+	if (type === "link" && message.content) {
 		return (
 			<a
-						href={normalizeUrl(message.content)}
+				href={normalizeUrl(message.content)}
 				target="_blank"
 				rel="noopener noreferrer"
 				className={cn(
@@ -115,6 +115,7 @@ const MessageItem = ({
 
 	const isOwn = message.senderId === currentUserId;
 	const isRecalled = message.isRecalled === true;
+	const isPinned = message.isPinned === true;
 	const isImage = message.type === "image" && !!message.fileUrl && !isRecalled;
 
 	const seenByOthers =
@@ -254,13 +255,19 @@ const MessageItem = ({
 										</DropdownMenuItem>
 									)}
 									<DropdownMenuItem onClick={() => setShowPinOptions(true)}>
-										Ghim tin nhắn
+										{isPinned ? (
+											<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
+										) : (
+											<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+										)}
+										{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
 									</DropdownMenuItem>
 									{isOwn && (
 										<DropdownMenuItem
 											className="text-destructive focus:text-destructive focus:bg-destructive/10"
 											onClick={() => setShowConfirmRecall(true)}
 										>
+											<Undo2 className="w-4 h-4 mr-2" strokeWidth={1.6} />
 											Thu hồi
 										</DropdownMenuItem>
 									)}
@@ -307,9 +314,9 @@ const MessageItem = ({
 				isOpen={showPinOptions}
 				onClose={() => setShowPinOptions(false)}
 				onConfirm={handlePin}
-				title="Ghim tin nhắn?"
-				description="Tin nhắn này sẽ được ghim vào đầu cuộc trò chuyện."
-				confirmText="Ghim"
+				title={isPinned ? "Bỏ ghim tin nhắn?" : "Ghim tin nhắn?"}
+				description={isPinned ? "Tin nhắn này sẽ được bỏ ghim." : "Tin nhắn này sẽ được ghim vào đầu cuộc trò chuyện."}
+				confirmText={isPinned ? "Bỏ ghim" : "Ghim"}
 			/>
 		</>
 	);

@@ -184,7 +184,10 @@ export async function recallMessage(req, res) {
         message.isRecalled = true;
         message.fileUrl = undefined;
         message.filePublicId = undefined;
-        if (message.isPinned) message.isPinned = false;
+        if (message.isPinned) {
+            message.isPinned = false;
+            message.pinnedAt = null;
+        }
         await message.save();
 
         conversation.participants.forEach((p) => {
@@ -197,6 +200,24 @@ export async function recallMessage(req, res) {
                     isRecalled: true,
                 });
             }
+            if (message.isPinned === false) {
+                const payload = {
+                    conversationId: message.conversationId.toString(),
+                    pinnedMessageId: null,
+                    unpinnedMessageId: message._id.toString(),
+                    isPinned: false,
+                    pinnedAt: null,
+                };
+
+                conversation.participants.forEach((p) => {
+                    const socketId = getReceiverSocketId(
+                        p.userId._id?.toString() ?? p.userId.toString()
+                    );
+                    if (socketId) {
+                        io.to(socketId).emit('pin-message', payload);
+                    }
+                });
+            }
         });
 
         return res.status(200).json({ success: true, message: 'Message recalled successfully.' });
@@ -205,7 +226,6 @@ export async function recallMessage(req, res) {
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }
-
 
 export async function pinMessage(req, res) {
     try {
@@ -221,15 +241,32 @@ export async function pinMessage(req, res) {
             return res.status(404).json({ message: 'Không tìm thấy cuộc trò chuyện.' });
         }
 
+        // Nếu đã ghim thì bỏ ghim luôn
         if (message.isPinned) {
+            message.isPinned = false;
+            message.pinnedAt = null;
+            await message.save();
+
+            const payload = {
+                conversationId: message.conversationId.toString(),
+                pinnedMessageId: null,
+                unpinnedMessageId: message._id.toString(),
+                isPinned: false,
+                pinnedAt: null,
+            };
+
+            conversation.participants.forEach((p) => {
+                const socketId = getReceiverSocketId(
+                    p.userId._id?.toString() ?? p.userId.toString()
+                );
+                if (socketId) {
+                    io.to(socketId).emit('pin-message', payload);
+                }
+            });
+
             return res.status(200).json({
-                message: 'Tin nhắn đã được ghim.',
-                data: {
-                    conversationId: message.conversationId.toString(),
-                    pinnedMessageId: message._id.toString(),
-                    unpinnedMessageId: null,
-                    pinnedAt: message.pinnedAt,
-                },
+                message: 'Bỏ ghim tin nhắn thành công.',
+                data: payload,
             });
         }
 
@@ -261,13 +298,18 @@ export async function pinMessage(req, res) {
         };
 
         conversation.participants.forEach((p) => {
-            const socketId = getReceiverSocketId(p.userId._id?.toString() ?? p.userId.toString());
+            const socketId = getReceiverSocketId(
+                p.userId._id?.toString() ?? p.userId.toString()
+            );
             if (socketId) {
                 io.to(socketId).emit('pin-message', payload);
             }
         });
 
-        return res.status(200).json({ message: 'Ghim tin nhắn thành công.', data: payload });
+        return res.status(200).json({
+            message: 'Ghim tin nhắn thành công.',
+            data: payload,
+        });
     } catch (error) {
         console.error('Error pinning message:', error);
         return res.status(500).json({ message: 'Internal server error.' });
