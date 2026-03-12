@@ -88,7 +88,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   const directDisplayName = useMemo(() => {
     return (
-      otherParticipant?.userId?.displayName || otherParticipant?.userId?.email || "Người dùng"
+      otherParticipant?.userId?.nickname || otherParticipant?.userId?.displayName || "Người dùng"
     );
   }, [otherParticipant]);
 
@@ -111,7 +111,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
     return 0;
   }, [conversations, user, conversation.type, otherParticipant]);
 
-  
+
 
   // (removed DOM measurement code; buttons now positioned via CSS)
 
@@ -162,7 +162,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   // DIRECT variant
   if (conversation.type === "direct") {
     return (
-      <aside className="flex flex-col h-full min-w-[340px] bg-background border-l border-border/40 overflow-y-auto beautiful-scrollbar">
+      <aside className="flex flex-col h-full min-w-[340px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
         <div className="flex flex-col items-center pt-6 pb-4 bg-card">
           <div className="w-[340px] flex flex-col items-center">
             <div className="relative mb-1 h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
@@ -212,13 +212,13 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             </div>
           </div>
         </div>
-          <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />
-          <button
-            className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal"
-          >
-            <Clock className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
-            <span className="text-[15px]">Danh sách nhắc hẹn</span>
-          </button>
+        <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />
+        <button
+          className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal"
+        >
+          <Clock className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
+          <span className="text-[15px]">Danh sách nhắc hẹn</span>
+        </button>
         <div
           role="button"
           onClick={() => setMutualPopoverOpen(true)}
@@ -280,7 +280,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const memberCount = conversation.participants.length;
 
   return (
-    <aside className="flex flex-col h-full min-w-[340px] bg-background border-l border-border/40 overflow-y-auto beautiful-scrollbar">
+    <aside className="flex flex-col h-full min-w-[340px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
       <div className="flex flex-col items-center pt-6 pb-4 bg-card">
         <div className="w-[340px] flex flex-col items-center">
           <div className="relative mb-1 h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
@@ -296,7 +296,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 <button
                   onClick={() => setOpenGroupRename(true)}
                   title="Đổi tên nhóm"
-                    className="absolute left-full top-1/2 ml-3 -translate-y-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-card/10 text-muted-foreground hover:bg-muted/20 transition-colors"
+                  className="absolute left-full top-1/2 ml-3 -translate-y-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-card/10 text-muted-foreground hover:bg-muted/20 transition-colors"
                 >
                   <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
                 </button>

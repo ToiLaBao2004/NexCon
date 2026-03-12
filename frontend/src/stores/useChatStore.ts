@@ -449,6 +449,7 @@ export const useChatStore = create<ChatState>()(
                     console.error("Lỗi khi ghim tin nhắn:", error);
                 }
             },
+
             pinMessageLocal: (conversationId, messageId, patch) =>
                 set((state) => {
                     const prevState = state.messages[conversationId] ?? {
@@ -462,13 +463,24 @@ export const useChatStore = create<ChatState>()(
                         m._id === messageId ? { ...m, ...patch } : m
                     );
 
-                    const updatedMessage = updatedItems.find((m) => m._id === messageId);
-                    let nextPinned = prevState.pinnedMessages ?? [];
+                    const existingPinned = prevState.pinnedMessages ?? [];
 
-                    if (updatedMessage?.isPinned) {
-                        nextPinned = nextPinned.some((m) => m._id === messageId)
-                            ? nextPinned.map((m) => (m._id === messageId ? updatedMessage : m))
-                            : [updatedMessage, ...nextPinned];
+                    const updatedPinnedMessages = existingPinned.map((m) =>
+                        m._id === messageId ? { ...m, ...patch } : m
+                    );
+
+                    const updatedMessage =
+                        updatedItems.find((m) => m._id === messageId) ??
+                        updatedPinnedMessages.find((m) => m._id === messageId);
+
+                    let nextPinned = updatedPinnedMessages;
+
+                    if (patch.isPinned) {
+                        if (updatedMessage) {
+                            nextPinned = nextPinned.some((m) => m._id === messageId)
+                                ? nextPinned.map((m) => (m._id === messageId ? updatedMessage : m))
+                                : [updatedMessage, ...nextPinned];
+                        }
                     } else {
                         nextPinned = nextPinned.filter((m) => m._id !== messageId);
                     }
