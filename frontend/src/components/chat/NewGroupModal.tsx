@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -100,6 +101,9 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
           <DialogTitle className="text-2xl font-semibold text-foreground text-center">
             Tạo nhóm
           </DialogTitle>
+          <DialogDescription className="text-center">
+            Nhập tên nhóm và chọn thành viên để bắt đầu cuộc trò chuyện nhóm.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">

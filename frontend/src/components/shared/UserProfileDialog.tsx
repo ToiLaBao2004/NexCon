@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
@@ -171,6 +172,9 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                 <div className="h-32 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent relative">
                     <DialogHeader className="p-4 absolute top-0 left-0">
                         <DialogTitle className="text-sm font-medium opacity-0">Thông tin cá nhân</DialogTitle>
+                        <DialogDescription className="opacity-0">
+                            Xem thong tin nguoi dung va thuc hien cac thao tac ket ban.
+                        </DialogDescription>
                     </DialogHeader>
                 </div>
 

@@ -257,6 +257,15 @@
 .dark .beautiful-scrollbar::-webkit-scrollbar-thumb:hover {
     background: hsl(215 20% 80% / 0.4);
 }
+
+.safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+[data-sonner-toaster] {
+  z-index: 2147483647 !important;
+}
+
   /* Animations */
   .transition-bounce {
     transition: var(--transition-bounce);

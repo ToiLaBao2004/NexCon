@@ -17,6 +17,36 @@ export const useChatStore = create<ChatState>()(
 
             setActiveConversation: (id) => set({ activeConversationId: id, focusedConversationId: id }),
             setFocusedConversation: (id) => set({ focusedConversationId: id }),
+            clearConversationCache: (keepConversationIds) => {
+                const keep = new Set(keepConversationIds.filter(Boolean));
+
+                set((state) => {
+                    let changed = false;
+                    const nextMessages = { ...state.messages };
+                    const nextMedia = { ...state.media };
+
+                    for (const id of Object.keys(nextMessages)) {
+                        if (!keep.has(id)) {
+                            delete nextMessages[id];
+                            changed = true;
+                        }
+                    }
+
+                    for (const id of Object.keys(nextMedia)) {
+                        if (!keep.has(id)) {
+                            delete nextMedia[id];
+                            changed = true;
+                        }
+                    }
+
+                    if (!changed) return state;
+
+                    return {
+                        messages: nextMessages,
+                        media: nextMedia,
+                    };
+                });
+            },
             reset: () => {
                 set({
                     conversations: [],

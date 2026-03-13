@@ -70,7 +70,13 @@ function App() {
 
   return (
     <>
-      <Toaster richColors />
+      <Toaster
+        richColors
+        position="top-center"
+        toastOptions={{
+          style: { zIndex: 2147483647 },
+        }}
+      />
       <CallManager />
       <BrowserRouter>
         <Routes>

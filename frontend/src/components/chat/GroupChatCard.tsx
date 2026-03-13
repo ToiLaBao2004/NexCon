@@ -62,7 +62,13 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 	};
 
 	const onOpenRename = () => {
-		setOpenRename(true);
+		setDropdownOpen(false);
+		if (document.activeElement instanceof HTMLElement) {
+			document.activeElement.blur();
+		}
+		requestAnimationFrame(() => {
+			setOpenRename(true);
+		});
 	};
 
 	const onSubmitGroupName = async () => {
@@ -94,25 +100,25 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 				<DropdownMenuTrigger asChild>
 					<button
 						type="button"
-						className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground/60 hover:text-foreground"
+						className="p-1 rounded hover:bg-muted transition"
 						aria-label="More actions"
 						onClick={(e) => e.stopPropagation()}
 						onPointerDown={(e) => e.stopPropagation()}
 					>
-						<MoreHorizontal className="size-4" />
+						<MoreHorizontal className="size-4 text-muted-foreground" />
 					</button>
 				</DropdownMenuTrigger>
 
 				<DropdownMenuContent
 					align="end"
 					sideOffset={6}
+					onCloseAutoFocus={(e) => e.preventDefault()}
 					onClick={(e) => e.stopPropagation()}
 					onPointerDown={(e) => e.stopPropagation()}
 				>
 					<DropdownMenuItem
 						onSelect={(e) => {
 							e.preventDefault();
-							setDropdownOpen(false);
 							onOpenRename();
 						}}
 					>

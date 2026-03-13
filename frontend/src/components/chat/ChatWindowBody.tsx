@@ -4,7 +4,7 @@ import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import MessageItem from "./MessageItem";
 import CallMessageItem from "./CallMessageItem";
 import { PinnedMessagesBanner } from "@/components/chat/PinnedMessagesBanner";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { useCallHistoryStore } from "@/stores/useCallHistoryStore";
@@ -59,7 +59,6 @@ const ChatWindowBody: React.FC = () => {
   }, [messages, calls]);
 
   const lastItemId = timeline[timeline.length - 1]?.data._id;
-  const firstItemId = timeline[0]?.data._id;
 
   const activeTypingUserIds = convoId
     ? (typingUsers[convoId]?.filter(id => id !== user?._id) || [])
@@ -69,7 +68,6 @@ const ChatWindowBody: React.FC = () => {
     selectedConvo?.participants.find(p => p.userId?._id?.toString() === id)
   );
 
-  const prevFirstItemId = useRef<string | undefined>(undefined);
   const loadingOlderRef = useRef(false);
 
   useEffect(() => {
@@ -117,55 +115,66 @@ const ChatWindowBody: React.FC = () => {
 
   useEffect(() => {
     isFirstLoad.current = true;
-    prevFirstItemId.current = undefined;
     prevMessageCount.current = 0;
+    loadingOlderRef.current = false;
+    prevScrollHeightRef.current = 0;
   }, [convoId]);
 
   useEffect(() => {
-    const container = scrollRef.current;
-    if (!container || !convoId) return;
-
-    const loadedOlderMessages =
-      timeline.length > prevMessageCount.current &&
-      prevMessageCount.current > 0 &&
-      firstItemId !== prevFirstItemId.current;
-
-    if (loadedOlderMessages) {
-      const newScrollHeight = container.scrollHeight;
-      container.scrollTop = newScrollHeight - prevScrollHeightRef.current;
-      // restored position, stop blocking auto-scroll behavior
-      loadingOlderRef.current = false;
-    }
-
     prevMessageCount.current = timeline.length;
-    prevFirstItemId.current = firstItemId;
-  }, [timeline.length, firstItemId, convoId]);
+  }, [timeline.length]);
 
   const { loading: callHistoryLoading } = useCallHistoryStore();
   const callData = convoId ? callsByConversation[convoId] : null;
   const hasMoreCalls = callData?.hasMore ?? false;
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     const container = scrollRef.current;
     if (!container || !convoId) return;
+    if (loadingOlderRef.current) return;
 
     const canFetchMoreMessages = hasMore && !messageLoading;
     const canFetchMoreCalls = hasMoreCalls && !callHistoryLoading;
 
     if (container.scrollTop < 100 && (canFetchMoreMessages || canFetchMoreCalls)) {
       prevScrollHeightRef.current = container.scrollHeight;
+      loadingOlderRef.current = true;
 
       if (canFetchMoreMessages) {
-        loadingOlderRef.current = true;
-        fetchMessages();
+        fetchMessages(convoId);
       }
 
       if (canFetchMoreCalls) {
-        loadingOlderRef.current = true;
         fetchCallsByConversation(convoId);
       }
     }
-  };
+  }, [convoId, hasMore, messageLoading, hasMoreCalls, callHistoryLoading, fetchMessages, fetchCallsByConversation]);
+
+  useEffect(() => {
+    if (!convoId || !loadingOlderRef.current) return;
+    if (messageLoading || callHistoryLoading) return;
+
+    const container = scrollRef.current;
+    if (!container) {
+      loadingOlderRef.current = false;
+      return;
+    }
+
+    const previousHeight = prevScrollHeightRef.current;
+    const newHeight = container.scrollHeight;
+    const delta = Math.max(0, newHeight - previousHeight);
+
+    if (delta > 0) {
+      container.scrollTop += delta;
+    }
+
+    loadingOlderRef.current = false;
+
+    const stillCanFetch = (hasMore && !messageLoading) || (hasMoreCalls && !callHistoryLoading);
+    if (stillCanFetch && container.scrollTop < 24) {
+      requestAnimationFrame(() => handleScroll());
+    }
+  }, [timeline.length, messageLoading, callHistoryLoading, convoId, hasMore, hasMoreCalls, handleScroll]);
 
   if (!convoId || !selectedConvo) {
     return <ChatWelcomeScreen />;
@@ -234,7 +243,7 @@ const ChatWindowBody: React.FC = () => {
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
               </span>
-              <span className="ml-2 text-xs italic text-muted-foreground hidden sm:inline">
+              <span className="ml-2 text-xs italic text-muted-foreground max-w-[56vw] truncate sm:max-w-none sm:truncate-none">
                 {activeTypingParticipants.map(p => p?.userId?.displayName || "Ai đó").join(", ")} đang soạn tin nhắn...
               </span>
             </div>

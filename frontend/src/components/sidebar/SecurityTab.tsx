@@ -6,7 +6,7 @@ import { Shield, KeyRound, ChevronRight, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { userService } from "@/services/userService";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 const changePasswordSchema = z.object({
     currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
@@ -25,6 +25,7 @@ interface SecurityTabProps {
 
 export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
     const [view, setView] = useState<"overview" | "change-password">("overview");
+    const { changePassword } = useAuthStore();
 
     const {
         register,
@@ -38,10 +39,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
 
     const onSubmitPassword = async (data: ChangePasswordFormValues) => {
         try {
-            await userService.changePassword({
-                currentPassword: data.currentPassword,
-                newPassword: data.newPassword
-            });
+            await changePassword(data.currentPassword, data.newPassword);
             reset();
             setView("overview");
         } catch (error: any) {

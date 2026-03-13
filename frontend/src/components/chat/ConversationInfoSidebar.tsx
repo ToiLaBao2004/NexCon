@@ -88,13 +88,17 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   const directDisplayName = useMemo(() => {
     return (
-      otherParticipant?.userId?.nickname || otherParticipant?.userId?.displayName || "Người dùng"
+      (otherParticipant?.userId?.nickname?.trim()
+        ? otherParticipant.userId.nickname
+        : otherParticipant?.userId?.displayName) || "Người dùng"
     );
   }, [otherParticipant]);
 
   const groupDisplayName = conversation.group?.name || "Nhóm";
 
-  const currentNickname = ""; // keep simple; store-backed nickname logic can be added later
+  const currentNickname = useMemo(() => {
+    return otherParticipant?.userId?.nickname ?? "";
+  }, [otherParticipant]);
 
   // mutual group count between current user and other participant
   const mutualGroupCount = useMemo(() => {
@@ -125,7 +129,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   // Handlers
   const handleSubmitNickname = async () => {
-    const val = nicknameValue.trim();
+    const val = nicknameValue;
     if (val === currentNickname) {
       setOpenNickname(false);
       return;

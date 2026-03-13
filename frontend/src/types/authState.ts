@@ -33,6 +33,11 @@ export default interface AuthState {
     confirmNewPassword: string
   ) => Promise<void>;
 
+  changePassword: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<void>;
+
   signOut: () => Promise<void>;
 
   loginGoogle: () => void;

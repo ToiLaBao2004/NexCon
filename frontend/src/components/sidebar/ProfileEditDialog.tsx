@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -91,9 +92,12 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="w-screen h-[100dvh] max-w-none rounded-none border-0 top-0 left-0 translate-x-0 translate-y-0 overflow-y-auto p-4 sm:h-auto sm:max-w-[425px] sm:rounded-lg sm:border sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:p-6">
                 <DialogHeader>
                     <DialogTitle>Chỉnh sửa hồ sơ</DialogTitle>
+                    <DialogDescription>
+                        Cập nhật thông tin cá nhân và ảnh đại diện của bạn.
+                    </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
                     <div className="flex flex-col items-center gap-4 mb-4">

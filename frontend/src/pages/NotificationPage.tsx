@@ -12,8 +12,8 @@ const NotificationPage = () => {
     }, [fetchNotifications]);
 
     return (
-        <div className="flex-1 h-full flex flex-col bg-card/20 rounded-2xl shadow-soft border border-border/40 overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm">
+        <div className="flex-1 h-full flex flex-col bg-card/20 rounded-none md:rounded-2xl shadow-soft border-0 md:border border-border/40 overflow-hidden">
+            <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
                     <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                         <Bell className="h-5 w-5 text-primary" />
@@ -36,7 +36,7 @@ const NotificationPage = () => {
                 </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
                 {loading && notifications.length === 0 ? (
                     <div className="flex items-center justify-center h-full">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>

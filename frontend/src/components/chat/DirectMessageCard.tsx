@@ -42,7 +42,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   const currentNickname = useMemo(() => {
     const otherUser = convo.participants.find((p) => p.userId?._id?.toString() !== user?._id?.toString());
-    return otherUser?.userId?.nickname?.trim() ?? "";
+    return otherUser?.userId?.nickname ?? "";
   }, [convo.participants, user?._id]);
 
   useEffect(() => {
@@ -70,13 +70,19 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     }
   };
   const onChangeNickname = () => {
-    setOpenRename(true);
+    setDropdownOpen(false);
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    requestAnimationFrame(() => {
+      setOpenRename(true);
+    });
   };
 
   const onSubmitNickname = async () => {
-    const value = nickname.trim()
+    const value = nickname;
 
-    if (value === currentNickname.trim()) {
+    if (value === currentNickname) {
       setOpenRename(false);
       return;
     }
@@ -99,7 +105,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="p-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition"
+            className="p-1 rounded hover:bg-muted opacity-100 transition"
             aria-label="More actions"
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
@@ -111,13 +117,13 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
         <DropdownMenuContent
           align="end"
           sideOffset={6}
+          onCloseAutoFocus={(e) => e.preventDefault()}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
           <DropdownMenuItem
             onSelect={(e) => {
               e.preventDefault();
-              setDropdownOpen(false);
               onChangeNickname();
             }}
           >
