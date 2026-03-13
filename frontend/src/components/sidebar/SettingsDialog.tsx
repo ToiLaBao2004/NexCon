@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -137,15 +140,19 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className={cn(
-                "p-0 overflow-hidden gap-0 border-border/40",
-                forgotPassStep === "none" ? "max-w-[700px]" : "sm:max-w-md p-6"
+                "gap-0 border-border/40 w-screen h-[100dvh] max-w-none rounded-none border-0 top-0 left-0 translate-x-0 translate-y-0 overflow-y-auto sm:h-auto sm:rounded-lg sm:border sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]",
+                forgotPassStep === "none" ? "p-0 sm:max-w-[700px]" : "p-4 sm:max-w-md sm:p-6"
             )}>
+                <DialogHeader className="sr-only">
+                    <DialogTitle>Cai dat</DialogTitle>
+                    <DialogDescription>Tuy chinh thong bao, bao mat va tai khoan.</DialogDescription>
+                </DialogHeader>
                 {forgotPassStep === "none" ? (
-                    <div className="flex h-[500px]">
+                    <div className="flex flex-col sm:flex-row h-[calc(100dvh-32px)] sm:h-[500px]">
                         {/* Sidebar */}
-                        <div className="w-[220px] bg-muted/40 border-r border-border/50 flex flex-col p-4">
-                            <h2 className="text-xl font-bold mb-6 px-2">Cài đặt</h2>
-                            <div className="flex flex-col gap-1">
+                        <div className="w-full sm:w-[220px] bg-muted/40 border-b sm:border-b-0 sm:border-r border-border/50 flex flex-col p-3 sm:p-4">
+                            <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-6 px-1 sm:px-2">Cài đặt</h2>
+                            <div className="grid grid-cols-2 sm:grid-cols-1 gap-1">
                                 <button
                                     onClick={() => setActiveTab("notifications")}
                                     className={cn(
@@ -171,7 +178,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
                         {/* Content */}
                         <div className="flex-1 overflow-y-auto">
-                            <div className="p-6 h-full relative">
+                            <div className="p-4 sm:p-6 h-full relative">
                                 {activeTab === "notifications" && <NotificationTab />}
                                 {activeTab === "security" && <SecurityTab onForgotPassword={handleForgotPassword} />}
                             </div>

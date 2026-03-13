@@ -1,7 +1,7 @@
 import { useFriendStore } from "@/stores/useFriendStore";
 import { Users, UserX, MessageSquare, UserPlus } from "lucide-react";
 import { useSocketStore } from "@/stores/useSocketStore";
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ElementType, type ReactNode } from "react";
 import { useSearchParams, useLocation } from "react-router";
 import { useChatStore } from "@/stores/useChatStore";
 import FriendsTab from "@/components/people/FriendsTab";
@@ -10,7 +10,25 @@ import GroupsTab from "@/components/people/GroupsTab";
 import BlockedTab from "@/components/people/BlockedTab";
 import UserSearch from "@/components/shared/UserSearch";
 import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
-import { SidebarProvider, Sidebar, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, Sidebar } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { MOBILE_BOTTOM_NAV_HEIGHT_REM } from "@/constants/layout";
+
+type PeopleTabKey = "friends" | "requests" | "groups" | "blocked";
+
+interface TabItem {
+	key: PeopleTabKey;
+	label: string;
+	shortLabel: string;
+	icon: ElementType;
+}
+
+const PEOPLE_TABS: TabItem[] = [
+	{ key: "friends", label: "Danh sách bạn bè", shortLabel: "Bạn bè", icon: Users },
+	{ key: "requests", label: "Lời mời kết bạn", shortLabel: "Lời mời", icon: UserPlus },
+	{ key: "groups", label: "Quản lý nhóm", shortLabel: "Nhóm", icon: MessageSquare },
+	{ key: "blocked", label: "Danh sách bị chặn", shortLabel: "Bị chặn", icon: UserX },
+];
 
 const PeoplePage = () => {
 	const {
@@ -31,10 +49,12 @@ const PeoplePage = () => {
 	const { openChat, activeConversationId, setActiveConversation, conversations } = useChatStore();
 	const [processingId, setProcessingId] = useState<string | null>(null);
 	const [searchParams, setSearchParams] = useSearchParams();
-	const initialTab = searchParams.get("tab") as 'friends' | 'requests' | 'groups' | 'blocked' || 'friends';
-	const [tab, setTab] = useState<'friends' | 'requests' | 'groups' | 'blocked'>(initialTab);
+	const rawTab = searchParams.get("tab") as PeopleTabKey | null;
+	const initialTab: PeopleTabKey = rawTab && PEOPLE_TABS.some((item) => item.key === rawTab) ? rawTab : "friends";
+	const [tab, setTab] = useState<PeopleTabKey>(initialTab);
 	const [showChat, setShowChat] = useState(false);
 	const location = useLocation();
+	const isMobile = useIsMobile();
 
 	useEffect(() => {
 		fetchFriends();
@@ -56,13 +76,13 @@ const PeoplePage = () => {
 	}, [activeConversationId]);
 
 	useEffect(() => {
-		const urlTab = searchParams.get("tab") as any;
-		if (urlTab && ['friends', 'requests', 'groups', 'blocked'].includes(urlTab)) {
+		const urlTab = searchParams.get("tab") as PeopleTabKey | null;
+		if (urlTab && PEOPLE_TABS.some((item) => item.key === urlTab)) {
 			setTab(urlTab);
 		}
 	}, [searchParams]);
 
-	const handleTabChange = (newTab: 'friends' | 'requests' | 'groups' | 'blocked') => {
+	const handleTabChange = (newTab: PeopleTabKey) => {
 		setTab(newTab);
 		setActiveConversation(null);
 		setSearchParams({ tab: newTab });
@@ -73,74 +93,86 @@ const PeoplePage = () => {
 		await openChat({ userId: friendId });
 	};
 
-	const getHeaderContent = () => {
-		const config = {
-			friends: {
-				title: "Bạn bè",
-				icon: <Users className="h-5 w-5 text-primary" />,
-				desc: friends.length > 0 ? `${friends.length} bạn bè` : 'Chưa có bạn bè nào'
-			},
-			requests: {
-				title: "Lời mời kết bạn",
-				icon: <UserPlus className="h-5 w-5 text-primary" />,
-				desc: (incomingRequests.length + sentRequests.length) > 0
-					? `${incomingRequests.length} lời mời đã nhận, ${sentRequests.length} đã gửi`
-					: 'Không có lời mời nào'
-			},
-			groups: {
-				title: "Quản lý nhóm",
-				icon: <MessageSquare className="h-5 w-5 text-primary" />,
-				desc: `${conversations.filter(c => c.type === 'group').length} nhóm`
-			},
-			blocked: {
-				title: "Danh sách bị chặn",
-				icon: <UserX className="h-5 w-5 text-primary" />,
-				desc: "Người dùng bạn đã chặn"
-			}
-		};
-		return config[tab] || config.friends;
+	const getTabBadge = (key: PeopleTabKey): number => {
+		if (key === "requests") return incomingRequests.length;
+		return 0;
 	};
 
-	const header = getHeaderContent();
+	const headerConfig: Record<PeopleTabKey, { title: string; icon: ReactNode; desc: string }> = {
+		friends: {
+			title: "Bạn bè",
+			icon: <Users className="h-5 w-5 text-primary" />,
+			desc: friends.length > 0 ? `${friends.length} bạn bè` : "Chưa có bạn bè nào",
+		},
+		requests: {
+			title: "Lời mời kết bạn",
+			icon: <UserPlus className="h-5 w-5 text-primary" />,
+			desc:
+				(incomingRequests.length + sentRequests.length) > 0
+					? `${incomingRequests.length} lời mời đã nhận, ${sentRequests.length} đã gửi`
+					: "Không có lời mời nào",
+		},
+		groups: {
+			title: "Quản lý nhóm",
+			icon: <MessageSquare className="h-5 w-5 text-primary" />,
+			desc: `${conversations.filter((c) => c.type === "group").length} nhóm`,
+		},
+		blocked: {
+			title: "Danh sách bị chặn",
+			icon: <UserX className="h-5 w-5 text-primary" />,
+			desc: "Người dùng bạn đã chặn",
+		},
+	};
+
+	const header = headerConfig[tab];
 
 	return (
-		<SidebarProvider className="flex h-full w-full relative min-h-0" style={{ "--sidebar-width": "300px" } as React.CSSProperties}>
-			<Sidebar
-				collapsible="offcanvas"
-				className="md:left-20 top-2 bottom-2 h-[calc(100vh-16px)] bg-card/20 backdrop-blur border border-border/40 rounded-2xl overflow-hidden"
-			>
-				<div className="p-4 space-y-2">
-					<button onClick={() => handleTabChange('friends')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'friends' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
-						<Users className="h-4 w-4" />
-						Danh sách bạn bè
-					</button>
-					<button onClick={() => handleTabChange('requests')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'requests' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
-						<UserPlus className="h-4 w-4" />
-						<span className="flex-1">Lời mời kết bạn</span>
-						{incomingRequests.length > 0 && (
-							<span className="ml-auto text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{incomingRequests.length}</span>
-						)}
-					</button>
-					<button onClick={() => handleTabChange('groups')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'groups' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
-						<MessageSquare className="h-4 w-4" />
-						Quản lý nhóm
-					</button>
-					<button onClick={() => handleTabChange('blocked')} className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === 'blocked' ? 'bg-primary/10 text-primary font-semibold' : 'hover:bg-muted/30'}`}>
-						<UserX className="h-4 w-4" />
-						Danh sách bị chặn
-					</button>
-				</div>
-			</Sidebar>
+		<SidebarProvider
+			className={`h-full w-full relative min-h-0 ${isMobile ? "flex flex-col" : "flex"}`}
+			style={{ "--sidebar-width": "300px" } as React.CSSProperties}
+		>
+			{!isMobile && (
+				<Sidebar
+					collapsible="offcanvas"
+					className="md:left-20 top-0 md:top-2 bottom-0 md:bottom-2 h-full md:h-[calc(100vh-16px)] bg-card/20 backdrop-blur border border-border/40 rounded-none md:rounded-2xl overflow-hidden"
+				>
+					<div className="space-y-2 p-4">
+						{PEOPLE_TABS.map((item) => {
+							const Icon = item.icon;
+							const badge = getTabBadge(item.key);
 
-			<main className="flex-1 min-w-0 bg-card rounded-2xl overflow-hidden shadow-soft border border-border/40 ml-2 h-full">
+							return (
+								<button
+									key={item.key}
+									onClick={() => handleTabChange(item.key)}
+									className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === item.key ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted/30"}`}
+								>
+									<Icon className="h-4 w-4" />
+									<span className="flex-1">{item.label}</span>
+									{badge > 0 && (
+										<span className="ml-auto text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{badge}</span>
+									)}
+								</button>
+							);
+						})}
+					</div>
+				</Sidebar>
+			)}
+
+			<main className={`flex-1 min-w-0 bg-card rounded-none md:rounded-2xl overflow-hidden shadow-soft border-0 md:border border-border/40 h-full ${isMobile ? "" : "md:ml-2"}`}>
 				{showChat ? (
 					<div className="h-full flex-1 min-h-0 flex flex-col">
 						<ChatWindowLayout />
 					</div>
 				) : (
-					<div className="h-full overflow-y-auto">
-						<div className="flex items-center gap-3 px-6 py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm sticky top-0 z-20 shrink-0">
-							<SidebarTrigger className="-ml-1 md:hidden" />
+					<div className={`h-full overflow-y-auto ${isMobile ? "pb-32" : ""}`}>
+						{isMobile && (
+							<div className="sticky top-0 z-20 px-4 pt-4 pb-3 bg-card border-b border-border/40">
+								<h1 className="text-[28px] leading-none font-bold tracking-tight text-primary">NextCon</h1>
+							</div>
+						)}
+
+						<div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm md:sticky md:top-0 md:z-20 shrink-0">
 							<div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
 								{header.icon}
 							</div>
@@ -185,6 +217,32 @@ const PeoplePage = () => {
 					</div>
 				)}
 			</main>
+
+			{isMobile && !showChat && (
+				<div
+					className="fixed left-0 right-0 z-40 border-t border-border/40 bg-card/95 backdrop-blur-md"
+					style={{ bottom: `calc(${MOBILE_BOTTOM_NAV_HEIGHT_REM}rem + env(safe-area-inset-bottom, 0px))` }}
+				>
+					<div className="grid grid-cols-4 gap-1 p-2">
+						{PEOPLE_TABS.map((item) => {
+							const Icon = item.icon;
+							const badge = getTabBadge(item.key);
+
+							return (
+								<button
+									key={item.key}
+									onClick={() => handleTabChange(item.key)}
+									className={`flex flex-col items-center justify-center gap-1 rounded-lg py-2 text-[11px] transition-colors relative ${tab === item.key ? "bg-primary/15 text-primary font-semibold" : "text-muted-foreground hover:bg-muted/30"}`}
+								>
+									<Icon className="h-4 w-4" />
+									<span>{item.shortLabel}</span>
+									{badge > 0 && <span className="absolute top-1 right-3 text-[10px] font-bold text-primary bg-primary/15 px-1.5 py-0.5 rounded-full">{badge}</span>}
+								</button>
+							);
+						})}
+					</div>
+				</div>
+			)}
 		</SidebarProvider>
 	);
 };

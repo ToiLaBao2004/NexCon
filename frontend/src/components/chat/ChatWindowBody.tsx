@@ -234,7 +234,7 @@ const ChatWindowBody: React.FC = () => {
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
               </span>
-              <span className="ml-2 text-xs italic text-muted-foreground hidden sm:inline">
+              <span className="ml-2 text-xs italic text-muted-foreground max-w-[56vw] truncate sm:max-w-none sm:truncate-none">
                 {activeTypingParticipants.map(p => p?.userId?.displayName || "Ai đó").join(", ")} đang soạn tin nhắn...
               </span>
             </div>

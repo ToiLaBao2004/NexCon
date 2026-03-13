@@ -7,12 +7,13 @@ import UserAvatar from "./UserAvatar";
 import StatusBadge from "./StatusBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { useSocketStore } from "@/stores/useSocketStore";
-import { Phone, Video, Search } from "lucide-react";
+import { Phone, Video, Search, ArrowLeft } from "lucide-react";
 import { Button } from "../ui/button";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useCallStore } from "@/stores/useCallStore";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const PanelRightIcon = ({ className, filled }: { className?: string; filled?: boolean }) => (
   <svg
@@ -39,12 +40,13 @@ interface ChatWindowHeaderProps {
 }
 
 const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProps) => {
-  const { conversations, activeConversationId } =
+  const { conversations, activeConversationId, setActiveConversation } =
     useChatStore();
   const { user } = useAuthStore();
   const { onlineUsers } = useSocketStore();
   const { startCall, status: callStatus } = useCallStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const isMobile = useIsMobile();
   let otherUser: Participant | null | undefined;
 
   chat = chat ?? conversations.find((c) => c._id === activeConversationId);
@@ -103,14 +105,28 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   };
 
   return (
-    <header className="sticky top-0 z-10 px-4 py-2 flex items-center bg-background">
-      <div className="flex items-center gap-2 w-full">
-        <SidebarTrigger className="-ml-1 text-foreground" />
-        <Separator
-          orientation="vertical"
-          className="mr-2 data-[orientation=vertical]:h-4"
-        />
-        <div className="p-2 w-full flex items-center gap-3">
+    <header className="sticky top-0 z-10 px-2 md:px-4 py-2 flex items-center bg-background">
+      <div className="flex items-center gap-1 md:gap-2 w-full">
+        {/* Mobile: back button to conversation list */}
+        {isMobile ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 h-9 w-9 md:hidden"
+            onClick={() => setActiveConversation(null)}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        ) : (
+          <>
+            <SidebarTrigger className="-ml-1 text-foreground" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+          </>
+        )}
+        <div className="px-1 md:p-2 w-full min-w-0 flex items-center gap-2 md:gap-3">
           {/* avatar */}
           <div
             className="relative cursor-pointer hover:opacity-80 transition-opacity"
@@ -137,7 +153,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
           {/* name */}
           <h2
             className={cn(
-              "font-medium text-foreground flex-1",
+              "font-medium text-foreground flex-1 truncate",
               chat.type === "direct" &&
               "cursor-pointer hover:text-primary transition-colors",
             )}
@@ -145,29 +161,29 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
           >
             {displayName}
           </h2>
-          <div className="flex items-center gap-1 ml-2">
+          <div className="flex items-center gap-0 md:gap-1 ml-0.5 md:ml-2 shrink-0">
             {/* call buttons */}
             {chat.type === "direct" && (
               <>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-9 w-9"
+                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
                   disabled={!canCall}
                   title="Gọi thoại"
                   onClick={handleVoiceCall}
                 >
-                  <Phone className="h-[20px] w-[20px]" strokeWidth={1.5} />
+                  <Phone className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-9 w-9"
+                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
                   disabled={!canCall}
                   title="Gọi video"
                   onClick={handleVideoCall}
                 >
-                  <Video className="h-[22px] w-[22px]" strokeWidth={1.5} />
+                  <Video className="h-[19px] w-[19px] md:h-[22px] md:w-[22px]" strokeWidth={1.5} />
                 </Button>
               </>
             )}
@@ -175,10 +191,10 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-md hover:bg-muted hover:text-foreground transition-colors h-9 w-9"
+              className="inline-flex rounded-md hover:bg-muted hover:text-foreground transition-colors h-8 w-8 md:h-9 md:w-9"
               title="Tìm kiếm"
             >
-              <Search className="h-[20px] w-[20px]" strokeWidth={1.5} />
+              <Search className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
             </Button>
 
             {/* info toggle button */}
@@ -187,7 +203,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "rounded-md transition-colors h-9 w-9",
+                  "rounded-md transition-colors h-8 w-8 md:h-9 md:w-9",
                   showInfo
                     ? "bg-primary/10 text-primary hover:bg-primary/20"
                     : "hover:bg-muted hover:text-foreground"

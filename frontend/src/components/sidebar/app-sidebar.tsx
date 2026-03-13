@@ -19,10 +19,12 @@ import DirectMessageList from "../chat/DirectMessageList"
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/useChatStore"
 import { Plus } from "lucide-react"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const setFocusedConversation = useChatStore((s) => s.setFocusedConversation);
   const [isGroupModalOpen, setIsGroupModalOpen] = React.useState(false);
+  const isMobile = useIsMobile();
 
   return (
     <Sidebar
@@ -37,6 +39,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         onClick={() => setFocusedConversation(null)}
       >
         <div onClick={(e) => e.stopPropagation()}>
+          {isMobile && (
+            <div className="sticky top-0 z-20 px-4 pt-4 pb-3 bg-card border-b border-border/40">
+              <h1 className="text-[28px] leading-none font-bold tracking-tight text-primary">NextCon</h1>
+            </div>
+          )}
+
           <AddFriendModal />
           <SidebarGroup>
             <SidebarGroupContent>

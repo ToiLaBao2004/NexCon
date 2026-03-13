@@ -50,31 +50,26 @@ const NotificationCard: React.FC<NotificationCardProps> = ({ notification }) => 
     return (
         <div
             onClick={handleClick}
-            className={`p-4 pr-20 cursor-pointer border rounded-lg transition-colors group relative ${notification.isRead ? 'bg-card' : 'bg-primary/5 border-primary/20'
-                } hover:bg-accent w-full flex justify-between items-center gap-4`}
+            className={`p-4 cursor-pointer border rounded-lg transition-colors group ${notification.isRead ? 'bg-card' : 'bg-primary/5 border-primary/20'
+                } hover:bg-accent w-full`}
         >
             <div className="flex-1 min-w-0">
                 <p className={`text-sm break-words ${notification.isRead ? 'text-muted-foreground' : 'text-foreground font-bold'}`}>
                     {notification.content}
                 </p>
-            </div>
-
-            <div
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-end w-32"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="relative w-full h-8 flex items-center justify-end">
-                    <span className="text-[10px] text-muted-foreground group-hover:opacity-0 transition-opacity whitespace-nowrap absolute right-0 pr-2">
+                <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-muted-foreground break-words">
                         {formatTime(notification.createdAt)}
                     </span>
 
-                    <div className="opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto transition-opacity absolute right-0">
+                    <div className="opacity-100 md:opacity-0 md:group-hover:opacity-100 pointer-events-auto transition-opacity shrink-0">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 rounded-full hover:bg-background/50 focus-visible:ring-0"
+                                    onClick={(e) => e.stopPropagation()}
                                 >
                                     <MoreHorizontal className="h-4 w-4" />
                                 </Button>
