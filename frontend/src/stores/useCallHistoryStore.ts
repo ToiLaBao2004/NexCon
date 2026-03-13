@@ -93,5 +93,27 @@ export const useCallHistoryStore = create<CallHistoryState>((set, get) => ({
     });
   },
 
+  clearConversationHistory: (keepConversationIds: string[]) => {
+    const keep = new Set(keepConversationIds.filter(Boolean));
+
+    set((state) => {
+      let changed = false;
+      const nextCallsByConversation = { ...state.callsByConversation };
+
+      for (const id of Object.keys(nextCallsByConversation)) {
+        if (!keep.has(id)) {
+          delete nextCallsByConversation[id];
+          changed = true;
+        }
+      }
+
+      if (!changed) return state;
+
+      return {
+        callsByConversation: nextCallsByConversation,
+      };
+    });
+  },
+
   reset: () => set({ callsByConversation: {}, loading: false }),
 }));

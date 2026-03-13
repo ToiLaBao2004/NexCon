@@ -7,7 +7,9 @@ import { SidebarInset } from "../ui/sidebar";
 import ChatWindowHeader from "./ChatWindowHeader";
 import ChatWindowBody from "./ChatWindowBody";
 import MessageInput from "./MessageInput";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
+
+const MAX_CACHED_CONVERSATIONS = 1;
 
 interface ChatWindowLayoutProps {
   showInfo?: boolean;
@@ -23,13 +25,17 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
     messages: allMessages,
     markAsSeen,
     fetchMessages,
+    clearConversationCache,
   } = useChatStore();
 
   const {
     loading: callHistoryLoading,
     callsByConversation,
     fetchCallsByConversation,
+    clearConversationHistory,
   } = useCallHistoryStore();
+
+  const recentConversationIdsRef = useRef<string[]>([]);
 
   const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
 
@@ -37,6 +43,26 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
   const hasLoadedCalls = (callsByConversation[activeConversationId!]?.items?.length ?? 0) > 0;
 
   const { joinConversation } = useSocketStore();
+
+  useEffect(() => {
+    if (!activeConversationId) {
+      recentConversationIdsRef.current = [];
+      clearConversationCache([]);
+      clearConversationHistory([]);
+      return;
+    }
+
+    const deduped = [
+      activeConversationId,
+      ...recentConversationIdsRef.current.filter((id) => id !== activeConversationId),
+    ];
+
+    const keepIds = deduped.slice(0, MAX_CACHED_CONVERSATIONS);
+    recentConversationIdsRef.current = keepIds;
+
+    clearConversationCache(keepIds);
+    clearConversationHistory(keepIds);
+  }, [activeConversationId, clearConversationCache, clearConversationHistory]);
 
   useEffect(() => {
     if (activeConversationId) {

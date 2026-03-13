@@ -40,6 +40,7 @@ export interface ChatState {
 
   setActiveConversation: (id: string | null) => void;
   setFocusedConversation: (id: string | null) => void;
+  clearConversationCache: (keepConversationIds: string[]) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
   sendMessage: (payload: SendMessagePayload, onProgress?: (pct: number) => void) => Promise<void>;
@@ -154,6 +155,7 @@ export interface CallHistoryState {
 
   fetchCallsByConversation: (conversationId: string, isRefresh?: boolean) => Promise<void>;
   addCallRecord: (conversationId: string, call: CallRecord) => void;
+  clearConversationHistory: (keepConversationIds: string[]) => void;
   reset: () => void;
 }
 
