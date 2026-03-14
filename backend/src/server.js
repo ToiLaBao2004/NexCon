@@ -12,6 +12,7 @@ import messageRouter from './routes/messageRoute.js';
 import conversationRouter from './routes/conversationRoute.js';
 import notificationRouter from './routes/notificationRoute.js';
 import callRouter from './routes/callRoute.js';
+import livekitRouter from './routes/livekitRoute.js';
 import { app, server } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -44,6 +45,7 @@ app.use('/api/messages', messageRouter);
 app.use('/api/conversations', conversationRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/calls', callRouter);
+app.use('/api/livekit', livekitRouter);
 
 connectDB().then(() => {
     server.listen(PORT, () => {
