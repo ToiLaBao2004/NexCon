@@ -23,6 +23,23 @@ export interface MediaState {
   links: Message[];
 }
 
+export type MediaKind = 'image' | 'file' | 'link';
+
+export interface MediaPageState {
+  items: Message[];
+  page: number;
+  hasMore: boolean;
+  isFetching: boolean;
+  nextCursor: string | null;
+  limit: number;
+}
+
+export interface MediaPaginationState {
+  image: MediaPageState;
+  file: MediaPageState;
+  link: MediaPageState;
+}
+
 export interface ChatState {
   conversations: Conversation[];
   messages: Record<string, {
@@ -32,6 +49,7 @@ export interface ChatState {
     pinnedMessages: Message[];
   }>;
   media: Record<string, MediaState>;
+  mediaPagination: Record<string, MediaPaginationState>;
   activeConversationId: string | null;
   focusedConversationId: string | null;
   convoLoading: boolean;
@@ -55,6 +73,8 @@ export interface ChatState {
   pinMessageLocal: (conversationId: string, messageId: string, patch: { isPinned: boolean, pinnedAt: string | null }) => void;
   recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
   fetchMedia: (conversationId: string) => Promise<void>;
+  fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number) => Promise<void>;
+  resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
 }
 
 export interface SocketState {

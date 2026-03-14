@@ -10,6 +10,7 @@ export const useChatStore = create<ChatState>()(
             conversations: [],
             messages: {},
             media: {},
+            mediaPagination: {},
             activeConversationId: null,
             focusedConversationId: null,
             convoLoading: false,
@@ -24,6 +25,7 @@ export const useChatStore = create<ChatState>()(
                     let changed = false;
                     const nextMessages = { ...state.messages };
                     const nextMedia = { ...state.media };
+                    const nextMediaPagination = { ...state.mediaPagination };
 
                     for (const id of Object.keys(nextMessages)) {
                         if (!keep.has(id)) {
@@ -39,11 +41,19 @@ export const useChatStore = create<ChatState>()(
                         }
                     }
 
+                    for (const id of Object.keys(nextMediaPagination)) {
+                        if (!keep.has(id)) {
+                            delete nextMediaPagination[id];
+                            changed = true;
+                        }
+                    }
+
                     if (!changed) return state;
 
                     return {
                         messages: nextMessages,
                         media: nextMedia,
+                        mediaPagination: nextMediaPagination,
                     };
                 });
             },
@@ -52,6 +62,7 @@ export const useChatStore = create<ChatState>()(
                     conversations: [],
                     messages: {},
                     media: {},
+                    mediaPagination: {},
                     activeConversationId: null,
                     focusedConversationId: null,
                     convoLoading: false,
@@ -273,7 +284,9 @@ export const useChatStore = create<ChatState>()(
                         }
 
                         const prevMedia = state.media[convoId];
+                        const prevMediaPagination = state.mediaPagination[convoId];
                         let nextMedia = prevMedia;
+                        let nextMediaPagination = prevMediaPagination;
                         if (prevMedia) {
                             const mediaType = message.type;
                             if (mediaType === 'image' && message.fileUrl) {
@@ -294,6 +307,43 @@ export const useChatStore = create<ChatState>()(
                             }
                         }
 
+                        if (prevMediaPagination) {
+                            if (message.type === 'image' && message.fileUrl) {
+                                const exists = prevMediaPagination.image.items.some((m) => m._id === message._id);
+                                if (!exists) {
+                                    nextMediaPagination = {
+                                        ...prevMediaPagination,
+                                        image: {
+                                            ...prevMediaPagination.image,
+                                            items: [message, ...prevMediaPagination.image.items],
+                                        },
+                                    };
+                                }
+                            } else if (message.type === 'file' && message.fileUrl) {
+                                const exists = prevMediaPagination.file.items.some((m) => m._id === message._id);
+                                if (!exists) {
+                                    nextMediaPagination = {
+                                        ...prevMediaPagination,
+                                        file: {
+                                            ...prevMediaPagination.file,
+                                            items: [message, ...prevMediaPagination.file.items],
+                                        },
+                                    };
+                                }
+                            } else if (message.type === 'link' && message.content) {
+                                const exists = prevMediaPagination.link.items.some((m) => m._id === message._id);
+                                if (!exists) {
+                                    nextMediaPagination = {
+                                        ...prevMediaPagination,
+                                        link: {
+                                            ...prevMediaPagination.link,
+                                            items: [message, ...prevMediaPagination.link.items],
+                                        },
+                                    };
+                                }
+                            }
+                        }
+
                         return {
                             messages: {
                                 ...state.messages,
@@ -304,6 +354,7 @@ export const useChatStore = create<ChatState>()(
                                 },
                             },
                             ...(nextMedia !== prevMedia ? { media: { ...state.media, [convoId]: nextMedia } } : {}),
+                            ...(nextMediaPagination !== prevMediaPagination ? { mediaPagination: { ...state.mediaPagination, [convoId]: nextMediaPagination } } : {}),
                         };
                     });
                 } catch (error) {
@@ -545,7 +596,9 @@ export const useChatStore = create<ChatState>()(
 
                     // Also remove from media state if recalled
                     const prevMedia = state.media[conversationId];
+                    const prevMediaPagination = state.mediaPagination[conversationId];
                     let nextMediaState = state.media;
+                    let nextMediaPaginationState = state.mediaPagination;
                     if (prevMedia && patch.isRecalled) {
                         nextMediaState = {
                             ...state.media,
@@ -553,6 +606,27 @@ export const useChatStore = create<ChatState>()(
                                 images: prevMedia.images.filter((m) => m._id !== messageId),
                                 files: prevMedia.files.filter((m) => m._id !== messageId),
                                 links: prevMedia.links.filter((m) => m._id !== messageId),
+                            },
+                        };
+                    }
+
+                    if (prevMediaPagination && patch.isRecalled) {
+                        nextMediaPaginationState = {
+                            ...state.mediaPagination,
+                            [conversationId]: {
+                                ...prevMediaPagination,
+                                image: {
+                                    ...prevMediaPagination.image,
+                                    items: prevMediaPagination.image.items.filter((m) => m._id !== messageId),
+                                },
+                                file: {
+                                    ...prevMediaPagination.file,
+                                    items: prevMediaPagination.file.items.filter((m) => m._id !== messageId),
+                                },
+                                link: {
+                                    ...prevMediaPagination.link,
+                                    items: prevMediaPagination.link.items.filter((m) => m._id !== messageId),
+                                },
                             },
                         };
                     }
@@ -567,6 +641,7 @@ export const useChatStore = create<ChatState>()(
                             },
                         },
                         media: nextMediaState,
+                        mediaPagination: nextMediaPaginationState,
                     };
                 }),
             fetchMedia: async (conversationId: string) => {
@@ -589,6 +664,213 @@ export const useChatStore = create<ChatState>()(
                 } catch (error) {
                     console.error('Failed to fetch media:', error);
                 }
+            },
+            fetchMediaPage: async (conversationId, type, limit) => {
+                const current = get().mediaPagination[conversationId]?.[type];
+                if (current?.isFetching || current?.hasMore === false) {
+                    return;
+                }
+
+                if (!current) {
+                    set((state) => {
+                        const prevConvo = state.mediaPagination[conversationId] ?? {
+                            image: {
+                                items: [],
+                                page: 0,
+                                hasMore: true,
+                                isFetching: false,
+                                nextCursor: '' as string | null,
+                                limit: 24,
+                            },
+                            file: {
+                                items: [],
+                                page: 0,
+                                hasMore: true,
+                                isFetching: false,
+                                nextCursor: '' as string | null,
+                                limit: 20,
+                            },
+                            link: {
+                                items: [],
+                                page: 0,
+                                hasMore: true,
+                                isFetching: false,
+                                nextCursor: '' as string | null,
+                                limit: 20,
+                            },
+                        };
+                        return {
+                            mediaPagination: {
+                                ...state.mediaPagination,
+                                [conversationId]: {
+                                    ...prevConvo,
+                                    [type]: {
+                                        items: [],
+                                        page: 0,
+                                        hasMore: true,
+                                        isFetching: false,
+                                        nextCursor: '' as string | null,
+                                        limit: limit ?? prevConvo[type].limit,
+                                    },
+                                },
+                            },
+                        };
+                    });
+                } else if (limit && current.limit !== limit) {
+                    set((state) => {
+                        const prevConvo = state.mediaPagination[conversationId];
+                        if (!prevConvo) return state;
+                        return {
+                            mediaPagination: {
+                                ...state.mediaPagination,
+                                [conversationId]: {
+                                    ...prevConvo,
+                                    [type]: {
+                                        ...prevConvo[type],
+                                        limit,
+                                    },
+                                },
+                            },
+                        };
+                    });
+                }
+
+                const active = get().mediaPagination[conversationId]?.[type];
+                if (!active || active.isFetching || !active.hasMore) {
+                    return;
+                }
+
+                set((state) => {
+                    const prevConvo = state.mediaPagination[conversationId];
+                    if (!prevConvo) return state;
+                    return {
+                        mediaPagination: {
+                            ...state.mediaPagination,
+                            [conversationId]: {
+                                ...prevConvo,
+                                [type]: {
+                                    ...prevConvo[type],
+                                    isFetching: true,
+                                },
+                            },
+                        },
+                    };
+                });
+
+                try {
+                    const res = await chatService.fetchMedia(
+                        conversationId,
+                        type,
+                        active.limit,
+                        active.nextCursor || undefined,
+                    );
+
+                    const fetched = res.messages ?? [];
+
+                    set((state) => {
+                        const prevConvo = state.mediaPagination[conversationId] ?? {
+                            image: {
+                                items: [],
+                                page: 0,
+                                hasMore: true,
+                                isFetching: false,
+                                nextCursor: '' as string | null,
+                                limit: 24,
+                            },
+                            file: {
+                                items: [],
+                                page: 0,
+                                hasMore: true,
+                                isFetching: false,
+                                nextCursor: '' as string | null,
+                                limit: 20,
+                            },
+                            link: {
+                                items: [],
+                                page: 0,
+                                hasMore: true,
+                                isFetching: false,
+                                nextCursor: '' as string | null,
+                                limit: 20,
+                            },
+                        };
+                        const prevPage = prevConvo[type];
+                        const merged = [...prevPage.items];
+
+                        for (const item of fetched) {
+                            if (!merged.some((m) => m._id === item._id)) {
+                                merged.push(item);
+                            }
+                        }
+
+                        const noMoreData = fetched.length === 0 || fetched.length < prevPage.limit || !res.nextCursor;
+
+                        return {
+                            mediaPagination: {
+                                ...state.mediaPagination,
+                                [conversationId]: {
+                                    ...prevConvo,
+                                    [type]: {
+                                        ...prevPage,
+                                        items: merged,
+                                        page: prevPage.page + 1,
+                                        hasMore: !noMoreData,
+                                        isFetching: false,
+                                        nextCursor: noMoreData ? null : res.nextCursor,
+                                    },
+                                },
+                            },
+                        };
+                    });
+                } catch (error) {
+                    console.error('Failed to fetch media page:', error);
+                    set((state) => {
+                        const prevConvo = state.mediaPagination[conversationId];
+                        if (!prevConvo) return state;
+
+                        return {
+                            mediaPagination: {
+                                ...state.mediaPagination,
+                                [conversationId]: {
+                                    ...prevConvo,
+                                    [type]: {
+                                        ...prevConvo[type],
+                                        isFetching: false,
+                                    },
+                                },
+                            },
+                        };
+                    });
+                }
+            },
+            resetMediaPagination: (conversationId, type) => {
+                set((state) => {
+                    const prevConvo = state.mediaPagination[conversationId];
+                    if (!prevConvo) return state;
+
+                    if (!type) {
+                        const nextMediaPagination = { ...state.mediaPagination };
+                        delete nextMediaPagination[conversationId];
+                        return { mediaPagination: nextMediaPagination };
+                    }
+
+                    return {
+                        mediaPagination: {
+                            ...state.mediaPagination,
+                            [conversationId]: {
+                                ...prevConvo,
+                                [type]: {
+                                    items: [],
+                                    page: 0,
+                                    hasMore: true,
+                                    isFetching: false,
+                                    nextCursor: '' as string | null,
+                                    limit: prevConvo[type].limit,
+                                },
+                            },
+                        },
+                    };
+                });
             },
         }),
         {
