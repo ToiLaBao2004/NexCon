@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useMeetStore } from '@/stores/useMeetStore';
 import api from '@/lib/axios';
 import GroupCallRoom from '@/components/call/GroupCallRoom';
 
@@ -14,6 +15,7 @@ const generateMeetingCode = () => {
 
 const MeetPage = () => {
     const { user } = useAuthStore();
+    const { setIsInMeeting } = useMeetStore();
     const [mode, setMode] = useState<Mode>('select');
     const [meetingTitle, setMeetingTitle] = useState('');
     const [meetingCode, setMeetingCode] = useState('');
@@ -45,6 +47,7 @@ const MeetPage = () => {
             setToken(res.data.token);
             setRoomLabel(meetingTitle.trim());
             setJoined(true);
+            setIsInMeeting(true);
         } catch (err: any) {
             setError(err.response?.data?.message ?? 'Không thể kết nối');
         } finally {
@@ -67,6 +70,7 @@ const MeetPage = () => {
             setMeetingCode(code);
             setRoomLabel('');
             setJoined(true);
+            setIsInMeeting(true);
         } catch (err: any) {
             setError(err.response?.data?.message ?? 'Không thể kết nối');
         } finally {
@@ -76,6 +80,7 @@ const MeetPage = () => {
 
     const handleLeave = () => {
         setJoined(false);
+        setIsInMeeting(false);
         setMode('select');
         setMeetingCode('');
         setMeetingTitle('');

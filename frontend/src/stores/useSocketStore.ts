@@ -244,6 +244,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       refreshCallHistory();
     });
 
+    socket.on("call-video-toggle", ({ isVideoOff }: { isVideoOff: boolean }) => {
+      useCallStore.getState().handleVideoToggle(isVideoOff);
+    });
+
     socket.on("ice-candidate", ({ candidate }) => {
       useCallStore.getState().handleIceCandidate(candidate);
     });

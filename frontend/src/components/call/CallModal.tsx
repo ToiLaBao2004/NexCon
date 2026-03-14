@@ -1,8 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Mic, MicOff, PhoneOff, Video, VideoOff } from "lucide-react";
 import { useCallStore } from "@/stores/useCallStore";
+import { useAuthStore } from "@/stores/useAuthStore";
 import UserAvatar from "@/components/chat/UserAvatar";
 import { cn } from "@/lib/utils";
+
+const AVATAR_PALETTE = [
+  '#7c3aed', '#2563eb', '#0891b2', '#059669',
+  '#d97706', '#dc2626', '#be185d', '#0284c7',
+];
+const nameToColor = (name: string) => {
+  let h = 0;
+  for (const c of name) h = Math.imul(31, h) + c.charCodeAt(0);
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+};
 
 const CallModal = () => {
   const {
@@ -12,10 +23,12 @@ const CallModal = () => {
     remoteStream,
     isMuted,
     isVideoOff,
+    isRemoteVideoOff,
     endCall,
     toggleMute,
     toggleVideo,
   } = useCallStore();
+  const authUser = useAuthStore((s) => s.user);
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -70,6 +83,8 @@ const CallModal = () => {
             toggleMute={toggleMute}
             toggleVideo={toggleVideo}
             endCall={endCall}
+            localUser={authUser ?? undefined}
+            isRemoteVideoOff={isRemoteVideoOff}
           />
         ) : (
           <VoiceCallLayout
@@ -98,6 +113,8 @@ interface VideoCallLayoutProps {
   toggleMute: () => void;
   toggleVideo?: () => void;
   endCall: () => void;
+  localUser?: { displayName: string; avatarUrl?: string | null };
+  isRemoteVideoOff: boolean;
 }
 
 const VideoCallLayout = ({
@@ -111,36 +128,53 @@ const VideoCallLayout = ({
   toggleMute,
   toggleVideo,
   endCall,
+  localUser,
+  isRemoteVideoOff,
 }: VideoCallLayoutProps) => {
+  const showRemoteAvatar = !remoteStream || isRemoteVideoOff;
+
   return (
     <>
-      <div className="flex-1 bg-zinc-900 relative">
-        {remoteStream ? (
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className="w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-4">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full animate-pulse bg-primary/20 scale-150" />
-              <UserAvatar
-                type="sidebar"
-                name={remoteUser.displayName}
-                avatarUrl={remoteUser.avatarUrl ?? undefined}
+      <div className="flex-1 min-h-0 bg-zinc-900 relative overflow-hidden">
+        {/* Remote video */}
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className={cn("w-full h-full object-cover", showRemoteAvatar && "hidden")}
+        />
+
+        {/* Remote avatar (connecting / cam off) */}
+        {showRemoteAvatar && (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+            {remoteUser.avatarUrl ? (
+              <img
+                src={remoteUser.avatarUrl}
+                alt={remoteUser.displayName}
+                className="w-16 h-16 rounded-full object-cover shadow-md select-none"
               />
-            </div>
-            <p className="text-zinc-400 animate-pulse">Đang kết nối...</p>
+            ) : (
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-md select-none"
+                style={{ background: nameToColor(remoteUser.displayName) }}
+              >
+                {remoteUser.displayName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <p className="text-sm font-medium text-zinc-300">{remoteUser.displayName}</p>
+            {!remoteStream && (
+              <p className="text-xs text-zinc-500 animate-pulse">Đang kết nối...</p>
+            )}
           </div>
         )}
 
+        {/* Timer */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-medium tabular-nums border border-white/10">
           {formatTime(elapsed)}
         </div>
 
-        <div className="absolute bottom-6 right-6 w-40 h-28 rounded-2xl overflow-hidden border border-white/20 shadow-2xl bg-zinc-800 group">
+        {/* Local PiP */}
+        <div className="absolute bottom-6 right-6 w-40 h-28 rounded-2xl overflow-hidden border border-white/20 shadow-2xl bg-zinc-800">
           {!isVideoOff ? (
             <video
               ref={localVideoRef}
@@ -150,8 +184,21 @@ const VideoCallLayout = ({
               className="w-full h-full object-cover scale-x-[-1]"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-zinc-800">
-              <VideoOff className="h-8 w-8 text-zinc-500" />
+            <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-zinc-800">
+              {localUser?.avatarUrl ? (
+                <img
+                  src={localUser.avatarUrl}
+                  alt={localUser.displayName}
+                  className="w-10 h-10 rounded-full object-cover shadow-md select-none"
+                />
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md select-none"
+                  style={{ background: nameToColor(localUser?.displayName ?? '') }}
+                >
+                  {localUser?.displayName?.charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
           )}
         </div>

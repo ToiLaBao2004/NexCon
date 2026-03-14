@@ -147,6 +147,7 @@ export interface CallState {
   remoteStream: MediaStream | null;
   isMuted: boolean;
   isVideoOff: boolean;
+  isRemoteVideoOff: boolean;
   _peerConnection: RTCPeerConnection | null;
   _pendingOffer: RTCSessionDescriptionInit | null;
   _iceCandidateQueue: RTCIceCandidateInit[];
@@ -157,6 +158,7 @@ export interface CallState {
   endCall: () => void;
   toggleMute: () => void;
   toggleVideo: () => void;
+  handleVideoToggle: (isVideoOff: boolean) => void;
   handleIncomingCall: (from: RemoteUser, offer: RTCSessionDescriptionInit, callType: CallType) => void;
   handleCallAnswered: (answer: RTCSessionDescriptionInit) => Promise<void>;
   handleCallRejected: () => void;

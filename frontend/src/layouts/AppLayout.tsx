@@ -1,6 +1,7 @@
 import MainSidebar from "@/components/sidebar/MainSidebar";
 import MobileBottomNav from "@/components/sidebar/MobileBottomNav";
 import { useChatStore } from "@/stores/useChatStore";
+import { useMeetStore } from "@/stores/useMeetStore";
 import { cn } from "@/lib/utils";
 import { Outlet, useLocation } from "react-router";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -9,9 +10,10 @@ const AppLayout = () => {
     const location = useLocation();
     const isMobile = useIsMobile();
     const { activeConversationId } = useChatStore();
+    const { isInMeeting } = useMeetStore();
 
     const isChatRoute = location.pathname === "/" || location.pathname === "/chat";
-    const shouldHideMobileBottomNav = isMobile && isChatRoute && !!activeConversationId;
+    const shouldHideMobileBottomNav = isMobile && (isInMeeting || (isChatRoute && !!activeConversationId));
 
     return (
         <div className="flex bg-background h-svh w-full overflow-hidden p-0 md:p-2 md:gap-2 relative">

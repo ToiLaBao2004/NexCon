@@ -398,6 +398,14 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
             console.error("Error in call-ended:", error);
         }
     });
+    // Một bên toggle camera — relay sang người còn lại
+    socket.on("call-video-toggle", ({ toUserId, isVideoOff }) => {
+        const otherSocketId = getReceiverSocketId(toUserId.toString());
+        if (otherSocketId) {
+            io.to(otherSocketId).emit("call-video-toggle", { isVideoOff });
+        }
+    });
+
 }
 
 // Xử lý disconnect liên quan đến call

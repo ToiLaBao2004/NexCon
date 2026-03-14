@@ -27,6 +27,7 @@ const IDLE_STATE = {
   _callTimeout: null,
   isMuted: false,
   isVideoOff: false,
+  isRemoteVideoOff: false,
 };
 
 function cleanup(get: () => CallState) {
@@ -227,11 +228,19 @@ export const useCallStore = create<CallState>((set, get) => ({
   },
 
   toggleVideo() {
-    const { localStream, isVideoOff } = get();
+    const { localStream, isVideoOff, remoteUser } = get();
     localStream?.getVideoTracks().forEach((t) => {
       t.enabled = isVideoOff;
     });
-    set({ isVideoOff: !isVideoOff });
+    const next = !isVideoOff;
+    set({ isVideoOff: next });
+    if (remoteUser) {
+      emitCallEvent("call-video-toggle", { toUserId: remoteUser._id, isVideoOff: next });
+    }
+  },
+
+  handleVideoToggle(isVideoOff: boolean) {
+    set({ isRemoteVideoOff: isVideoOff });
   },
 
   // Socket event handlers (called from useSocketStore)
