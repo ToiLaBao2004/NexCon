@@ -13,6 +13,7 @@ import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useCallStore } from "@/stores/useCallStore";
+import { useGroupCallStore } from "@/stores/useGroupCallStore";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const PanelRightIcon = ({ className, filled }: { className?: string; filled?: boolean }) => (
@@ -45,6 +46,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   const { user } = useAuthStore();
   const { onlineUsers } = useSocketStore();
   const { startCall, status: callStatus } = useCallStore();
+  const { startGroupCall, status: groupCallStatus } = useGroupCallStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isMobile = useIsMobile();
   let otherUser: Participant | null | undefined;
@@ -186,6 +188,20 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                   <Video className="h-[19px] w-[19px] md:h-[22px] md:w-[22px]" strokeWidth={1.5} />
                 </Button>
               </>
+            )}
+
+            {/* group call button */}
+            {chat.type === "group" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                disabled={groupCallStatus !== "idle"}
+                title="Gọi nhóm"
+                onClick={() => startGroupCall(chat._id, "video")}
+              >
+                <Video className="h-[19px] w-[19px] md:h-[22px] md:w-[22px]" strokeWidth={1.5} />
+              </Button>
             )}
 
             <Button

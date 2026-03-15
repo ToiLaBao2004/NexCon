@@ -192,3 +192,76 @@ export interface NotificationState {
   setUnreadCount: (count: number) => void;
   reset: () => void;
 }
+
+export type GroupCallParticipantStatus =
+  | "ringing"
+  | "joined"
+  | "declined"
+  | "left"
+  | "no-answer";
+
+export interface GroupCallParticipant {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  status: GroupCallParticipantStatus;
+  joinedAt: string | null;
+  leftAt: string | null;
+}
+
+export type GroupCallStatus = "idle" | "outgoing" | "incoming" | "joining" | "active";
+
+export interface GroupCallState {
+  status: GroupCallStatus;
+  conversationId: string | null;
+  callId: string | null;
+  callType: "voice" | "video" | null;
+  token: string | null;
+  initiator: {
+    _id: string;
+    displayName: string;
+    avatarUrl: string | null;
+  } | null;
+  groupName: string | null;
+  participants: GroupCallParticipant[];
+  hasLeftActiveCall: Record<string, boolean>;
+
+  startGroupCall: (conversationId: string, callType: "voice" | "video") => void;
+  joinGroupCall: (conversationId: string) => void;
+  declineGroupCall: (conversationId: string) => void;
+  leaveGroupCall: () => void;
+  rejoinGroupCall: (conversationId: string) => void;
+  checkGroupCallStatus: (conversationId: string) => void;
+
+  handleGroupCallStarted: (payload: {
+    conversationId: string;
+    callId: string;
+    callType: "voice" | "video";
+    token: string;
+    initiator: { _id: string; displayName: string; avatarUrl: string | null };
+    groupName: string;
+    participants: GroupCallParticipant[];
+  }) => void;
+  handleGroupCallIncoming: (payload: {
+    conversationId: string;
+    callId: string;
+    callType: "voice" | "video";
+    initiator: { _id: string; displayName: string; avatarUrl: string | null };
+    groupName: string;
+    participants: GroupCallParticipant[];
+  }) => void;
+  handleGroupCallToken: (payload: { conversationId: string; token: string }) => void;
+  handleGroupCallUserJoined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallUserDeclined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallUserLeft: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallEnded: (payload: {
+    conversationId: string;
+    callId: string;
+    duration: number;
+    endedAt: string;
+  }) => void;
+  handleGroupCallStatusResponse: (payload: { conversationId: string; active: boolean }) => void;
+  handleGroupCallError: (payload: { reason: string }) => void;
+
+  reset: () => void;
+}

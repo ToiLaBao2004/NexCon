@@ -1,12 +1,14 @@
 import { useChatStore } from "@/stores/useChatStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { useCallHistoryStore } from "@/stores/useCallHistoryStore";
+import { useGroupCallStore } from "@/stores/useGroupCallStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import ChatWindowSkeleton from "./ChatWindowSkeleton";
 import { SidebarInset } from "../ui/sidebar";
 import ChatWindowHeader from "./ChatWindowHeader";
 import ChatWindowBody from "./ChatWindowBody";
 import MessageInput from "./MessageInput";
+import OngoingCallBanner from "@/components/call/OngoingCallBanner";
 import { useEffect, useRef } from "react";
 
 const MAX_CACHED_CONVERSATIONS = 1;
@@ -91,6 +93,13 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
     markSeen();
   }, [markAsSeen, selectedConvo, activeConversationId, focusedConversationId]);
 
+  // Check if there's an active group call when opening a group conversation
+  useEffect(() => {
+    if (activeConversationId && selectedConvo?.type === "group") {
+      useGroupCallStore.getState().checkGroupCallStatus(activeConversationId);
+    }
+  }, [activeConversationId, selectedConvo?.type]);
+
   if (!selectedConvo) {
     return <ChatWelcomeScreen />;
   }
@@ -113,6 +122,10 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
         showInfo={showInfo}
         onToggleInfo={onToggleInfo}
       />
+
+      {selectedConvo.type === "group" && activeConversationId && (
+        <OngoingCallBanner conversationId={activeConversationId} />
+      )}
 
       <div className="flex-1 min-h-0 bg-primary-foreground">
         <ChatWindowBody />

@@ -16,9 +16,11 @@ COPY . .
 # VITE_API_URL và VITE_SOCKET_URL cần truyền vào bằng build args
 ARG VITE_API_URL=http://localhost:5001/api
 ARG VITE_SOCKET_URL=http://localhost:5001/
+ARG VITE_LIVEKIT_URL=ws://localhost:7880
 
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
+ENV VITE_LIVEKIT_URL=$VITE_LIVEKIT_URL
 
 RUN npm run build
 

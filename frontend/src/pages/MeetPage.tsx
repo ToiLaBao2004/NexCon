@@ -96,7 +96,6 @@ const MeetPage = () => {
                 <GroupCallRoom
                     roomName={meetingCode}
                     roomLabel={roomLabel || undefined}
-                    identity={identity}
                     token={token}
                     onLeave={handleLeave}
                 />

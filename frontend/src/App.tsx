@@ -22,6 +22,7 @@ import { useNotificationStore } from "./stores/useNotificationStore";
 import { useChatStore } from "./stores/useChatStore";
 import { unlockMessageSound, unlockNotificationSound, unlockRingtone } from "./utils/sound";
 import CallManager from "./components/call/CallManager";
+import GroupCallManager from "./components/call/GroupCallManager";
 
 function App() {
   const { isDark, setTheme } = useThemeStore();
@@ -78,6 +79,7 @@ function App() {
         }}
       />
       <CallManager />
+      <GroupCallManager />
       <BrowserRouter>
         <Routes>
           <Route path="/signin" element={<SignInPage />} />

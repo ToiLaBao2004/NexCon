@@ -20,7 +20,6 @@ import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor } from 'lucide-r
 interface GroupCallRoomProps {
     roomName: string;
     roomLabel?: string;
-    identity: string;
     token: string;
     onLeave?: () => void;
 }
@@ -53,7 +52,16 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
     const displayName = name ?? identity ?? 'Unknown';
     const initial = displayName.charAt(0).toUpperCase();
     const avatarColor = nameToColor(displayName);
-    const avatarUrl = trackRef.participant.metadata ?? '';
+
+    // metadata: JSON { displayName, avatarUrl } (group call) hoặc raw URL (meet)
+    let avatarUrl = '';
+    try {
+        const meta = JSON.parse(trackRef.participant.metadata || '{}');
+        avatarUrl = meta.avatarUrl ?? '';
+    } catch {
+        avatarUrl = trackRef.participant.metadata ?? '';
+    }
+
     const isLocal = trackRef.participant.isLocal;
 
     return (
@@ -158,12 +166,7 @@ const RoomHeader = ({ roomName, roomLabel }: { roomName: string; roomLabel?: str
         <div className="flex items-center justify-between px-5 py-3 bg-card border-b border-border shrink-0">
             <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <div className="flex flex-col">
-                    <span className="text-sm font-semibold text-foreground">{roomLabel ?? roomName}</span>
-                    {roomLabel && (
-                        <span className="text-[11px] text-muted-foreground font-mono">{roomName}</span>
-                    )}
-                </div>
+                <span className="text-sm font-semibold text-foreground">{roomLabel ?? roomName}</span>
             </div>
             <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
                 <Users size={13} />
