@@ -1,15 +1,74 @@
-import { PhoneOff } from "lucide-react";
+import { PhoneOff, Minimize2, Maximize2 } from "lucide-react";
 import { useCallStore } from "@/stores/useCallStore";
 import UserAvatar from "@/components/chat/UserAvatar";
+import { useDraggable } from "@/hooks/useDraggable";
 
-const OutgoingCallModal = () => {
+interface OutgoingCallModalProps {
+  isMinimized: boolean;
+  onMinimize: () => void;
+  onMaximize: () => void;
+}
+
+const OutgoingCallModal = ({ isMinimized, onMinimize, onMaximize }: OutgoingCallModalProps) => {
   const { remoteUser, callType, endCall } = useCallStore();
+  const { ref: dragRef, style: dragStyle, dragHandlers } = useDraggable({ placement: "top-center" });
 
   if (!remoteUser) return null;
 
+  // Minimized floating widget
+  if (isMinimized) {
+    return (
+      <div
+        ref={dragRef}
+        style={dragStyle}
+        {...dragHandlers}
+        className="z-[100] w-72 rounded-2xl shadow-2xl border border-border bg-card text-card-foreground overflow-hidden cursor-grab active:cursor-grabbing"
+      >
+        <div className="flex items-center gap-3 px-4 py-3">
+          <UserAvatar
+            type="chat"
+            name={remoteUser.displayName}
+            avatarUrl={remoteUser.avatarUrl ?? undefined}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{remoteUser.displayName}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {callType === "video" ? "Video" : "Thoại"} · Đang gọi
+              <RingingDots />
+            </p>
+          </div>
+          <button
+            onClick={onMaximize}
+            className="p-1.5 rounded-full hover:bg-muted transition-colors"
+            title="Phóng to"
+          >
+            <Maximize2 size={16} />
+          </button>
+        </div>
+        <div className="flex items-center justify-center gap-4 px-4 pb-3">
+          <button
+            onClick={endCall}
+            className="p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+          >
+            <PhoneOff size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="bg-background rounded-2xl shadow-2xl w-80 overflow-hidden">
+      <div className="bg-background rounded-2xl shadow-2xl w-80 overflow-hidden relative">
+        {/* Minimize button */}
+        <button
+          onClick={onMinimize}
+          className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-black/20 hover:bg-black/40 text-foreground transition-colors"
+          title="Thu nhỏ"
+        >
+          <Minimize2 size={16} />
+        </button>
+
         {/* Header */}
         <div className="bg-gradient-to-b from-primary/20 to-background px-6 pt-8 pb-4 flex flex-col items-center gap-3">
           <div className="relative">

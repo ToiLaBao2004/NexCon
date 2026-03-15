@@ -1,36 +1,22 @@
+import { useState } from "react";
 import { useGroupCallStore } from "@/stores/useGroupCallStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import GroupCallRoom from "./GroupCallRoom";
 import { PhoneOff, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useDraggable } from "@/hooks/useDraggable";
 
 const StatusBadge = ({ status }: { status: string }) => {
   const config: Record<string, { label: string; className: string }> = {
-    ringing: {
-      label: "Đang gọi",
-      className: "text-yellow-500 bg-yellow-500/10",
-    },
-    joined: {
-      label: "Đã tham gia",
-      className: "text-green-500 bg-green-500/10",
-    },
-    declined: {
-      label: "Từ chối",
-      className: "text-red-500 bg-red-500/10",
-    },
-    left: {
-      label: "Đã rời",
-      className: "text-muted-foreground bg-muted",
-    },
-    "no-answer": {
-      label: "Không trả lời",
-      className: "text-muted-foreground bg-muted",
-    },
+    ringing: { label: "Đang gọi", className: "text-yellow-500 bg-yellow-500/10" },
+    joined: { label: "Đã tham gia", className: "text-green-500 bg-green-500/10" },
+    declined: { label: "Từ chối", className: "text-red-500 bg-red-500/10" },
+    left: { label: "Đã rời", className: "text-muted-foreground bg-muted" },
+    "no-answer": { label: "Không trả lời", className: "text-muted-foreground bg-muted" },
   };
   const c = config[status] ?? config["no-answer"];
   return (
-    <span
-      className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.className}`}
-    >
+    <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", c.className)}>
       {c.label}
     </span>
   );
@@ -47,17 +33,48 @@ const GroupCallScreen = () => {
     leaveGroupCall,
   } = useGroupCallStore();
   const user = useAuthStore((s) => s.user);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const { ref: dragRef, style: dragStyle, dragHandlers } = useDraggable({ placement: "top-center" });
 
   if (!conversationId) return null;
 
-  return (
-    <div className="fixed inset-0 z-[90] bg-background flex flex-col">
-      {status === "active" && token ? (
+  const isActive = status === "active" && token;
+
+  // Minimized: draggable floating widget
+  if (isActive && isMinimized) {
+    return (
+      <div
+        ref={dragRef}
+        style={dragStyle}
+        {...dragHandlers}
+        className="z-[90] w-80 rounded-2xl shadow-2xl border border-border bg-card flex flex-col overflow-hidden cursor-grab active:cursor-grabbing"
+      >
         <GroupCallRoom
           roomName={conversationId}
           roomLabel={groupName ?? undefined}
           token={token}
           onLeave={leaveGroupCall}
+          minimized={true}
+          onMinimize={() => setIsMinimized(true)}
+          onMaximize={() => setIsMinimized(false)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="fixed top-0 right-0 bottom-0 left-0 md:top-2 md:right-2 md:bottom-2 md:left-[5rem] z-[90] bg-background md:rounded-2xl md:border md:border-border/40 md:shadow-soft flex flex-col overflow-hidden"
+    >
+      {isActive ? (
+        <GroupCallRoom
+          roomName={conversationId}
+          roomLabel={groupName ?? undefined}
+          token={token}
+          onLeave={leaveGroupCall}
+          minimized={false}
+          onMinimize={() => setIsMinimized(true)}
+          onMaximize={() => setIsMinimized(false)}
         />
       ) : (
         /* Outgoing / Joining screen */

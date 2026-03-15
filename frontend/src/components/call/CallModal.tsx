@@ -1,21 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Video, VideoOff, Minimize2, Maximize2 } from "lucide-react";
 import { useCallStore } from "@/stores/useCallStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import UserAvatar from "@/components/chat/UserAvatar";
-import { cn } from "@/lib/utils";
+import { cn, formatCallTimer, nameToColor } from "@/lib/utils";
+import { useDraggable, type DragHandlers } from "@/hooks/useDraggable";
 
-const AVATAR_PALETTE = [
-  '#7c3aed', '#2563eb', '#0891b2', '#059669',
-  '#d97706', '#dc2626', '#be185d', '#0284c7',
-];
-const nameToColor = (name: string) => {
-  let h = 0;
-  for (const c of name) h = Math.imul(31, h) + c.charCodeAt(0);
-  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
-};
+interface CallModalProps {
+  isMinimized: boolean;
+  onMinimize: () => void;
+  onMaximize: () => void;
+}
 
-const CallModal = () => {
+const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
   const {
     remoteUser,
     callType,
@@ -29,27 +26,28 @@ const CallModal = () => {
     toggleVideo,
   } = useCallStore();
   const authUser = useAuthStore((s) => s.user);
+  const { ref: dragRef, style: dragStyle, dragHandlers } = useDraggable({ placement: "top-center" });
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const [elapsed, setElapsed] = useState(0);
 
-  // Attach local stream
+  // Attach local stream (re-run when minimize toggles because DOM elements remount)
   useEffect(() => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream]);
+  }, [localStream, isMinimized]);
 
-  // Attach remote stream
+  // Attach remote stream (re-run when minimize toggles because DOM elements remount)
   useEffect(() => {
     if (callType === 'video' && remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
     } else if (callType === 'voice' && remoteAudioRef.current && remoteStream) {
       remoteAudioRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream, callType]);
+  }, [remoteStream, callType, isMinimized]);
 
   // Call duration timer
   useEffect(() => {
@@ -61,6 +59,29 @@ const CallModal = () => {
 
   const isVideo = callType === "video";
 
+  // Minimized floating widget
+  if (isMinimized) {
+    return (
+      <DraggableCallWidget
+        dragRef={dragRef}
+        dragStyle={dragStyle}
+        dragHandlers={dragHandlers}
+        isVideo={isVideo}
+        remoteUser={remoteUser}
+        elapsed={elapsed}
+        isMuted={isMuted}
+        isVideoOff={isVideoOff}
+        toggleMute={toggleMute}
+        toggleVideo={toggleVideo}
+        endCall={endCall}
+        onMaximize={onMaximize}
+        localVideoRef={localVideoRef}
+        remoteVideoRef={remoteVideoRef}
+        remoteAudioRef={remoteAudioRef}
+      />
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
       <div
@@ -71,6 +92,16 @@ const CallModal = () => {
             : "w-80 py-8 px-6",
         )}
       >
+        {/* Minimize button */}
+        <button
+          onClick={onMinimize}
+          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-sm text-white text-xs font-medium transition-colors"
+          title="Thu nhỏ"
+        >
+          <Minimize2 size={14} />
+          Thu nhỏ
+        </button>
+
         {isVideo ? (
           <VideoCallLayout
             remoteUser={remoteUser}
@@ -170,7 +201,7 @@ const VideoCallLayout = ({
 
         {/* Timer */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-medium tabular-nums border border-white/10">
-          {formatTime(elapsed)}
+          {formatCallTimer(elapsed)}
         </div>
 
         {/* Local PiP */}
@@ -275,7 +306,7 @@ const VoiceCallLayout = ({
           {remoteUser.displayName}
         </h2>
         <p className="text-sm text-green-500 font-medium tabular-nums">
-          {formatTime(elapsed)}
+          {formatCallTimer(elapsed)}
         </p>
       </div>
 
@@ -309,17 +340,6 @@ const VoiceCallLayout = ({
   );
 };
 
-const formatTime = (s: number) => {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-
-  if (h > 0) {
-    return `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
-  }
-  return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`;
-};
-
 function ControlButton({
   onClick,
   active,
@@ -348,6 +368,106 @@ function ControlButton({
       </div>
       <span className="text-[10px] text-zinc-500 font-medium">{label}</span>
     </button>
+  );
+}
+
+// Draggable minimized widget for active call
+function DraggableCallWidget({
+  dragRef,
+  dragStyle,
+  dragHandlers,
+  isVideo,
+  remoteUser,
+  elapsed,
+  isMuted,
+  isVideoOff,
+  toggleMute,
+  toggleVideo,
+  endCall,
+  onMaximize,
+  localVideoRef,
+  remoteVideoRef,
+  remoteAudioRef,
+}: {
+  dragRef: React.RefObject<HTMLDivElement | null>;
+  dragStyle: React.CSSProperties;
+  dragHandlers: DragHandlers;
+  isVideo: boolean;
+  remoteUser: { displayName: string; avatarUrl?: string | null };
+  elapsed: number;
+  isMuted: boolean;
+  isVideoOff: boolean;
+  toggleMute: () => void;
+  toggleVideo: () => void;
+  endCall: () => void;
+  onMaximize: () => void;
+  localVideoRef: React.RefObject<HTMLVideoElement | null>;
+  remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
+  remoteAudioRef: React.RefObject<HTMLAudioElement | null>;
+}) {
+  return (
+    <div
+      ref={dragRef}
+      style={dragStyle}
+      {...dragHandlers}
+      className="z-[100] w-72 rounded-2xl shadow-2xl border border-border bg-card text-card-foreground overflow-hidden cursor-grab active:cursor-grabbing"
+    >
+      <div className="flex items-center gap-3 px-4 py-3">
+        <UserAvatar
+          type="chat"
+          name={remoteUser.displayName}
+          avatarUrl={remoteUser.avatarUrl ?? undefined}
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{remoteUser.displayName}</p>
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {isVideo ? "Video" : "Thoại"} · {formatCallTimer(elapsed)}
+          </p>
+        </div>
+        <button
+          onClick={onMaximize}
+          className="p-1.5 rounded-full hover:bg-muted transition-colors"
+          title="Phóng to"
+        >
+          <Maximize2 size={16} />
+        </button>
+      </div>
+      <div className="flex items-center justify-center gap-4 px-4 pb-3">
+        <button
+          onClick={toggleMute}
+          className={cn(
+            "p-2 rounded-full transition-colors",
+            isMuted ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900" : "bg-muted text-muted-foreground hover:bg-muted/80",
+          )}
+        >
+          {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
+        </button>
+        {isVideo && (
+          <button
+            onClick={toggleVideo}
+            className={cn(
+              "p-2 rounded-full transition-colors",
+              isVideoOff ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900" : "bg-muted text-muted-foreground hover:bg-muted/80",
+            )}
+          >
+            {isVideoOff ? <VideoOff size={16} /> : <Video size={16} />}
+          </button>
+        )}
+        <button
+          onClick={endCall}
+          className="p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+        >
+          <PhoneOff size={16} />
+        </button>
+      </div>
+      {/* Hidden elements to keep streams alive */}
+      <video ref={localVideoRef} autoPlay playsInline muted className="hidden" />
+      {isVideo ? (
+        <video ref={remoteVideoRef} autoPlay playsInline className="hidden" />
+      ) : (
+        <audio ref={remoteAudioRef} autoPlay className="hidden" />
+      )}
+    </div>
   );
 }
 
