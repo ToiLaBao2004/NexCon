@@ -15,7 +15,6 @@ interface CallModalProps {
 const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
   const {
     remoteUser,
-    callType,
     localStream,
     remoteStream,
     isMuted,
@@ -30,7 +29,6 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
 
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const [elapsed, setElapsed] = useState(0);
 
   // Attach local stream (re-run when minimize toggles because DOM elements remount)
@@ -40,14 +38,12 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
     }
   }, [localStream, isMinimized]);
 
-  // Attach remote stream (re-run when minimize toggles because DOM elements remount)
+  // Attach remote stream — luôn dùng <video> (video element chạy audio-only tốt)
   useEffect(() => {
-    if (callType === 'video' && remoteVideoRef.current && remoteStream) {
+    if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
-    } else if (callType === 'voice' && remoteAudioRef.current && remoteStream) {
-      remoteAudioRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream, callType, isMinimized]);
+  }, [remoteStream, isMinimized]);
 
   // Call duration timer
   useEffect(() => {
@@ -57,8 +53,6 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
 
   if (!remoteUser) return null;
 
-  const isVideo = callType === "video";
-
   // Minimized floating widget
   if (isMinimized) {
     return (
@@ -66,7 +60,6 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
         dragRef={dragRef}
         dragStyle={dragStyle}
         dragHandlers={dragHandlers}
-        isVideo={isVideo}
         remoteUser={remoteUser}
         elapsed={elapsed}
         isMuted={isMuted}
@@ -77,21 +70,13 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
         onMaximize={onMaximize}
         localVideoRef={localVideoRef}
         remoteVideoRef={remoteVideoRef}
-        remoteAudioRef={remoteAudioRef}
       />
     );
   }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div
-        className={cn(
-          "relative overflow-hidden rounded-3xl shadow-2xl bg-zinc-950 text-white flex flex-col transition-all duration-500",
-          isVideo
-            ? "w-[854px] h-[480px] max-w-[95vw] max-h-[80vh]"
-            : "w-80 py-8 px-6",
-        )}
-      >
+      <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-zinc-950 text-white flex flex-col transition-all duration-500 w-[854px] h-[480px] max-w-[95vw] max-h-[80vh]">
         {/* Minimize button */}
         <button
           onClick={onMinimize}
@@ -102,32 +87,20 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
           Thu nhỏ
         </button>
 
-        {isVideo ? (
-          <VideoCallLayout
-            remoteUser={remoteUser}
-            remoteStream={remoteStream}
-            localVideoRef={localVideoRef}
-            remoteVideoRef={remoteVideoRef}
-            isVideoOff={isVideoOff}
-            isMuted={isMuted}
-            elapsed={elapsed}
-            toggleMute={toggleMute}
-            toggleVideo={toggleVideo}
-            endCall={endCall}
-            localUser={authUser ?? undefined}
-            isRemoteVideoOff={isRemoteVideoOff}
-          />
-        ) : (
-          <VoiceCallLayout
-            remoteUser={remoteUser}
-            localVideoRef={localVideoRef}
-            remoteAudioRef={remoteAudioRef}
-            isMuted={isMuted}
-            elapsed={elapsed}
-            toggleMute={toggleMute}
-            endCall={endCall}
-          />
-        )}
+        <VideoCallLayout
+          remoteUser={remoteUser}
+          remoteStream={remoteStream}
+          localVideoRef={localVideoRef}
+          remoteVideoRef={remoteVideoRef}
+          isVideoOff={isVideoOff}
+          isMuted={isMuted}
+          elapsed={elapsed}
+          toggleMute={toggleMute}
+          toggleVideo={toggleVideo}
+          endCall={endCall}
+          localUser={authUser ?? undefined}
+          isRemoteVideoOff={isRemoteVideoOff}
+        />
       </div>
     </div>
   );
@@ -270,76 +243,6 @@ const VideoCallLayout = ({
   );
 };
 
-interface VoiceCallLayoutProps {
-  remoteUser: any;
-  localVideoRef: React.RefObject<HTMLVideoElement | null>;
-  remoteAudioRef: React.RefObject<HTMLAudioElement | null>;
-  isMuted: boolean;
-  elapsed: number;
-  toggleMute: () => void;
-  endCall: () => void;
-}
-
-const VoiceCallLayout = ({
-  remoteUser,
-  localVideoRef,
-  remoteAudioRef,
-  isMuted,
-  elapsed,
-  toggleMute,
-  endCall,
-}: VoiceCallLayoutProps) => {
-  return (
-    <div className="flex flex-col items-center gap-6">
-      <div className="relative">
-        <div className="absolute inset-0 rounded-full animate-ping bg-green-500/20" />
-        <div className="absolute inset-[-8px] rounded-full animate-pulse bg-green-500/10" />
-        <UserAvatar
-          type="sidebar"
-          name={remoteUser.displayName}
-          avatarUrl={remoteUser.avatarUrl ?? undefined}
-        />
-      </div>
-
-      <div className="text-center space-y-1">
-        <h2 className="text-xl font-semibold tracking-tight">
-          {remoteUser.displayName}
-        </h2>
-        <p className="text-sm text-green-500 font-medium tabular-nums">
-          {formatCallTimer(elapsed)}
-        </p>
-      </div>
-
-      <video ref={localVideoRef} autoPlay playsInline muted className="hidden" />
-      <audio ref={remoteAudioRef} autoPlay />
-
-      <div className="flex items-center gap-8 pt-4">
-        <ControlButton
-          onClick={toggleMute}
-          active={isMuted}
-          label={isMuted ? "Bật mic" : "Tắt mic"}
-        >
-          {isMuted ? (
-            <MicOff className="h-5 w-5" />
-          ) : (
-            <Mic className="h-5 w-5" />
-          )}
-        </ControlButton>
-
-        <button
-          onClick={endCall}
-          className="group flex flex-col items-center gap-1.5"
-        >
-          <div className="p-4 rounded-full bg-destructive text-destructive-foreground shadow-lg shadow-destructive/20 group-hover:bg-destructive/90 group-active:scale-95 transition-all">
-            <PhoneOff className="h-7 w-7" />
-          </div>
-          <span className="text-xs text-zinc-500 font-medium">Kết thúc</span>
-        </button>
-      </div>
-    </div>
-  );
-};
-
 function ControlButton({
   onClick,
   active,
@@ -376,7 +279,6 @@ function DraggableCallWidget({
   dragRef,
   dragStyle,
   dragHandlers,
-  isVideo,
   remoteUser,
   elapsed,
   isMuted,
@@ -387,12 +289,10 @@ function DraggableCallWidget({
   onMaximize,
   localVideoRef,
   remoteVideoRef,
-  remoteAudioRef,
 }: {
   dragRef: React.RefObject<HTMLDivElement | null>;
   dragStyle: React.CSSProperties;
   dragHandlers: DragHandlers;
-  isVideo: boolean;
   remoteUser: { displayName: string; avatarUrl?: string | null };
   elapsed: number;
   isMuted: boolean;
@@ -403,7 +303,6 @@ function DraggableCallWidget({
   onMaximize: () => void;
   localVideoRef: React.RefObject<HTMLVideoElement | null>;
   remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
-  remoteAudioRef: React.RefObject<HTMLAudioElement | null>;
 }) {
   return (
     <div
@@ -421,7 +320,7 @@ function DraggableCallWidget({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{remoteUser.displayName}</p>
           <p className="text-xs text-muted-foreground tabular-nums">
-            {isVideo ? "Video" : "Thoại"} · {formatCallTimer(elapsed)}
+            {isVideoOff ? "Thoại" : "Video"} · {formatCallTimer(elapsed)}
           </p>
         </div>
         <button
@@ -442,17 +341,15 @@ function DraggableCallWidget({
         >
           {isMuted ? <MicOff size={16} /> : <Mic size={16} />}
         </button>
-        {isVideo && (
-          <button
-            onClick={toggleVideo}
-            className={cn(
-              "p-2 rounded-full transition-colors",
-              isVideoOff ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900" : "bg-muted text-muted-foreground hover:bg-muted/80",
-            )}
-          >
-            {isVideoOff ? <VideoOff size={16} /> : <Video size={16} />}
-          </button>
-        )}
+        <button
+          onClick={toggleVideo}
+          className={cn(
+            "p-2 rounded-full transition-colors",
+            isVideoOff ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900" : "bg-muted text-muted-foreground hover:bg-muted/80",
+          )}
+        >
+          {isVideoOff ? <VideoOff size={16} /> : <Video size={16} />}
+        </button>
         <button
           onClick={endCall}
           className="p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
@@ -460,13 +357,9 @@ function DraggableCallWidget({
           <PhoneOff size={16} />
         </button>
       </div>
-      {/* Hidden elements to keep streams alive */}
+      {/* Hidden video element to keep streams alive */}
       <video ref={localVideoRef} autoPlay playsInline muted className="hidden" />
-      {isVideo ? (
-        <video ref={remoteVideoRef} autoPlay playsInline className="hidden" />
-      ) : (
-        <audio ref={remoteAudioRef} autoPlay className="hidden" />
-      )}
+      <video ref={remoteVideoRef} autoPlay playsInline className="hidden" />
     </div>
   );
 }
