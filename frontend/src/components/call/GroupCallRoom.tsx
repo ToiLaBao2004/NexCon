@@ -30,7 +30,7 @@ interface GroupCallRoomProps {
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
 
-// ParticipantCardInner
+/* ─── ParticipantCard ─── */
 const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }) => {
   const { identity, name } = useParticipantInfo({ participant: trackRef.participant });
   const isSpeaking = useIsSpeaking(trackRef.participant);
@@ -47,7 +47,6 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
   const initial = displayName.charAt(0).toUpperCase();
   const avatarColor = nameToColor(displayName);
 
-  // metadata: JSON { displayName, avatarUrl } (group call) or raw URL (meet)
   let avatarUrl = '';
   try {
     const meta = JSON.parse(trackRef.participant.metadata || '{}');
@@ -60,12 +59,10 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
 
   return (
     <div
-      className="relative w-full h-full overflow-hidden rounded-xl bg-card transition-all duration-200"
-      style={{
-        boxShadow: isSpeaking
-          ? '0 0 0 2.5px hsl(var(--primary))'
-          : '0 0 0 1px hsl(var(--border))',
-      }}
+      className={cn(
+        'relative w-full h-full overflow-hidden rounded-2xl transition-shadow duration-300',
+        isSpeaking ? 'ring-2 ring-primary shadow-lg shadow-primary/20' : 'ring-1 ring-border',
+      )}
     >
       {hasVideo ? (
         <VideoTrack
@@ -73,51 +70,47 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
         />
       ) : (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-muted/30">
+        <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-muted/50">
           {avatarUrl ? (
             <img
               src={avatarUrl}
               alt={displayName}
-              className="w-16 h-16 rounded-full object-cover shadow-md select-none"
+              className="w-20 h-20 rounded-full object-cover ring-2 ring-border shadow-lg select-none"
             />
           ) : (
             <div
-              className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-md select-none"
+              className="w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-bold ring-2 ring-border shadow-lg select-none"
               style={{ background: avatarColor }}
             >
               {initial}
             </div>
           )}
-          <span className="text-sm font-medium text-muted-foreground">{displayName}</span>
         </div>
       )}
 
       {isScreenShare && (
-        <div className="absolute top-2 left-2 flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5 rounded-full">
+        <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2.5 py-1 rounded-full shadow-md">
           <Monitor size={10} />
           Màn hình
         </div>
       )}
 
-      <div className="absolute bottom-0 inset-x-0 px-2.5 py-2 flex items-center justify-between bg-gradient-to-t from-black/60 to-transparent">
-        <span className="text-white text-xs font-medium truncate drop-shadow">
+      {/* Name + mic overlay */}
+      <div className="absolute bottom-0 inset-x-0 px-3 py-2 flex items-center gap-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent">
+        <span className="text-white text-xs font-medium truncate drop-shadow-md">
           {displayName} {isLocal && '(Bạn)'}
         </span>
         {isMicMuted && (
-          <span className="bg-destructive/90 text-white rounded-full p-0.5 ml-1 shrink-0">
-            <MicOff size={11} />
+          <span className="shrink-0 bg-red-500/90 text-white rounded-full p-0.5">
+            <MicOff size={10} />
           </span>
         )}
       </div>
-
-      {isSpeaking && (
-        <div className="absolute inset-0 rounded-xl pointer-events-none ring-2 ring-inset ring-primary/80 animate-pulse" />
-      )}
     </div>
   );
 };
 
-// Stage
+/* ─── Video Grid ─── */
 const Stage = () => {
   const tracks = useTracks(
     [
@@ -132,15 +125,11 @@ const Stage = () => {
 
   return (
     <div
+      className="h-full w-full p-3 gap-3 bg-background"
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(${cols}, 1fr)`,
         gridAutoRows: 'minmax(0, 1fr)',
-        gap: '10px',
-        height: '100%',
-        width: '100%',
-        padding: '10px',
-        boxSizing: 'border-box',
       }}
     >
       {tracks.map((trackRef) => (
@@ -153,35 +142,33 @@ const Stage = () => {
   );
 };
 
-// RoomHeader
-const RoomHeader = ({ roomName, roomLabel, onMinimize }: { roomName: string; roomLabel?: string; onMinimize?: () => void }) => {
+/* ─── Header ─── */
+const RoomHeader = ({ roomLabel, onMinimize }: { roomName: string; roomLabel?: string; onMinimize?: () => void }) => {
   const participants = useParticipants();
   return (
-    <div className="flex items-center justify-between px-5 py-3 bg-card border-b border-border shrink-0">
-      <div className="flex items-center gap-2">
+    <div className="flex items-center justify-between px-5 py-3 shrink-0 bg-card border-b border-border">
+      <div className="flex items-center gap-2.5">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-sm font-semibold text-foreground">{roomLabel ?? roomName}</span>
+        <span className="text-sm font-semibold text-foreground">{roomLabel ?? 'Cuộc gọi'}</span>
+        <span className="text-xs text-muted-foreground flex items-center gap-1">
+          <Users size={12} />
+          {participants.length}
+        </span>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-          <Users size={13} />
-          <span>{participants.length} thành viên</span>
-        </div>
-        {onMinimize && (
-          <button
-            onClick={onMinimize}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/70 transition-colors text-foreground text-xs font-medium"
-            title="Thu nhỏ"
-          >
-            <Minimize2 size={14} />
-          </button>
-        )}
-      </div>
+      {onMinimize && (
+        <button
+          onClick={onMinimize}
+          className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="Thu nhỏ"
+        >
+          <Minimize2 size={16} />
+        </button>
+      )}
     </div>
   );
 };
 
-// ControlBar
+/* ─── Control Bar ─── */
 const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
   const { toggle: toggleMic, enabled: micOn, pending: micPending } = useTrackToggle({
     source: Track.Source.Microphone,
@@ -196,45 +183,48 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
     onLeave?.();
   };
 
-  const btn = 'flex flex-col items-center gap-1 w-16 py-2.5 rounded-xl transition-all duration-150 focus:outline-none disabled:opacity-50 cursor-pointer text-[11px] font-medium';
-
   return (
-    <div className="flex items-center justify-center gap-2 px-6 py-3 bg-card border-t border-border shrink-0">
+    <div className="flex items-center justify-center gap-3 px-6 py-4 shrink-0 bg-card border-t border-border">
       <button
-        className={cn(btn, micOn ? 'bg-muted hover:bg-muted/70 text-foreground' : 'bg-destructive/15 hover:bg-destructive/25 text-destructive')}
+        className={cn(
+          'p-3.5 rounded-full transition-all duration-150',
+          micOn
+            ? 'bg-muted hover:bg-muted/70 text-foreground'
+            : 'bg-destructive/15 text-destructive hover:bg-destructive/25',
+        )}
         onClick={() => toggleMic()}
         disabled={micPending}
         title={micOn ? 'Tắt mic' : 'Bật mic'}
       >
-        {micOn ? <Mic size={18} /> : <MicOff size={18} />}
-        {micOn ? 'Mic' : 'Tắt mic'}
+        {micOn ? <Mic size={20} /> : <MicOff size={20} />}
       </button>
 
       <button
-        className={cn(btn, camOn ? 'bg-muted hover:bg-muted/70 text-foreground' : 'bg-destructive/15 hover:bg-destructive/25 text-destructive')}
+        className={cn(
+          'p-3.5 rounded-full transition-all duration-150',
+          camOn
+            ? 'bg-muted hover:bg-muted/70 text-foreground'
+            : 'bg-destructive/15 text-destructive hover:bg-destructive/25',
+        )}
         onClick={() => toggleCam()}
         disabled={camPending}
         title={camOn ? 'Tắt camera' : 'Bật camera'}
       >
-        {camOn ? <Video size={18} /> : <VideoOff size={18} />}
-        {camOn ? 'Camera' : 'Tắt cam'}
+        {camOn ? <Video size={20} /> : <VideoOff size={20} />}
       </button>
 
-      <div className="w-px h-9 bg-border mx-2" />
-
       <button
-        className={cn(btn, 'bg-destructive hover:bg-destructive/85 text-destructive-foreground w-20')}
+        className="p-3.5 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors ml-2"
         onClick={handleLeave}
         title="Rời phòng"
       >
-        <PhoneOff size={18} />
-        Rời phòng
+        <PhoneOff size={20} />
       </button>
     </div>
   );
 };
 
-// MiniControls — compact bar for minimized PiP mode
+/* ─── Mini Controls (PiP mode) ─── */
 const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => void; onLeave?: () => void; roomLabel?: string }) => {
   const { toggle: toggleMic, enabled: micOn } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn } = useTrackToggle({ source: Track.Source.Camera });
@@ -247,7 +237,7 @@ const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => v
   };
 
   return (
-    <div className="flex items-center gap-2 p-3">
+    <div className="flex items-center gap-2 p-3 bg-card">
       <div className="flex-1 min-w-0 cursor-pointer" onClick={onMaximize}>
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
@@ -293,7 +283,7 @@ const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => v
   );
 };
 
-// Main component
+/* ─── Main Component ─── */
 const GroupCallRoom = ({ roomName, roomLabel, token, onLeave, minimized, onMinimize, onMaximize }: GroupCallRoomProps) => {
   return (
     <LiveKitRoom
@@ -302,7 +292,10 @@ const GroupCallRoom = ({ roomName, roomLabel, token, onLeave, minimized, onMinim
       token={token}
       serverUrl={LIVEKIT_URL}
       onDisconnected={onLeave}
-      style={{ width: '100%', display: 'flex', flexDirection: 'column', ...(minimized ? {} : { height: '100%' }) }}
+      className={cn(
+        'w-full flex flex-col bg-background',
+        !minimized && 'h-full',
+      )}
     >
       <RoomAudioRenderer />
       {minimized ? (
@@ -310,7 +303,7 @@ const GroupCallRoom = ({ roomName, roomLabel, token, onLeave, minimized, onMinim
       ) : (
         <>
           <RoomHeader roomName={roomName} roomLabel={roomLabel} onMinimize={onMinimize} />
-          <div className="flex-1 overflow-hidden bg-background">
+          <div className="flex-1 overflow-hidden">
             <Stage />
           </div>
           <ControlBar onLeave={onLeave} />

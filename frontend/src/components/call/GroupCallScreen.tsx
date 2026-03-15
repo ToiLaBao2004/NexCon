@@ -1,26 +1,9 @@
 import { useState } from "react";
 import { useGroupCallStore } from "@/stores/useGroupCallStore";
-import { useAuthStore } from "@/stores/useAuthStore";
 import GroupCallRoom from "./GroupCallRoom";
-import { PhoneOff, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import UserAvatar from "@/components/chat/UserAvatar";
+import { PhoneOff, Minimize2, Maximize2, Loader2 } from "lucide-react";
 import { useDraggable } from "@/hooks/useDraggable";
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const config: Record<string, { label: string; className: string }> = {
-    ringing: { label: "Đang gọi", className: "text-yellow-500 bg-yellow-500/10" },
-    joined: { label: "Đã tham gia", className: "text-green-500 bg-green-500/10" },
-    declined: { label: "Từ chối", className: "text-red-500 bg-red-500/10" },
-    left: { label: "Đã rời", className: "text-muted-foreground bg-muted" },
-    "no-answer": { label: "Không trả lời", className: "text-muted-foreground bg-muted" },
-  };
-  const c = config[status] ?? config["no-answer"];
-  return (
-    <span className={cn("text-xs px-2 py-0.5 rounded-full font-medium", c.className)}>
-      {c.label}
-    </span>
-  );
-};
 
 const GroupCallScreen = () => {
   const {
@@ -29,18 +12,18 @@ const GroupCallScreen = () => {
     callType,
     token,
     groupName,
-    participants,
     leaveGroupCall,
   } = useGroupCallStore();
-  const user = useAuthStore((s) => s.user);
   const [isMinimized, setIsMinimized] = useState(false);
   const { ref: dragRef, style: dragStyle, dragHandlers } = useDraggable({ placement: "top-center" });
 
   if (!conversationId) return null;
 
   const isActive = status === "active" && token;
+  const displayName = groupName ?? "Nhóm";
+  const callLabel = callType === "video" ? "Cuộc gọi video nhóm" : "Cuộc gọi thoại nhóm";
 
-  // Minimized: draggable floating widget
+  // ── Active call: full-screen or minimized GroupCallRoom ──
   if (isActive && isMinimized) {
     return (
       <div
@@ -62,11 +45,9 @@ const GroupCallScreen = () => {
     );
   }
 
-  return (
-    <div
-      className="fixed top-0 right-0 bottom-0 left-0 md:top-2 md:right-2 md:bottom-2 md:left-[5rem] z-[90] bg-background md:rounded-2xl md:border md:border-border/40 md:shadow-soft flex flex-col overflow-hidden"
-    >
-      {isActive ? (
+  if (isActive) {
+    return (
+      <div className="fixed top-0 right-0 bottom-0 left-0 md:top-2 md:right-2 md:bottom-2 md:left-[5rem] z-[90] bg-background md:rounded-2xl md:border md:border-border/40 md:shadow-soft flex flex-col overflow-hidden">
         <GroupCallRoom
           roomName={conversationId}
           roomLabel={groupName ?? undefined}
@@ -76,66 +57,109 @@ const GroupCallScreen = () => {
           onMinimize={() => setIsMinimized(true)}
           onMaximize={() => setIsMinimized(false)}
         />
-      ) : (
-        /* Outgoing / Joining screen */
-        <div className="flex-1 flex flex-col items-center justify-center gap-6">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold">{groupName}</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              {callType === "video" ? "Cuộc gọi video nhóm" : "Cuộc gọi thoại nhóm"}
+      </div>
+    );
+  }
+
+  // ── Outgoing / Joining: small modal (like OutgoingCallModal) ──
+
+  if (isMinimized) {
+    return (
+      <div
+        ref={dragRef}
+        style={dragStyle}
+        {...dragHandlers}
+        className="z-[100] w-72 rounded-2xl shadow-2xl border border-border bg-card text-card-foreground overflow-hidden cursor-grab active:cursor-grabbing"
+      >
+        <div className="flex items-center gap-3 px-4 py-3">
+          <UserAvatar type="chat" name={displayName} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{displayName}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {callType === "video" ? "Video" : "Thoại"} · {status === "joining" ? "Đang kết nối" : "Đang gọi"}
+              <RingingDots />
             </p>
-            <p className="text-muted-foreground mt-2">
-              {status === "joining" ? "Đang kết nối..." : "Đang gọi..."}
-            </p>
-            {status === "joining" && (
-              <Loader2 className="h-6 w-6 animate-spin mx-auto mt-3 text-primary" />
-            )}
+          </div>
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="p-1.5 rounded-full hover:bg-muted transition-colors"
+            title="Phóng to"
+          >
+            <Maximize2 size={16} />
+          </button>
+        </div>
+        <div className="flex items-center justify-center gap-4 px-4 pb-3">
+          <button
+            onClick={leaveGroupCall}
+            className="p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+          >
+            <PhoneOff size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+      <div className="bg-background rounded-2xl shadow-2xl w-80 overflow-hidden relative">
+        {/* Minimize button */}
+        <button
+          onClick={() => setIsMinimized(true)}
+          className="absolute top-3 right-3 z-10 p-1.5 rounded-lg bg-black/20 hover:bg-black/40 text-foreground transition-colors"
+          title="Thu nhỏ"
+        >
+          <Minimize2 size={16} />
+        </button>
+
+        {/* Header */}
+        <div className="bg-gradient-to-b from-primary/20 to-background px-6 pt-8 pb-4 flex flex-col items-center gap-3">
+          <div className="relative">
+            <span className="absolute inset-0 rounded-full animate-ping bg-primary/30" />
+            <span className="absolute inset-[-6px] rounded-full animate-pulse bg-primary/15" />
+            <UserAvatar type="sidebar" name={displayName} />
           </div>
 
-          {/* Participant status list */}
-          {participants.length > 0 && (
-            <div className="w-80 max-h-64 overflow-y-auto space-y-2 px-1">
-              {participants
-                .filter((p) => p.userId !== user?._id)
-                .map((p) => (
-                  <div
-                    key={p.userId}
-                    className="flex items-center gap-3 px-3 py-2 rounded-lg bg-card"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-bold shrink-0 overflow-hidden">
-                      {p.avatarUrl ? (
-                        <img
-                          src={p.avatarUrl}
-                          alt={p.displayName}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        p.displayName.charAt(0).toUpperCase()
-                      )}
-                    </div>
-                    <span className="flex-1 text-sm font-medium truncate">
-                      {p.displayName}
-                    </span>
-                    <StatusBadge status={p.status} />
-                  </div>
-                ))}
-            </div>
-          )}
-
-          {/* Cancel button */}
-          {status === "outgoing" && (
-            <button
-              onClick={leaveGroupCall}
-              className="flex items-center gap-2 px-6 py-3 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
-            >
-              <PhoneOff className="h-5 w-5" />
-              Hủy cuộc gọi
-            </button>
-          )}
+          <div className="text-center">
+            <h2 className="text-lg font-semibold text-foreground">{displayName}</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {callLabel} {" · "}
+              {status === "joining" ? (
+                <span className="inline-flex items-center gap-1">
+                  Đang kết nối <Loader2 className="inline h-3 w-3 animate-spin" />
+                </span>
+              ) : (
+                <RingingDots />
+              )}
+            </p>
+          </div>
         </div>
-      )}
+
+        {/* Cancel button */}
+        <div className="flex items-center justify-center px-6 py-5">
+          <button
+            onClick={leaveGroupCall}
+            className="flex flex-col items-center gap-1.5 group"
+          >
+            <span className="flex items-center justify-center w-14 h-14 rounded-full bg-destructive text-destructive-foreground shadow-lg shadow-destructive/30 group-hover:scale-105 transition-transform">
+              <PhoneOff className="h-6 w-6" />
+            </span>
+            <span className="text-xs text-muted-foreground">Huỷ</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
+
+function RingingDots() {
+  return (
+    <span className="inline-flex items-center gap-[3px]">
+      <span className="w-1 h-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:0ms]" />
+      <span className="w-1 h-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:150ms]" />
+      <span className="w-1 h-1 rounded-full bg-muted-foreground animate-bounce [animation-delay:300ms]" />
+    </span>
+  );
+}
 
 export default GroupCallScreen;

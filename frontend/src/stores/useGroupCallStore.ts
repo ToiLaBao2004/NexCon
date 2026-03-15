@@ -72,7 +72,11 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
   rejoinGroupCall(conversationId) {
     const socket = useSocketStore.getState().socket;
     if (!socket) return;
-    set({ status: "joining", conversationId });
+    const convo = useChatStore
+      .getState()
+      .conversations.find((c) => c._id === conversationId);
+    const groupName = convo?.group?.name || null;
+    set({ status: "joining", conversationId, groupName });
     socket.emit("group-call:join", { conversationId });
   },
 
@@ -86,7 +90,7 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
 
   handleGroupCallStarted(payload) {
     set({
-      status: "active",
+      status: "outgoing",
       conversationId: payload.conversationId,
       callId: payload.callId,
       callType: payload.callType,
@@ -128,7 +132,11 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
 
   handleGroupCallUserJoined(payload) {
     if (get().conversationId === payload.conversationId) {
-      set({ participants: payload.participants });
+      if (get().status === "outgoing") {
+        set({ status: "active", participants: payload.participants });
+      } else {
+        set({ participants: payload.participants });
+      }
     }
   },
 
