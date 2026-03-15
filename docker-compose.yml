@@ -7,6 +7,19 @@ version: "3.9"
 
 services:
 
+  # LIVEKIT
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: nexcon_livekit
+    command: --dev --bind 0.0.0.0
+    restart: unless-stopped
+    ports:
+      - "7880:7880"       # HTTP API + WebSocket
+      - "7881:7881"       # RTC over TCP
+      - "7882:7882/udp"   # RTC over UDP
+    networks:
+      - nexcon_net
+
   # BACKEND
   server:
     build:
@@ -39,6 +52,10 @@ services:
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASS: ${EMAIL_PASS}
 
+      # LiveKit
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
+
       # Cloudinary
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
@@ -63,6 +80,7 @@ services:
         # Vite nhúng env vào JS tại BUILD TIME nên phải truyền qua build args
         VITE_API_URL: ${VITE_API_URL:-http://localhost:5001/api}
         VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:5001/}
+        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
     container_name: nexcon_client
     restart: unless-stopped
     ports:

@@ -7,6 +7,7 @@ import { useFriendStore } from "./useFriendStore";
 import { useNotificationStore } from "./useNotificationStore";
 import { useCallStore } from "./useCallStore";
 import { useCallHistoryStore } from "./useCallHistoryStore";
+import { useGroupCallStore } from "./useGroupCallStore";
 import { toast } from "sonner";
 import { playMessageSound, playNotificationSound } from "@/utils/sound";
 
@@ -244,8 +245,50 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       refreshCallHistory();
     });
 
+    socket.on("call-video-toggle", ({ isVideoOff }: { isVideoOff: boolean }) => {
+      useCallStore.getState().handleVideoToggle(isVideoOff);
+    });
+
     socket.on("ice-candidate", ({ candidate }) => {
       useCallStore.getState().handleIceCandidate(candidate);
+    });
+
+    // Group call events
+    socket.on("group-call:started", (payload) => {
+      useGroupCallStore.getState().handleGroupCallStarted(payload);
+    });
+
+    socket.on("group-call:incoming", (payload) => {
+      useGroupCallStore.getState().handleGroupCallIncoming(payload);
+    });
+
+    socket.on("group-call:token", (payload) => {
+      useGroupCallStore.getState().handleGroupCallToken(payload);
+    });
+
+    socket.on("group-call:user-joined", (payload) => {
+      useGroupCallStore.getState().handleGroupCallUserJoined(payload);
+    });
+
+    socket.on("group-call:user-declined", (payload) => {
+      useGroupCallStore.getState().handleGroupCallUserDeclined(payload);
+    });
+
+    socket.on("group-call:user-left", (payload) => {
+      useGroupCallStore.getState().handleGroupCallUserLeft(payload);
+    });
+
+    socket.on("group-call:ended", (payload) => {
+      useGroupCallStore.getState().handleGroupCallEnded(payload);
+      refreshCallHistory();
+    });
+
+    socket.on("group-call:status-response", (payload) => {
+      useGroupCallStore.getState().handleGroupCallStatusResponse(payload);
+    });
+
+    socket.on("group-call:error", (payload) => {
+      useGroupCallStore.getState().handleGroupCallError(payload);
     });
   },
 
@@ -262,6 +305,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       set({ socket: null });
       // Reset call state if any
       useCallStore.getState().handleCallEnded();
+      useGroupCallStore.getState().reset();
     }
   },
 }));

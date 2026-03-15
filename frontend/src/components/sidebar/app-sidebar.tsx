@@ -6,19 +6,15 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
 } from "@/components/ui/sidebar"
-import CreateNewChat from "../chat/CreateNewChat"
 import NewGroupChatModal from "../chat/NewGroupModal"
-import GroupChatList from "../chat/GroupChatList"
 import AddFriendModal from "../chat/AddFriendModal"
-import DirectMessageList from "../chat/DirectMessageList"
+import ConversationMixedList from "../chat/ConversationMixedList"
 
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/useChatStore"
-import { Plus } from "lucide-react"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -46,34 +42,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           )}
 
           <AddFriendModal />
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <CreateNewChat />
-            </SidebarGroupContent>
-          </SidebarGroup>
 
           <SidebarGroup>
-            <SidebarGroupLabel className="uppercase">
-              nhóm chat
-            </SidebarGroupLabel>
-            <SidebarGroupAction
-              title="Tạo Nhóm"
-              className="cursor-pointer"
-              onClick={() => setIsGroupModalOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-            </SidebarGroupAction>
-            <SidebarGroupContent>
-              <GroupChatList />
-            </SidebarGroupContent>
-          </SidebarGroup>
-
-          <SidebarGroup>
-            <SidebarGroupLabel className="uppercase">
-              bạn bè
+            <SidebarGroupLabel asChild>
+              <div className="uppercase flex items-center justify-between">
+                <span>cuộc trò chuyện</span>
+                <button
+                  type="button"
+                  onClick={() => setIsGroupModalOpen(true)}
+                  className="normal-case text-xs font-medium px-2 py-1 rounded-md border border-border/60 bg-background hover:bg-muted/20 text-foreground transition-colors"
+                >
+                  Tạo nhóm
+                </button>
+              </div>
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <DirectMessageList />
+              <ConversationMixedList />
             </SidebarGroupContent>
           </SidebarGroup>
         </div>

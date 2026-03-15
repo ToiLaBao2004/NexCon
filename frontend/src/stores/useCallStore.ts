@@ -27,6 +27,7 @@ const IDLE_STATE = {
   _callTimeout: null,
   isMuted: false,
   isVideoOff: false,
+  isRemoteVideoOff: false,
 };
 
 function cleanup(get: () => CallState) {
@@ -63,8 +64,14 @@ export const useCallStore = create<CallState>((set, get) => ({
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: callType === "video",
+        video: true,
       });
+
+      // Voice call: tắt video track ngay (vẫn có track để toggle sau)
+      const startWithVideoOff = callType === "voice";
+      if (startWithVideoOff) {
+        stream.getVideoTracks().forEach((t) => (t.enabled = false));
+      }
 
       pc = new RTCPeerConnection(ICE_SERVERS);
       pc.onconnectionstatechange = () => {
@@ -111,7 +118,7 @@ export const useCallStore = create<CallState>((set, get) => ({
         _peerConnection: pc,
         _callTimeout: timeout,
         isMuted: false,
-        isVideoOff: false,
+        isVideoOff: startWithVideoOff,
       });
 
       emitCallEvent("call-offer", { toUserId: toUser._id, offer, callType });
@@ -140,8 +147,14 @@ export const useCallStore = create<CallState>((set, get) => ({
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: callType === "video",
+        video: true,
       });
+
+      // Voice call: tắt video track ngay (vẫn có track để toggle sau)
+      const startWithVideoOff = callType === "voice";
+      if (startWithVideoOff) {
+        stream.getVideoTracks().forEach((t) => (t.enabled = false));
+      }
 
       pc = new RTCPeerConnection(ICE_SERVERS);
       pc.onconnectionstatechange = () => {
@@ -182,7 +195,7 @@ export const useCallStore = create<CallState>((set, get) => ({
         _pendingOffer: null,
         _iceCandidateQueue: remaining,
         isMuted: false,
-        isVideoOff: false,
+        isVideoOff: startWithVideoOff,
       });
 
       emitCallEvent("call-answer", { toUserId: remoteUser._id, answer });
@@ -227,11 +240,19 @@ export const useCallStore = create<CallState>((set, get) => ({
   },
 
   toggleVideo() {
-    const { localStream, isVideoOff } = get();
+    const { localStream, isVideoOff, remoteUser } = get();
     localStream?.getVideoTracks().forEach((t) => {
       t.enabled = isVideoOff;
     });
-    set({ isVideoOff: !isVideoOff });
+    const next = !isVideoOff;
+    set({ isVideoOff: next });
+    if (remoteUser) {
+      emitCallEvent("call-video-toggle", { toUserId: remoteUser._id, isVideoOff: next });
+    }
+  },
+
+  handleVideoToggle(isVideoOff: boolean) {
+    set({ isRemoteVideoOff: isVideoOff });
   },
 
   // Socket event handlers (called from useSocketStore)

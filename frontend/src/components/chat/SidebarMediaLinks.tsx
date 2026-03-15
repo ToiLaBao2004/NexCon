@@ -1,16 +1,38 @@
 import { Image as ImageIcon, CheckCircle2, Link2, FileText, ChevronDown, ChevronUp } from "lucide-react";
 import { useState, useEffect } from "react";
+import type { ReactNode, UIEvent } from "react";
 import type { Conversation } from "@/types/chat";
 import { useChatStore } from "@/stores/useChatStore";
 import { formatBytes, formatMessageTime } from "@/lib/utils";
+import type { MediaKind } from "@/types/store";
+import { SidebarMediaViewerModal } from "./SidebarMediaViewerModal";
+
+const VIEW_ALL_LIMIT: Record<MediaKind, number> = {
+  image: 24,
+  file: 20,
+  link: 20,
+};
 
 export function SidebarMediaLinks({ conversation }: { conversation: Conversation }) {
   const mediaState = useChatStore((s) => s.media[conversation._id]);
   const fetchMedia = useChatStore((s) => s.fetchMedia);
+  const fetchMediaPage = useChatStore((s) => s.fetchMediaPage);
+  const resetMediaPagination = useChatStore((s) => s.resetMediaPagination);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [activeViewer, setActiveViewer] = useState<MediaKind | null>(null);
+  const mediaPage = useChatStore((s) =>
+    activeViewer ? s.mediaPagination[conversation._id]?.[activeViewer] : undefined
+  );
 
   useEffect(() => {
     fetchMedia(conversation._id);
   }, [conversation._id, fetchMedia]);
+
+  useEffect(() => {
+    return () => {
+      resetMediaPagination(conversation._id);
+    };
+  }, [conversation._id, resetMediaPagination]);
 
   const imageMessages = mediaState?.images ?? [];
   const fileMessages = mediaState?.files ?? [];
@@ -114,6 +136,122 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     if (/^https?:\/\//i.test(t)) return t;
     return `https://${t}`;
   };
+
+  const openViewer = (type: MediaKind) => {
+    setActiveViewer(type);
+    setIsViewerOpen(true);
+  };
+
+  const closeViewer = () => {
+    if (activeViewer) {
+      resetMediaPagination(conversation._id, activeViewer);
+    }
+    setIsViewerOpen(false);
+    setActiveViewer(null);
+  };
+
+  useEffect(() => {
+    if (!isViewerOpen || !activeViewer) return;
+
+    resetMediaPagination(conversation._id, activeViewer);
+    fetchMediaPage(conversation._id, activeViewer, VIEW_ALL_LIMIT[activeViewer]);
+  }, [isViewerOpen, activeViewer, conversation._id, fetchMediaPage, resetMediaPagination]);
+
+  const onViewerScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (!activeViewer) return;
+    const target = event.currentTarget;
+    const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    if (distanceToBottom <= 180) {
+      fetchMediaPage(conversation._id, activeViewer, VIEW_ALL_LIMIT[activeViewer]);
+    }
+  };
+
+  const viewerItems = mediaPage?.items ?? [];
+  const viewerLoading = mediaPage?.isFetching ?? false;
+  const viewerHasMore = mediaPage?.hasMore ?? true;
+
+  const renderFileRow = (msg: any) => {
+    const name = msg.fileName ?? msg.content ?? "File";
+    const size = msg.fileSize ? formatBytes(msg.fileSize) : msg.mimeType || "";
+    const showImage = isImageFile(msg) && msg.fileUrl;
+    const showVideo = isVideoFile(msg) && msg.fileUrl;
+
+    return (
+      <a
+        key={msg._id}
+        href={msg.fileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 py-2 cursor-pointer group hover:bg-muted/10 rounded-lg transition-colors"
+        download={name}
+      >
+        <div className="h-10 w-10 rounded-lg bg-muted/10 text-white flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
+          {showImage ? (
+            <img src={msg.fileUrl} alt={name} className="h-full w-full object-cover" />
+          ) : showVideo ? (
+            <video src={msg.fileUrl} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+          ) : (
+            <FileTypeIcon fileName={msg.fileName} />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold truncate text-foreground">{name}</p>
+          <div className="flex justify-between items-center mt-0.5">
+            <p className="text-[13px] text-muted-foreground/90 flex items-center gap-1">
+              {size} <CheckCircle2 className="h-[14px] w-[14px] text-green-500" strokeWidth={2.5} />
+            </p>
+            <p className="text-[12px] text-muted-foreground/90 whitespace-nowrap">{formatMessageTime(new Date(msg.createdAt))}</p>
+          </div>
+        </div>
+      </a>
+    );
+  };
+
+  const renderLinkRow = (msg: any) => {
+    const title = msg.previewTitle || msg.content || "Liên kết";
+    let host = "";
+    try {
+      let u: URL;
+      try {
+        u = new URL(msg.content);
+      } catch (err) {
+        u = new URL("https://" + msg.content);
+      }
+      host = u.hostname.replace(/^www\./, "");
+    } catch (e) {
+      host = msg.content;
+    }
+
+    return (
+      <a
+        key={msg._id}
+        href={normalizeUrl(msg.content)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 py-2 cursor-pointer group hover:bg-muted/10 rounded-lg transition-colors"
+      >
+        <div className="h-10 w-10 rounded-[6px] bg-muted/10 flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
+          {msg.previewImage || getYouTubeThumbnail(msg.content) ? (
+            <img
+              src={msg.previewImage || getYouTubeThumbnail(msg.content) || undefined}
+              alt={title}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            getHostIcon(host) || <Link2 className="h-5 w-5 text-muted-foreground/70" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate text-foreground group-hover:text-blue-500 transition-colors">{title}</p>
+          <div className="flex justify-between items-center mt-0.5">
+            <p className="text-[13px] text-blue-500 hover:underline cursor-pointer truncate mr-2">{host}</p>
+            <p className="text-[12px] text-muted-foreground/90 whitespace-nowrap">{formatMessageTime(new Date(msg.createdAt))}</p>
+          </div>
+        </div>
+      </a>
+    );
+  };
+
   // Local Section and ThickDivider (extracted from previous SidebarShared)
   function ThickDividerLocal() {
     return <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />;
@@ -125,7 +263,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     defaultOpen = true,
   }: {
     title: string;
-    children: React.ReactNode;
+    children: ReactNode;
     defaultOpen?: boolean;
   }) {
     const [open, setOpen] = useState(defaultOpen);
@@ -169,7 +307,10 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
             </div>
           ))}
         </div>
-        <button className="mt-4 w-full py-[10px] rounded-[6px] bg-card/10 text-[14px] font-semibold text-foreground hover:bg-muted/30 transition-colors">
+        <button
+          onClick={() => openViewer("image")}
+          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors"
+        >
           Xem tất cả
         </button>
       </SectionLocal>
@@ -180,43 +321,12 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
           {fileMessages.length === 0 && (
             <div className="text-sm text-muted-foreground/90 py-2">Không có file nào</div>
           )}
-          {fileMessages.map((msg: any) => {
-            const name = msg.fileName ?? msg.content ?? "File";
-            const size = msg.fileSize ? formatBytes(msg.fileSize) : msg.mimeType || "";
-            const showImage = isImageFile(msg) && msg.fileUrl;
-            const showVideo = isVideoFile(msg) && msg.fileUrl;
-            return (
-              <a
-                key={msg._id}
-                href={msg.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 py-2 cursor-pointer group hover:bg-muted/10 rounded-lg transition-colors"
-                download={name}
-              >
-                <div className="h-10 w-10 rounded-lg bg-muted/10 text-white flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
-                  {showImage ? (
-                    <img src={msg.fileUrl} alt={name} className="h-full w-full object-cover" />
-                  ) : showVideo ? (
-                    <video src={msg.fileUrl} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-                  ) : (
-                    <FileTypeIcon fileName={msg.fileName} />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold truncate text-foreground">{name}</p>
-                  <div className="flex justify-between items-center mt-0.5">
-                    <p className="text-[13px] text-muted-foreground/90 flex items-center gap-1">
-                      {size} <CheckCircle2 className="h-[14px] w-[14px] text-green-500" strokeWidth={2.5} />
-                    </p>
-                    <p className="text-[12px] text-muted-foreground/90 whitespace-nowrap">{formatMessageTime(new Date(msg.createdAt))}</p>
-                  </div>
-                </div>
-              </a>
-            );
-          })}
+          {fileMessages.map((msg: any) => renderFileRow(msg))}
         </div>
-        <button className="mt-4 w-full py-[10px] rounded-[6px] bg-card/10 text-[14px] font-semibold text-foreground hover:bg-muted/30 transition-colors">
+        <button
+          onClick={() => openViewer("file")}
+          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors"
+        >
           Xem tất cả
         </button>
       </SectionLocal>
@@ -225,54 +335,27 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
       <SectionLocal title="Link" defaultOpen={true}>
         <div className="flex flex-col gap-0.5">
           {linkMessages.length === 0 && <div className="text-sm text-muted-foreground/90 py-2">Không có liên kết nào</div>}
-          {linkMessages.map((msg: any) => {
-            const title = msg.previewTitle || msg.content || "Liên kết";
-            let host = "";
-            try {
-              let u: URL;
-              try {
-                u = new URL(msg.content);
-              } catch (err) {
-                u = new URL("https://" + msg.content);
-              }
-              host = u.hostname.replace(/^www\./, "");
-            } catch (e) {
-              host = msg.content;
-            }
-            return (
-              <a
-                key={msg._id}
-                href={normalizeUrl(msg.content)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 py-2 cursor-pointer group hover:bg-muted/10 rounded-lg transition-colors"
-              >
-                <div className="h-10 w-10 rounded-[6px] bg-muted/10 flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
-                  {msg.previewImage || getYouTubeThumbnail(msg.content) ? (
-                    <img
-                      src={msg.previewImage || getYouTubeThumbnail(msg.content) || undefined}
-                      alt={title}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    getHostIcon(host) || <Link2 className="h-5 w-5 text-muted-foreground/70" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate text-foreground group-hover:text-blue-500 transition-colors">{title}</p>
-                          <div className="flex justify-between items-center mt-0.5">
-                            <p className="text-[13px] text-blue-500 hover:underline cursor-pointer truncate mr-2">{host}</p>
-                            <p className="text-[12px] text-muted-foreground/90 whitespace-nowrap">{formatMessageTime(new Date(msg.createdAt))}</p>
-                          </div>
-                        </div>
-              </a>
-            );
-          })}
+          {linkMessages.map((msg: any) => renderLinkRow(msg))}
         </div>
-        <button className="mt-4 w-full py-[10px] rounded-[6px] bg-card/10 text-[14px] font-semibold text-foreground hover:bg-muted/30 transition-colors">
+        <button
+          onClick={() => openViewer("link")}
+          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors"
+        >
           Xem tất cả
         </button>
       </SectionLocal>
+
+      <SidebarMediaViewerModal
+        open={isViewerOpen}
+        type={activeViewer}
+        items={viewerItems}
+        isFetching={viewerLoading}
+        hasMore={viewerHasMore}
+        onOpenChange={(open) => (open ? setIsViewerOpen(true) : closeViewer())}
+        onScroll={onViewerScroll}
+        renderFileRow={renderFileRow}
+        renderLinkRow={renderLinkRow}
+      />
     </div>
   );
 }

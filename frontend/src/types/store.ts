@@ -23,6 +23,23 @@ export interface MediaState {
   links: Message[];
 }
 
+export type MediaKind = 'image' | 'file' | 'link';
+
+export interface MediaPageState {
+  items: Message[];
+  page: number;
+  hasMore: boolean;
+  isFetching: boolean;
+  nextCursor: string | null;
+  limit: number;
+}
+
+export interface MediaPaginationState {
+  image: MediaPageState;
+  file: MediaPageState;
+  link: MediaPageState;
+}
+
 export interface ChatState {
   conversations: Conversation[];
   messages: Record<string, {
@@ -32,6 +49,7 @@ export interface ChatState {
     pinnedMessages: Message[];
   }>;
   media: Record<string, MediaState>;
+  mediaPagination: Record<string, MediaPaginationState>;
   activeConversationId: string | null;
   focusedConversationId: string | null;
   convoLoading: boolean;
@@ -55,6 +73,8 @@ export interface ChatState {
   pinMessageLocal: (conversationId: string, messageId: string, patch: { isPinned: boolean, pinnedAt: string | null }) => void;
   recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
   fetchMedia: (conversationId: string) => Promise<void>;
+  fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number) => Promise<void>;
+  resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
 }
 
 export interface SocketState {
@@ -127,6 +147,7 @@ export interface CallState {
   remoteStream: MediaStream | null;
   isMuted: boolean;
   isVideoOff: boolean;
+  isRemoteVideoOff: boolean;
   _peerConnection: RTCPeerConnection | null;
   _pendingOffer: RTCSessionDescriptionInit | null;
   _iceCandidateQueue: RTCIceCandidateInit[];
@@ -137,6 +158,7 @@ export interface CallState {
   endCall: () => void;
   toggleMute: () => void;
   toggleVideo: () => void;
+  handleVideoToggle: (isVideoOff: boolean) => void;
   handleIncomingCall: (from: RemoteUser, offer: RTCSessionDescriptionInit, callType: CallType) => void;
   handleCallAnswered: (answer: RTCSessionDescriptionInit) => Promise<void>;
   handleCallRejected: () => void;
@@ -168,5 +190,78 @@ export interface NotificationState {
   markAllAsRead: () => Promise<void>;
   addNotification: (notification: Notification) => void;
   setUnreadCount: (count: number) => void;
+  reset: () => void;
+}
+
+export type GroupCallParticipantStatus =
+  | "ringing"
+  | "joined"
+  | "declined"
+  | "left"
+  | "no-answer";
+
+export interface GroupCallParticipant {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  status: GroupCallParticipantStatus;
+  joinedAt: string | null;
+  leftAt: string | null;
+}
+
+export type GroupCallStatus = "idle" | "outgoing" | "incoming" | "joining" | "active";
+
+export interface GroupCallState {
+  status: GroupCallStatus;
+  conversationId: string | null;
+  callId: string | null;
+  callType: "voice" | "video" | null;
+  token: string | null;
+  initiator: {
+    _id: string;
+    displayName: string;
+    avatarUrl: string | null;
+  } | null;
+  groupName: string | null;
+  participants: GroupCallParticipant[];
+  hasLeftActiveCall: Record<string, boolean>;
+
+  startGroupCall: (conversationId: string, callType: "voice" | "video") => void;
+  joinGroupCall: (conversationId: string) => void;
+  declineGroupCall: (conversationId: string) => void;
+  leaveGroupCall: () => void;
+  rejoinGroupCall: (conversationId: string) => void;
+  checkGroupCallStatus: (conversationId: string) => void;
+
+  handleGroupCallStarted: (payload: {
+    conversationId: string;
+    callId: string;
+    callType: "voice" | "video";
+    token: string;
+    initiator: { _id: string; displayName: string; avatarUrl: string | null };
+    groupName: string;
+    participants: GroupCallParticipant[];
+  }) => void;
+  handleGroupCallIncoming: (payload: {
+    conversationId: string;
+    callId: string;
+    callType: "voice" | "video";
+    initiator: { _id: string; displayName: string; avatarUrl: string | null };
+    groupName: string;
+    participants: GroupCallParticipant[];
+  }) => void;
+  handleGroupCallToken: (payload: { conversationId: string; token: string }) => void;
+  handleGroupCallUserJoined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallUserDeclined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallUserLeft: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallEnded: (payload: {
+    conversationId: string;
+    callId: string;
+    duration: number;
+    endedAt: string;
+  }) => void;
+  handleGroupCallStatusResponse: (payload: { conversationId: string; active: boolean }) => void;
+  handleGroupCallError: (payload: { reason: string }) => void;
+
   reset: () => void;
 }

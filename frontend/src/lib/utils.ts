@@ -121,6 +121,18 @@ export function getFileExt(fileName: string = ""): string {
   return fileName.split(".").pop()?.toLowerCase() ?? "";
 }
 
+const AVATAR_PALETTE = [
+  "#7c3aed", "#2563eb", "#0891b2", "#059669",
+  "#d97706", "#dc2626", "#be185d", "#0284c7",
+];
+
+/** Deterministic avatar background color derived from a display name. */
+export function nameToColor(name: string): string {
+  let h = 0;
+  for (const c of name) h = Math.imul(31, h) + c.charCodeAt(0);
+  return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+}
+
 /** Return YouTube hqdefault thumbnail URL, or null if not a YouTube link. */
 export function getYouTubeThumbnail(url: string): string | null {
   try {

@@ -6,6 +6,7 @@ import { getUserConversationsForSocketIO } from "../controllers/conversationCont
 import { searchUserByEmailAndPhone } from "../controllers/userController.js";
 import Conversation from "../models/conversationModel.js";
 import { registerCallHandlers, handleCallDisconnect } from "./callHandler.js";
+import { registerGroupCallHandlers, handleGroupCallDisconnect } from "./groupCallHandler.js";
 
 const app = express();
 
@@ -68,12 +69,18 @@ io.on("connection", async (socket) => {
     // Call handlers (tách riêng)
     registerCallHandlers(socket, user, activeCalls, onlineUsers, io, getReceiverSocketId);
 
+    // Group call handlers
+    registerGroupCallHandlers(socket, user, onlineUsers, io);
+
     // Disconnect
     socket.on("disconnect", async () => {
         const userId = user._id.toString();
 
         // Xử lý cuộc gọi đang active (lưu DB + thông báo đối phương)
         await handleCallDisconnect(userId, activeCalls, io, getReceiverSocketId);
+
+        // Xử lý group call đang active
+        await handleGroupCallDisconnect(userId, io);
 
         onlineUsers.delete(userId);
         io.emit("online-users", Array.from(onlineUsers.keys()));
