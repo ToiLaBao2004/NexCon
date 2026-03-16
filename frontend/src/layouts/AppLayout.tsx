@@ -10,10 +10,10 @@ const AppLayout = () => {
     const location = useLocation();
     const isMobile = useIsMobile();
     const { activeConversationId } = useChatStore();
-    const { isInMeeting } = useMeetStore();
+    const { isInMeeting, isMinimized: isMeetMinimized } = useMeetStore();
 
     const isChatRoute = location.pathname === "/" || location.pathname === "/chat";
-    const shouldHideMobileBottomNav = isMobile && (isInMeeting || (isChatRoute && !!activeConversationId));
+    const shouldHideMobileBottomNav = isMobile && ((isInMeeting && !isMeetMinimized) || (isChatRoute && !!activeConversationId));
 
     return (
         <div className="flex bg-background h-svh w-full overflow-hidden p-0 md:p-2 md:gap-2 relative">

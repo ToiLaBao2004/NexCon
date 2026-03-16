@@ -23,6 +23,7 @@ import { useChatStore } from "./stores/useChatStore";
 import { unlockMessageSound, unlockNotificationSound, unlockRingtone } from "./utils/sound";
 import CallManager from "./components/call/CallManager";
 import GroupCallManager from "./components/call/GroupCallManager";
+import MeetManager from "./components/call/MeetManager";
 
 function App() {
   const { isDark, setTheme } = useThemeStore();
@@ -80,6 +81,7 @@ function App() {
       />
       <CallManager />
       <GroupCallManager />
+      <MeetManager />
       <BrowserRouter>
         <Routes>
           <Route path="/signin" element={<SignInPage />} />
