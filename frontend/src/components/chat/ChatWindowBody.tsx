@@ -210,6 +210,7 @@ const ChatWindowBody: React.FC = () => {
             return (
               <div
                 key={`msg-${item.data._id ?? index}`}
+                id={`message-${item.data._id}`}
               >
                 <MessageItem
                   message={item.data}

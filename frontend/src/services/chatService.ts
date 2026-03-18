@@ -10,7 +10,6 @@ interface FetchMessageProps {
 
 const pageLimit = 20;
 
-
 function resolveErrorMessage(error: any): string {
 	const status = error?.response?.status;
 	const serverMsg = error?.response?.data?.message ?? '';
@@ -101,5 +100,18 @@ export const chatService = {
 		} catch (error: any) {
 			throw new Error(resolveErrorMessage(error));
 		}
+	},
+
+	async searchMessages(
+		conversationId: string,
+		keyword: string,
+		filters?: { senderId?: string; fromDate?: string; toDate?: string }
+	) {
+		const params = new URLSearchParams({ conversationId, keyword });
+		if (filters?.senderId) params.set('senderId', filters.senderId);
+		if (filters?.fromDate) params.set('fromDate', filters.fromDate);
+		if (filters?.toDate) params.set('toDate', filters.toDate);
+		const res = await api.get(`/messages/search?${params.toString()}`);
+		return res.data as { messages: Message[] };
 	},
 };

@@ -1,7 +1,8 @@
-import Message from '../models/messageModel.js';
+﻿import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
 import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
 import { io, getReceiverSocketId } from '../socket/index.js';
+import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
     uploadChatImageFromBuffer,
     uploadRawFileFromBuffer,
@@ -329,5 +330,59 @@ export async function pinMessage(req, res) {
     } catch (error) {
         console.error('Error pinning message:', error);
         return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function searchMessages(req, res) {
+    try {
+        const { conversationId, senderId, fromDate, toDate } = req.query;
+        const q = req.query.keyword || req.query.q;
+
+        if (!q || !q.trim()) {
+            return res.status(400).json({ message: 'ChÆ°a nháº­p tá»« khÃ³a tÃ¬m kiáº¿m.' });
+        }
+
+        if (!conversationId) {
+            return res.status(400).json({ message: 'Thiáº¿u conversationId.' });
+        }
+
+        // Build base filter
+        const filter = {
+            conversationId,
+            searchContent: { $regex: normalizeVietnamese(q), $options: 'i' },
+            isRecalled: { $ne: true },
+        };
+
+        // Optional: filter by sender
+        if (senderId) {
+            filter.senderId = senderId;
+        }
+
+        // Optional: filter by date range
+        if (fromDate || toDate) {
+            filter.createdAt = {};
+            if (fromDate) filter.createdAt.$gte = new Date(fromDate);
+            if (toDate) {
+                // Include the entire toDate day (set to end of day)
+                const end = new Date(toDate);
+                end.setHours(23, 59, 59, 999);
+                filter.createdAt.$lte = end;
+            }
+        }
+
+        const messages = await Message.find(filter)
+            .sort({ createdAt: -1 })
+            .populate('senderId', 'displayName avatarUrl')
+            .populate({
+                path: 'replyTo',
+                select: '_id senderId type content fileName isRecalled',
+                populate: { path: 'senderId', select: 'displayName' },
+            })
+            .lean();
+
+        return res.status(200).json({ messages });
+    } catch (error) {
+        console.error('Error searching messages:', error);
+        return res.status(500).json({ message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™.' });
     }
 }

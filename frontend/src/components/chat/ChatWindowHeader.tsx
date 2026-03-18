@@ -41,7 +41,7 @@ interface ChatWindowHeaderProps {
 }
 
 const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProps) => {
-  const { conversations, activeConversationId, setActiveConversation } =
+  const { conversations, activeConversationId, setActiveConversation, showSearch, setShowSearch } =
     useChatStore();
   const { user } = useAuthStore();
   const { onlineUsers } = useSocketStore();
@@ -104,6 +104,15 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
       },
       "video",
     );
+  };
+
+  const handleToggleSearch = () => {
+    const next = !showSearch;
+    setShowSearch(next);
+    // Close info panel when opening search
+    if (next && showInfo && onToggleInfo) {
+      onToggleInfo();
+    }
   };
 
   return (
@@ -204,11 +213,18 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
               </Button>
             )}
 
+            {/* Search toggle button */}
             <Button
               variant="ghost"
               size="icon"
-              className="inline-flex rounded-md hover:bg-muted hover:text-foreground transition-colors h-8 w-8 md:h-9 md:w-9"
-              title="Tìm kiếm"
+              className={cn(
+                "rounded-md transition-colors h-8 w-8 md:h-9 md:w-9",
+                showSearch
+                  ? "bg-primary/10 text-primary hover:bg-primary/20"
+                  : "hover:bg-muted hover:text-foreground"
+              )}
+              onClick={handleToggleSearch}
+              title="Tìm kiếm trong trò chuyện"
             >
               <Search className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
             </Button>

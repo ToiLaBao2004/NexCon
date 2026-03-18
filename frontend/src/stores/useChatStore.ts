@@ -16,6 +16,12 @@ export const useChatStore = create<ChatState>()(
             convoLoading: false,
             messageLoading: false,
             replyingTo: null,
+            showSearch: false,
+            searchResults: {
+                items: [] as import('@/types/chat').Message[],
+                isSearching: false,
+                query: '',
+            },
 
             setActiveConversation: (id) => set({ activeConversationId: id, focusedConversationId: id }),
             setFocusedConversation: (id) => set({ focusedConversationId: id }),
@@ -59,6 +65,35 @@ export const useChatStore = create<ChatState>()(
                     };
                 });
             },
+            setShowSearch: (show: boolean) => set({ showSearch: show }),
+            clearSearch: () => set({
+                searchResults: { items: [], isSearching: false, query: '' },
+            }),
+            searchMessages: async (query: string, filters?: { senderId?: string; fromDate?: string; toDate?: string }) => {
+                const { activeConversationId } = get();
+                if (!activeConversationId || !query.trim()) return;
+
+                set((state) => ({
+                    searchResults: { ...state.searchResults, isSearching: true, query },
+                }));
+
+                try {
+                    const { messages } = await chatService.searchMessages(activeConversationId, query, filters);
+                    const { user } = useAuthStore.getState();
+                    const processed = messages.map((m: any) => ({
+                        ...m,
+                        isOwn: m.senderId?._id === user?._id || m.senderId === user?._id,
+                    }));
+                    set((state) => ({
+                        searchResults: { ...state.searchResults, items: processed, isSearching: false },
+                    }));
+                } catch (error) {
+                    console.error('Lỗi khi tìm kiếm tin nhắn:', error);
+                    set((state) => ({
+                        searchResults: { ...state.searchResults, isSearching: false },
+                    }));
+                }
+            },
             reset: () => {
                 set({
                     conversations: [],
@@ -69,6 +104,8 @@ export const useChatStore = create<ChatState>()(
                     focusedConversationId: null,
                     convoLoading: false,
                     replyingTo: null,
+                    showSearch: false,
+                    searchResults: { items: [], isSearching: false, query: '' },
                 });
             },
             fetchConversations: async () => {

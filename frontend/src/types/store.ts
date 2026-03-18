@@ -78,6 +78,20 @@ export interface ChatState {
   fetchMedia: (conversationId: string) => Promise<void>;
   fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number) => Promise<void>;
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
+
+  // Message search
+  showSearch: boolean;
+  searchResults: {
+    items: Message[];
+    isSearching: boolean;
+    query: string;
+  };
+  setShowSearch: (show: boolean) => void;
+  clearSearch: () => void;
+  searchMessages: (
+    query: string,
+    filters?: { senderId?: string; fromDate?: string; toDate?: string }
+  ) => Promise<void>;
 }
 
 export interface SocketState {
