@@ -38,7 +38,7 @@ export const chatService = {
 		payload: SendMessagePayload,
 		onProgress?: (percent: number) => void,
 	): Promise<Message> {
-		const { type, recipientId, conversationId, content, file } = payload;
+		const { type, recipientId, conversationId, content, file, replyToMessageId } = payload;
 
 		const formData = new FormData();
 		formData.append('type', type);
@@ -46,6 +46,7 @@ export const chatService = {
 		if (conversationId) formData.append('conversationId', conversationId);
 		if (content) formData.append('content', content);
 		if (file) formData.append('file', file);
+		if (replyToMessageId) formData.append('replyTo', replyToMessageId);
 
 		try {
 			const res = await api.post('/messages/send', formData, {

@@ -22,6 +22,7 @@ const ChatWindowBody: React.FC = () => {
     messages: allMessages,
     fetchMessages,
     messageLoading,
+    setReplyingTo,
   } = useChatStore();
 
   const convoId = activeConversationId ?? null;
@@ -209,7 +210,6 @@ const ChatWindowBody: React.FC = () => {
             return (
               <div
                 key={`msg-${item.data._id ?? index}`}
-                id={`msg-${item.data._id}`}
               >
                 <MessageItem
                   message={item.data}
@@ -218,6 +218,7 @@ const ChatWindowBody: React.FC = () => {
                   selectedConvo={selectedConvo}
                   currentUserId={user?._id ?? ""}
                   isLast={item.data._id === lastItemId}
+                  onReply={setReplyingTo}
                 />
               </div>
             );

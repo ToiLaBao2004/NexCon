@@ -15,9 +15,11 @@ export const useChatStore = create<ChatState>()(
             focusedConversationId: null,
             convoLoading: false,
             messageLoading: false,
+            replyingTo: null,
 
             setActiveConversation: (id) => set({ activeConversationId: id, focusedConversationId: id }),
             setFocusedConversation: (id) => set({ focusedConversationId: id }),
+            setReplyingTo: (message) => set({ replyingTo: message }),
             clearConversationCache: (keepConversationIds) => {
                 const keep = new Set(keepConversationIds.filter(Boolean));
 
@@ -66,6 +68,7 @@ export const useChatStore = create<ChatState>()(
                     activeConversationId: null,
                     focusedConversationId: null,
                     convoLoading: false,
+                    replyingTo: null,
                 });
             },
             fetchConversations: async () => {
@@ -133,13 +136,27 @@ export const useChatStore = create<ChatState>()(
 
             },
             sendMessage: async (payload: SendMessagePayload, onProgress?: (pct: number) => void) => {
-                const { activeConversationId } = get();
+                const { activeConversationId, replyingTo } = get();
                 const { user } = useAuthStore.getState();
 
                 const finalPayload: SendMessagePayload = {
                     ...payload,
                     conversationId: payload.conversationId ?? (!payload.recipientId ? (activeConversationId ?? undefined) : undefined),
+                    replyToMessageId: replyingTo?._id ?? undefined,
                 };
+
+                const replyToSnapshot = replyingTo
+                    ? {
+                        _id: replyingTo._id,
+                        senderId: replyingTo.senderId,
+                        type: replyingTo.type,
+                        content: replyingTo.content,
+                        fileName: replyingTo.fileName,
+                        isRecalled: replyingTo.isRecalled,
+                    }
+                    : null;
+
+                set({ replyingTo: null });
 
                 const convoId = finalPayload.conversationId ?? activeConversationId;
                 const isFileUpload = !!payload.file;
@@ -168,6 +185,7 @@ export const useChatStore = create<ChatState>()(
                         createdAt: new Date().toISOString(),
                         isOwn: true,
                         status: 'sending' as const,
+                        replyTo: replyToSnapshot,
                     };
 
                     set((state) => {

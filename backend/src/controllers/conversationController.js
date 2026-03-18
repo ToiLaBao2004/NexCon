@@ -149,11 +149,21 @@ export async function getMessages(req, res) {
 		})
 			.sort({ pinnedAt: -1, createdAt: -1 })
 			.populate('senderId', 'displayName avatarUrl')
+			.populate({
+				path: 'replyTo',
+				select: '_id senderId type content fileName isRecalled',
+				populate: { path: 'senderId', select: 'displayName' },
+			})
 			.lean();
 
 		let messages = await Message.find(query)
 			.sort({ createdAt: -1 })
-			.limit(Number(limit) + 1);
+			.limit(Number(limit) + 1)
+			.populate({
+				path: 'replyTo',
+				select: '_id senderId type content fileName isRecalled',
+				populate: { path: 'senderId', select: 'displayName' },
+			});
 
 		let nextCursor = null;
 

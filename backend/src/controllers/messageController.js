@@ -16,7 +16,7 @@ import { safeUpload } from '../utils/messageHelper.js';
 export async function sendMessage(req, res) {
     try {
         const senderId = req.user._id;
-        const { type = 'text', recipientId, content } = req.body;
+        const { type = 'text', recipientId, content, replyTo } = req.body;
         const uploadedFile = req.file;
 
         let conversation = req.conversation;
@@ -121,7 +121,23 @@ export async function sendMessage(req, res) {
                 return res.status(400).json({ message: `Unsupported message type: ${type}` });
         }
 
-        const message = await Message.create(messageData);
+        if (replyTo) {
+            const repliedMessage = await Message.findById(replyTo);
+            if (!repliedMessage || repliedMessage.conversationId.toString() !== conversation._id.toString()) {
+                return res.status(400).json({ message: 'Tin nhắn trả lời không hợp lệ.' });
+            }
+            messageData.replyTo = replyTo;
+        }
+
+        let message = await Message.create(messageData);
+
+        if (message.replyTo) {
+            message = await message.populate({
+                path: 'replyTo',
+                select: '_id senderId type content fileName isRecalled',
+                populate: { path: 'senderId', select: 'displayName' },
+            });
+        }
 
         updateConversationLastMessage(conversation, message, senderId);
         await conversation.save();

@@ -9,6 +9,7 @@ export interface SendMessagePayload {
   conversationId?: string;
   content?: string;
   file?: File;
+  replyToMessageId?: string;
 }
 
 export interface ThemeState {
@@ -54,10 +55,12 @@ export interface ChatState {
   focusedConversationId: string | null;
   convoLoading: boolean;
   messageLoading: boolean;
+  replyingTo: Message | null;
   reset: () => void;
 
   setActiveConversation: (id: string | null) => void;
   setFocusedConversation: (id: string | null) => void;
+  setReplyingTo: (message: Message | null) => void;
   clearConversationCache: (keepConversationIds: string[]) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;

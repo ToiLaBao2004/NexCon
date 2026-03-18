@@ -1,5 +1,5 @@
 import { cn, formatMessageTime, formatBytes, normalizeUrl } from "@/lib/utils";
-import type { Conversation, Message, MessageType, Participant } from "@/types/chat";
+import type { Conversation, Message, MessageType, Participant, ReplyToMessage } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import { Card } from "../ui/card";
 import {
@@ -12,7 +12,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { useState } from "react";
 import { toast } from "sonner";
-import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2 } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon } from "lucide-react";
 
 interface MessageItemProps {
 	message: Message;
@@ -21,6 +21,7 @@ interface MessageItemProps {
 	selectedConvo: Conversation;
 	currentUserId: string;
 	isLast?: boolean;
+	onReply?: (message: Message) => void;
 }
 
 
@@ -94,6 +95,87 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
 	return <span className="text-sm whitespace-pre-wrap break-words">{message.content}</span>;
 }
 
+// Reply quote (rendered inside the Card bubble) 
+function ReplyQuoteInline({ replyTo, isOwn }: { replyTo: ReplyToMessage; isOwn: boolean }) {
+	const senderName =
+		typeof replyTo.senderId === "object"
+			? replyTo.senderId.displayName
+			: null;
+
+	       let preview: React.ReactNode;
+	       if (replyTo.isRecalled) {
+		       preview = <span className="italic">Tin nhắn đã thu hồi</span>;
+	       } else if (replyTo.type === "image") {
+		       preview = (
+			       <span className="flex items-center gap-2">
+				       {replyTo.fileUrl && (
+					       <img
+						       src={replyTo.fileUrl}
+						       alt="reply-thumbnail"
+						       className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+					       />
+				       )}
+				       <span className="flex items-center gap-1">
+					       <ImageIcon className="size-3 shrink-0" /> Hình ảnh
+				       </span>
+			       </span>
+		       );
+	       } else if (replyTo.type === "file") {
+		       preview = (
+			       <span className="flex items-center gap-1">
+				       <FileText className="size-3 shrink-0" /> {replyTo.fileName ?? "Tệp đính kèm"}
+			       </span>
+		       );
+	       } else if (replyTo.type === "link") {
+		       preview = (
+			       <span className="flex items-center gap-1">
+				       <Link2 className="size-3 shrink-0" /> {replyTo.content ?? "Liên kết"}
+			       </span>
+		       );
+	       } else {
+		       const text = replyTo.content ?? "";
+		       preview = text.length > 80 ? text.slice(0, 80) + "…" : text;
+	       }
+
+	       return (
+		       <div
+			       className={cn(
+				       "mb-2 cursor-pointer transition-colors",
+				       "border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30",
+				       "px-3 py-2 rounded-xl shadow-sm",
+				       "flex flex-col gap-0.5",
+				       isOwn ? "border-white/60 bg-white/20" : "border-blue-500",
+			       )}
+			       style={{ boxShadow: "0 2px 8px 0 rgba(0, 120, 255, 0.08)" }}
+			       onClick={(e) => {
+				       e.stopPropagation();
+				       const el = document.getElementById(`msg-${replyTo._id}`);
+				       if (el) {
+					       el.scrollIntoView({ behavior: "smooth", block: "center" });
+					       el.classList.add("ring-2", "ring-primary/40", "rounded-2xl");
+					       setTimeout(() => el.classList.remove("ring-2", "ring-primary/40", "rounded-2xl"), 2000);
+				       }
+			       }}
+		       >
+			       {senderName && (
+				       <span className={cn(
+					       "block text-xs font-semibold truncate leading-snug mb-0.5",
+					       isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
+				       )}>
+					       {senderName}
+				       </span>
+			       )}
+			       <span className={cn(
+				       "block truncate text-xs leading-snug",
+				       senderName ? "mt-px" : "",
+				       isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
+			       )}>
+				       {preview}
+			       </span>
+		       </div>
+	       );
+}
+
 const MessageItem = ({
 	message,
 	index,
@@ -101,6 +183,7 @@ const MessageItem = ({
 	selectedConvo,
 	currentUserId,
 	isLast,
+	onReply,
 }: MessageItemProps) => {
 	const prev = messages[index - 1];
 
@@ -149,6 +232,7 @@ const MessageItem = ({
 	return (
 		<>
 			<div
+				id={`msg-${message._id}`}
 				className={cn(
 					"group relative flex gap-2 mt-0.5 mx-2 px-1",
 					isOwn ? "justify-end" : "justify-start"
@@ -185,6 +269,9 @@ const MessageItem = ({
 										: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
 							)}
 						>
+							{message.replyTo && !isRecalled && (
+								<ReplyQuoteInline replyTo={message.replyTo} isOwn={isOwn} />
+							)}
 							<div className="flex flex-col gap-0.5 w-fit">
 								<div className="w-fit">
 									<MessageContent message={message} isOwn={isOwn} />
@@ -243,7 +330,10 @@ const MessageItem = ({
 								</DropdownMenuTrigger>
 
 								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
-									<DropdownMenuItem>Trả lời</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => onReply?.(message)}>
+										<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
+										Trả lời
+									</DropdownMenuItem>
 									{message.content && (
 										<DropdownMenuItem onClick={handleCopy}>Sao chép</DropdownMenuItem>
 									)}

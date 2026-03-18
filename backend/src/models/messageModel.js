@@ -49,6 +49,11 @@ const messageSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    replyTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Message',
+        default: null,
+    },
 }, { timestamps: true });
 
 // Compound index to optimize queries fetching messages by conversation and sorting by creation time
