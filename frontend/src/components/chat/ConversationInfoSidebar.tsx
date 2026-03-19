@@ -166,9 +166,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   // DIRECT variant
   if (conversation.type === "direct") {
     return (
-      <aside className="flex flex-col h-full min-w-[340px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
+      <aside className="flex flex-col h-full min-w-[350px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
         <div className="flex flex-col items-center pt-6 pb-4 bg-card">
-          <div className="w-[340px] flex flex-col items-center">
+          <div className="w-[350px] flex flex-col items-center">
             <div className="relative mb-1 h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
               <UserAvatar
                 type="profile"
@@ -284,9 +284,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const memberCount = conversation.participants.length;
 
   return (
-    <aside className="flex flex-col h-full min-w-[340px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
+    <aside className="flex flex-col h-full min-w-[350px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
       <div className="flex flex-col items-center pt-6 pb-4 bg-card">
-        <div className="w-[340px] flex flex-col items-center">
+        <div className="w-[350px] flex flex-col items-center">
           <div className="relative mb-1 h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
             <GroupChatAvatar participants={conversation.participants} type="sidebar" />
           </div>

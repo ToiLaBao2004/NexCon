@@ -14,12 +14,7 @@ import { useEffect, useRef } from "react";
 
 const MAX_CACHED_CONVERSATIONS = 1;
 
-interface ChatWindowLayoutProps {
-  showInfo?: boolean;
-  onToggleInfo?: () => void;
-}
-
-const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => {
+const ChatWindowLayout = () => {
   const {
     activeConversationId,
     focusedConversationId,
@@ -29,8 +24,8 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
     markAsSeen,
     fetchMessages,
     clearConversationCache,
-    showSearch,
-    setShowSearch,
+    activeSidebar,
+    setActiveSidebar,
     clearSearch,
   } = useChatStore();
 
@@ -104,13 +99,13 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
     }
   }, [activeConversationId, selectedConvo?.type]);
 
-  // Close search panel when conversation changes
+  // Handle sidebar defaults when conversation changes
   useEffect(() => {
     if (activeConversationId) {
-      setShowSearch(false);
+      setActiveSidebar('info');
       clearSearch();
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, setActiveSidebar, clearSearch]);
 
   if (!selectedConvo) {
     return <ChatWelcomeScreen />;
@@ -133,8 +128,14 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
       <SidebarInset className="flex flex-col h-full flex-1 overflow-hidden bg-transparent shadow-none border-none min-w-0">
         <ChatWindowHeader
           chat={selectedConvo}
-          showInfo={showInfo}
-          onToggleInfo={onToggleInfo}
+          showInfo={activeSidebar === 'info'}
+          onToggleInfo={() => {
+            if (activeSidebar !== 'info') {
+              setActiveSidebar('info');
+            } else {
+              setActiveSidebar(null);
+            }
+          }}
         />
 
         {selectedConvo.type === "group" && activeConversationId && (
@@ -149,10 +150,10 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
       </SidebarInset>
 
       {/* Search panel — fullscreen overlay on mobile, side panel on desktop */}
-      {showSearch && (
+      {activeSidebar === 'search' && (
         <MessageSearchSidebar
           onClose={() => {
-            setShowSearch(false);
+            setActiveSidebar('info');
             clearSearch();
           }}
         />

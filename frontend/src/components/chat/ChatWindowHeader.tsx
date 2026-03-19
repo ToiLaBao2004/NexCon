@@ -41,7 +41,7 @@ interface ChatWindowHeaderProps {
 }
 
 const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProps) => {
-  const { conversations, activeConversationId, setActiveConversation, showSearch, setShowSearch } =
+  const { conversations, activeConversationId, setActiveConversation, activeSidebar, setActiveSidebar } =
     useChatStore();
   const { user } = useAuthStore();
   const { onlineUsers } = useSocketStore();
@@ -107,11 +107,10 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   };
 
   const handleToggleSearch = () => {
-    const next = !showSearch;
-    setShowSearch(next);
-    // Close info panel when opening search
-    if (next && showInfo && onToggleInfo) {
-      onToggleInfo();
+    if (activeSidebar !== 'search') {
+      setActiveSidebar('search');
+    } else {
+      setActiveSidebar('info');
     }
   };
 
@@ -219,7 +218,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
               size="icon"
               className={cn(
                 "rounded-md transition-colors h-8 w-8 md:h-9 md:w-9",
-                showSearch
+                activeSidebar === 'search'
                   ? "bg-primary/10 text-primary hover:bg-primary/20"
                   : "hover:bg-muted hover:text-foreground"
               )}

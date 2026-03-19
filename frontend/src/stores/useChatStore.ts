@@ -16,7 +16,7 @@ export const useChatStore = create<ChatState>()(
             convoLoading: false,
             messageLoading: false,
             replyingTo: null,
-            showSearch: false,
+            activeSidebar: null,
             searchResults: {
                 items: [] as import('@/types/chat').Message[],
                 isSearching: false,
@@ -65,7 +65,7 @@ export const useChatStore = create<ChatState>()(
                     };
                 });
             },
-            setShowSearch: (show: boolean) => set({ showSearch: show }),
+            setActiveSidebar: (sidebar) => set({ activeSidebar: sidebar }),
             clearSearch: () => set({
                 searchResults: { items: [], isSearching: false, query: '' },
             }),
@@ -104,7 +104,7 @@ export const useChatStore = create<ChatState>()(
                     focusedConversationId: null,
                     convoLoading: false,
                     replyingTo: null,
-                    showSearch: false,
+                    activeSidebar: null,
                     searchResults: { items: [], isSearching: false, query: '' },
                 });
             },

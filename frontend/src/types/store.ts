@@ -79,14 +79,14 @@ export interface ChatState {
   fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number) => Promise<void>;
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
 
-  // Message search
-  showSearch: boolean;
+  // Sidebar
+  activeSidebar: 'search' | 'info' | null;
+  setActiveSidebar: (sidebar: 'search' | 'info' | null) => void;
   searchResults: {
     items: Message[];
     isSearching: boolean;
     query: string;
   };
-  setShowSearch: (show: boolean) => void;
   clearSearch: () => void;
   searchMessages: (
     query: string,
