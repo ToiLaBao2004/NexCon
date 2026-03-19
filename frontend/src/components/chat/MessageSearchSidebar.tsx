@@ -270,116 +270,115 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
         </Button>
       </div>
 
-      {/* Scrollable body */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto beautiful-scrollbar">
-        {/* Search input */}
-        <div className="px-4 pt-4 pb-3 space-y-2.5">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              ref={inputRef}
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Tìm kiếm"
-              className="pl-9 pr-12 h-9 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-full text-sm"
-            />
-            {keyword && (
-              <button onClick={handleClear}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-                Xóa
-              </button>
-            )}
-          </div>
-
-          {/* Filters row */}
-          <div className="flex gap-2 flex-wrap">
-            {/* Sender dropdown */}
-            <Dropdown
-              label={<><span className="opacity-60 text-[10px] mr-0.5">👤</span>{senderLabel}</>}
-              open={senderOpen}
-              onToggle={() => { setSenderOpen(o => !o); setDateOpen(false); }}
-              onClickOutside={() => setSenderOpen(false)}
-            >
-              {/* All option */}
-              <button
-                onClick={() => { setSelectedSenderId(""); setSenderOpen(false); }}
-                className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-muted/40 text-sm transition-colors"
-              >
-                <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0 text-muted-foreground text-xs">
-                  Tất cả
-                </div>
-                <span className="flex-1 text-left truncate">Tất cả</span>
-                {!selectedSenderId && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
-              </button>
-              {participants.map((p) => {
-                const u = p.userId;
-                const isSelected = selectedSenderId === u._id;
-                return (
-                  <button
-                    key={u._id}
-                    onClick={() => { setSelectedSenderId(isSelected ? "" : u._id); setSenderOpen(false); }}
-                    className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-muted/40 transition-colors"
-                  >
-                    <UserAvatar type="profile" name={u.displayName} avatarUrl={u.avatarUrl ?? undefined}
-                      className="!h-7 !w-7 !text-xs shrink-0" />
-                    <span className="flex-1 text-sm text-left truncate">{u.displayName}</span>
-                    {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
-                  </button>
-                );
-              })}
-            </Dropdown>
-
-            {/* Date dropdown */}
-            <Dropdown
-              label={<><span className="opacity-60 text-[10px] mr-0.5">📅</span>{dateLabel}</>}
-              open={dateOpen}
-              onToggle={() => { setDateOpen(o => !o); setSenderOpen(false); }}
-              onClickOutside={() => setDateOpen(false)}
-            >
-              {DATE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => {
-                    setDateOption(opt.value);
-                    if (opt.value !== 'custom') setDateOpen(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-3 py-2 hover:bg-muted/40 text-sm transition-colors"
-                >
-                  <span className="flex-1 text-left">{opt.label}</span>
-                  {dateOption === opt.value && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
-                </button>
-              ))}
-              {/* Custom date range pickers */}
-              {dateOption === 'custom' && (
-                <div className="px-3 pb-3 pt-1 space-y-2 border-t border-border/30 mt-1">
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-muted-foreground">Từ ngày</label>
-                    <input
-                      type="date"
-                      value={customFrom}
-                      onChange={(e) => setCustomFrom(e.target.value)}
-                      className="w-full h-8 px-2 rounded-lg border border-border/50 bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary/40"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-muted-foreground">Đến ngày</label>
-                    <input
-                      type="date"
-                      value={customTo}
-                      min={customFrom}
-                      onChange={(e) => setCustomTo(e.target.value)}
-                      className="w-full h-8 px-2 rounded-lg border border-border/50 bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary/40"
-                    />
-                  </div>
-                  <Button size="sm" className="w-full h-7 text-xs" onClick={() => setDateOpen(false)}>
-                    Áp dụng
-                  </Button>
-                </div>
-              )}
-            </Dropdown>
-          </div>
+      {/* Fixed Top Section: Search Input + Filters */}
+      <div className="shrink-0 px-4 pt-4 pb-3 space-y-2.5 bg-background">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            ref={inputRef}
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="Tìm kiếm"
+            className="pl-9 pr-12 h-9 bg-muted/30 border-none focus-visible:ring-1 focus-visible:ring-primary/40 rounded-full text-sm"
+          />
+          {keyword && (
+            <button onClick={handleClear}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
+              Xóa
+            </button>
+          )}
         </div>
 
+        {/* Filters row */}
+        <div className="flex gap-2 flex-wrap">
+          {/* Sender dropdown */}
+          <Dropdown
+            label={<><span className="opacity-60 text-[10px] mr-0.5">👤</span>{senderLabel}</>}
+            open={senderOpen}
+            onToggle={() => { setSenderOpen(o => !o); setDateOpen(false); }}
+            onClickOutside={() => setSenderOpen(false)}
+          >
+            {/* All option */}
+            <button
+              onClick={() => { setSelectedSenderId(""); setSenderOpen(false); }}
+              className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-muted/40 text-sm transition-colors"
+            >
+              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center shrink-0 text-muted-foreground text-xs">
+                Tất cả
+              </div>
+              <span className="flex-1 text-left truncate">Tất cả</span>
+              {!selectedSenderId && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+            </button>
+            {participants.map((p) => {
+              const u = p.userId;
+              const isSelected = selectedSenderId === u._id;
+              return (
+                <button
+                  key={u._id}
+                  onClick={() => { setSelectedSenderId(isSelected ? "" : u._id); setSenderOpen(false); }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-muted/40 transition-colors"
+                >
+                  <UserAvatar type="profile" name={u.displayName} avatarUrl={u.avatarUrl ?? undefined}
+                    className="!h-7 !w-7 !text-xs shrink-0" />
+                  <span className="flex-1 text-sm text-left truncate">{u.displayName}</span>
+                  {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                </button>
+              );
+            })}
+          </Dropdown>
+
+          {/* Date dropdown */}
+          <Dropdown
+            label={<><span className="opacity-60 text-[10px] mr-0.5">📅</span>{dateLabel}</>}
+            open={dateOpen}
+            onToggle={() => { setDateOpen(o => !o); setSenderOpen(false); }}
+            onClickOutside={() => setDateOpen(false)}
+          >
+            {DATE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  setDateOption(opt.value);
+                  if (opt.value !== 'custom') setDateOpen(false);
+                }}
+                className="flex items-center gap-2 w-full px-3 py-2 hover:bg-muted/40 text-sm transition-colors"
+              >
+                <span className="flex-1 text-left">{opt.label}</span>
+                {dateOption === opt.value && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+              </button>
+            ))}
+            {/* Custom date range pickers */}
+            {dateOption === 'custom' && (
+              <div className="px-3 pb-3 pt-1 space-y-2 border-t border-border/30 mt-1">
+                <div className="space-y-1">
+                  <label className="text-[11px] text-muted-foreground">Từ ngày</label>
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="w-full h-8 px-2 rounded-lg border border-border/50 bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-muted-foreground">Đến ngày</label>
+                  <input
+                    type="date"
+                    value={customTo}
+                    min={customFrom}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="w-full h-8 px-2 rounded-lg border border-border/50 bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary/40"
+                  />
+                </div>
+                <Button size="sm" className="w-full h-7 text-xs" onClick={() => setDateOpen(false)}>
+                  Áp dụng
+                </Button>
+              </div>
+            )}
+          </Dropdown>
+        </div>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto beautiful-scrollbar">
         {/* Section header */}
         <div className="px-4 pb-1.5 border-t border-border/20 pt-3">
           <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
