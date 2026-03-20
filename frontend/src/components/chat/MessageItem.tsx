@@ -12,7 +12,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { useState } from "react";
 import { toast } from "sonner";
-import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
@@ -432,11 +432,15 @@ const MessageItem = ({
 										Trả lời
 									</DropdownMenuItem>
 									{message.content && (
-										<DropdownMenuItem onClick={handleCopy}>Sao chép</DropdownMenuItem>
+										<DropdownMenuItem onClick={handleCopy}>
+											<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											Sao chép
+										</DropdownMenuItem>
 									)}
 									{message.fileUrl && (
 										<DropdownMenuItem asChild>
-											<a href={message.fileUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer">
+											<a href={message.fileUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center">
+												<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
 												Tải xuống
 											</a>
 										</DropdownMenuItem>
