@@ -12,7 +12,12 @@ import { useChatStore } from "@/stores/useChatStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { useState } from "react";
 import { toast } from "sonner";
-import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
+import ReactionDetailModal from "./ReactionDetailModal";
+import { useMemo } from "react";
 
 interface MessageItemProps {
 	message: Message;
@@ -206,9 +211,39 @@ const MessageItem = ({
 			(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
 		) ?? [];
 
-	const { recallMessage, pinMessage } = useChatStore();
+	const { recallMessage, pinMessage, reactToMessage } = useChatStore();
 	const [showConfirmRecall, setShowConfirmRecall] = useState(false);
 	const [showPinOptions, setShowPinOptions] = useState(false);
+	const [showReactionModal, setShowReactionModal] = useState(false);
+	const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+	const [isReacting, setIsReacting] = useState(false);
+
+	const reactionSummary = useMemo(() => {
+		if (!message.reactions?.length) return null;
+		
+		const counts: Record<string, number> = {};
+		message.reactions.forEach(r => {
+			counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+		});
+
+		const uniqueEmojis = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
+		const totalCount = message.reactions.length;
+		const myReaction = message.reactions.find(r => r.userId === currentUserId);
+		
+		return { uniqueEmojis, totalCount, myReaction };
+	}, [message.reactions, currentUserId]);
+
+	const handleEmojiSelect = async (emoji: any) => {
+		if (isReacting) return;
+		setIsReacting(true);
+		try {
+			await reactToMessage(message._id, emoji.native);
+		} catch (error) {
+			console.error("Reaction failed:", error);
+		} finally {
+			setIsReacting(false);
+		}
+	};
 
 	const handlePin = async () => {
 		try { await pinMessage(message._id); }
@@ -256,12 +291,13 @@ const MessageItem = ({
 						isOwn ? "items-end" : "items-start"
 					)}
 				>
-					<div className="relative">
+					<div className={cn("relative", reactionSummary && "mb-3.5")}>
 						<Card
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
 								isImage ? "p-0 bg-transparent border-0" : "px-2 py-1.5 text-sm",
+								reactionSummary && !isImage && "min-w-[85px]", // Ensure bubble is wide enough for time + reaction
 								isRecalled
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
 									: isOwn
@@ -301,6 +337,67 @@ const MessageItem = ({
 								<div className="flex items-center gap-1.5 bg-black/20 dark:bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 h-5">
 									<Clock className="size-3 text-white/80 animate-spin" />
 									<span className="text-[11px] font-medium text-white/90">Đang gửi</span>
+								</div>
+							</div>
+						)}
+						
+						{/* Reaction Display */}
+						{reactionSummary && (
+							<button
+								onClick={() => setShowReactionModal(true)}
+								className={cn(
+									"absolute bottom-0 right-0 translate-y-[52%] translate-x-[20%] z-10",
+									"flex items-center gap-1.5 px-1.5 py-0.5 rounded-full border shadow-lg transition-all",
+									"bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 active:scale-95 group/reacts",
+									reactionSummary.myReaction ? "border-primary/50" : "border-border/60"
+								)}
+							>
+								<div className="flex -space-x-1">
+									{reactionSummary.uniqueEmojis.map((e, i) => (
+										<span key={i} className="text-[13px] leading-none drop-shadow-sm">{e}</span>
+									))}
+								</div>
+								{reactionSummary.totalCount > 1 && (
+									<span className="text-[10px] font-bold text-muted-foreground ml-0.5 leading-none group-hover/reacts:text-foreground">
+										{reactionSummary.totalCount}
+									</span>
+								)}
+							</button>
+						)}
+
+						{/* Hover Action Bar - Quick Reaction Button */}
+						{!isRecalled && !message.status && (
+							<div className={cn(
+								"absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto z-30",
+								isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19"
+							)}>
+								<div className="flex items-center gap-1 bg-background shadow-md border border-border/40 rounded-full px-0.5 py-0.5">
+									<Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+										<PopoverTrigger asChild>
+											<button
+												className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+												disabled={isReacting}
+												title="Thả cảm xúc"
+												onClick={() => setShowEmojiPicker(true)}
+											>
+												<Smile className="h-4 w-4" />
+											</button>
+										</PopoverTrigger>
+										<PopoverContent className="w-auto p-0 border-0 shadow-2xl" align={isOwn ? "end" : "start"} side="top" sideOffset={8}>
+											<Picker 
+												data={data} 
+												onEmojiSelect={(emoji: any) => {
+													handleEmojiSelect(emoji);
+													setShowEmojiPicker(false);
+												}}
+												theme="light"
+												set="native"
+												autoFocus={false}
+												skinTonePosition="none"
+												previewPosition="none"
+											/>
+										</PopoverContent>
+									</Popover>
 								</div>
 							</div>
 						)}
@@ -408,6 +505,14 @@ const MessageItem = ({
 				description={isPinned ? "Tin nhắn này sẽ được bỏ ghim." : "Tin nhắn này sẽ được ghim vào đầu cuộc trò chuyện."}
 				confirmText={isPinned ? "Bỏ ghim" : "Ghim"}
 			/>
+			
+			{message.reactions && (
+				<ReactionDetailModal
+					isOpen={showReactionModal}
+					onClose={() => setShowReactionModal(false)}
+					reactions={message.reactions}
+				/>
+			)}
 		</>
 	);
 };

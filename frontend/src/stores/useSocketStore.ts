@@ -195,6 +195,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         });
       }
     });
+    
+    socket.on("message-reaction", ({ messageId, reactions }) => {
+      useChatStore.getState().updateMessageReaction(messageId, reactions);
+    });
 
     socket.on("user-blocked", ({ blockedBy }) => {
       useFriendStore.getState().addBlockedBy(blockedBy);

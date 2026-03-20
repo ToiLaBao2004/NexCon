@@ -114,4 +114,13 @@ export const chatService = {
 		const res = await api.get(`/messages/search?${params.toString()}`);
 		return res.data as { messages: Message[] };
 	},
+
+	async reactToMessage(messageId: string, emoji: string) {
+		try {
+			const res = await api.put(`/messages/${messageId}/react`, { emoji });
+			return res.data as { reactions: { userId: string; emoji: string }[] };
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
 };

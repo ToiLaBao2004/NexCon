@@ -83,5 +83,6 @@ export interface Message {
   status?: 'sending' | 'sent' | 'error';
   progress?: number;
   replyTo?: ReplyToMessage | null;
+  reactions?: { userId: string; emoji: string }[];
 }
 

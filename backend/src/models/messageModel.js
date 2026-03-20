@@ -60,6 +60,12 @@ const messageSchema = new mongoose.Schema({
         ref: 'Message',
         default: null,
     },
+    reactions: [
+        {
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+            emoji: { type: String, required: true }
+        }
+    ],
 }, { timestamps: true });
 
 // Pre-save hook to normalize content for search

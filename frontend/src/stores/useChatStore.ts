@@ -927,6 +927,36 @@ export const useChatStore = create<ChatState>()(
                     };
                 });
             },
+            updateMessageReaction: (messageId, reactions) => {
+                set((state) => {
+                    const nextMessages = { ...state.messages };
+                    let changed = false;
+
+                    for (const convoId in nextMessages) {
+                        const convo = nextMessages[convoId];
+                        const index = convo.items.findIndex(m => m._id === messageId);
+                        if (index !== -1) {
+                            const newItems = [...convo.items];
+                            newItems[index] = { ...newItems[index], reactions };
+                            nextMessages[convoId] = { ...convo, items: newItems };
+                            changed = true;
+                            break;
+                        }
+                    }
+
+                    if (!changed) return state;
+                    return { messages: nextMessages };
+                });
+            },
+            reactToMessage: async (messageId, emoji) => {
+                try {
+                    const { reactions } = await chatService.reactToMessage(messageId, emoji);
+                    get().updateMessageReaction(messageId, reactions);
+                } catch (error) {
+                    console.error('Failed to react to message:', error);
+                    throw error;
+                }
+            },
         }),
         {
             name: "chat-storage",

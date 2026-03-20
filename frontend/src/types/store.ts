@@ -78,6 +78,8 @@ export interface ChatState {
   fetchMedia: (conversationId: string) => Promise<void>;
   fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number) => Promise<void>;
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
+  updateMessageReaction: (messageId: string, reactions: { userId: string; emoji: string }[]) => void;
+  reactToMessage: (messageId: string, emoji: string) => Promise<void>;
 
   // Sidebar
   activeSidebar: 'search' | 'info' | null;

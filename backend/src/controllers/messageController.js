@@ -386,3 +386,47 @@ export async function searchMessages(req, res) {
         return res.status(500).json({ message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™.' });
     }
 }
+export async function reactToMessage(req, res) {
+    try {
+        const { emoji } = req.body;
+        const userId = req.user._id;
+
+        if (!emoji) {
+            return res.status(400).json({ message: 'Emoji is required.' });
+        }
+
+        const { message, conversation } = req;
+
+        const existingReactionIndex = message.reactions.findIndex(
+            (r) => r.userId.toString() === userId.toString()
+        );
+
+        if (existingReactionIndex !== -1) {
+            const existingReaction = message.reactions[existingReactionIndex];
+            if (existingReaction.emoji === emoji) {
+                message.reactions.splice(existingReactionIndex, 1);
+            } else {
+                message.reactions[existingReactionIndex].emoji = emoji;
+            }
+        } else {
+            message.reactions.push({ userId, emoji });
+        }
+
+        await message.save();
+        conversation.participants.forEach((p) => {
+            const socketId = getReceiverSocketId(p.userId._id?.toString() ?? p.userId.toString());
+            if (socketId) {
+                io.to(socketId).emit('message-reaction', {
+                    conversationId: conversation._id.toString(),
+                    messageId: message._id.toString(),
+                    reactions: message.reactions,
+                });
+            }
+        });
+
+        return res.status(200).json({ reactions: message.reactions });
+    } catch (error) {
+        console.error('Error reacting to message:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
