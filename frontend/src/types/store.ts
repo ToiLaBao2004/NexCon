@@ -24,6 +24,12 @@ export interface MediaState {
   links: Message[];
 }
 
+export interface MediaCacheState {
+  cache: Record<string, string>;
+  setUrl: (messageId: string, url: string) => void;
+  clearUrl: (messageId: string) => void;
+}
+
 export type MediaKind = 'image' | 'file' | 'link';
 
 export interface MediaPageState {

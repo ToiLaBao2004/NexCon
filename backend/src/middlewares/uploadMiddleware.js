@@ -41,6 +41,7 @@ export const uploadChatImageFromBuffer = (buffer, folder = 'NexCon/messages/imag
             {
                 folder,
                 resource_type: 'image',
+                type: 'authenticated',
             },
             (error, result) => (error ? reject(error) : resolve(result))
         );
@@ -54,6 +55,7 @@ export const uploadRawFileFromBuffer = (buffer, originalName, folder = 'NexCon/m
             {
                 folder,
                 resource_type: 'raw',
+                type: 'authenticated',
                 public_id: `${Date.now()}_${originalName}`,
                 use_filename: false,
             },
@@ -63,11 +65,11 @@ export const uploadRawFileFromBuffer = (buffer, originalName, folder = 'NexCon/m
     });
 };
 
-export const deleteCloudinaryResource = (publicId, resourceType = 'image') => {
+export const deleteCloudinaryResource = (publicId, resourceType = 'image', deliveryType = 'upload') => {
     return new Promise((resolve, reject) => {
         cloudinary.uploader.destroy(
             publicId,
-            { resource_type: resourceType },
+            { resource_type: resourceType, type: deliveryType },
             (error, result) => (error ? reject(error) : resolve(result))
         );
     });

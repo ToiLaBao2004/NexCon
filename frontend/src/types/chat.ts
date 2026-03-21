@@ -60,6 +60,7 @@ export interface ReplyToMessage {
   content?: string | null;
   fileName?: string | null;
   fileUrl?: string | null;
+  filePublicId?: string | null;
   isRecalled?: boolean | null;
 }
 
@@ -71,6 +72,7 @@ export interface Message {
   content?: string | null;
   fileUrl?: string | null;
   filePublicId?: string | null;
+  signedUrl?: string | null;
   fileName?: string | null;
   fileSize?: number | null;
   mimeType?: string | null;

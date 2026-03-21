@@ -29,11 +29,9 @@ const messageSchema = new mongoose.Schema({
         trim: true,
         select: false,
     },
-    fileUrl: {
-        type: String,
-    },
     filePublicId: {
         type: String,
+        default: null,
     },
     fileName: {
         type: String,

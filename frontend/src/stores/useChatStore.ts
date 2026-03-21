@@ -3,6 +3,7 @@ import type { ChatState, SendMessagePayload } from '@/types/store';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
+import useMediaCacheStore from './useMediaCacheStore';
 
 export const useChatStore = create<ChatState>()(
     persist(
@@ -239,7 +240,7 @@ export const useChatStore = create<ChatState>()(
                 }
 
                 try {
-                    const realMsg = await chatService.sendMessage(finalPayload, (pct) => {
+                    const response = await chatService.sendMessage(finalPayload, (pct) => {
                         if (tempId && convoId) {
                             set((state) => {
                                 const prev = state.messages[convoId];
@@ -260,6 +261,13 @@ export const useChatStore = create<ChatState>()(
                         }
                         onProgress?.(pct);
                     });
+
+                    const realMsg = response.message;
+
+                    // Set cached signed URL before rendering
+                    if (response.signedUrl) {
+                        useMediaCacheStore.getState().setUrl(realMsg._id, response.signedUrl);
+                    }
 
                     if (tempId && convoId) {
                         set((state) => {

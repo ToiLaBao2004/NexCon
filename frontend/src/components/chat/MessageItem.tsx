@@ -10,14 +10,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useChatStore } from "@/stores/useChatStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
+import SecureImage from "../SecureImage";
+import useMediaCacheStore from "@/stores/useMediaCacheStore";
+import { chatService } from "@/services/chatService";
 import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import ReactionDetailModal from "./ReactionDetailModal";
-import { useMemo } from "react";
 
 interface MessageItemProps {
 	message: Message;
@@ -31,7 +33,7 @@ interface MessageItemProps {
 
 
 // ── Content renderer ──────────────────────────────────────────────────────────
-function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }) {
+function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isOwn: boolean; downloadUrl: string }) {
 	const type: MessageType = message.type ?? "text";
 
 	if (message.isRecalled) {
@@ -42,25 +44,36 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
 		);
 	}
 
-	if (type === "image" && message.fileUrl) {
+	if (type === "image" && (message.filePublicId || message.fileUrl)) {
 		return (
 			<div className="flex flex-col gap-1.5">
-				<a href={message.fileUrl} target="_blank" rel="noopener noreferrer">
-					<img
-						src={message.fileUrl}
-						alt={message.fileName ?? "image"}
-						className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-					/>
-				</a>
+				{message.filePublicId ? (
+					<a href={downloadUrl} target="_blank" rel="noopener noreferrer">
+						<SecureImage
+							messageId={message._id}
+							alt={message.fileName ?? "image"}
+							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+						/>
+					</a>
+				) : (
+					<a href={message.fileUrl!} target="_blank" rel="noopener noreferrer">
+						<img
+							src={message.fileUrl!}
+							alt={message.fileName ?? "image"}
+							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+						/>
+					</a>
+				)}
 				{message.content && <p className="text-sm px-1">{message.content}</p>}
 			</div>
 		);
 	}
 
-	if (type === "file" && message.fileUrl) {
+	if (type === "file" && (message.filePublicId || message.fileUrl)) {
+		// Temporary fallback for downloading file. Ideally we also do signed URL for files if needed.
 		return (
 			<a
-				href={message.fileUrl}
+				href={downloadUrl}
 				target="_blank"
 				rel="noopener noreferrer"
 				className="flex items-center gap-2.5 hover:opacity-80 transition-opacity group/file"
@@ -113,13 +126,21 @@ function ReplyQuoteInline({ replyTo, isOwn }: { replyTo: ReplyToMessage; isOwn: 
 	       } else if (replyTo.type === "image") {
 		       preview = (
 			       <span className="flex items-center gap-2">
-				       {replyTo.fileUrl && (
-					       <img
-						       src={replyTo.fileUrl}
-						       alt="reply-thumbnail"
-						       className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
-					       />
-				       )}
+				       {replyTo.filePublicId || replyTo.fileUrl ? (
+					       replyTo.filePublicId ? (
+							<SecureImage
+								messageId={replyTo._id}
+								alt="reply-thumbnail"
+								className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+							/>
+						   ) : (
+							<img
+								src={replyTo.fileUrl!}
+								alt="reply-thumbnail"
+								className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+							/>
+						   )
+				       ) : null}
 				       <span className="flex items-center gap-1">
 					       <ImageIcon className="size-3 shrink-0" /> Hình ảnh
 				       </span>
@@ -204,7 +225,25 @@ const MessageItem = ({
 	const isOwn = message.senderId === currentUserId;
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
-	const isImage = message.type === "image" && !!message.fileUrl && !isRecalled;
+	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
+
+	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
+	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
+
+	// Automatically fetch signed URL for files if not cached
+	useEffect(() => {
+		if (message.type === "file" && message.filePublicId && !message.fileUrl && !cachedMediaUrl) {
+			const fetchUrl = async () => {
+				try {
+					const { url } = await chatService.getSignedMediaUrl(message._id);
+					useMediaCacheStore.getState().setUrl(message._id, url);
+				} catch (error) {
+					console.error('Failed to fetch media url for file:', message._id, error);
+				}
+			};
+			fetchUrl();
+		}
+	}, [message._id, message.type, message.filePublicId, message.fileUrl, cachedMediaUrl]);
 
 	const seenByOthers =
 		selectedConvo.seenBy?.filter(
@@ -310,7 +349,7 @@ const MessageItem = ({
 							)}
 							<div className="flex flex-col gap-0.5 w-fit">
 								<div className="w-fit">
-									<MessageContent message={message} isOwn={isOwn} />
+									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} />
 								</div>
 
 								{!isImage && (
@@ -437,9 +476,9 @@ const MessageItem = ({
 											Sao chép
 										</DropdownMenuItem>
 									)}
-									{message.fileUrl && (
+									{(message.fileUrl || message.filePublicId) && (
 										<DropdownMenuItem asChild>
-											<a href={message.fileUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center">
+											<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center">
 												<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
 												Tải xuống
 											</a>

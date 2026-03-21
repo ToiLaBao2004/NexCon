@@ -6,6 +6,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import { formatBytes, formatMessageTime } from "@/lib/utils";
 import type { MediaKind } from "@/types/store";
 import { SidebarMediaViewerModal } from "./SidebarMediaViewerModal";
+import SecureImage from "../SecureImage";
 
 const VIEW_ALL_LIMIT: Record<MediaKind, number> = {
   image: 24,
@@ -173,8 +174,6 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   const renderFileRow = (msg: any) => {
     const name = msg.fileName ?? msg.content ?? "File";
     const size = msg.fileSize ? formatBytes(msg.fileSize) : msg.mimeType || "";
-    const showImage = isImageFile(msg) && msg.fileUrl;
-    const showVideo = isVideoFile(msg) && msg.fileUrl;
 
     return (
       <a
@@ -186,9 +185,13 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         download={name}
       >
         <div className="h-10 w-10 rounded-lg bg-muted/10 text-white flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
-          {showImage ? (
-            <img src={msg.fileUrl} alt={name} className="h-full w-full object-cover" />
-          ) : showVideo ? (
+          {(isImageFile(msg) && (msg.filePublicId || msg.fileUrl)) ? (
+             msg.filePublicId ? (
+               <SecureImage messageId={msg._id} alt={name} className="h-full w-full object-cover" />
+             ) : (
+               <img src={msg.fileUrl!} alt={name} className="h-full w-full object-cover" />
+             )
+          ) : (isVideoFile(msg) && msg.fileUrl) ? (
             <video src={msg.fileUrl} className="h-full w-full object-cover" muted playsInline preload="metadata" />
           ) : (
             <FileTypeIcon fileName={msg.fileName} />
@@ -294,7 +297,11 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
               key={`img-${msg._id || i}`}
               className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30 cursor-pointer"
             >
-              <img src={msg.fileUrl!} alt="media" className="h-full w-full object-cover" />
+              {msg.filePublicId ? (
+                <SecureImage messageId={msg._id} alt="media" className="h-full w-full object-cover" />
+              ) : (
+                <img src={msg.fileUrl!} alt="media" className="h-full w-full object-cover" />
+              )}
             </div>
           ))}
 

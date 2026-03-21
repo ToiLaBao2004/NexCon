@@ -261,10 +261,10 @@ export async function getMediaByType(req, res) {
 
 		if (type === 'image') {
 			query.type = 'image';
-			query.fileUrl = { $ne: null };
+			query.filePublicId = { $ne: null };
 		} else if (type === 'file') {
 			query.type = 'file';
-			query.fileUrl = { $ne: null };
+			query.filePublicId = { $ne: null };
 		} else if (type === 'link') {
 			query.type = 'link';
 			query.content = { $ne: null };

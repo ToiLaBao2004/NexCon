@@ -10,6 +10,7 @@ import { useCallHistoryStore } from "./useCallHistoryStore";
 import { useGroupCallStore } from "./useGroupCallStore";
 import { toast } from "sonner";
 import { playMessageSound, playNotificationSound } from "@/utils/sound";
+import useMediaCacheStore from "./useMediaCacheStore";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -74,6 +75,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     socket.on("new-message", ({ message, conversation, unreadCounts }) => {
       const chatState = useChatStore.getState();
       const currentUserId = useAuthStore.getState().user?._id;
+
+      if (message.signedUrl) {
+        useMediaCacheStore.getState().setUrl(message._id, message.signedUrl);
+      }
 
       useChatStore.getState().addMessage(message);
 

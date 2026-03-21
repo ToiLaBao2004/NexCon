@@ -1,6 +1,6 @@
-﻿import Message from '../models/messageModel.js';
+import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
-import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
+import { emitNewMessage, updateConversationLastMessage, generateSignedUrl } from '../utils/messageHelper.js';
 import { io, getReceiverSocketId } from '../socket/index.js';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
@@ -11,6 +11,7 @@ import {
     MAX_IMAGE_SIZE,
 } from '../middlewares/uploadMiddleware.js';
 import { safeUpload } from '../utils/messageHelper.js';
+import { v2 as cloudinary } from 'cloudinary';
 
 
 
@@ -85,7 +86,6 @@ export async function sendMessage(req, res) {
                 }
 
                 const result = await safeUpload(uploadChatImageFromBuffer, uploadedFile.buffer);
-                messageData.fileUrl = result.secure_url;
                 messageData.filePublicId = result.public_id;
                 messageData.fileName = uploadedFile.originalname;
                 messageData.fileSize = uploadedFile.size;
@@ -109,7 +109,6 @@ export async function sendMessage(req, res) {
                     uploadedFile.buffer,
                     uploadedFile.originalname
                 );
-                messageData.fileUrl = result.secure_url;
                 messageData.filePublicId = result.public_id;
                 messageData.fileName = uploadedFile.originalname;
                 messageData.fileSize = uploadedFile.size;
@@ -143,9 +142,10 @@ export async function sendMessage(req, res) {
         updateConversationLastMessage(conversation, message, senderId);
         await conversation.save();
 
-        emitNewMessage(io, conversation, message);
+        const signedUrl = generateSignedUrl(message.filePublicId, message.type);
+        emitNewMessage(io, conversation, message, signedUrl);
 
-        return res.status(201).json({ message });
+        return res.status(201).json({ message, signedUrl });
     } catch (error) {
         console.error('Error sending message:', error);
         const statusCode = error.statusCode ?? 500;
@@ -192,14 +192,13 @@ export async function recallMessage(req, res) {
         if (message.filePublicId) {
             try {
                 const resourceType = message.type === 'file' ? 'raw' : 'image';
-                await deleteCloudinaryResource(message.filePublicId, resourceType);
+                await deleteCloudinaryResource(message.filePublicId, resourceType, 'authenticated');
             } catch (cloudErr) {
                 console.warn('Cloudinary delete warning:', cloudErr?.message);
             }
         }
 
         message.isRecalled = true;
-        message.fileUrl = undefined;
         message.filePublicId = undefined;
         if (message.isPinned) {
             message.isPinned = false;
@@ -427,6 +426,36 @@ export async function reactToMessage(req, res) {
         return res.status(200).json({ reactions: message.reactions });
     } catch (error) {
         console.error('Error reacting to message:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+
+export async function getSignedMediaUrl(req, res) {
+    try {
+        const { messageId } = req.params;
+        const message = await Message.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ message: 'Tin nhắn không tồn tại.' });
+        }
+        if (!message.filePublicId) {
+            return res.status(404).json({ message: 'Tin nhắn không có file đính kèm.' });
+        }
+
+        const conversation = await Conversation.findOne({
+            _id: message.conversationId,
+            'participants.userId': req.user._id
+        });
+
+        if (!conversation) {
+            return res.status(403).json({ message: 'Bạn không có quyền xem ảnh này.' });
+        }
+
+        const signedUrl = generateSignedUrl(message.filePublicId, message.type);
+
+        return res.status(200).json({ url: signedUrl });
+    } catch (error) {
+        console.error('Error generating signed URL:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }

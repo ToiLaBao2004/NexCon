@@ -36,7 +36,7 @@ export const chatService = {
 	async sendMessage(
 		payload: SendMessagePayload,
 		onProgress?: (percent: number) => void,
-	): Promise<Message> {
+	): Promise<{ message: Message; signedUrl?: string }> {
 		const { type, recipientId, conversationId, content, file, replyToMessageId } = payload;
 
 		const formData = new FormData();
@@ -56,7 +56,7 @@ export const chatService = {
 				},
 				timeout: 300_000,
 			});
-			return res.data.message;
+			return { message: res.data.message, signedUrl: res.data.signedUrl };
 		} catch (error: any) {
 			throw new Error(resolveErrorMessage(error));
 		}
@@ -119,6 +119,15 @@ export const chatService = {
 		try {
 			const res = await api.put(`/messages/${messageId}/react`, { emoji });
 			return res.data as { reactions: { userId: string; emoji: string }[] };
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async getSignedMediaUrl(messageId: string) {
+		try {
+			const res = await api.get(`/messages/${messageId}/media-url`);
+			return res.data as { url: string };
 		} catch (error: any) {
 			throw new Error(resolveErrorMessage(error));
 		}
