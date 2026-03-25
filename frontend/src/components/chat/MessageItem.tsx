@@ -120,86 +120,86 @@ function ReplyQuoteInline({ replyTo, isOwn }: { replyTo: ReplyToMessage; isOwn: 
 			? replyTo.senderId.displayName
 			: null;
 
-	       let preview: React.ReactNode;
-	       if (replyTo.isRecalled) {
-		       preview = <span className="italic">Tin nhắn đã thu hồi</span>;
-	       } else if (replyTo.type === "image") {
-		       preview = (
-			       <span className="flex items-center gap-2">
-				       {replyTo.filePublicId || replyTo.fileUrl ? (
-					       replyTo.filePublicId ? (
-							<SecureImage
-								messageId={replyTo._id}
-								alt="reply-thumbnail"
-								className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
-							/>
-						   ) : (
-							<img
-								src={replyTo.fileUrl!}
-								alt="reply-thumbnail"
-								className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
-							/>
-						   )
-				       ) : null}
-				       <span className="flex items-center gap-1">
-					       <ImageIcon className="size-3 shrink-0" /> Hình ảnh
-				       </span>
-			       </span>
-		       );
-	       } else if (replyTo.type === "file") {
-		       preview = (
-			       <span className="flex items-center gap-1">
-				       <FileText className="size-3 shrink-0" /> {replyTo.fileName ?? "Tệp đính kèm"}
-			       </span>
-		       );
-	       } else if (replyTo.type === "link") {
-		       preview = (
-			       <span className="flex items-center gap-1">
-				       <Link2 className="size-3 shrink-0" /> {replyTo.content ?? "Liên kết"}
-			       </span>
-		       );
-	       } else {
-		       const text = replyTo.content ?? "";
-		       preview = text.length > 80 ? text.slice(0, 80) + "…" : text;
-	       }
+	let preview: React.ReactNode;
+	if (replyTo.isRecalled) {
+		preview = <span className="italic">Tin nhắn đã thu hồi</span>;
+	} else if (replyTo.type === "image") {
+		preview = (
+			<span className="flex items-center gap-2">
+				{replyTo.filePublicId || replyTo.fileUrl ? (
+					replyTo.filePublicId ? (
+						<SecureImage
+							messageId={replyTo._id}
+							alt="reply-thumbnail"
+							className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+						/>
+					) : (
+						<img
+							src={replyTo.fileUrl!}
+							alt="reply-thumbnail"
+							className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+						/>
+					)
+				) : null}
+				<span className="flex items-center gap-1">
+					<ImageIcon className="size-3 shrink-0" /> Hình ảnh
+				</span>
+			</span>
+		);
+	} else if (replyTo.type === "file") {
+		preview = (
+			<span className="flex items-center gap-1">
+				<FileText className="size-3 shrink-0" /> {replyTo.fileName ?? "Tệp đính kèm"}
+			</span>
+		);
+	} else if (replyTo.type === "link") {
+		preview = (
+			<span className="flex items-center gap-1">
+				<Link2 className="size-3 shrink-0" /> {replyTo.content ?? "Liên kết"}
+			</span>
+		);
+	} else {
+		const text = replyTo.content ?? "";
+		preview = text.length > 80 ? text.slice(0, 80) + "…" : text;
+	}
 
-	       return (
-		       <div
-			       className={cn(
-				       "mb-2 cursor-pointer transition-colors",
-				       "border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30",
-				       "px-3 py-2 rounded-xl shadow-sm",
-				       "flex flex-col gap-0.5",
-				       isOwn ? "border-white/60 bg-white/20" : "border-blue-500",
-			       )}
-			       style={{ boxShadow: "0 2px 8px 0 rgba(0, 120, 255, 0.08)" }}
-			       onClick={(e) => {
-				       e.stopPropagation();
-				       const el = document.getElementById(`msg-${replyTo._id}`);
-				       if (el) {
-					       el.scrollIntoView({ behavior: "smooth", block: "center" });
-					       el.classList.add("ring-2", "ring-primary/40", "rounded-2xl");
-					       setTimeout(() => el.classList.remove("ring-2", "ring-primary/40", "rounded-2xl"), 2000);
-				       }
-			       }}
-		       >
-			       {senderName && (
-				       <span className={cn(
-					       "block text-xs font-semibold truncate leading-snug mb-0.5",
-					       isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
-				       )}>
-					       {senderName}
-				       </span>
-			       )}
-			       <span className={cn(
-				       "block truncate text-xs leading-snug",
-				       senderName ? "mt-px" : "",
-				       isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
-			       )}>
-				       {preview}
-			       </span>
-		       </div>
-	       );
+	return (
+		<div
+			className={cn(
+				"-mb-5 cursor-pointer transition-colors",
+				"border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30",
+				"px-3 py-1.5 rounded-xl shadow-sm",
+				"flex flex-col gap-0",
+				isOwn ? "border-white/60 bg-white/20" : "border-blue-500",
+			)}
+			style={{ boxShadow: "0 2px 8px 0 rgba(0, 120, 255, 0.08)" }}
+			onClick={(e) => {
+				e.stopPropagation();
+				const el = document.getElementById(`msg-${replyTo._id}`);
+				if (el) {
+					el.scrollIntoView({ behavior: "smooth", block: "center" });
+					el.classList.add("ring-2", "ring-primary/40", "rounded-2xl");
+					setTimeout(() => el.classList.remove("ring-2", "ring-primary/40", "rounded-2xl"), 2000);
+				}
+			}}
+		>
+			{senderName && (
+				<span className={cn(
+					"block text-xs font-semibold truncate leading-snug mb-0.5",
+					isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
+				)}>
+					{senderName}
+				</span>
+			)}
+			<span className={cn(
+				"block truncate text-xs leading-snug",
+				senderName ? "mt-px" : "",
+				isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
+			)}>
+				{preview}
+			</span>
+		</div>
+	);
 }
 
 const MessageItem = ({
@@ -259,7 +259,7 @@ const MessageItem = ({
 
 	const reactionSummary = useMemo(() => {
 		if (!message.reactions?.length) return null;
-		
+
 		const counts: Record<string, number> = {};
 		message.reactions.forEach(r => {
 			counts[r.emoji] = (counts[r.emoji] || 0) + 1;
@@ -268,7 +268,7 @@ const MessageItem = ({
 		const uniqueEmojis = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
 		const totalCount = message.reactions.length;
 		const myReaction = message.reactions.find(r => r.userId === currentUserId);
-		
+
 		return { uniqueEmojis, totalCount, myReaction };
 	}, [message.reactions, currentUserId]);
 
@@ -379,7 +379,7 @@ const MessageItem = ({
 								</div>
 							</div>
 						)}
-						
+
 						{/* Reaction Display */}
 						{reactionSummary && (
 							<button
@@ -423,8 +423,8 @@ const MessageItem = ({
 											</button>
 										</PopoverTrigger>
 										<PopoverContent className="w-auto p-0 border-0 shadow-2xl" align={isOwn ? "end" : "start"} side="top" sideOffset={8}>
-											<Picker 
-												data={data} 
+											<Picker
+												data={data}
 												onEmojiSelect={(emoji: any) => {
 													handleEmojiSelect(emoji);
 													setShowEmojiPicker(false);
@@ -548,7 +548,7 @@ const MessageItem = ({
 				description={isPinned ? "Tin nhắn này sẽ được bỏ ghim." : "Tin nhắn này sẽ được ghim vào đầu cuộc trò chuyện."}
 				confirmText={isPinned ? "Bỏ ghim" : "Ghim"}
 			/>
-			
+
 			{message.reactions && (
 				<ReactionDetailModal
 					isOpen={showReactionModal}

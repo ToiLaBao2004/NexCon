@@ -221,7 +221,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 						const msgObj = convo.lastMessage as any;
 						const content = msgObj.content ?? "";
 						const type = msgObj.type ?? "text";
-						const prefix = isMyLastMessage ? "Bạn: " : `${senderName}: `;
+						const prefix = isMyLastMessage ? "Bạn " : `${senderName}: `;
 
 						let cleanMsg = content;
 						if (cleanMsg.startsWith("📎 ")) cleanMsg = cleanMsg.replace("📎 ", "");
