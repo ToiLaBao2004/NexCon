@@ -114,11 +114,32 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 }
 
 // Reply quote (rendered inside the Card bubble) 
-function ReplyQuoteInline({ replyTo, isOwn }: { replyTo: ReplyToMessage; isOwn: boolean }) {
-	const senderName =
+function ReplyQuoteInline({
+	replyTo,
+	isOwn,
+	participants,
+	currentUserId,
+}: {
+	replyTo: ReplyToMessage;
+	isOwn: boolean;
+	participants: Participant[];
+	currentUserId: string;
+}) {
+	const senderId =
 		typeof replyTo.senderId === "object"
-			? replyTo.senderId.displayName
-			: null;
+			? replyTo.senderId._id
+			: replyTo.senderId;
+
+	const senderName =
+		senderId?.toString() === currentUserId
+			? "Bạn"
+			: participants.find(
+				(p) => p.userId?._id?.toString() === senderId?.toString()
+			)?.userId?.nickname?.trim() ||
+			(typeof replyTo.senderId === "object"
+				? replyTo.senderId.displayName
+				: null) ||
+			"Người dùng";
 
 	let preview: React.ReactNode;
 	if (replyTo.isRecalled) {
@@ -184,18 +205,22 @@ function ReplyQuoteInline({ replyTo, isOwn }: { replyTo: ReplyToMessage; isOwn: 
 			}}
 		>
 			{senderName && (
-				<span className={cn(
-					"block text-xs font-semibold truncate leading-snug mb-0.5",
-					isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
-				)}>
+				<span
+					className={cn(
+						"block text-xs font-semibold truncate leading-snug mb-0.5",
+						isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
+					)}
+				>
 					{senderName}
 				</span>
 			)}
-			<span className={cn(
-				"block truncate text-xs leading-snug",
-				senderName ? "mt-px" : "",
-				isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
-			)}>
+			<span
+				className={cn(
+					"block truncate text-xs leading-snug",
+					senderName ? "mt-px" : "",
+					isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
+				)}
+			>
 				{preview}
 			</span>
 		</div>
@@ -317,7 +342,7 @@ const MessageItem = ({
 						{isGroupBreak && (
 							<UserAvatar
 								type="chat"
-								name={participant?.userId.displayName ?? "User"}
+								name={participant?.userId.nickname ?? participant?.userId.displayName ?? "User"}
 								avatarUrl={participant?.userId.avatarUrl ?? undefined}
 							/>
 						)}
@@ -345,7 +370,12 @@ const MessageItem = ({
 							)}
 						>
 							{message.replyTo && !isRecalled && (
-								<ReplyQuoteInline replyTo={message.replyTo} isOwn={isOwn} />
+								<ReplyQuoteInline
+									replyTo={message.replyTo}
+									isOwn={isOwn}
+									participants={selectedConvo.participants}
+									currentUserId={currentUserId}
+								/>
 							)}
 							<div className="flex flex-col gap-0.5 w-fit">
 								<div className="w-fit">
@@ -520,7 +550,7 @@ const MessageItem = ({
 								<UserAvatar
 									key={seenUserId}
 									type="seen"
-									name={seenParticipant.userId.displayName ?? ""}
+									name={seenParticipant.userId.nickname ?? seenParticipant.userId.displayName ?? "User"}
 									avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
 								/>
 							) : null;
