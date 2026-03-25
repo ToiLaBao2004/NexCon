@@ -237,7 +237,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
             const msgObj = convo.lastMessage as any;
             const content = msgObj.content ?? "";
             const type = msgObj.type ?? "text";
-            const prefix = isMyLastMessage ? "Bạn: " : "";
+            const prefix = isMyLastMessage ? "Bạn " : "";
 
             let cleanMsg = content;
             if (cleanMsg.startsWith("📎 ")) cleanMsg = cleanMsg.replace("📎 ", "");
