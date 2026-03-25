@@ -3,6 +3,7 @@ import type { ChatState, SendMessagePayload } from '@/types/store';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
+import useMediaCacheStore from './useMediaCacheStore';
 
 export const useChatStore = create<ChatState>()(
     persist(
@@ -15,9 +16,17 @@ export const useChatStore = create<ChatState>()(
             focusedConversationId: null,
             convoLoading: false,
             messageLoading: false,
+            replyingTo: null,
+            activeSidebar: null,
+            searchResults: {
+                items: [] as import('@/types/chat').Message[],
+                isSearching: false,
+                query: '',
+            },
 
             setActiveConversation: (id) => set({ activeConversationId: id, focusedConversationId: id }),
             setFocusedConversation: (id) => set({ focusedConversationId: id }),
+            setReplyingTo: (message) => set({ replyingTo: message }),
             clearConversationCache: (keepConversationIds) => {
                 const keep = new Set(keepConversationIds.filter(Boolean));
 
@@ -57,6 +66,35 @@ export const useChatStore = create<ChatState>()(
                     };
                 });
             },
+            setActiveSidebar: (sidebar) => set({ activeSidebar: sidebar }),
+            clearSearch: () => set({
+                searchResults: { items: [], isSearching: false, query: '' },
+            }),
+            searchMessages: async (query: string, filters?: { senderId?: string; fromDate?: string; toDate?: string }) => {
+                const { activeConversationId } = get();
+                if (!activeConversationId || !query.trim()) return;
+
+                set((state) => ({
+                    searchResults: { ...state.searchResults, isSearching: true, query },
+                }));
+
+                try {
+                    const { messages } = await chatService.searchMessages(activeConversationId, query, filters);
+                    const { user } = useAuthStore.getState();
+                    const processed = messages.map((m: any) => ({
+                        ...m,
+                        isOwn: m.senderId?._id === user?._id || m.senderId === user?._id,
+                    }));
+                    set((state) => ({
+                        searchResults: { ...state.searchResults, items: processed, isSearching: false },
+                    }));
+                } catch (error) {
+                    console.error('Lỗi khi tìm kiếm tin nhắn:', error);
+                    set((state) => ({
+                        searchResults: { ...state.searchResults, isSearching: false },
+                    }));
+                }
+            },
             reset: () => {
                 set({
                     conversations: [],
@@ -66,6 +104,9 @@ export const useChatStore = create<ChatState>()(
                     activeConversationId: null,
                     focusedConversationId: null,
                     convoLoading: false,
+                    replyingTo: null,
+                    activeSidebar: null,
+                    searchResults: { items: [], isSearching: false, query: '' },
                 });
             },
             fetchConversations: async () => {
@@ -133,13 +174,27 @@ export const useChatStore = create<ChatState>()(
 
             },
             sendMessage: async (payload: SendMessagePayload, onProgress?: (pct: number) => void) => {
-                const { activeConversationId } = get();
+                const { activeConversationId, replyingTo } = get();
                 const { user } = useAuthStore.getState();
 
                 const finalPayload: SendMessagePayload = {
                     ...payload,
                     conversationId: payload.conversationId ?? (!payload.recipientId ? (activeConversationId ?? undefined) : undefined),
+                    replyToMessageId: replyingTo?._id ?? undefined,
                 };
+
+                const replyToSnapshot = replyingTo
+                    ? {
+                        _id: replyingTo._id,
+                        senderId: replyingTo.senderId,
+                        type: replyingTo.type,
+                        content: replyingTo.content,
+                        fileName: replyingTo.fileName,
+                        isRecalled: replyingTo.isRecalled,
+                    }
+                    : null;
+
+                set({ replyingTo: null });
 
                 const convoId = finalPayload.conversationId ?? activeConversationId;
                 const isFileUpload = !!payload.file;
@@ -168,6 +223,7 @@ export const useChatStore = create<ChatState>()(
                         createdAt: new Date().toISOString(),
                         isOwn: true,
                         status: 'sending' as const,
+                        replyTo: replyToSnapshot,
                     };
 
                     set((state) => {
@@ -184,7 +240,7 @@ export const useChatStore = create<ChatState>()(
                 }
 
                 try {
-                    const realMsg = await chatService.sendMessage(finalPayload, (pct) => {
+                    const response = await chatService.sendMessage(finalPayload, (pct) => {
                         if (tempId && convoId) {
                             set((state) => {
                                 const prev = state.messages[convoId];
@@ -205,6 +261,13 @@ export const useChatStore = create<ChatState>()(
                         }
                         onProgress?.(pct);
                     });
+
+                    const realMsg = response.message;
+
+                    // Set cached signed URL before rendering
+                    if (response.signedUrl) {
+                        useMediaCacheStore.getState().setUrl(realMsg._id, response.signedUrl);
+                    }
 
                     if (tempId && convoId) {
                         set((state) => {
@@ -871,6 +934,36 @@ export const useChatStore = create<ChatState>()(
                         },
                     };
                 });
+            },
+            updateMessageReaction: (messageId, reactions) => {
+                set((state) => {
+                    const nextMessages = { ...state.messages };
+                    let changed = false;
+
+                    for (const convoId in nextMessages) {
+                        const convo = nextMessages[convoId];
+                        const index = convo.items.findIndex(m => m._id === messageId);
+                        if (index !== -1) {
+                            const newItems = [...convo.items];
+                            newItems[index] = { ...newItems[index], reactions };
+                            nextMessages[convoId] = { ...convo, items: newItems };
+                            changed = true;
+                            break;
+                        }
+                    }
+
+                    if (!changed) return state;
+                    return { messages: nextMessages };
+                });
+            },
+            reactToMessage: async (messageId, emoji) => {
+                try {
+                    const { reactions } = await chatService.reactToMessage(messageId, emoji);
+                    get().updateMessageReaction(messageId, reactions);
+                } catch (error) {
+                    console.error('Failed to react to message:', error);
+                    throw error;
+                }
             },
         }),
         {

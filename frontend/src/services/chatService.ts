@@ -10,7 +10,6 @@ interface FetchMessageProps {
 
 const pageLimit = 20;
 
-
 function resolveErrorMessage(error: any): string {
 	const status = error?.response?.status;
 	const serverMsg = error?.response?.data?.message ?? '';
@@ -37,8 +36,8 @@ export const chatService = {
 	async sendMessage(
 		payload: SendMessagePayload,
 		onProgress?: (percent: number) => void,
-	): Promise<Message> {
-		const { type, recipientId, conversationId, content, file } = payload;
+	): Promise<{ message: Message; signedUrl?: string }> {
+		const { type, recipientId, conversationId, content, file, replyToMessageId } = payload;
 
 		const formData = new FormData();
 		formData.append('type', type);
@@ -46,6 +45,7 @@ export const chatService = {
 		if (conversationId) formData.append('conversationId', conversationId);
 		if (content) formData.append('content', content);
 		if (file) formData.append('file', file);
+		if (replyToMessageId) formData.append('replyTo', replyToMessageId);
 
 		try {
 			const res = await api.post('/messages/send', formData, {
@@ -56,7 +56,7 @@ export const chatService = {
 				},
 				timeout: 300_000,
 			});
-			return res.data.message;
+			return { message: res.data.message, signedUrl: res.data.signedUrl };
 		} catch (error: any) {
 			throw new Error(resolveErrorMessage(error));
 		}
@@ -97,6 +97,37 @@ export const chatService = {
 		try {
 			const res = await api.put('/messages/pin', { messageId });
 			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async searchMessages(
+		conversationId: string,
+		keyword: string,
+		filters?: { senderId?: string; fromDate?: string; toDate?: string }
+	) {
+		const params = new URLSearchParams({ conversationId, keyword });
+		if (filters?.senderId) params.set('senderId', filters.senderId);
+		if (filters?.fromDate) params.set('fromDate', filters.fromDate);
+		if (filters?.toDate) params.set('toDate', filters.toDate);
+		const res = await api.get(`/messages/search?${params.toString()}`);
+		return res.data as { messages: Message[] };
+	},
+
+	async reactToMessage(messageId: string, emoji: string) {
+		try {
+			const res = await api.put(`/messages/${messageId}/react`, { emoji });
+			return res.data as { reactions: { userId: string; emoji: string }[] };
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async getSignedMediaUrl(messageId: string) {
+		try {
+			const res = await api.get(`/messages/${messageId}/media-url`);
+			return res.data as { url: string };
 		} catch (error: any) {
 			throw new Error(resolveErrorMessage(error));
 		}

@@ -53,6 +53,17 @@ export interface ConversationResponse {
 
 export type MessageType = 'text' | 'image' | 'file' | 'link';
 
+export interface ReplyToMessage {
+  _id: string;
+  senderId: string | { _id: string; displayName: string };
+  type: MessageType;
+  content?: string | null;
+  fileName?: string | null;
+  fileUrl?: string | null;
+  filePublicId?: string | null;
+  isRecalled?: boolean | null;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -61,6 +72,7 @@ export interface Message {
   content?: string | null;
   fileUrl?: string | null;
   filePublicId?: string | null;
+  signedUrl?: string | null;
   fileName?: string | null;
   fileSize?: number | null;
   mimeType?: string | null;
@@ -72,5 +84,7 @@ export interface Message {
   isOwn?: boolean;
   status?: 'sending' | 'sent' | 'error';
   progress?: number;
+  replyTo?: ReplyToMessage | null;
+  reactions?: { userId: string; emoji: string }[];
 }
 

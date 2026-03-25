@@ -149,11 +149,21 @@ export async function getMessages(req, res) {
 		})
 			.sort({ pinnedAt: -1, createdAt: -1 })
 			.populate('senderId', 'displayName avatarUrl')
+			.populate({
+				path: 'replyTo',
+				select: '_id senderId type content fileName isRecalled',
+				populate: { path: 'senderId', select: 'displayName' },
+			})
 			.lean();
 
 		let messages = await Message.find(query)
 			.sort({ createdAt: -1 })
-			.limit(Number(limit) + 1);
+			.limit(Number(limit) + 1)
+			.populate({
+				path: 'replyTo',
+				select: '_id senderId type content fileName isRecalled',
+				populate: { path: 'senderId', select: 'displayName' },
+			});
 
 		let nextCursor = null;
 
@@ -251,10 +261,10 @@ export async function getMediaByType(req, res) {
 
 		if (type === 'image') {
 			query.type = 'image';
-			query.fileUrl = { $ne: null };
+			query.filePublicId = { $ne: null };
 		} else if (type === 'file') {
 			query.type = 'file';
-			query.fileUrl = { $ne: null };
+			query.filePublicId = { $ne: null };
 		} else if (type === 'link') {
 			query.type = 'link';
 			query.content = { $ne: null };

@@ -1,5 +1,5 @@
 import { cn, formatMessageTime, formatBytes, normalizeUrl } from "@/lib/utils";
-import type { Conversation, Message, MessageType, Participant } from "@/types/chat";
+import type { Conversation, Message, MessageType, Participant, ReplyToMessage } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import { Card } from "../ui/card";
 import {
@@ -10,9 +10,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useChatStore } from "@/stores/useChatStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
-import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2 } from "lucide-react";
+import SecureImage from "../SecureImage";
+import useMediaCacheStore from "@/stores/useMediaCacheStore";
+import { chatService } from "@/services/chatService";
+import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import Picker from '@emoji-mart/react';
+import data from '@emoji-mart/data';
+import ReactionDetailModal from "./ReactionDetailModal";
 
 interface MessageItemProps {
 	message: Message;
@@ -21,11 +28,12 @@ interface MessageItemProps {
 	selectedConvo: Conversation;
 	currentUserId: string;
 	isLast?: boolean;
+	onReply?: (message: Message) => void;
 }
 
 
 // ── Content renderer ──────────────────────────────────────────────────────────
-function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }) {
+function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isOwn: boolean; downloadUrl: string }) {
 	const type: MessageType = message.type ?? "text";
 
 	if (message.isRecalled) {
@@ -36,25 +44,36 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
 		);
 	}
 
-	if (type === "image" && message.fileUrl) {
+	if (type === "image" && (message.filePublicId || message.fileUrl)) {
 		return (
 			<div className="flex flex-col gap-1.5">
-				<a href={message.fileUrl} target="_blank" rel="noopener noreferrer">
-					<img
-						src={message.fileUrl}
-						alt={message.fileName ?? "image"}
-						className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-					/>
-				</a>
+				{message.filePublicId ? (
+					<a href={downloadUrl} target="_blank" rel="noopener noreferrer">
+						<SecureImage
+							messageId={message._id}
+							alt={message.fileName ?? "image"}
+							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+						/>
+					</a>
+				) : (
+					<a href={message.fileUrl!} target="_blank" rel="noopener noreferrer">
+						<img
+							src={message.fileUrl!}
+							alt={message.fileName ?? "image"}
+							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
+						/>
+					</a>
+				)}
 				{message.content && <p className="text-sm px-1">{message.content}</p>}
 			</div>
 		);
 	}
 
-	if (type === "file" && message.fileUrl) {
+	if (type === "file" && (message.filePublicId || message.fileUrl)) {
+		// Temporary fallback for downloading file. Ideally we also do signed URL for files if needed.
 		return (
 			<a
-				href={message.fileUrl}
+				href={downloadUrl}
 				target="_blank"
 				rel="noopener noreferrer"
 				className="flex items-center gap-2.5 hover:opacity-80 transition-opacity group/file"
@@ -94,6 +113,95 @@ function MessageContent({ message, isOwn }: { message: Message; isOwn: boolean }
 	return <span className="text-sm whitespace-pre-wrap break-words">{message.content}</span>;
 }
 
+// Reply quote (rendered inside the Card bubble) 
+function ReplyQuoteInline({ replyTo, isOwn }: { replyTo: ReplyToMessage; isOwn: boolean }) {
+	const senderName =
+		typeof replyTo.senderId === "object"
+			? replyTo.senderId.displayName
+			: null;
+
+	       let preview: React.ReactNode;
+	       if (replyTo.isRecalled) {
+		       preview = <span className="italic">Tin nhắn đã thu hồi</span>;
+	       } else if (replyTo.type === "image") {
+		       preview = (
+			       <span className="flex items-center gap-2">
+				       {replyTo.filePublicId || replyTo.fileUrl ? (
+					       replyTo.filePublicId ? (
+							<SecureImage
+								messageId={replyTo._id}
+								alt="reply-thumbnail"
+								className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+							/>
+						   ) : (
+							<img
+								src={replyTo.fileUrl!}
+								alt="reply-thumbnail"
+								className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+							/>
+						   )
+				       ) : null}
+				       <span className="flex items-center gap-1">
+					       <ImageIcon className="size-3 shrink-0" /> Hình ảnh
+				       </span>
+			       </span>
+		       );
+	       } else if (replyTo.type === "file") {
+		       preview = (
+			       <span className="flex items-center gap-1">
+				       <FileText className="size-3 shrink-0" /> {replyTo.fileName ?? "Tệp đính kèm"}
+			       </span>
+		       );
+	       } else if (replyTo.type === "link") {
+		       preview = (
+			       <span className="flex items-center gap-1">
+				       <Link2 className="size-3 shrink-0" /> {replyTo.content ?? "Liên kết"}
+			       </span>
+		       );
+	       } else {
+		       const text = replyTo.content ?? "";
+		       preview = text.length > 80 ? text.slice(0, 80) + "…" : text;
+	       }
+
+	       return (
+		       <div
+			       className={cn(
+				       "mb-2 cursor-pointer transition-colors",
+				       "border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30",
+				       "px-3 py-2 rounded-xl shadow-sm",
+				       "flex flex-col gap-0.5",
+				       isOwn ? "border-white/60 bg-white/20" : "border-blue-500",
+			       )}
+			       style={{ boxShadow: "0 2px 8px 0 rgba(0, 120, 255, 0.08)" }}
+			       onClick={(e) => {
+				       e.stopPropagation();
+				       const el = document.getElementById(`msg-${replyTo._id}`);
+				       if (el) {
+					       el.scrollIntoView({ behavior: "smooth", block: "center" });
+					       el.classList.add("ring-2", "ring-primary/40", "rounded-2xl");
+					       setTimeout(() => el.classList.remove("ring-2", "ring-primary/40", "rounded-2xl"), 2000);
+				       }
+			       }}
+		       >
+			       {senderName && (
+				       <span className={cn(
+					       "block text-xs font-semibold truncate leading-snug mb-0.5",
+					       isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
+				       )}>
+					       {senderName}
+				       </span>
+			       )}
+			       <span className={cn(
+				       "block truncate text-xs leading-snug",
+				       senderName ? "mt-px" : "",
+				       isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
+			       )}>
+				       {preview}
+			       </span>
+		       </div>
+	       );
+}
+
 const MessageItem = ({
 	message,
 	index,
@@ -101,6 +209,7 @@ const MessageItem = ({
 	selectedConvo,
 	currentUserId,
 	isLast,
+	onReply,
 }: MessageItemProps) => {
 	const prev = messages[index - 1];
 
@@ -116,16 +225,64 @@ const MessageItem = ({
 	const isOwn = message.senderId === currentUserId;
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
-	const isImage = message.type === "image" && !!message.fileUrl && !isRecalled;
+	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
+
+	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
+	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
+
+	// Automatically fetch signed URL for files if not cached
+	useEffect(() => {
+		if (message.type === "file" && message.filePublicId && !message.fileUrl && !cachedMediaUrl) {
+			const fetchUrl = async () => {
+				try {
+					const { url } = await chatService.getSignedMediaUrl(message._id);
+					useMediaCacheStore.getState().setUrl(message._id, url);
+				} catch (error) {
+					console.error('Failed to fetch media url for file:', message._id, error);
+				}
+			};
+			fetchUrl();
+		}
+	}, [message._id, message.type, message.filePublicId, message.fileUrl, cachedMediaUrl]);
 
 	const seenByOthers =
 		selectedConvo.seenBy?.filter(
 			(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
 		) ?? [];
 
-	const { recallMessage, pinMessage } = useChatStore();
+	const { recallMessage, pinMessage, reactToMessage } = useChatStore();
 	const [showConfirmRecall, setShowConfirmRecall] = useState(false);
 	const [showPinOptions, setShowPinOptions] = useState(false);
+	const [showReactionModal, setShowReactionModal] = useState(false);
+	const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+	const [isReacting, setIsReacting] = useState(false);
+
+	const reactionSummary = useMemo(() => {
+		if (!message.reactions?.length) return null;
+		
+		const counts: Record<string, number> = {};
+		message.reactions.forEach(r => {
+			counts[r.emoji] = (counts[r.emoji] || 0) + 1;
+		});
+
+		const uniqueEmojis = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
+		const totalCount = message.reactions.length;
+		const myReaction = message.reactions.find(r => r.userId === currentUserId);
+		
+		return { uniqueEmojis, totalCount, myReaction };
+	}, [message.reactions, currentUserId]);
+
+	const handleEmojiSelect = async (emoji: any) => {
+		if (isReacting) return;
+		setIsReacting(true);
+		try {
+			await reactToMessage(message._id, emoji.native);
+		} catch (error) {
+			console.error("Reaction failed:", error);
+		} finally {
+			setIsReacting(false);
+		}
+	};
 
 	const handlePin = async () => {
 		try { await pinMessage(message._id); }
@@ -149,6 +306,7 @@ const MessageItem = ({
 	return (
 		<>
 			<div
+				id={`msg-${message._id}`}
 				className={cn(
 					"group relative flex gap-2 mt-0.5 mx-2 px-1",
 					isOwn ? "justify-end" : "justify-start"
@@ -172,12 +330,13 @@ const MessageItem = ({
 						isOwn ? "items-end" : "items-start"
 					)}
 				>
-					<div className="relative">
+					<div className={cn("relative", reactionSummary && "mb-3.5")}>
 						<Card
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
 								isImage ? "p-0 bg-transparent border-0" : "px-2 py-1.5 text-sm",
+								reactionSummary && !isImage && "min-w-[85px]", // Ensure bubble is wide enough for time + reaction
 								isRecalled
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
 									: isOwn
@@ -185,9 +344,12 @@ const MessageItem = ({
 										: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
 							)}
 						>
+							{message.replyTo && !isRecalled && (
+								<ReplyQuoteInline replyTo={message.replyTo} isOwn={isOwn} />
+							)}
 							<div className="flex flex-col gap-0.5 w-fit">
 								<div className="w-fit">
-									<MessageContent message={message} isOwn={isOwn} />
+									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} />
 								</div>
 
 								{!isImage && (
@@ -217,6 +379,67 @@ const MessageItem = ({
 								</div>
 							</div>
 						)}
+						
+						{/* Reaction Display */}
+						{reactionSummary && (
+							<button
+								onClick={() => setShowReactionModal(true)}
+								className={cn(
+									"absolute bottom-0 right-0 translate-y-[52%] translate-x-[20%] z-10",
+									"flex items-center gap-1.5 px-1.5 py-0.5 rounded-full border shadow-lg transition-all",
+									"bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 active:scale-95 group/reacts",
+									reactionSummary.myReaction ? "border-primary/50" : "border-border/60"
+								)}
+							>
+								<div className="flex -space-x-1">
+									{reactionSummary.uniqueEmojis.map((e, i) => (
+										<span key={i} className="text-[13px] leading-none drop-shadow-sm">{e}</span>
+									))}
+								</div>
+								{reactionSummary.totalCount > 1 && (
+									<span className="text-[10px] font-bold text-muted-foreground ml-0.5 leading-none group-hover/reacts:text-foreground">
+										{reactionSummary.totalCount}
+									</span>
+								)}
+							</button>
+						)}
+
+						{/* Hover Action Bar - Quick Reaction Button */}
+						{!isRecalled && !message.status && (
+							<div className={cn(
+								"absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto z-30",
+								isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19"
+							)}>
+								<div className="flex items-center gap-1 bg-background shadow-md border border-border/40 rounded-full px-0.5 py-0.5">
+									<Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
+										<PopoverTrigger asChild>
+											<button
+												className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
+												disabled={isReacting}
+												title="Thả cảm xúc"
+												onClick={() => setShowEmojiPicker(true)}
+											>
+												<Smile className="h-4 w-4" />
+											</button>
+										</PopoverTrigger>
+										<PopoverContent className="w-auto p-0 border-0 shadow-2xl" align={isOwn ? "end" : "start"} side="top" sideOffset={8}>
+											<Picker 
+												data={data} 
+												onEmojiSelect={(emoji: any) => {
+													handleEmojiSelect(emoji);
+													setShowEmojiPicker(false);
+												}}
+												theme="light"
+												set="native"
+												autoFocus={false}
+												skinTonePosition="none"
+												previewPosition="none"
+											/>
+										</PopoverContent>
+									</Popover>
+								</div>
+							</div>
+						)}
 
 
 						{!isRecalled && (!message.status || message.status === "sent") && (
@@ -243,13 +466,20 @@ const MessageItem = ({
 								</DropdownMenuTrigger>
 
 								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
-									<DropdownMenuItem>Trả lời</DropdownMenuItem>
+									<DropdownMenuItem onClick={() => onReply?.(message)}>
+										<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
+										Trả lời
+									</DropdownMenuItem>
 									{message.content && (
-										<DropdownMenuItem onClick={handleCopy}>Sao chép</DropdownMenuItem>
+										<DropdownMenuItem onClick={handleCopy}>
+											<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											Sao chép
+										</DropdownMenuItem>
 									)}
-									{message.fileUrl && (
+									{(message.fileUrl || message.filePublicId) && (
 										<DropdownMenuItem asChild>
-											<a href={message.fileUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer">
+											<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center">
+												<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
 												Tải xuống
 											</a>
 										</DropdownMenuItem>
@@ -318,6 +548,14 @@ const MessageItem = ({
 				description={isPinned ? "Tin nhắn này sẽ được bỏ ghim." : "Tin nhắn này sẽ được ghim vào đầu cuộc trò chuyện."}
 				confirmText={isPinned ? "Bỏ ghim" : "Ghim"}
 			/>
+			
+			{message.reactions && (
+				<ReactionDetailModal
+					isOpen={showReactionModal}
+					onClose={() => setShowReactionModal(false)}
+					reactions={message.reactions}
+				/>
+			)}
 		</>
 	);
 };

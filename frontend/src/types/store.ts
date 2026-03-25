@@ -9,6 +9,7 @@ export interface SendMessagePayload {
   conversationId?: string;
   content?: string;
   file?: File;
+  replyToMessageId?: string;
 }
 
 export interface ThemeState {
@@ -21,6 +22,12 @@ export interface MediaState {
   images: Message[];
   files: Message[];
   links: Message[];
+}
+
+export interface MediaCacheState {
+  cache: Record<string, string>;
+  setUrl: (messageId: string, url: string) => void;
+  clearUrl: (messageId: string) => void;
 }
 
 export type MediaKind = 'image' | 'file' | 'link';
@@ -54,10 +61,12 @@ export interface ChatState {
   focusedConversationId: string | null;
   convoLoading: boolean;
   messageLoading: boolean;
+  replyingTo: Message | null;
   reset: () => void;
 
   setActiveConversation: (id: string | null) => void;
   setFocusedConversation: (id: string | null) => void;
+  setReplyingTo: (message: Message | null) => void;
   clearConversationCache: (keepConversationIds: string[]) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
@@ -75,6 +84,22 @@ export interface ChatState {
   fetchMedia: (conversationId: string) => Promise<void>;
   fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number) => Promise<void>;
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
+  updateMessageReaction: (messageId: string, reactions: { userId: string; emoji: string }[]) => void;
+  reactToMessage: (messageId: string, emoji: string) => Promise<void>;
+
+  // Sidebar
+  activeSidebar: 'search' | 'info' | null;
+  setActiveSidebar: (sidebar: 'search' | 'info' | null) => void;
+  searchResults: {
+    items: Message[];
+    isSearching: boolean;
+    query: string;
+  };
+  clearSearch: () => void;
+  searchMessages: (
+    query: string,
+    filters?: { senderId?: string; fromDate?: string; toDate?: string }
+  ) => Promise<void>;
 }
 
 export interface SocketState {

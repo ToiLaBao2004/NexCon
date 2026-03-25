@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { Dialog, DialogHeader, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 import type { Message } from "@/types/chat";
 import type { MediaKind } from "@/types/store";
+import SecureImage from "../SecureImage";
 
 const VIEWER_TITLES: Record<MediaKind, string> = {
   image: "Tất cả ảnh/video",
@@ -46,15 +47,24 @@ export function SidebarMediaViewerModal({
       return (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
           {items.map((msg, i) => (
-            <a
-              key={`all-img-${msg._id || i}`}
-              href={msg.fileUrl || undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30"
-            >
-              <img src={msg.fileUrl || undefined} alt="media" className="h-full w-full object-cover" />
-            </a>
+             msg.filePublicId ? (
+                <div
+                  key={`all-img-${msg._id || i}`}
+                  className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30"
+                >
+                  <SecureImage messageId={msg._id} alt="media" className="h-full w-full object-cover" />
+                </div>
+             ) : (
+                <a
+                  key={`all-img-${msg._id || i}`}
+                  href={msg.fileUrl || undefined}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30"
+                >
+                  <img src={msg.fileUrl || undefined} alt="media" className="h-full w-full object-cover" />
+                </a>
+             )
           ))}
         </div>
       );

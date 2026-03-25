@@ -8,7 +8,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
-import { Paperclip, ImagePlus, Send, X, FileText } from "lucide-react";
+import { Paperclip, ImagePlus, Send, X, FileText, Reply } from "lucide-react";
 import { isUrl, formatBytes } from "@/lib/utils";
 
 
@@ -43,7 +43,7 @@ function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: numb
 const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
     const { user } = useAuthStore();
     const { emitTyping, emitStopTyping } = useSocketStore();
-    const { sendMessage, markAsSeen } = useChatStore();
+    const { sendMessage, markAsSeen, replyingTo, setReplyingTo } = useChatStore();
     const { blockedUsers, blockedBy } = useFriendStore();
 
     const [value, setValue] = useState("");
@@ -189,6 +189,37 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
     return (
         <div className="flex flex-col bg-background border-t border-border/50">
+
+            {replyingTo && (
+                <div className="flex items-center gap-2 px-3 pt-2.5 pb-1 animate-in slide-in-from-bottom-2 duration-200">
+                    <div className="flex-1 min-w-0 flex items-center gap-2.5 border-l-[3px] border-blue-500 bg-blue-500/8 dark:bg-blue-400/10 rounded-r-lg px-3 py-2">
+                        <Reply className="size-4 text-blue-500 dark:text-blue-400 shrink-0 rotate-180" />
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[12px] font-bold text-blue-600 dark:text-blue-400 truncate">
+                                Đang trả lời
+                            </span>
+                            <span className="text-[11px] text-muted-foreground truncate leading-snug mt-px">
+                                {replyingTo.isRecalled
+                                    ? "Tin nhắn đã thu hồi"
+                                    : replyingTo.type === "image"
+                                        ? "Hình ảnh"
+                                        : replyingTo.type === "file"
+                                            ? (replyingTo.fileName ?? "Tệp đính kèm")
+                                            : (replyingTo.content && replyingTo.content.length > 50
+                                                ? replyingTo.content.slice(0, 50) + "…"
+                                                : replyingTo.content ?? "")}
+                            </span>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setReplyingTo(null)}
+                        className="p-1.5 rounded-full hover:bg-muted/80 transition-colors shrink-0"
+                        title="Hủy trả lời"
+                    >
+                        <X className="size-4 text-muted-foreground hover:text-foreground transition-colors" />
+                    </button>
+                </div>
+            )}
 
             {loadingLocal && <ProgressBar percent={100} label="Đang tải" />}
 

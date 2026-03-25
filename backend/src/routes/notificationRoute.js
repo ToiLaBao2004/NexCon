@@ -7,6 +7,6 @@ notificationRouter.get('/', getNotifications);
 notificationRouter.put('/:id/mark-as-read', markAsRead);
 notificationRouter.patch('/mark-all-as-read', markAllAsRead);
 notificationRouter.put('/:id/mark-as-unread', markAsUnread);
-notificationRouter.delete('/:id', deleteNotification);
+notificationRouter.delete('/delete/:id', deleteNotification);
 
 export default notificationRouter;

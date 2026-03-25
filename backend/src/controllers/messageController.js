@@ -1,7 +1,8 @@
 import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
-import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
+import { emitNewMessage, updateConversationLastMessage, generateSignedUrl } from '../utils/messageHelper.js';
 import { io, getReceiverSocketId } from '../socket/index.js';
+import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
     uploadChatImageFromBuffer,
     uploadRawFileFromBuffer,
@@ -10,13 +11,14 @@ import {
     MAX_IMAGE_SIZE,
 } from '../middlewares/uploadMiddleware.js';
 import { safeUpload } from '../utils/messageHelper.js';
+import { v2 as cloudinary } from 'cloudinary';
 
 
 
 export async function sendMessage(req, res) {
     try {
         const senderId = req.user._id;
-        const { type = 'text', recipientId, content } = req.body;
+        const { type = 'text', recipientId, content, replyTo } = req.body;
         const uploadedFile = req.file;
 
         let conversation = req.conversation;
@@ -84,7 +86,6 @@ export async function sendMessage(req, res) {
                 }
 
                 const result = await safeUpload(uploadChatImageFromBuffer, uploadedFile.buffer);
-                messageData.fileUrl = result.secure_url;
                 messageData.filePublicId = result.public_id;
                 messageData.fileName = uploadedFile.originalname;
                 messageData.fileSize = uploadedFile.size;
@@ -108,7 +109,6 @@ export async function sendMessage(req, res) {
                     uploadedFile.buffer,
                     uploadedFile.originalname
                 );
-                messageData.fileUrl = result.secure_url;
                 messageData.filePublicId = result.public_id;
                 messageData.fileName = uploadedFile.originalname;
                 messageData.fileSize = uploadedFile.size;
@@ -121,14 +121,31 @@ export async function sendMessage(req, res) {
                 return res.status(400).json({ message: `Unsupported message type: ${type}` });
         }
 
-        const message = await Message.create(messageData);
+        if (replyTo) {
+            const repliedMessage = await Message.findById(replyTo);
+            if (!repliedMessage || repliedMessage.conversationId.toString() !== conversation._id.toString()) {
+                return res.status(400).json({ message: 'Tin nhắn trả lời không hợp lệ.' });
+            }
+            messageData.replyTo = replyTo;
+        }
+
+        let message = await Message.create(messageData);
+
+        if (message.replyTo) {
+            message = await message.populate({
+                path: 'replyTo',
+                select: '_id senderId type content fileName isRecalled',
+                populate: { path: 'senderId', select: 'displayName' },
+            });
+        }
 
         updateConversationLastMessage(conversation, message, senderId);
         await conversation.save();
 
-        emitNewMessage(io, conversation, message);
+        const signedUrl = generateSignedUrl(message.filePublicId, message.type);
+        emitNewMessage(io, conversation, message, signedUrl);
 
-        return res.status(201).json({ message });
+        return res.status(201).json({ message, signedUrl });
     } catch (error) {
         console.error('Error sending message:', error);
         const statusCode = error.statusCode ?? 500;
@@ -175,14 +192,13 @@ export async function recallMessage(req, res) {
         if (message.filePublicId) {
             try {
                 const resourceType = message.type === 'file' ? 'raw' : 'image';
-                await deleteCloudinaryResource(message.filePublicId, resourceType);
+                await deleteCloudinaryResource(message.filePublicId, resourceType, 'authenticated');
             } catch (cloudErr) {
                 console.warn('Cloudinary delete warning:', cloudErr?.message);
             }
         }
 
         message.isRecalled = true;
-        message.fileUrl = undefined;
         message.filePublicId = undefined;
         if (message.isPinned) {
             message.isPinned = false;
@@ -312,6 +328,134 @@ export async function pinMessage(req, res) {
         });
     } catch (error) {
         console.error('Error pinning message:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function searchMessages(req, res) {
+    try {
+        const { conversationId, senderId, fromDate, toDate } = req.query;
+        const q = req.query.keyword || req.query.q;
+
+        if (!q || !q.trim()) {
+            return res.status(400).json({ message: 'ChÆ°a nháº­p tá»« khÃ³a tÃ¬m kiáº¿m.' });
+        }
+
+        if (!conversationId) {
+            return res.status(400).json({ message: 'Thiáº¿u conversationId.' });
+        }
+
+        // Build base filter
+        const filter = {
+            conversationId,
+            searchContent: { $regex: normalizeVietnamese(q), $options: 'i' },
+            isRecalled: { $ne: true },
+        };
+
+        // Optional: filter by sender
+        if (senderId) {
+            filter.senderId = senderId;
+        }
+
+        // Optional: filter by date range
+        if (fromDate || toDate) {
+            filter.createdAt = {};
+            if (fromDate) filter.createdAt.$gte = new Date(fromDate);
+            if (toDate) {
+                // Include the entire toDate day (set to end of day)
+                const end = new Date(toDate);
+                end.setHours(23, 59, 59, 999);
+                filter.createdAt.$lte = end;
+            }
+        }
+
+        const messages = await Message.find(filter)
+            .sort({ createdAt: -1 })
+            .populate('senderId', 'displayName avatarUrl')
+            .populate({
+                path: 'replyTo',
+                select: '_id senderId type content fileName isRecalled',
+                populate: { path: 'senderId', select: 'displayName' },
+            })
+            .lean();
+
+        return res.status(200).json({ messages });
+    } catch (error) {
+        console.error('Error searching messages:', error);
+        return res.status(500).json({ message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™.' });
+    }
+}
+export async function reactToMessage(req, res) {
+    try {
+        const { emoji } = req.body;
+        const userId = req.user._id;
+
+        if (!emoji) {
+            return res.status(400).json({ message: 'Emoji is required.' });
+        }
+
+        const { message, conversation } = req;
+
+        const existingReactionIndex = message.reactions.findIndex(
+            (r) => r.userId.toString() === userId.toString()
+        );
+
+        if (existingReactionIndex !== -1) {
+            const existingReaction = message.reactions[existingReactionIndex];
+            if (existingReaction.emoji === emoji) {
+                message.reactions.splice(existingReactionIndex, 1);
+            } else {
+                message.reactions[existingReactionIndex].emoji = emoji;
+            }
+        } else {
+            message.reactions.push({ userId, emoji });
+        }
+
+        await message.save();
+        conversation.participants.forEach((p) => {
+            const socketId = getReceiverSocketId(p.userId._id?.toString() ?? p.userId.toString());
+            if (socketId) {
+                io.to(socketId).emit('message-reaction', {
+                    conversationId: conversation._id.toString(),
+                    messageId: message._id.toString(),
+                    reactions: message.reactions,
+                });
+            }
+        });
+
+        return res.status(200).json({ reactions: message.reactions });
+    } catch (error) {
+        console.error('Error reacting to message:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+
+export async function getSignedMediaUrl(req, res) {
+    try {
+        const { messageId } = req.params;
+        const message = await Message.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ message: 'Tin nhắn không tồn tại.' });
+        }
+        if (!message.filePublicId) {
+            return res.status(404).json({ message: 'Tin nhắn không có file đính kèm.' });
+        }
+
+        const conversation = await Conversation.findOne({
+            _id: message.conversationId,
+            'participants.userId': req.user._id
+        });
+
+        if (!conversation) {
+            return res.status(403).json({ message: 'Bạn không có quyền xem ảnh này.' });
+        }
+
+        const signedUrl = generateSignedUrl(message.filePublicId, message.type);
+
+        return res.status(200).json({ url: signedUrl });
+    } catch (error) {
+        console.error('Error generating signed URL:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }

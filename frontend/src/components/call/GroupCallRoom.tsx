@@ -15,7 +15,7 @@ import {
   type TrackReference,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor, Minimize2, Maximize2 } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor, MonitorUp, MonitorOff, Minimize2, Maximize2 } from 'lucide-react';
 import { cn, nameToColor } from '@/lib/utils';
 
 interface GroupCallRoomProps {
@@ -176,6 +176,9 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
   const { toggle: toggleCam, enabled: camOn, pending: camPending } = useTrackToggle({
     source: Track.Source.Camera,
   });
+  const { toggle: toggleScreen, enabled: screenOn, pending: screenPending } = useTrackToggle({
+    source: Track.Source.ScreenShare,
+  });
   const { buttonProps: leaveProps } = useDisconnectButton({ stopTracks: true });
 
   const handleLeave = () => {
@@ -214,6 +217,20 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
       </button>
 
       <button
+        className={cn(
+          'p-3.5 rounded-full transition-all duration-150',
+          screenOn
+            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+            : 'bg-muted hover:bg-muted/70 text-foreground',
+        )}
+        onClick={() => toggleScreen()}
+        disabled={screenPending}
+        title={screenOn ? 'Dừng chia sẻ màn hình' : 'Chia sẻ màn hình'}
+      >
+        {screenOn ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
+      </button>
+
+      <button
         className="p-3.5 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors ml-2"
         onClick={handleLeave}
         title="Rời phòng"
@@ -228,6 +245,7 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
 const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => void; onLeave?: () => void; roomLabel?: string }) => {
   const { toggle: toggleMic, enabled: micOn } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn } = useTrackToggle({ source: Track.Source.Camera });
+  const { toggle: toggleScreen, enabled: screenOn } = useTrackToggle({ source: Track.Source.ScreenShare });
   const participants = useParticipants();
   const { buttonProps: leaveProps } = useDisconnectButton({ stopTracks: true });
 
@@ -263,6 +281,13 @@ const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => v
           title={camOn ? 'Tắt camera' : 'Bật camera'}
         >
           {camOn ? <Video size={16} /> : <VideoOff size={16} />}
+        </button>
+        <button
+          onClick={() => toggleScreen()}
+          className={cn('p-2 rounded-full transition-colors', screenOn ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-muted')}
+          title={screenOn ? 'Dừng chia sẻ' : 'Chia sẻ màn hình'}
+        >
+          {screenOn ? <MonitorOff size={16} /> : <MonitorUp size={16} />}
         </button>
         <button
           onClick={handleLeave}

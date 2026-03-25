@@ -3,7 +3,7 @@ import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
 import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
 import ConversationInfoSidebar from "@/components/chat/ConversationInfoSidebar";
 import { useChatStore } from "@/stores/useChatStore";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMaxWidth } from "@/hooks/use-max-width";
 import type { Conversation } from "@/types/chat";
@@ -18,7 +18,7 @@ interface ChatAppPageContentProps {
   activeConversationId: string | null;
   conversations: Conversation[];
   showInfo: boolean;
-  setShowInfo: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowSidebar: (sidebar: 'search' | 'info' | null) => void;
   isMobile: boolean;
   isTabletOrBelow: boolean;
 }
@@ -27,7 +27,7 @@ const ChatAppPageContent = ({
   activeConversationId,
   conversations,
   showInfo,
-  setShowInfo,
+  setShowSidebar,
   isMobile,
   isTabletOrBelow,
 }: ChatAppPageContentProps) => {
@@ -65,12 +65,12 @@ const ChatAppPageContent = ({
       {showChatWindow && (
         <main className="flex-1 min-w-0 bg-card rounded-none md:rounded-2xl overflow-hidden shadow-soft border border-border/40 md:ml-2 h-full flex">
           <div className="flex-1 min-w-0 flex flex-col">
-            <ChatWindowLayout showInfo={showInfo} onToggleInfo={() => setShowInfo((v) => !v)} />
+            <ChatWindowLayout />
           </div>
 
           {/* Right info sidebar – hidden on mobile, full-screen overlay handled separately */}
           {!useOverlayInfoSidebar && showInfo && selectedConvo && (
-            <div className="w-[340px] shrink-0 border-l border-border/40 overflow-hidden bg-card/10">
+            <div className="w-[350px] shrink-0 border-l border-border/40 overflow-hidden bg-card/10">
               <ConversationInfoSidebar conversation={selectedConvo} />
             </div>
           )}
@@ -89,7 +89,7 @@ const ChatAppPageContent = ({
         >
           <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 bg-card border-b border-border/40">
             <button
-              onClick={() => setShowInfo(false)}
+              onClick={() => setShowSidebar(null)}
               className="text-foreground p-1"
             >
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
@@ -104,10 +104,11 @@ const ChatAppPageContent = ({
 };
 
 const ChatAppPage = () => {
-  const { activeConversationId, conversations } = useChatStore();
-  const [showInfo, setShowInfo] = useState(false);
+  const { activeConversationId, conversations, activeSidebar, setActiveSidebar } = useChatStore();
   const isMobile = useIsMobile();
   const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
+
+  const showInfo = activeSidebar === 'info';
 
   return (
     <SidebarProvider
@@ -118,7 +119,7 @@ const ChatAppPage = () => {
         activeConversationId={activeConversationId}
         conversations={conversations}
         showInfo={showInfo}
-        setShowInfo={setShowInfo}
+        setShowSidebar={setActiveSidebar}
         isMobile={isMobile}
         isTabletOrBelow={isTabletOrBelow}
       />

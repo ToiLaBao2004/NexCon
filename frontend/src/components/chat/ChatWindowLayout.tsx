@@ -9,16 +9,12 @@ import ChatWindowHeader from "./ChatWindowHeader";
 import ChatWindowBody from "./ChatWindowBody";
 import MessageInput from "./MessageInput";
 import OngoingCallBanner from "@/components/call/OngoingCallBanner";
+import MessageSearchSidebar from "./MessageSearchSidebar";
 import { useEffect, useRef } from "react";
 
 const MAX_CACHED_CONVERSATIONS = 1;
 
-interface ChatWindowLayoutProps {
-  showInfo?: boolean;
-  onToggleInfo?: () => void;
-}
-
-const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => {
+const ChatWindowLayout = () => {
   const {
     activeConversationId,
     focusedConversationId,
@@ -28,6 +24,9 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
     markAsSeen,
     fetchMessages,
     clearConversationCache,
+    activeSidebar,
+    setActiveSidebar,
+    clearSearch,
   } = useChatStore();
 
   const {
@@ -100,6 +99,14 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
     }
   }, [activeConversationId, selectedConvo?.type]);
 
+  // Handle sidebar defaults when conversation changes
+  useEffect(() => {
+    if (activeConversationId) {
+      setActiveSidebar('info');
+      clearSearch();
+    }
+  }, [activeConversationId, setActiveSidebar, clearSearch]);
+
   if (!selectedConvo) {
     return <ChatWelcomeScreen />;
   }
@@ -115,25 +122,43 @@ const ChatWindowLayout = ({ showInfo, onToggleInfo }: ChatWindowLayoutProps) => 
   if (isInitialLoading) {
     return <ChatWindowSkeleton />
   }
+
   return (
-    <SidebarInset className="flex flex-col h-full flex-1 overflow-hidden bg-transparent shadow-none border-none">
-      <ChatWindowHeader
-        chat={selectedConvo}
-        showInfo={showInfo}
-        onToggleInfo={onToggleInfo}
-      />
+    <div className="flex h-full flex-1 overflow-hidden relative">
+      <SidebarInset className="flex flex-col h-full flex-1 overflow-hidden bg-transparent shadow-none border-none min-w-0">
+        <ChatWindowHeader
+          chat={selectedConvo}
+          showInfo={activeSidebar === 'info'}
+          onToggleInfo={() => {
+            if (activeSidebar !== 'info') {
+              setActiveSidebar('info');
+            } else {
+              setActiveSidebar(null);
+            }
+          }}
+        />
 
-      {selectedConvo.type === "group" && activeConversationId && (
-        <OngoingCallBanner conversationId={activeConversationId} />
+        {selectedConvo.type === "group" && activeConversationId && (
+          <OngoingCallBanner conversationId={activeConversationId} />
+        )}
+
+        <div className="flex-1 min-h-0 bg-primary-foreground">
+          <ChatWindowBody />
+        </div>
+
+        <MessageInput selectedConvo={selectedConvo} />
+      </SidebarInset>
+
+      {/* Search panel — fullscreen overlay on mobile, side panel on desktop */}
+      {activeSidebar === 'search' && (
+        <MessageSearchSidebar
+          onClose={() => {
+            setActiveSidebar('info');
+            clearSearch();
+          }}
+        />
       )}
-
-      <div className="flex-1 min-h-0 bg-primary-foreground">
-        <ChatWindowBody />
-      </div>
-
-      <MessageInput selectedConvo={selectedConvo} />
-
-    </SidebarInset>
+    </div>
   );
 
 };
