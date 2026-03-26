@@ -299,6 +299,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     socket.on("group-call:error", (payload) => {
       useGroupCallStore.getState().handleGroupCallError(payload);
     });
+
+    socket.on("group-disbanded", ({ conversationId }) => {
+      useChatStore.getState().markGroupAsDisbanded(conversationId);
+      const activeConvo = useChatStore.getState().activeConversationId;
+      if (activeConvo === conversationId) {
+        toast.warning("Nhóm này đã bị giải tán.");
+      }
+    });
   },
 
   joinConversation(conversationId: string) {

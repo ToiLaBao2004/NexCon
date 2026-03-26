@@ -327,7 +327,7 @@ export async function updateGroupName(req, res) {
 	}
 }
 
-async function disbandGroup(conversation, io) {
+async function disbandGroup(conversation) {
 	conversation.disbanded = true;
 	await conversation.save();
 	io.to(conversation._id.toString()).emit('group-disbanded', { conversationId: conversation._id });
@@ -337,7 +337,6 @@ export async function disbandGroupByAdmin(req, res) {
 	try {
 		const { conversationId } = req.params;
 		const userId = req.user._id.toString();
-		const io = req.app.get('io');
 
 		const conversation = await Conversation.findById(conversationId);
 		if (!conversation) {
@@ -352,7 +351,7 @@ export async function disbandGroupByAdmin(req, res) {
 			return res.status(403).json({ message: 'Only admins can disband the group.' });
 		}
 
-		await disbandGroup(conversation, io);
+		await disbandGroup(conversation);
 		res.status(200).json({ message: 'Group disbanded successfully.' });
 	} catch (error) {
 		console.error('Error disbanding group:', error);

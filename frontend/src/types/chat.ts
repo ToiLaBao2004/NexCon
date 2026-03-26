@@ -20,6 +20,7 @@ export interface SeenUser {
 export interface Group {
   name: string;
   createdBy: string;
+  admins?: string[];
 }
 
 export interface LastMessage {
@@ -45,6 +46,7 @@ export interface Conversation {
   unreadCounts: Record<string, number>;
   createdAt: string;
   updatedAt: string;
+  disbanded?: boolean;
 }
 
 export interface ConversationResponse {

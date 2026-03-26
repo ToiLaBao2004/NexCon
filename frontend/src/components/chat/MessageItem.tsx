@@ -251,6 +251,7 @@ const MessageItem = ({
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
 	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
+	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
 	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
@@ -435,7 +436,7 @@ const MessageItem = ({
 						)}
 
 						{/* Hover Action Bar - Quick Reaction Button */}
-						{!isRecalled && !message.status && (
+						{!isRecalled && !message.status && !isDisbanded && (
 							<div className={cn(
 								"absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto z-30",
 								isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19"
@@ -496,10 +497,12 @@ const MessageItem = ({
 								</DropdownMenuTrigger>
 
 								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
-									<DropdownMenuItem onClick={() => onReply?.(message)}>
-										<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
-										Trả lời
-									</DropdownMenuItem>
+									{!isDisbanded && (
+										<DropdownMenuItem onClick={() => onReply?.(message)}>
+											<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											Trả lời
+										</DropdownMenuItem>
+									)}
 									{message.content && (
 										<DropdownMenuItem onClick={handleCopy}>
 											<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
@@ -514,15 +517,17 @@ const MessageItem = ({
 											</a>
 										</DropdownMenuItem>
 									)}
-									<DropdownMenuItem onClick={() => setShowPinOptions(true)}>
-										{isPinned ? (
-											<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
-										) : (
-											<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
-										)}
-										{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-									</DropdownMenuItem>
-									{isOwn && (
+									{!isDisbanded && (
+										<DropdownMenuItem onClick={() => setShowPinOptions(true)}>
+											{isPinned ? (
+												<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											) : (
+												<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											)}
+											{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+										</DropdownMenuItem>
+									)}
+									{isOwn && !isDisbanded && (
 										<DropdownMenuItem
 											className="text-destructive focus:text-destructive focus:bg-destructive/10"
 											onClick={() => setShowConfirmRecall(true)}

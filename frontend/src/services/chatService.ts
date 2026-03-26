@@ -84,6 +84,15 @@ export const chatService = {
 		return res.data;
 	},
 
+	async disbandGroup(conversationId: string) {
+		try {
+			const res = await api.delete(`/conversations/${conversationId}/disband-group`);
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
 	async recallMessage(messageId: string) {
 		try {
 			const res = await api.put('/messages/recall', { messageId });

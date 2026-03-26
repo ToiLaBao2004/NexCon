@@ -78,6 +78,7 @@ export interface ChatState {
   openChat: (params: { userId?: string; conversationId?: string }) => Promise<void>;
   createGroup: (name: string, members: string[]) => Promise<void>;
   recallMessage: (messageId: string) => Promise<void>;
+  disbandGroup: (conversationId: string) => Promise<void>;
   pinMessage: (messageId: string) => Promise<void>;
   pinMessageLocal: (conversationId: string, messageId: string, patch: { isPinned: boolean, pinnedAt: string | null }) => void;
   recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
@@ -86,6 +87,7 @@ export interface ChatState {
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
   updateMessageReaction: (messageId: string, reactions: { userId: string; emoji: string }[]) => void;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
+  markGroupAsDisbanded: (conversationId: string) => void;
 
   // Sidebar
   activeSidebar: 'search' | 'info' | null;

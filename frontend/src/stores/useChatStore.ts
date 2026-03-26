@@ -965,6 +965,22 @@ export const useChatStore = create<ChatState>()(
                     throw error;
                 }
             },
+            markGroupAsDisbanded: (conversationId: string) => {
+                set((state) => ({
+                    conversations: state.conversations.map((c) =>
+                        c._id === conversationId ? { ...c, disbanded: true } : c
+                    )
+                }));
+            },
+            disbandGroup: async (conversationId: string) => {
+                get().markGroupAsDisbanded(conversationId);
+                try {
+                    await chatService.disbandGroup(conversationId);
+                } catch (error) {
+                    console.error("Lỗi khi giải tán nhóm:", error);
+                    throw error;
+                }
+            },
         }),
         {
             name: "chat-storage",
