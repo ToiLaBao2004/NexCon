@@ -6,8 +6,8 @@ import { upload, handleUploadError } from '../middlewares/uploadMiddleware.js';
 const messageRouter = express.Router();
 
 messageRouter.post('/send', upload.single('file'), handleUploadError, checkMessagePermission, sendMessage);
-messageRouter.put('/recall', recallMessage);
-messageRouter.put('/pin', pinMessage);
+messageRouter.put('/recall', checkConversationMembership, recallMessage);
+messageRouter.put('/pin', checkConversationMembership, pinMessage);
 messageRouter.get('/search', searchMessages);
 messageRouter.put('/:messageId/react', checkConversationMembership, reactToMessage);
 messageRouter.get('/:messageId/media-url', getSignedMediaUrl);

@@ -312,6 +312,9 @@ export async function updateGroupName(req, res) {
 		if (conversation.type !== 'group') {
 			return res.status(400).json({ message: "Only group conversations can be renamed" });
 		}
+		if (conversation.disbanded === true) {
+			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
+		}
 		if (!conversation.participants.some(p => p.userId.toString() === userId)) {
 			return res.status(403).json({ message: "Only group participants can rename the group" });
 		}
