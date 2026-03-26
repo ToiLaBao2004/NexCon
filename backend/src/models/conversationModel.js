@@ -20,7 +20,8 @@ const groupSchema = new mongoose.Schema({
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
-    }
+    },
+    admins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, { _id: false });
 
 const lastMessageSchema = new mongoose.Schema({
@@ -67,6 +68,7 @@ const conversationSchema = new mongoose.Schema({
         of: Number,
         default: () => new Map(),
     },
+    disbanded: { type: Boolean, default: false }
 }, { timestamps: true });
 
 conversationSchema.index({ 'participants.userId': 1, 'lastMessage.createdAt': -1 });

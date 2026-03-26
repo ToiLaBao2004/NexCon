@@ -31,7 +31,11 @@ export async function createConversation(req, res) {
 			participants.push({ userId: userId, joinedAt: new Date() });
 			conversation = new Conversation({
 				type: 'group',
-				group: { name: name, createdBy: userId },
+				group: {
+					name: name,
+					createdBy: userId,
+					admins: [userId]
+				},
 				participants: participants
 			});
 			conversation = await Conversation.create(conversation);
@@ -317,5 +321,38 @@ export async function updateGroupName(req, res) {
 	} catch (error) {
 		console.error("An error occurred while updating group name: ", error);
 		return res.status(500).json({ message: "Internal server error" });
+	}
+}
+
+async function disbandGroup(conversation, io) {
+	conversation.disbanded = true;
+	await conversation.save();
+	io.to(conversation._id.toString()).emit('group-disbanded', { conversationId: conversation._id });
+}
+
+export async function disbandGroupByAdmin(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const userId = req.user._id.toString();
+		const io = req.app.get('io');
+
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+
+		if (conversation.type !== 'group') {
+			return res.status(400).json({ message: 'Only group conversations can be disbanded.' });
+		}
+
+		if (!conversation.group.admins.some(adminId => adminId.toString() === userId)) {
+			return res.status(403).json({ message: 'Only admins can disband the group.' });
+		}
+
+		await disbandGroup(conversation, io);
+		res.status(200).json({ message: 'Group disbanded successfully.' });
+	} catch (error) {
+		console.error('Error disbanding group:', error);
+		res.status(500).json({ message: 'Internal server error' });
 	}
 }
