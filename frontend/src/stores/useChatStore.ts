@@ -114,6 +114,12 @@ export const useChatStore = create<ChatState>()(
                     set({ convoLoading: true });
                     const { conversations } = await chatService.fetchConversations();
 
+                    conversations.sort((a: any, b: any) => {
+                        const dateA = new Date(a.lastMessage?.createdAt || a.createdAt || a.updatedAt || 0).getTime();
+                        const dateB = new Date(b.lastMessage?.createdAt || b.createdAt || b.updatedAt || 0).getTime();
+                        return dateB - dateA;
+                    });
+
                     set({ conversations, convoLoading: false });
                 } catch (error) {
                     console.error("Lỗi khi tải danh sách cuộc trò chuyện:", error);

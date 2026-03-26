@@ -11,6 +11,9 @@ import MessageInput from "./MessageInput";
 import OngoingCallBanner from "@/components/call/OngoingCallBanner";
 import MessageSearchSidebar from "./MessageSearchSidebar";
 import { useEffect, useRef } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useMaxWidth } from "@/hooks/use-max-width";
+import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
 
 const MAX_CACHED_CONVERSATIONS = 1;
 
@@ -28,6 +31,10 @@ const ChatWindowLayout = () => {
     setActiveSidebar,
     clearSearch,
   } = useChatStore();
+
+  const isMobile = useIsMobile();
+  const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
+  const useOverlayInfoSidebar = isMobile || isTabletOrBelow;
 
   const {
     loading: callHistoryLoading,
@@ -102,7 +109,7 @@ const ChatWindowLayout = () => {
   // Handle sidebar defaults when conversation changes
   useEffect(() => {
     if (activeConversationId) {
-      setActiveSidebar('info');
+      setActiveSidebar(useOverlayInfoSidebar ? null : 'info');
       clearSearch();
     }
   }, [activeConversationId, setActiveSidebar, clearSearch]);
