@@ -84,7 +84,7 @@ export interface ChatState {
   recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
   clearConversation: (conversationId: string) => Promise<void>;
   fetchMedia: (conversationId: string) => Promise<void>;
-  fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number) => Promise<void>;
+  fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number, force?: boolean) => Promise<void>;
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
   updateMessageReaction: (messageId: string, reactions: { userId: string; emoji: string }[]) => void;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;

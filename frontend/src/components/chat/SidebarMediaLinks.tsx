@@ -14,13 +14,48 @@ const VIEW_ALL_LIMIT: Record<MediaKind, number> = {
   link: 20,
 };
 
+function ThickDivider() {
+  return <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />;
+}
+
+function Section({
+  title,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="bg-card w-full">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-[14px] text-[15px] font-bold text-foreground hover:bg-muted/10 transition-colors"
+      >
+        {title}
+        {open ? (
+          <ChevronUp className="h-[18px] w-[18px] text-muted-foreground/60" strokeWidth={2} />
+        ) : (
+          <ChevronDown className="h-[18px] w-[18px] text-muted-foreground/60" strokeWidth={2} />
+        )}
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  );
+}
+
 export function SidebarMediaLinks({ conversation }: { conversation: Conversation }) {
   const mediaState = useChatStore((s) => s.media[conversation._id]);
   const fetchMedia = useChatStore((s) => s.fetchMedia);
   const fetchMediaPage = useChatStore((s) => s.fetchMediaPage);
   const resetMediaPagination = useChatStore((s) => s.resetMediaPagination);
+
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [activeViewer, setActiveViewer] = useState<MediaKind | null>(null);
+  const [viewerKey, setViewerKey] = useState(0);
+
   const mediaPage = useChatStore((s) =>
     activeViewer ? s.mediaPagination[conversation._id]?.[activeViewer] : undefined
   );
@@ -29,11 +64,19 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     fetchMedia(conversation._id);
   }, [conversation._id, fetchMedia]);
 
+  // Cleanup pagination khi unmount
   useEffect(() => {
     return () => {
       resetMediaPagination(conversation._id);
     };
   }, [conversation._id, resetMediaPagination]);
+
+  // Khi viewer mở (hoặc viewerKey thay đổi), fetch sạch từ đầu
+  useEffect(() => {
+    if (!isViewerOpen || !activeViewer) return;
+    // force=true: tự reset state + fetch, bỏ qua mọi guard trong store
+    fetchMediaPage(conversation._id, activeViewer, VIEW_ALL_LIMIT[activeViewer], true);
+  }, [isViewerOpen, activeViewer, viewerKey, conversation._id, fetchMediaPage]);
 
   const imageMessages = mediaState?.images ?? [];
   const fileMessages = mediaState?.files ?? [];
@@ -58,7 +101,6 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
       try {
         u = new URL(url);
       } catch (e) {
-        // try with https:// prefix for host-only urls
         u = new URL("https://" + url);
       }
       if (u.hostname.includes("youtube.com") || u.hostname.includes("youtu.be")) {
@@ -70,7 +112,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         }
         if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
       }
-    } catch (e) {}
+    } catch (e) { }
     return null;
   };
 
@@ -112,14 +154,12 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         </svg>
       );
     }
-    // default generic file
     return <FileText className="h-5 w-5 text-[#475569]" />;
   };
 
   const getHostIcon = (host: string) => {
     if (!host) return null;
     if (host.includes("youtube.com") || host.includes("youtu.be")) {
-      // simple YouTube play icon
       return (
         <svg className="h-10 w-10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect width="24" height="24" rx="4" fill="#FF0000" />
@@ -127,7 +167,6 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         </svg>
       );
     }
-    // fallback to favicon service
     return <img src={`https://www.google.com/s2/favicons?domain=${host}&sz=64`} alt={host} className="h-full w-full object-contain" />;
   };
 
@@ -141,6 +180,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   const openViewer = (type: MediaKind) => {
     setActiveViewer(type);
     setIsViewerOpen(true);
+    setViewerKey((k) => k + 1);
   };
 
   const closeViewer = () => {
@@ -150,13 +190,6 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     setIsViewerOpen(false);
     setActiveViewer(null);
   };
-
-  useEffect(() => {
-    if (!isViewerOpen || !activeViewer) return;
-
-    resetMediaPagination(conversation._id, activeViewer);
-    fetchMediaPage(conversation._id, activeViewer, VIEW_ALL_LIMIT[activeViewer]);
-  }, [isViewerOpen, activeViewer, conversation._id, fetchMediaPage, resetMediaPagination]);
 
   const onViewerScroll = (event: UIEvent<HTMLDivElement>) => {
     if (!activeViewer) return;
@@ -186,11 +219,11 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
       >
         <div className="h-10 w-10 rounded-lg bg-muted/10 text-white flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
           {(isImageFile(msg) && (msg.filePublicId || msg.fileUrl)) ? (
-             msg.filePublicId ? (
-               <SecureImage messageId={msg._id} alt={name} className="h-full w-full object-cover" />
-             ) : (
-               <img src={msg.fileUrl!} alt={name} className="h-full w-full object-cover" />
-             )
+            msg.filePublicId ? (
+              <SecureImage messageId={msg._id} alt={name} className="h-full w-full object-cover" />
+            ) : (
+              <img src={msg.fileUrl!} alt={name} className="h-full w-full object-cover" />
+            )
           ) : (isVideoFile(msg) && msg.fileUrl) ? (
             <video src={msg.fileUrl} className="h-full w-full object-cover" muted playsInline preload="metadata" />
           ) : (
@@ -255,42 +288,9 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     );
   };
 
-  // Local Section and ThickDivider (extracted from previous SidebarShared)
-  function ThickDividerLocal() {
-    return <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />;
-  }
-
-  function SectionLocal({
-    title,
-    children,
-    defaultOpen = true,
-  }: {
-    title: string;
-    children: ReactNode;
-    defaultOpen?: boolean;
-  }) {
-    const [open, setOpen] = useState(defaultOpen);
-    return (
-      <div className="bg-card w-full">
-          <button
-            onClick={() => setOpen((v: boolean) => !v)}
-            className="flex w-full items-center justify-between px-4 py-[14px] text-[15px] font-bold text-foreground hover:bg-muted/10 transition-colors"
-          >
-            {title}
-            {open ? (
-              <ChevronUp className="h-[18px] w-[18px] text-muted-foreground/60" strokeWidth={2} />
-            ) : (
-              <ChevronDown className="h-[18px] w-[18px] text-muted-foreground/60" strokeWidth={2} />
-            )}
-          </button>
-        {open && <div className="px-4 pb-4">{children}</div>}
-      </div>
-    );
-  }
-
   return (
     <div className="w-full flex flex-col gap-0">
-      <SectionLocal title="Ảnh/Video" defaultOpen={true}>
+      <Section title="Ảnh/Video" defaultOpen={true}>
         <div className="grid grid-cols-4 gap-[6px]">
           {imageMessages.map((msg, i) => (
             <div
@@ -320,10 +320,10 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         >
           Xem tất cả
         </button>
-      </SectionLocal>
-      <ThickDividerLocal />
+      </Section>
+      <ThickDivider />
 
-      <SectionLocal title="File" defaultOpen={true}>
+      <Section title="File" defaultOpen={true}>
         <div className="flex flex-col gap-0.5">
           {fileMessages.length === 0 && (
             <div className="text-sm text-muted-foreground/90 py-2">Không có file nào</div>
@@ -336,10 +336,10 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         >
           Xem tất cả
         </button>
-      </SectionLocal>
-      <ThickDividerLocal />
+      </Section>
+      <ThickDivider />
 
-      <SectionLocal title="Link" defaultOpen={true}>
+      <Section title="Link" defaultOpen={true}>
         <div className="flex flex-col gap-0.5">
           {linkMessages.length === 0 && <div className="text-sm text-muted-foreground/90 py-2">Không có liên kết nào</div>}
           {linkMessages.map((msg: any) => renderLinkRow(msg))}
@@ -350,7 +350,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         >
           Xem tất cả
         </button>
-      </SectionLocal>
+      </Section>
 
       <SidebarMediaViewerModal
         open={isViewerOpen}
