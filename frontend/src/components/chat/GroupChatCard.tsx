@@ -4,7 +4,7 @@ import type { Conversation } from "@/types/chat";
 import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
-import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2 } from "lucide-react";
+import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine } from "lucide-react";
 import { isUrl } from "@/lib/utils";
 import {
 	DropdownMenu,
@@ -34,6 +34,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 		fetchMessages,
 		fetchConversations,
 		updateGroupName,
+		clearConversation,
 	} = useChatStore();
 
 	const [openRename, setOpenRename] = useState(false);
@@ -94,6 +95,15 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 		}
 	};
 
+	const handleClearConversation = async () => {
+		try {
+			setDropdownOpen(false);
+			await clearConversation(convo._id);
+		} catch (error) {
+			console.error("Xóa cuộc trò chuyện thất bại:", error);
+		}
+	};
+
 	const menuNode = (
 		<Dialog open={openRename} onOpenChange={setOpenRename}>
 			<DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
@@ -122,7 +132,18 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 							onOpenRename();
 						}}
 					>
+						<PencilLine className="size-4 mr-2" />
 						Đổi group name
+					</DropdownMenuItem>
+					<DropdownMenuItem
+						className="text-destructive focus:text-destructive"
+						onSelect={(e) => {
+							e.preventDefault();
+							handleClearConversation();
+						}}
+					>
+						<Trash2 className="size-4 mr-2" />
+						Xóa cuộc trò chuyện
 					</DropdownMenuItem>
 				</DropdownMenuContent>
 			</DropdownMenu>

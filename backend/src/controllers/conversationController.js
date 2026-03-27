@@ -67,12 +67,22 @@ export async function getConversations(req, res) {
 	try {
 		const myId = req.user._id.toString();
 
-		const conversations = await Conversation.find({ "participants.userId": myId })
+		let conversations = await Conversation.find({ "participants.userId": myId })
 			.sort({ "lastMessage.createdAt": -1, updatedAt: -1 })
 			.populate("participants.userId", "displayName avatarUrl email bio phone")
 			.populate("lastMessage.senderId", "displayName avatarUrl")
 			.populate("seenBy", "displayName avatarUrl")
 			.lean();
+
+		conversations = conversations.filter(c => {
+			const me = c.participants?.find(p => p.userId?._id?.toString() === myId);
+			if (!me || !me.clearedAt) return true;
+			
+			const compareTime = c.lastMessage?.createdAt 
+				? new Date(c.lastMessage.createdAt).getTime() 
+				: new Date(c.updatedAt).getTime();
+			return compareTime > new Date(me.clearedAt).getTime();
+		});
 
 		const allOtherIds = [
 			...new Set(
@@ -142,15 +152,29 @@ export async function getMessages(req, res) {
 	try {
 		const { conversationId } = req.params;
 		const { limit = 50, cursor } = req.query;
+		const userId = req.user._id.toString();
+
+		const conversation = await Conversation.findById(conversationId).select('participants').lean();
+		const me = conversation?.participants?.find(p => p.userId.toString() === userId);
+		const clearedAt = me?.clearedAt ? new Date(me.clearedAt) : null;
+
 		const query = { conversationId };
 		if (cursor) {
-			query.createdAt = { $lt: new Date(cursor) }
+			query.createdAt = { $lt: new Date(cursor) };
+		}
+		if (clearedAt) {
+			query.createdAt = { ...query.createdAt, $gt: clearedAt };
 		}
 
-		const pinnedMessages = await Message.find({
+		const pinnedQuery = {
 			conversationId: query.conversationId,
 			isPinned: true,
-		})
+		};
+		if (clearedAt) {
+			pinnedQuery.createdAt = { $gt: clearedAt };
+		}
+
+		const pinnedMessages = await Message.find(pinnedQuery)
 			.sort({ pinnedAt: -1, createdAt: -1 })
 			.populate('senderId', 'displayName avatarUrl')
 			.populate({
@@ -355,6 +379,32 @@ export async function disbandGroupByAdmin(req, res) {
 		res.status(200).json({ message: 'Group disbanded successfully.' });
 	} catch (error) {
 		console.error('Error disbanding group:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+}
+
+export async function clearConversation(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const userId = req.user._id;
+
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+
+		const participant = conversation.participants.find(p => p.userId.toString() === userId.toString());
+		if (!participant) {
+			return res.status(403).json({ message: 'You are not a participant in this conversation.' });
+		}
+
+		participant.clearedAt = Date.now();
+		conversation.markModified('participants');
+		await conversation.save();
+
+		return res.status(200).json({ message: 'Conversation cleared successfully.' });
+	} catch (error) {
+		console.error('Error clearing conversation:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 }

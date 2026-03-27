@@ -548,6 +548,29 @@ export const useChatStore = create<ChatState>()(
                     throw error;
                 }
             },
+            clearConversation: async (conversationId: string) => {
+                try {
+                    await chatService.clearConversation(conversationId);
+                    set((state) => {
+                        const nextConversations = state.conversations.filter(c => c._id !== conversationId);
+                        const isActive = state.activeConversationId === conversationId;
+                        const isFocused = state.focusedConversationId === conversationId;
+                        
+                        const nextMessages = { ...state.messages };
+                        delete nextMessages[conversationId];
+
+                        return {
+                            conversations: nextConversations,
+                            activeConversationId: isActive ? null : state.activeConversationId,
+                            focusedConversationId: isFocused ? null : state.focusedConversationId,
+                            messages: nextMessages,
+                        };
+                    });
+                } catch (error) {
+                    console.error("Lỗi khi xóa cuộc trò chuyện:", error);
+                    throw error;
+                }
+            },
             recallMessage: async (messageId: string) => {
                 try {
                     await chatService.recallMessage(messageId);

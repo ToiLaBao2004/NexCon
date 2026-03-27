@@ -82,6 +82,7 @@ export interface ChatState {
   pinMessage: (messageId: string) => Promise<void>;
   pinMessageLocal: (conversationId: string, messageId: string, patch: { isPinned: boolean, pinnedAt: string | null }) => void;
   recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
+  clearConversation: (conversationId: string) => Promise<void>;
   fetchMedia: (conversationId: string) => Promise<void>;
   fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number) => Promise<void>;
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;

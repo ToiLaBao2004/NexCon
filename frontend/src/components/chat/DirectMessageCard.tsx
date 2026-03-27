@@ -8,7 +8,7 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2 } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2 } from "lucide-react";
 import { isUrl } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -31,7 +31,7 @@ import { useEffect, useMemo, useState } from "react";
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations } = useChatStore();
+  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation } = useChatStore();
   const { onlineUsers } = useSocketStore();
   const { setNickName, loading } = useFriendStore();
   const active = focusedConversationId === convo._id;
@@ -99,6 +99,15 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     }
   }
 
+  const handleClearConversation = async () => {
+    try {
+      setDropdownOpen(false);
+      await clearConversation(convo._id);
+    } catch (error) {
+      console.error("Xóa cuộc trò chuyện thất bại:", error);
+    }
+  };
+
   const menuNode = (
     <Dialog open={openRename} onOpenChange={setOpenRename}>
       <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
@@ -127,8 +136,18 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
               onChangeNickname();
             }}
           >
-            <PencilLine className="h-4 w-4" />
+            <PencilLine className="h-4 w-4 mr-2" />
             Đổi nickname
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            onSelect={(e) => {
+              e.preventDefault();
+              handleClearConversation();
+            }}
+          >
+            <Trash2 className="size-4 mr-2" />
+            Xóa cuộc trò chuyện
           </DropdownMenuItem>
           <UserActionDropdown
             userId={otherUser.userId?._id}

@@ -9,6 +9,10 @@ const participantSchema = new mongoose.Schema({
     joinedAt: {
         type: Date,
         default: Date.now
+    },
+    clearedAt: {
+        type: Date,
+        default: null
     }
 }, { _id: false });
 
