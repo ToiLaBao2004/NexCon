@@ -227,6 +227,8 @@ function ReplyQuoteInline({
 	);
 }
 
+import { getSystemMessageText } from "@/utils/chatUtils";
+
 function SystemMessageComponent({
 	message,
 	selectedConvo,
@@ -236,50 +238,37 @@ function SystemMessageComponent({
 	selectedConvo: Conversation;
 	currentUserId: string;
 }) {
-	const payload = useMemo(() => {
-		try {
-			return JSON.parse(message.content || "{}");
-		} catch {
-			return {};
-		}
-	}, [message.content]);
+	const text = getSystemMessageText(message, currentUserId);
 
-	const addedBy = payload.addedBy;
-	const addedUserIds = (payload.addedUserIds || []) as string[];
-	const addedNames = payload.addedUserNamesString || "";
+	const metadata = message.metadata || {};
+	const addedUserIds = Array.isArray(metadata.addedUserIds) ? metadata.addedUserIds : [];
+	const addedUsersInfo = Array.isArray(metadata.addedUsersInfo) ? metadata.addedUsersInfo : null;
 
-	const isMeAdding = addedBy?.toString() === currentUserId?.toString();
-	const adder = selectedConvo.participants.find(
-		(p) => p.userId?._id?.toString() === addedBy?.toString()
-	);
-	const adderName = isMeAdding ? "bạn" : adder?.userId?.nickname?.trim() || adder?.userId?.displayName || "Người dùng";
-
-	let text = "";
-	if (payload.type === "members-added") {
-		const isMeAdded = addedUserIds.some(id => id.toString() === currentUserId?.toString());
-		if (isMeAdded) {
-			text = `Bạn đã được ${isMeAdding ? 'hệ thống' : adderName} mời tham gia nhóm`;
-		} else {
-			text = `${addedNames} được ${adderName} thêm vào nhóm`;
-		}
-	} else {
-		text = message.content || "Thông báo hệ thống";
-	}
-
-	// Get avatars of added people
 	const addedParticipants = useMemo(() => {
+		if (addedUsersInfo && addedUsersInfo.length > 0) {
+			// Using snapshot stored in metadata when the member was added
+			return addedUsersInfo.map((info: any) => ({
+				userId: {
+					_id: info._id,
+					displayName: info.displayName,
+					avatarUrl: info.avatarUrl
+				}
+			}));
+		}
+
+		// Fallback for older messages
 		if (!addedUserIds.length) return [];
-		return selectedConvo.participants.filter((p) =>
-			addedUserIds.some(id => id.toString() === p.userId?._id?.toString())
+		return selectedConvo.participants.filter((p: any) =>
+			addedUserIds.some((id: any) => id.toString() === (p.userId?._id || p.userId)?.toString())
 		);
-	}, [addedUserIds, selectedConvo.participants]);
+	}, [addedUserIds, addedUsersInfo, selectedConvo.participants]);
 
 	return (
 		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
 			<div className="flex items-center gap-2.5 bg-white/95 dark:bg-gray-800/60 backdrop-blur-sm border border-black/5 dark:border-white/5 py-1.5 px-4 rounded-full max-w-[90%] shadow-[0_2px_12px_-3px_rgba(0,0,0,0.08)] hover:shadow-md transition-all group/sys font-medium">
 				<div className="flex -space-x-1.5 shrink-0">
 					{addedParticipants.length > 0 ? (
-						addedParticipants.slice(0, 2).map((p, i) => (
+						addedParticipants.slice(0, 2).map((p: any, i: number) => (
 							<UserAvatar
 								key={p.userId?._id}
 								type="seen"
@@ -294,7 +283,7 @@ function SystemMessageComponent({
 					) : (
 						<UserAvatar
 							type="seen"
-							name={addedNames?.split(',')[0]?.trim() || "User"}
+							name={(metadata.addedUserNames as string)?.split(',')[0]?.trim() || "User"}
 							className="size-5 border-2 border-background shadow-sm"
 						/>
 					)}
@@ -322,16 +311,33 @@ const MessageItem = ({
 
 	const prev = messages[index - 1];
 
+	// Handle populated senderId (from fallback or normally populated)
+	const senderObj = typeof message.senderId === "object" ? message.senderId as any : null;
+	const actualSenderId = senderObj ? senderObj._id : message.senderId;
+
 	const isGroupBreak =
 		index === 0 ||
-		message.senderId !== prev?.senderId ||
+		actualSenderId !== (typeof prev?.senderId === "object" ? (prev?.senderId as any)._id : prev?.senderId) ||
 		new Date(message.createdAt).getTime() - new Date(prev?.createdAt || 0).getTime() > 300000;
 
-	const participant = selectedConvo.participants.find(
-		(p: Participant) => p.userId?._id?.toString() === message.senderId?.toString()
+	// Determine participant. If populated object, mock the participant object. Otherwise, look up in selectedConvo.
+	let participant = selectedConvo.participants.find(
+		(p: Participant) => p.userId?._id?.toString() === actualSenderId?.toString()
 	);
 
-	const isOwn = message.senderId === currentUserId;
+	if (!participant && senderObj) {
+		participant = {
+			userId: {
+				_id: senderObj._id || "deleted",
+				displayName: senderObj.displayName || "Người dùng đã xóa",
+				avatarUrl: senderObj.avatarUrl || null,
+				email: ""
+			},
+			joinedAt: message.createdAt
+		};
+	}
+
+	const isOwn = actualSenderId?.toString() === currentUserId?.toString();
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
 	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;

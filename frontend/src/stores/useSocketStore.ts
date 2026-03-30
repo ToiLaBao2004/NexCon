@@ -82,21 +82,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
       useChatStore.getState().addMessage(message);
 
-      const lastMessage = {
-        _id: conversation.lastMessage._id,
-        content: conversation.lastMessage.content,
-        type: conversation.lastMessage.type,
-        createdAt: conversation.lastMessage.createdAt,
-        sender: {
-          _id: conversation.lastMessage.senderId,
-          displayName: "",
-          avatarUrl: null,
-        },
-      };
-
       const updatedConversation = {
         ...conversation,
-        lastMessage,
         unreadCounts,
       };
 
@@ -170,8 +157,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       get().joinConversation(conversation._id);
     });
 
-    socket.on("members-added", () => {
-      useChatStore.getState().fetchConversations();
+    socket.on("members-added", ({ conversation }) => {
+      if (conversation) {
+        // Update the conversation with the fully-populated version from backend
+        useChatStore.getState().updateConversation(conversation);
+      } else {
+        // Fallback: refetch all if no payload
+        useChatStore.getState().fetchConversations();
+      }
     });
 
     socket.on(

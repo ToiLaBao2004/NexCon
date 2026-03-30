@@ -6,6 +6,10 @@ const participantSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    userInfo: {
+        displayName: { type: String },
+        avatarUrl: { type: String }
+    },
     joinedAt: {
         type: Date,
         default: Date.now
@@ -37,9 +41,22 @@ const lastMessageSchema = new mongoose.Schema({
         type: String,
         default: 'text'
     },
+    systemType: {
+        type: String,
+        default: null
+    },
+    metadata: {
+        type: Map,
+        of: mongoose.Schema.Types.Mixed,
+        default: null
+    },
     senderId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
+    },
+    senderInfo: {
+        displayName: { type: String },
+        avatarUrl: { type: String }
     },
     createdAt: {
         type: Date

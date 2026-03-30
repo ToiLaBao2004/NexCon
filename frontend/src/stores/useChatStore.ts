@@ -474,7 +474,16 @@ export const useChatStore = create<ChatState>()(
                         const existingConv = state.conversations.find((c) => c._id === conversation._id);
                         if (!existingConv) return state;
 
-                        const updatedConv = { ...existingConv, ...conversation, participants: existingConv.participants };
+                        // Only update participants if the new payload has fully populated participants
+                        // (i.e., userId is an object with displayName, not a raw ObjectId string)
+                        const newParticipants = conversation.participants;
+                        const isPopulated = newParticipants?.[0]?.userId?.displayName !== undefined;
+
+                        const updatedConv = {
+                            ...existingConv,
+                            ...conversation,
+                            participants: (isPopulated ? newParticipants : null) || existingConv.participants
+                        };
 
                         const updatedConversations = state.conversations.map((c) =>
                             c._id === conversation._id ? updatedConv : c
@@ -486,7 +495,13 @@ export const useChatStore = create<ChatState>()(
                             return dateB - dateA;
                         });
 
-                        return { conversations: updatedConversations };
+                        // Also update selectedConvo if it's the active one
+                        const isActive = state.activeConversationId === conversation._id;
+
+                        return {
+                            conversations: updatedConversations,
+                            ...(isActive ? { selectedConvo: updatedConv } : {})
+                        };
                     });
                 }
             },

@@ -43,6 +43,10 @@ export async function sendMessage(req, res) {
         const messageData = {
             conversationId: conversation._id,
             senderId,
+            senderInfo: {
+                displayName: req.user.displayName,
+                avatarUrl: req.user.avatarUrl
+            },
             type,
         };
 

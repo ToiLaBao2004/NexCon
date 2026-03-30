@@ -5,7 +5,6 @@ import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine } from "lucide-react";
-import { isUrl } from "@/lib/utils";
 import {
 	DropdownMenu,
 	DropdownMenuTrigger,
@@ -25,6 +24,7 @@ import { Input } from "../ui/input";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "./UserAvatar";
 import { ConfirmationModal } from "../shared/ConfirmationModal";
+import { getSystemMessageText } from "@/utils/chatUtils";
 
 const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideStatusIcon?: boolean }) => {
 	const { user } = useAuthStore();
@@ -255,23 +255,24 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 					{(() => {
 						if (!convo.lastMessage) return <span className="truncate">{convo.participants.length} Thành Viên</span>;
 						const msgObj = convo.lastMessage as any;
-						const content = msgObj.content ?? "";
 						const type = msgObj.type ?? "text";
-						const prefix = isMyLastMessage ? "Bạn " : `${senderName}: `;
+						const content = msgObj.content ?? "";
 
+						if (type === "system") {
+							return <span className="truncate italic">{getSystemMessageText(msgObj, user._id)}</span>;
+						}
+
+						const prefix = isMyLastMessage ? "Bạn: " : `${senderName}: `;
 						let cleanMsg = content;
-						if (cleanMsg.startsWith("📎 ")) cleanMsg = cleanMsg.replace("📎 ", "");
-						else if (cleanMsg.startsWith("📷 ")) cleanMsg = cleanMsg.replace("📷 ", "");
-						else if (cleanMsg.startsWith("🔗 ")) cleanMsg = cleanMsg.replace("🔗 ", "");
 
 						let Icon = null;
-						if (type === "image" || content.includes("Đã gửi một ảnh")) Icon = ImageIcon;
-						else if (type === "file" || content.startsWith("📎 ")) Icon = Paperclip;
-						else if (type === "link" || content.includes("Đã gửi một liên kết") || isUrl(cleanMsg)) Icon = Link2;
+						if (type === "image") Icon = ImageIcon;
+						else if (type === "file") Icon = Paperclip;
+						else if (type === "link") Icon = Link2;
 
 						return (
 							<span className="flex items-center gap-1 w-full truncate">
-								{prefix && <span className="shrink-0">{prefix.trim()}:</span>}
+								<span className="shrink-0">{prefix}</span>
 								{Icon && <Icon className="size-3.5 shrink-0" />}
 								<span className="truncate">{cleanMsg}</span>
 							</span>

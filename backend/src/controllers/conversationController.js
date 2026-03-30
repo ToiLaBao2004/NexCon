@@ -1,6 +1,7 @@
 import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import Friend from '../models/friendModel.js';
+import User from '../models/userModel.js';
 import { io, getReceiverSocketId } from '../socket/index.js';
 
 export async function createConversation(req, res) {
@@ -15,20 +16,30 @@ export async function createConversation(req, res) {
 		if (type === 'direct') {
 			const participantId = memberIds[0];
 			conversation = await Conversation.findOne({ type: 'direct', 'participants.userId': { $all: [userId, participantId] } });
+			const partner = await User.findById(participantId).select('displayName avatarUrl');
 			if (!conversation) {
 				conversation = new Conversation({
 					type: 'direct',
 					participants: [
-						{ userId: userId, joinedAt: new Date() },
-						{ userId: participantId, joinedAt: new Date() }
+						{ userId: userId, userInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl }, joinedAt: new Date() },
+						{ userId: participantId, userInfo: { displayName: partner?.displayName || 'User', avatarUrl: partner?.avatarUrl }, joinedAt: new Date() }
 					]
 				});
 				conversation = await Conversation.create(conversation);
 			}
 		}
 		if (type === 'group') {
-			const participants = memberIds.map(id => ({ userId: id, joinedAt: new Date() }));
-			participants.push({ userId: userId, joinedAt: new Date() });
+			const members = await User.find({ _id: { $in: memberIds } }).select('displayName avatarUrl');
+			const participants = members.map(m => ({
+				userId: m._id,
+				userInfo: { displayName: m.displayName, avatarUrl: m.avatarUrl },
+				joinedAt: new Date()
+			}));
+			participants.push({
+				userId: userId,
+				userInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+				joinedAt: new Date()
+			});
 			conversation = new Conversation({
 				type: 'group',
 				group: {
@@ -126,18 +137,35 @@ export async function getConversations(req, res) {
 
 		const formatted = conversations.map((c) => ({
 			...c,
-			participants: c.participants.map((p) => {
-				const pid = p.userId?._id?.toString();
-				const nickname = pid && pid !== myId ? nickMap.get(pid) || null : null;
+			participants: c.participants
+				.map((p) => {
+					// Fallback to snapshot userInfo if user array is populated as null (user was deleted)
+					let userObj = p.userId;
+					if (!userObj && p.userInfo) {
+						userObj = {
+							_id: null,
+							displayName: p.userInfo.displayName || "Người dùng đã xóa",
+							avatarUrl: p.userInfo.avatarUrl || null
+						};
+					} else if (!userObj) {
+						userObj = {
+							_id: null,
+							displayName: "Người dùng đã xóa",
+							avatarUrl: null
+						};
+					}
 
-				return {
-					...p,
-					userId: {
-						...p.userId,
-						nickname,
-					},
-				};
-			}),
+					const pid = userObj?._id?.toString();
+					const nickname = pid && pid !== myId ? nickMap.get(pid) || null : null;
+
+					return {
+						...p,
+						userId: {
+							...userObj,
+							nickname,
+						},
+					};
+				}),
 			unreadCounts: c.unreadCounts || {},
 		}));
 
@@ -187,6 +215,7 @@ export async function getMessages(req, res) {
 		let messages = await Message.find(query)
 			.sort({ createdAt: -1 })
 			.limit(Number(limit) + 1)
+			.populate('senderId', 'displayName avatarUrl')
 			.populate({
 				path: 'replyTo',
 				select: '_id senderId type content fileName isRecalled',
@@ -203,10 +232,31 @@ export async function getMessages(req, res) {
 
 		messages = messages.reverse();
 
+		// Fallback for hard-deleted users
+		const fallbackSender = (msg) => {
+			if (msg && !msg.senderId) {
+				msg.senderId = {
+					_id: null,
+					displayName: msg.senderInfo?.displayName || "Người dùng đã xóa",
+					avatarUrl: msg.senderInfo?.avatarUrl || null
+				};
+			}
+			if (msg?.replyTo && !msg.replyTo.senderId) {
+				msg.replyTo.senderId = {
+					_id: null,
+					displayName: "Người dùng đã xóa"
+				};
+			}
+			return msg;
+		};
+
+		messages = messages.map(fallbackSender);
+		const safePinnedMessages = pinnedMessages.map(fallbackSender);
+
 		return res.status(200).json({
 			messages,
 			nextCursor,
-			pinnedMessages,
+			pinnedMessages: safePinnedMessages,
 		});
 
 	} catch (error) {
@@ -258,6 +308,9 @@ export async function markAsSeen(req, res) {
 			lastMessage: {
 				_id: updated.lastMessage._id,
 				content: updated.lastMessage.content,
+				type: updated.lastMessage.type,
+				systemType: updated.lastMessage.systemType,
+				metadata: updated.lastMessage.metadata,
 				createdAt: updated.lastMessage.createdAt,
 				senderId: updated.lastMessage.senderId,
 			}
@@ -351,12 +404,30 @@ export async function updateGroupName(req, res) {
 	}
 }
 
-async function disbandGroup(conversation) {
+async function disbandGroup(conversation, adminUser) {
 	conversation.disbanded = true;
-	await conversation.save();
-	io.to(conversation._id.toString()).emit('group-disbanded', { conversationId: conversation._id });
-}
 
+	const systemMessage = new Message({
+		conversationId: conversation._id,
+		senderId: adminUser._id,
+		type: 'system',
+		systemType: 'group_disbanded',
+		metadata: {
+			disbandedBy: adminUser._id,
+			adminName: adminUser.displayName
+		},
+		content: 'Nhóm đã bị giải tán'
+	});
+	const savedMsg = await systemMessage.save();
+	const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+
+	const { updateConversationLastMessage, emitNewMessage } = await import('../utils/messageHelper.js');
+	updateConversationLastMessage(conversation, finalMsg, adminUser._id);
+	await conversation.save();
+
+	io.to(conversation._id.toString()).emit('group-disbanded', { conversationId: conversation._id });
+	emitNewMessage(io, conversation, finalMsg);
+}
 export async function disbandGroupByAdmin(req, res) {
 	try {
 		const { conversationId } = req.params;
@@ -375,7 +446,7 @@ export async function disbandGroupByAdmin(req, res) {
 			return res.status(403).json({ message: 'Only admins can disband the group.' });
 		}
 
-		await disbandGroup(conversation);
+		await disbandGroup(conversation, req.user);
 		res.status(200).json({ message: 'Group disbanded successfully.' });
 	} catch (error) {
 		console.error('Error disbanding group:', error);
@@ -446,9 +517,13 @@ export async function addMembers(req, res) {
 		if (conversation.participants.length + filteredUserIds.length > MAX_MEMBERS) {
 			return res.status(400).json({ message: `Nhóm chỉ có thể chứa tối đa ${MAX_MEMBERS} thành viên.` });
 		}
+		const membersToAdd = await User.find({ _id: { $in: filteredUserIds } }).select('displayName avatarUrl');
+
 		filteredUserIds.forEach(id => {
+			const member = membersToAdd.find(m => m._id.toString() === id.toString());
 			conversation.participants.push({
 				userId: id,
+				userInfo: member ? { displayName: member.displayName, avatarUrl: member.avatarUrl } : undefined,
 				joinedAt: new Date()
 			});
 		});
@@ -460,20 +535,32 @@ export async function addMembers(req, res) {
 			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
 		]);
 		const newParticipants = conversation.participants.filter(p =>
-			filteredUserIds.some(id => id.toString() === p.userId._id.toString())
+			filteredUserIds.some(id => id.toString() === p.userId._id?.toString())
 		);
-		const addedUserNamesString = newParticipants.map(p => p.userId.displayName).join(", ");
+		const addedUserNamesString = newParticipants.map(p => p.userId.displayName || p.userInfo?.displayName).join(", ");
+		const addedUsersInfo = newParticipants.map(p => ({
+			_id: p.userId._id || p.userId,
+			displayName: p.userId.displayName || p.userInfo?.displayName,
+			avatarUrl: p.userId.avatarUrl || p.userInfo?.avatarUrl
+		}));
 
 		const systemMessage = new Message({
 			conversationId,
 			senderId: currentUserId,
+			senderInfo: {
+				displayName: req.user.displayName,
+				avatarUrl: req.user.avatarUrl
+			},
 			type: 'system',
-			content: JSON.stringify({
+			systemType: 'member_added',
+			metadata: {
 				addedBy: currentUserId,
+				addedByName: req.user.displayName,
 				addedUserIds: filteredUserIds,
-				addedUserNamesString,
-				type: 'members-added'
-			}),
+				addedUserNames: addedUserNamesString,
+				addedUsersInfo: addedUsersInfo
+			},
+			content: `Đã thêm ${addedUserNamesString} vào nhóm`
 		});
 
 		const savedMsg = await systemMessage.save();
@@ -483,7 +570,20 @@ export async function addMembers(req, res) {
 		updateConversationLastMessage(conversation, finalMsg, currentUserId);
 		await conversation.save();
 
-		emitNewMessage(io, conversation, finalMsg);
+		// Refresh and populate to ensure full info for socket emit
+		const updatedConversation = await Conversation.findById(conversationId).populate({
+			path: 'participants.userId',
+			select: 'displayName avatarUrl nickname about status lastSeen'
+		});
+
+		emitNewMessage(io, updatedConversation, finalMsg);
+
+		// Also emit members-added with populated conversation so all existing members update
+		// their state (participants list, avatars, member count) in real-time
+		io.to(conversationId.toString()).emit('members-added', {
+			conversationId,
+			conversation: updatedConversation
+		});
 
 		filteredUserIds.forEach(newMemberId => {
 			const receiverSocketId = getReceiverSocketId(newMemberId.toString());

@@ -27,6 +27,8 @@ export interface LastMessage {
   _id: string;
   content: string;
   type?: MessageType;
+  systemType?: string | null;
+  metadata?: any;
   createdAt: string;
   sender: {
     _id: string;
@@ -71,6 +73,8 @@ export interface Message {
   conversationId: string;
   senderId: string;
   type: MessageType;
+  systemType?: string | null;
+  metadata?: any;
   content?: string | null;
   fileUrl?: string | null;
   filePublicId?: string | null;
