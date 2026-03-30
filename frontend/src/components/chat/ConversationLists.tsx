@@ -52,7 +52,12 @@ export default function ConversationLists({ conversation, mutualGroupCount, memb
       <ThickDividerLocal />
       <ListRowLocal icon={Clock} label="Danh sách nhắc hẹn" />
       {isGroup ? (
-        <MembersPanel participants={conversation.participants} memberCount={memberCount} />
+        <MembersPanel
+          participants={conversation.participants}
+          memberCount={memberCount}
+          currentUserId={user?._id}
+          isGroupAdmin={conversation.group?.admins?.some(adminId => adminId.toString() === user?._id?.toString())}
+        />
       ) : (
         <MutualGroupsPopover
           mutualGroups={mutualGroups}
@@ -61,7 +66,7 @@ export default function ConversationLists({ conversation, mutualGroupCount, memb
             setActiveConversation(id);
             try {
               await fetchMessages(id);
-            } catch {}
+            } catch { }
           }}
         />
       )}
