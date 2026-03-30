@@ -82,6 +82,18 @@ export const getSystemMessageText = (
         case "call_ended":
             return "Cuộc gọi đã kết thúc";
 
+        case "approval_mode_changed": {
+            const changedBy = meta.changedBy;
+            const changedByName = meta.changedByName || "Một quản trị viên";
+            const isApprovalRequired = meta.isApprovalRequired;
+            const isMe = changedBy?.toString() === currentUserId;
+
+            const name = isMe ? "Bạn" : changedByName;
+            const statusStr = isApprovalRequired ? "bật" : "tắt";
+
+            return `${name} đã ${statusStr} chế độ phê duyệt thành viên mới`;
+        }
+
         default:
             return content || "Thông báo hệ thống";
     }

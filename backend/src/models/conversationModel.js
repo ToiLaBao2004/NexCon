@@ -29,7 +29,16 @@ const groupSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
-    admins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    admins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    isApprovalRequired: {
+        type: Boolean,
+        default: false
+    },
+    approvalQueue: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        createdAt: { type: Date, default: Date.now }
+    }]
 }, { _id: false });
 
 const lastMessageSchema = new mongoose.Schema({

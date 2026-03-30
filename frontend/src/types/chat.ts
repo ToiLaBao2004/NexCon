@@ -17,10 +17,28 @@ export interface SeenUser {
   avatarUrl?: string | null;
 }
 
+export interface ApprovalQueueItem {
+  _id?: string;
+  userId: {
+    _id: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    email: string;
+  };
+  addedBy: {
+    _id: string;
+    displayName: string;
+    avatarUrl?: string | null;
+  };
+  createdAt: string;
+}
+
 export interface Group {
   name: string;
   createdBy: string;
   admins?: string[];
+  isApprovalRequired?: boolean;
+  approvalQueue?: any[];
 }
 
 export interface LastMessage {
@@ -82,6 +100,11 @@ export interface Message {
   fileName?: string | null;
   fileSize?: number | null;
   mimeType?: string | null;
+  senderInfo?: {
+    _id?: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+  };
   isRecalled: boolean | null;
   isPinned: boolean | null;
   pinnedAt?: string | null;

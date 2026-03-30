@@ -159,4 +159,31 @@ export const chatService = {
 			throw new Error(resolveErrorMessage(error));
 		}
 	},
+
+	async updateGroupSettings(conversationId: string, isApprovalRequired: boolean) {
+		try {
+			const res = await api.patch(`/conversations/${conversationId}/settings`, { isApprovalRequired });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async getApprovalQueue(conversationId: string) {
+		try {
+			const res = await api.get(`/conversations/${conversationId}/approvals`);
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async handleApproval(conversationId: string, userId: string, action: 'approve' | 'reject') {
+		try {
+			const res = await api.post(`/conversations/${conversationId}/approvals`, { userId, action });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
 };

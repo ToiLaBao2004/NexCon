@@ -297,6 +297,19 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useGroupCallStore.getState().handleGroupCallError(payload);
     });
 
+    socket.on("approval-requested", ({ conversationId }) => {
+      const chatState = useChatStore.getState();
+      const currentUserId = useAuthStore.getState().user?._id;
+      const conversation = chatState.conversations.find((c) => c._id === conversationId);
+
+      if (conversation && currentUserId && conversation.group?.admins?.includes(currentUserId)) {
+        toast.info(`Có yêu cầu tham gia nhóm ${conversation.group?.name || ''} đang chờ duyệt.`);
+      }
+    });
+
+    socket.on("approval-queue-updated", () => {
+    });
+
     socket.on("group-disbanded", ({ conversationId }) => {
       useChatStore.getState().markGroupAsDisbanded(conversationId);
       const activeConvo = useChatStore.getState().activeConversationId;

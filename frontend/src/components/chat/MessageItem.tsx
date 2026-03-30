@@ -263,30 +263,48 @@ function SystemMessageComponent({
 		);
 	}, [addedUserIds, addedUsersInfo, selectedConvo.participants]);
 
+	const getAvatars = () => {
+		if (message.systemType === 'approval_mode_changed' || message.systemType === 'group_disbanded' || message.systemType === 'chat_cleared' || message.systemType === 'member_kicked' || message.systemType === 'member_left') {
+			return (
+				<UserAvatar
+					type="seen"
+					name={metadata.changedByName || metadata.kickedUserName || metadata.userName || message.senderInfo?.displayName || "Hệ thống"}
+					avatarUrl={message.senderInfo?.avatarUrl ?? undefined}
+					className="size-5 border-2 border-background shadow-sm"
+				/>
+			);
+		}
+
+		if (addedParticipants.length > 0) {
+			return addedParticipants.slice(0, 2).map((p: any, i: number) => (
+				<UserAvatar
+					key={p.userId?._id}
+					type="seen"
+					name={p.userId?.displayName || "User"}
+					avatarUrl={p.userId?.avatarUrl ?? undefined}
+					className={cn(
+						"size-5 border-2 border-background shadow-sm hover:z-20 transition-transform group-hover/sys:scale-105",
+						i > 0 && "z-10"
+					)}
+				/>
+			));
+		}
+
+		return (
+			<UserAvatar
+				type="seen"
+				name={(metadata.addedUserNames as string)?.split(',')[0]?.trim() || message.senderInfo?.displayName || "Hệ thống"}
+				avatarUrl={message.senderInfo?.avatarUrl ?? undefined}
+				className="size-5 border-2 border-background shadow-sm"
+			/>
+		);
+	};
+
 	return (
 		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
 			<div className="flex items-center gap-2.5 bg-white/95 dark:bg-gray-800/60 backdrop-blur-sm border border-black/5 dark:border-white/5 py-1.5 px-4 rounded-full max-w-[90%] shadow-[0_2px_12px_-3px_rgba(0,0,0,0.08)] hover:shadow-md transition-all group/sys font-medium">
 				<div className="flex -space-x-1.5 shrink-0">
-					{addedParticipants.length > 0 ? (
-						addedParticipants.slice(0, 2).map((p: any, i: number) => (
-							<UserAvatar
-								key={p.userId?._id}
-								type="seen"
-								name={p.userId?.displayName || "User"}
-								avatarUrl={p.userId?.avatarUrl ?? undefined}
-								className={cn(
-									"size-5 border-2 border-background shadow-sm hover:z-20 transition-transform group-hover/sys:scale-105",
-									i > 0 && "z-10"
-								)}
-							/>
-						))
-					) : (
-						<UserAvatar
-							type="seen"
-							name={(metadata.addedUserNames as string)?.split(',')[0]?.trim() || "User"}
-							className="size-5 border-2 border-background shadow-sm"
-						/>
-					)}
+					{getAvatars()}
 				</div>
 				<p className="text-[13px] text-slate-600 dark:text-slate-300 truncate leading-tight tracking-tight">
 					{text}

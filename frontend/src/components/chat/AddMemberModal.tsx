@@ -66,8 +66,14 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
         setLoading(true);
         try {
-            await chatService.addMembers(conversation._id, selectedIds);
-            toast.success(`Đã thêm ${selectedIds.length} thành viên vào nhóm`);
+            const res = await chatService.addMembers(conversation._id, selectedIds);
+            
+            if (res.approvalRequired) {
+                toast.success(res.message || 'Đã gửi yêu cầu phê duyệt thành viên tới trưởng nhóm');
+            } else {
+                toast.success(`Đã thêm ${selectedIds.length} thành viên vào nhóm`);
+            }
+            
             onOpenChange(false);
             setSelectedIds([]);
             setSearch('');

@@ -546,6 +546,27 @@ export const useChatStore = create<ChatState>()(
                     console.error("Lỗi khi cập nhật tên nhóm:", error);
                 }
             },
+            updateGroupSettings: async (conversationId: string, isApprovalRequired: boolean) => {
+                try {
+                    await chatService.updateGroupSettings(conversationId, isApprovalRequired);
+                    set((state) => ({
+                        conversations: state.conversations.map((c) =>
+                            c._id === conversationId ? { ...c, group: { ...c.group, isApprovalRequired } } : c
+                        )
+                    }));
+                } catch (error) {
+                    console.error("Lỗi khi cập nhật cài đặt nhóm:", error);
+                    throw error;
+                }
+            },
+            handleApproval: async (conversationId: string, userId: string, action: 'approve' | 'reject') => {
+                try {
+                    await chatService.handleApproval(conversationId, userId, action);
+                } catch (error) {
+                    console.error("Lỗi khi duyệt thành viên:", error);
+                    throw error;
+                }
+            },
             openChat: async ({ userId, conversationId }: { userId?: string, conversationId?: string }) => {
                 const { conversations, setActiveConversation, fetchMessages, fetchConversations } = get();
                 let targetId = conversationId;

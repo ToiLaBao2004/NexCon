@@ -53,6 +53,8 @@ export default function ConversationLists({ conversation, mutualGroupCount, memb
       <ListRowLocal icon={Clock} label="Danh sách nhắc hẹn" />
       {isGroup ? (
         <MembersPanel
+          conversationId={conversation._id}
+          isApprovalRequired={conversation.group?.isApprovalRequired}
           participants={conversation.participants}
           memberCount={memberCount}
           currentUserId={user?._id}
