@@ -24,6 +24,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Input } from "../ui/input";
 import { Button } from "@/components/ui/button";
 import UserAvatar from "./UserAvatar";
+import { ConfirmationModal } from "../shared/ConfirmationModal";
 
 const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideStatusIcon?: boolean }) => {
 	const { user } = useAuthStore();
@@ -41,6 +42,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 	const [groupNameDraft, setGroupNameDraft] = useState("");
 	const [loading, setLoading] = useState(false);
 	const [dropdownOpen, setDropdownOpen] = useState(false);
+	const [openClearConfirm, setOpenClearConfirm] = useState(false);
 
 	const currentGroupName = useMemo(() => convo.group?.name ?? "", [convo.group?.name]);
 
@@ -97,7 +99,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 
 	const handleClearConversation = async () => {
 		try {
-			setDropdownOpen(false);
+			setOpenClearConfirm(false);
 			await clearConversation(convo._id);
 		} catch (error) {
 			console.error("Xóa cuộc trò chuyện thất bại:", error);
@@ -105,81 +107,94 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 	};
 
 	const menuNode = (
-		<Dialog open={openRename} onOpenChange={setOpenRename}>
-			<DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-				<DropdownMenuTrigger asChild>
-					<button
-						type="button"
-						className="p-1 rounded hover:bg-muted transition"
-						aria-label="More actions"
+		<>
+			<Dialog open={openRename} onOpenChange={setOpenRename}>
+				<DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+					<DropdownMenuTrigger asChild>
+						<button
+							type="button"
+							className="p-1 rounded hover:bg-muted transition"
+							aria-label="More actions"
+							onClick={(e) => e.stopPropagation()}
+							onPointerDown={(e) => e.stopPropagation()}
+						>
+							<MoreHorizontal className="size-4 text-muted-foreground" />
+						</button>
+					</DropdownMenuTrigger>
+
+					<DropdownMenuContent
+						align="end"
+						sideOffset={6}
+						onCloseAutoFocus={(e) => e.preventDefault()}
 						onClick={(e) => e.stopPropagation()}
 						onPointerDown={(e) => e.stopPropagation()}
 					>
-						<MoreHorizontal className="size-4 text-muted-foreground" />
-					</button>
-				</DropdownMenuTrigger>
+						<DropdownMenuItem
+							onSelect={(e) => {
+								e.preventDefault();
+								onOpenRename();
+							}}
+						>
+							<PencilLine className="size-4 mr-2" />
+							Đổi group name
+						</DropdownMenuItem>
+						<DropdownMenuItem
+							className="text-destructive focus:text-destructive"
+							onSelect={(e) => {
+								e.preventDefault();
+								setDropdownOpen(false);
+								setOpenClearConfirm(true);
+							}}
+						>
+							<Trash2 className="size-4 mr-2" />
+							Xóa cuộc trò chuyện
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 
-				<DropdownMenuContent
-					align="end"
-					sideOffset={6}
-					onCloseAutoFocus={(e) => e.preventDefault()}
+				<DialogContent
 					onClick={(e) => e.stopPropagation()}
 					onPointerDown={(e) => e.stopPropagation()}
 				>
-					<DropdownMenuItem
-						onSelect={(e) => {
-							e.preventDefault();
-							onOpenRename();
+					<DialogHeader>
+						<DialogTitle>Đổi group name</DialogTitle>
+						<DialogDescription>Tên mới sẽ hiển thị cho tất cả thành viên trong nhóm.</DialogDescription>
+					</DialogHeader>
+
+					<Input
+						value={groupNameDraft}
+						onChange={(e) => setGroupNameDraft(e.target.value)}
+						placeholder="Nhập tên nhóm mới"
+						autoFocus
+						onKeyDown={(e) => {
+							if (e.key === "Enter") onSubmitGroupName();
 						}}
-					>
-						<PencilLine className="size-4 mr-2" />
-						Đổi group name
-					</DropdownMenuItem>
-					<DropdownMenuItem
-						className="text-destructive focus:text-destructive"
-						onSelect={(e) => {
-							e.preventDefault();
-							handleClearConversation();
-						}}
-					>
-						<Trash2 className="size-4 mr-2" />
-						Xóa cuộc trò chuyện
-					</DropdownMenuItem>
-				</DropdownMenuContent>
-			</DropdownMenu>
+					/>
 
-			<DialogContent
-				onClick={(e) => e.stopPropagation()}
-				onPointerDown={(e) => e.stopPropagation()}
-			>
-				<DialogHeader>
-					<DialogTitle>Đổi group name</DialogTitle>
-					<DialogDescription>Tên mới sẽ hiển thị cho tất cả thành viên trong nhóm.</DialogDescription>
-				</DialogHeader>
+					<DialogFooter className="gap-2">
+						<Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>
+							Hủy
+						</Button>
+						<Button
+							onClick={onSubmitGroupName}
+							disabled={!groupNameDraft.trim() || loading}
+						>
+							{loading ? "Đang lưu..." : "Lưu"}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 
-				<Input
-					value={groupNameDraft}
-					onChange={(e) => setGroupNameDraft(e.target.value)}
-					placeholder="Nhập tên nhóm mới"
-					autoFocus
-					onKeyDown={(e) => {
-						if (e.key === "Enter") onSubmitGroupName();
-					}}
-				/>
-
-				<DialogFooter className="gap-2">
-					<Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>
-						Hủy
-					</Button>
-					<Button
-						onClick={onSubmitGroupName}
-						disabled={!groupNameDraft.trim() || loading}
-					>
-						{loading ? "Đang lưu..." : "Lưu"}
-					</Button>
-				</DialogFooter>
-			</DialogContent>
-		</Dialog>
+			<ConfirmationModal
+				isOpen={openClearConfirm}
+				onClose={() => setOpenClearConfirm(false)}
+				onConfirm={handleClearConversation}
+				title="Xóa toàn bộ cuộc trò chuyện?"
+				description="Hành động này không thể hoàn tác!"
+				variant="destructive"
+				confirmText="Xác nhận xóa"
+			/>
+		</>
 	);
 
 	const lastMessageObj = convo.lastMessage as any;
