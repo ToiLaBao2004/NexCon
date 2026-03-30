@@ -53,7 +53,7 @@ export interface ConversationResponse {
   conversations: Conversation[];
 }
 
-export type MessageType = 'text' | 'image' | 'file' | 'link';
+export type MessageType = 'text' | 'image' | 'file' | 'link' | 'system';
 
 export interface ReplyToMessage {
   _id: string;

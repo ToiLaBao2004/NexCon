@@ -170,6 +170,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       get().joinConversation(conversation._id);
     });
 
+    socket.on("members-added", () => {
+      useChatStore.getState().fetchConversations();
+    });
+
     socket.on(
       "recall-message",
       ({ conversationId, messageId, content, isRecalled }) => {
@@ -200,7 +204,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         });
       }
     });
-    
+
     socket.on("message-reaction", ({ messageId, reactions }) => {
       useChatStore.getState().updateMessageReaction(messageId, reactions);
     });

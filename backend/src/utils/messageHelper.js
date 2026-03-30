@@ -7,6 +7,17 @@ const resolveLastMessagePreview = (message) => {
         case 'image': return 'Đã gửi một ảnh';
         case 'file': return message.fileName ?? 'Tệp đính kèm';
         case 'link': return 'Đã gửi một liên kết';
+        case 'system': {
+            try {
+                const payload = JSON.parse(message.content);
+                if (payload.type === 'members-added') {
+                    return payload.addedUserNamesString ? `Đã thêm ${payload.addedUserNamesString}` : 'Đã thêm thành viên mới';
+                }
+                return 'Thông báo hệ thống';
+            } catch {
+                return 'Thông báo hệ thống';
+            }
+        }
         default: return '';
     }
 };
@@ -22,7 +33,8 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
     });
 
     conversation.participants.forEach((participant) => {
-        const memberId = participant.userId.toString();
+        const userIdObj = participant.userId;
+        const memberId = (userIdObj._id || userIdObj).toString();
         const isSender = memberId === senderId.toString();
         const prevCount = conversation.unreadCounts?.get(memberId) || 0;
         conversation.unreadCounts.set(memberId, isSender ? 0 : prevCount + 1);

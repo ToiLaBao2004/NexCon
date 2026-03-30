@@ -227,6 +227,86 @@ function ReplyQuoteInline({
 	);
 }
 
+function SystemMessageComponent({
+	message,
+	selectedConvo,
+	currentUserId,
+}: {
+	message: Message;
+	selectedConvo: Conversation;
+	currentUserId: string;
+}) {
+	const payload = useMemo(() => {
+		try {
+			return JSON.parse(message.content || "{}");
+		} catch {
+			return {};
+		}
+	}, [message.content]);
+
+	const addedBy = payload.addedBy;
+	const addedUserIds = (payload.addedUserIds || []) as string[];
+	const addedNames = payload.addedUserNamesString || "";
+
+	const isMeAdding = addedBy?.toString() === currentUserId?.toString();
+	const adder = selectedConvo.participants.find(
+		(p) => p.userId?._id?.toString() === addedBy?.toString()
+	);
+	const adderName = isMeAdding ? "bạn" : adder?.userId?.nickname?.trim() || adder?.userId?.displayName || "Người dùng";
+
+	let text = "";
+	if (payload.type === "members-added") {
+		const isMeAdded = addedUserIds.some(id => id.toString() === currentUserId?.toString());
+		if (isMeAdded) {
+			text = `Bạn đã được ${isMeAdding ? 'hệ thống' : adderName} mời tham gia nhóm`;
+		} else {
+			text = `${addedNames} được ${adderName} thêm vào nhóm`;
+		}
+	} else {
+		text = message.content || "Thông báo hệ thống";
+	}
+
+	// Get avatars of added people
+	const addedParticipants = useMemo(() => {
+		if (!addedUserIds.length) return [];
+		return selectedConvo.participants.filter((p) =>
+			addedUserIds.some(id => id.toString() === p.userId?._id?.toString())
+		);
+	}, [addedUserIds, selectedConvo.participants]);
+
+	return (
+		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
+			<div className="flex items-center gap-2.5 bg-white/95 dark:bg-gray-800/60 backdrop-blur-sm border border-black/5 dark:border-white/5 py-1.5 px-4 rounded-full max-w-[90%] shadow-[0_2px_12px_-3px_rgba(0,0,0,0.08)] hover:shadow-md transition-all group/sys font-medium">
+				<div className="flex -space-x-1.5 shrink-0">
+					{addedParticipants.length > 0 ? (
+						addedParticipants.slice(0, 2).map((p, i) => (
+							<UserAvatar
+								key={p.userId?._id}
+								type="seen"
+								name={p.userId?.displayName || "User"}
+								avatarUrl={p.userId?.avatarUrl ?? undefined}
+								className={cn(
+									"size-5 border-2 border-background shadow-sm hover:z-20 transition-transform group-hover/sys:scale-105",
+									i > 0 && "z-10"
+								)}
+							/>
+						))
+					) : (
+						<UserAvatar
+							type="seen"
+							name={addedNames?.split(',')[0]?.trim() || "User"}
+							className="size-5 border-2 border-background shadow-sm"
+						/>
+					)}
+				</div>
+				<p className="text-[13px] text-slate-600 dark:text-slate-300 truncate leading-tight tracking-tight">
+					{text}
+				</p>
+			</div>
+		</div>
+	);
+}
+
 const MessageItem = ({
 	message,
 	index,
@@ -236,6 +316,10 @@ const MessageItem = ({
 	isLast,
 	onReply,
 }: MessageItemProps) => {
+	if (message.type === "system") {
+		return <SystemMessageComponent message={message} selectedConvo={selectedConvo} currentUserId={currentUserId} />;
+	}
+
 	const prev = messages[index - 1];
 
 	const isGroupBreak =

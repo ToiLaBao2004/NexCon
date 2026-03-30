@@ -77,9 +77,9 @@ export async function getConversations(req, res) {
 		conversations = conversations.filter(c => {
 			const me = c.participants?.find(p => p.userId?._id?.toString() === myId);
 			if (!me || !me.clearedAt) return true;
-			
-			const compareTime = c.lastMessage?.createdAt 
-				? new Date(c.lastMessage.createdAt).getTime() 
+
+			const compareTime = c.lastMessage?.createdAt
+				? new Date(c.lastMessage.createdAt).getTime()
 				: new Date(c.updatedAt).getTime();
 			return compareTime > new Date(me.clearedAt).getTime();
 		});
@@ -405,6 +405,104 @@ export async function clearConversation(req, res) {
 		return res.status(200).json({ message: 'Conversation cleared successfully.' });
 	} catch (error) {
 		console.error('Error clearing conversation:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+}
+
+export async function addMembers(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const { userIds } = req.body;
+		const currentUserId = req.user._id.toString();
+
+		if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+			return res.status(400).json({ message: 'User IDs are required and must be an array.' });
+		}
+
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+
+		if (conversation.type !== 'group') {
+			return res.status(400).json({ message: 'Only group conversations can have members added.' });
+		}
+
+		if (conversation.disbanded === true) {
+			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
+		}
+		if (!conversation.participants.some(p => p.userId.toString() === currentUserId)) {
+			return res.status(403).json({ message: "Only group participants can add members." });
+		}
+
+		const filteredUserIds = userIds.filter(id =>
+			!conversation.participants.some(p => p.userId.toString() === id.toString())
+		);
+
+		if (filteredUserIds.length === 0) {
+			return res.status(400).json({ message: 'Tất cả người dùng được chọn đã là thành viên của nhóm.' });
+		}
+		const MAX_MEMBERS = 100;
+		if (conversation.participants.length + filteredUserIds.length > MAX_MEMBERS) {
+			return res.status(400).json({ message: `Nhóm chỉ có thể chứa tối đa ${MAX_MEMBERS} thành viên.` });
+		}
+		filteredUserIds.forEach(id => {
+			conversation.participants.push({
+				userId: id,
+				joinedAt: new Date()
+			});
+		});
+
+		await conversation.save();
+		await conversation.populate([
+			{ path: 'participants.userId', select: 'displayName avatarUrl email bio phone' },
+			{ path: 'seenBy', select: 'displayName avatarUrl' },
+			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
+		]);
+		const newParticipants = conversation.participants.filter(p =>
+			filteredUserIds.some(id => id.toString() === p.userId._id.toString())
+		);
+		const addedUserNamesString = newParticipants.map(p => p.userId.displayName).join(", ");
+
+		const systemMessage = new Message({
+			conversationId,
+			senderId: currentUserId,
+			type: 'system',
+			content: JSON.stringify({
+				addedBy: currentUserId,
+				addedUserIds: filteredUserIds,
+				addedUserNamesString,
+				type: 'members-added'
+			}),
+		});
+
+		const savedMsg = await systemMessage.save();
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+
+		const { updateConversationLastMessage, emitNewMessage } = await import('../utils/messageHelper.js');
+		updateConversationLastMessage(conversation, finalMsg, currentUserId);
+		await conversation.save();
+
+		emitNewMessage(io, conversation, finalMsg);
+
+		filteredUserIds.forEach(newMemberId => {
+			const receiverSocketId = getReceiverSocketId(newMemberId.toString());
+			if (receiverSocketId) {
+				const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+				if (receiverSocket) {
+					receiverSocket.join(conversationId);
+				}
+				io.to(receiverSocketId).emit("new-conversation", { conversation });
+			}
+		});
+
+		return res.status(200).json({
+			success: true,
+			conversation
+		});
+
+	} catch (error) {
+		console.error('Error adding members:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 }

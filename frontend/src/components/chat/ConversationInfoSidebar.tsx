@@ -10,6 +10,7 @@ import { Settings2, Clock, Users } from "lucide-react";
 import { SidebarMediaLinks } from "./SidebarMediaLinks";
 import { cn } from "@/lib/utils";
 import { GroupManagementPanel } from "./GroupManagementPanel";
+import { AddMemberModal } from "./AddMemberModal";
 
 function ActionBtnLocal({
   icon: Icon,
@@ -73,6 +74,8 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [groupRenameLoading, setGroupRenameLoading] = useState(false);
   const [isNewGroupModalOpen, setIsNewGroupModalOpen] = useState(false);
   const [manageGroupOpen, setManageGroupOpen] = useState(false);
+
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
 
   // refs for name elements (used for a11y / future enhancements)
   const nameRefDirect = useRef<HTMLSpanElement | null>(null);
@@ -284,11 +287,11 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   // GROUP variant
   const memberCount = conversation.participants.length;
-  
+
   const isGroup = conversation.type === "group";
   const isDisbanded = isGroup && conversation.disbanded === true;
   const isGroupAdmin = isGroup && (
-    conversation.group?.admins?.includes(user?._id || '') || 
+    conversation.group?.admins?.includes(user?._id || '') ||
     conversation.group?.createdBy === user?._id
   );
 
@@ -324,12 +327,17 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           <div className="flex justify-center gap-4 w-full px-2 mt-2">
             <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled={isDisbanded} />
             <ActionBtnLocal icon={Pin} label="Ghim hội thoại" disabled={isDisbanded} />
-            <ActionBtnLocal icon={UserPlus} label="Thêm thành viên" disabled={isDisbanded} />
-            <ActionBtnLocal 
-              icon={Settings2} 
-              label="Quản lý nhóm" 
+            <ActionBtnLocal
+              icon={UserPlus}
+              label="Thêm thành viên"
+              disabled={isDisbanded}
+              onClick={() => setIsAddMemberModalOpen(true)}
+            />
+            <ActionBtnLocal
+              icon={Settings2}
+              label="Quản lý nhóm"
               onClick={() => setManageGroupOpen(true)}
-              disabled={isDisbanded} 
+              disabled={isDisbanded}
             />
           </div>
         </div>
@@ -372,13 +380,18 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      
+
       {/* Group Management Panel */}
-      <GroupManagementPanel 
-        open={manageGroupOpen} 
-        onOpenChange={setManageGroupOpen} 
-        conversationId={conversation._id} 
+      <GroupManagementPanel
+        open={manageGroupOpen}
+        onOpenChange={setManageGroupOpen}
+        conversationId={conversation._id}
         isGroupAdmin={isGroupAdmin}
+      />
+      <AddMemberModal
+        open={isAddMemberModalOpen}
+        onOpenChange={setIsAddMemberModalOpen}
+        conversation={conversation}
       />
     </aside>
   );

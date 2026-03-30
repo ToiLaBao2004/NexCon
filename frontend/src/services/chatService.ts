@@ -150,4 +150,13 @@ export const chatService = {
 			throw new Error(resolveErrorMessage(error));
 		}
 	},
+
+	async addMembers(conversationId: string, userIds: string[]) {
+		try {
+			const res = await api.post(`/conversations/${conversationId}/add-members`, { userIds });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
 };

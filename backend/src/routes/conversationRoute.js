@@ -1,5 +1,5 @@
 import express from 'express';
-import { createConversation, getConversations, getMessages, getMediaByType, markAsSeen, updateGroupName, disbandGroupByAdmin, clearConversation } from '../controllers/conversationController.js';
+import { createConversation, getConversations, getMessages, getMediaByType, markAsSeen, updateGroupName, disbandGroupByAdmin, clearConversation, addMembers } from '../controllers/conversationController.js';
 import { checkFriendship } from '../middlewares/friendMiddleware.js';
 
 const conversationRouter = express.Router();
@@ -12,5 +12,6 @@ conversationRouter.patch('/:conversationId/mark-seen', markAsSeen);
 conversationRouter.put('/:conversationId/update-group-name', updateGroupName);
 conversationRouter.delete('/:conversationId/disband-group', disbandGroupByAdmin);
 conversationRouter.delete('/:conversationId/clear', clearConversation);
+conversationRouter.post('/:conversationId/add-members', addMembers);
 
 export default conversationRouter;
