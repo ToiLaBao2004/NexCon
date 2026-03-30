@@ -515,12 +515,8 @@ export const useChatStore = create<ChatState>()(
                     if (!convo || !convo.lastMessage) return;
 
                     const isUnread = (convo.unreadCounts?.[user._id] ?? 0) > 0;
-                    const isSeen = convo.seenBy?.some((s: any) => {
-                        const id = typeof s === "string" ? s : s._id?.toString();
-                        return id === user._id;
-                    });
-
-                    if (!isUnread && isSeen) return;
+                    
+                    if (!isUnread) return;
 
                     await chatService.markAsSeen(activeConversationId);
                     set((state) => ({

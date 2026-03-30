@@ -92,11 +92,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const senderId = message.senderId || message.sender?._id;
       const isMine = String(senderId) === String(currentUserId);
 
+      chatState.updateConversation(updatedConversation);
+
       if (isFocused) {
         chatState.markAsSeen();
       }
-
-      chatState.updateConversation(updatedConversation);
 
       if (!isMine) {
         void playMessageSound();
