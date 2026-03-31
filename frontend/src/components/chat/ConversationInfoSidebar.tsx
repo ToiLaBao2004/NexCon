@@ -9,6 +9,8 @@ import NewGroupModal from "./NewGroupModal";
 import { Settings2, Clock, Users } from "lucide-react";
 import { SidebarMediaLinks } from "./SidebarMediaLinks";
 import { cn } from "@/lib/utils";
+import { GroupManagementPanel } from "./GroupManagementPanel";
+import { AddMemberModal } from "./AddMemberModal";
 
 function ActionBtnLocal({
   icon: Icon,
@@ -27,7 +29,7 @@ function ActionBtnLocal({
       disabled={disabled}
       className={cn(
         "flex flex-col items-center gap-[6px] rounded-lg py-1 px-1 transition-colors min-w-0 bg-transparent",
-        disabled ? "opacity-100 cursor-default" : "hover:bg-muted/30 cursor-pointer"
+        disabled ? "opacity-100 cursor-default" : "hover:bg-muted/60 cursor-pointer"
       )}
     >
       <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-muted/10 text-foreground">
@@ -71,6 +73,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [groupNameDraft, setGroupNameDraft] = useState("");
   const [groupRenameLoading, setGroupRenameLoading] = useState(false);
   const [isNewGroupModalOpen, setIsNewGroupModalOpen] = useState(false);
+  const [manageGroupOpen, setManageGroupOpen] = useState(false);
+
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
 
   // refs for name elements (used for a11y / future enhancements)
   const nameRefDirect = useRef<HTMLSpanElement | null>(null);
@@ -187,7 +192,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                   <button
                     onClick={() => setOpenNickname(true)}
                     title="Đổi nickname"
-                    className="absolute left-full top-1/2 ml-3 -translate-y-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-card/10 text-muted-foreground hover:bg-muted/20 transition-colors"
+                    className="absolute left-full top-1/2 ml-3 -translate-y-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-card/10 text-muted-foreground hover:bg-muted/60 transition-colors"
                   >
                     <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
                   </button>
@@ -283,6 +288,13 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   // GROUP variant
   const memberCount = conversation.participants.length;
 
+  const isGroup = conversation.type === "group";
+  const isDisbanded = isGroup && conversation.disbanded === true;
+  const isGroupAdmin = isGroup && (
+    conversation.group?.admins?.includes(user?._id || '') ||
+    conversation.group?.createdBy === user?._id
+  );
+
   return (
     <aside className="flex flex-col h-full min-w-[350px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
       <div className="flex flex-col items-center pt-6 pb-4 bg-card">
@@ -298,9 +310,13 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                   {groupDisplayName}
                 </span>
                 <button
-                  onClick={() => setOpenGroupRename(true)}
-                  title="Đổi tên nhóm"
-                  className="absolute left-full top-1/2 ml-3 -translate-y-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-card/10 text-muted-foreground hover:bg-muted/20 transition-colors"
+                  onClick={() => { if (!isDisbanded) setOpenGroupRename(true); }}
+                  title={isDisbanded ? "Nhóm đã giải tán" : "Đổi tên nhóm"}
+                  disabled={isDisbanded}
+                  className={cn(
+                    "absolute left-full top-1/2 ml-3 -translate-y-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-card/10 text-muted-foreground transition-colors",
+                    isDisbanded ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
+                  )}
                 >
                   <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
                 </button>
@@ -309,10 +325,20 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           </div>
 
           <div className="flex justify-center gap-4 w-full px-2 mt-2">
-            <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled />
-            <ActionBtnLocal icon={Pin} label="Ghim hội thoại" disabled />
-            <ActionBtnLocal icon={UserPlus} label="Thêm thành viên" disabled />
-            <ActionBtnLocal icon={Settings2} label="Quản lý nhóm" disabled />
+            <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled={isDisbanded} />
+            <ActionBtnLocal icon={Pin} label="Ghim hội thoại" disabled={isDisbanded} />
+            <ActionBtnLocal
+              icon={UserPlus}
+              label="Thêm thành viên"
+              disabled={isDisbanded}
+              onClick={() => setIsAddMemberModalOpen(true)}
+            />
+            <ActionBtnLocal
+              icon={Settings2}
+              label="Quản lý nhóm"
+              onClick={() => setManageGroupOpen(true)}
+              disabled={isDisbanded}
+            />
           </div>
         </div>
       </div>
@@ -354,6 +380,19 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Group Management Panel */}
+      <GroupManagementPanel
+        open={manageGroupOpen}
+        onOpenChange={setManageGroupOpen}
+        conversationId={conversation._id}
+        isGroupAdmin={isGroupAdmin}
+      />
+      <AddMemberModal
+        open={isAddMemberModalOpen}
+        onOpenChange={setIsAddMemberModalOpen}
+        conversation={conversation}
+      />
     </aside>
   );
 }

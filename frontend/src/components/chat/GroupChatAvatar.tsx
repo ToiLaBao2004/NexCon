@@ -9,11 +9,12 @@ interface GroupChatAvatarProps {
 }
 
 const GroupChatAvatar = ({ participants, type }: GroupChatAvatarProps) => {
+    const validParticipants = participants;
     const avatars = [];
-    const limit = Math.min(participants.length, 4);
+    const limit = Math.min(validParticipants.length, 4);
 
     for (let i = 0; i < limit; i++) {
-        const member = participants[i];
+        const member = validParticipants[i];
         avatars.push(
             <UserAvatar
                 key={i}

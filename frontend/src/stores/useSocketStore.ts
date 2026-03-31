@@ -82,21 +82,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
       useChatStore.getState().addMessage(message);
 
-      const lastMessage = {
-        _id: conversation.lastMessage._id,
-        content: conversation.lastMessage.content,
-        type: conversation.lastMessage.type,
-        createdAt: conversation.lastMessage.createdAt,
-        sender: {
-          _id: conversation.lastMessage.senderId,
-          displayName: "",
-          avatarUrl: null,
-        },
-      };
-
       const updatedConversation = {
         ...conversation,
-        lastMessage,
         unreadCounts,
       };
 
@@ -105,11 +92,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const senderId = message.senderId || message.sender?._id;
       const isMine = String(senderId) === String(currentUserId);
 
+      chatState.updateConversation(updatedConversation);
+
       if (isFocused) {
         chatState.markAsSeen();
       }
-
-      chatState.updateConversation(updatedConversation);
 
       if (!isMine) {
         void playMessageSound();
@@ -170,6 +157,16 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       get().joinConversation(conversation._id);
     });
 
+    socket.on("members-added", ({ conversation }) => {
+      if (conversation) {
+        // Update the conversation with the fully-populated version from backend
+        useChatStore.getState().updateConversation(conversation);
+      } else {
+        // Fallback: refetch all if no payload
+        useChatStore.getState().fetchConversations();
+      }
+    });
+
     socket.on(
       "recall-message",
       ({ conversationId, messageId, content, isRecalled }) => {
@@ -200,7 +197,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         });
       }
     });
-    
+
     socket.on("message-reaction", ({ messageId, reactions }) => {
       useChatStore.getState().updateMessageReaction(messageId, reactions);
     });
@@ -298,6 +295,27 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("group-call:error", (payload) => {
       useGroupCallStore.getState().handleGroupCallError(payload);
+    });
+
+    socket.on("approval-requested", ({ conversationId }) => {
+      const chatState = useChatStore.getState();
+      const currentUserId = useAuthStore.getState().user?._id;
+      const conversation = chatState.conversations.find((c) => c._id === conversationId);
+
+      if (conversation && currentUserId && conversation.group?.admins?.includes(currentUserId)) {
+        toast.info(`Có yêu cầu tham gia nhóm ${conversation.group?.name || ''} đang chờ duyệt.`);
+      }
+    });
+
+    socket.on("approval-queue-updated", () => {
+    });
+
+    socket.on("group-disbanded", ({ conversationId }) => {
+      useChatStore.getState().markGroupAsDisbanded(conversationId);
+      const activeConvo = useChatStore.getState().activeConversationId;
+      if (activeConvo === conversationId) {
+        toast.warning("Nhóm này đã bị giải tán.");
+      }
     });
   },
 

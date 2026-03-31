@@ -114,6 +114,12 @@ export const useChatStore = create<ChatState>()(
                     set({ convoLoading: true });
                     const { conversations } = await chatService.fetchConversations();
 
+                    conversations.sort((a: any, b: any) => {
+                        const dateA = new Date(a.lastMessage?.createdAt || a.createdAt || a.updatedAt || 0).getTime();
+                        const dateB = new Date(b.lastMessage?.createdAt || b.createdAt || b.updatedAt || 0).getTime();
+                        return dateB - dateA;
+                    });
+
                     set({ conversations, convoLoading: false });
                 } catch (error) {
                     console.error("Lỗi khi tải danh sách cuộc trò chuyện:", error);
@@ -282,12 +288,45 @@ export const useChatStore = create<ChatState>()(
                                         ? { ...realMsg, isOwn: true, status: 'sent' as const }
                                         : m
                                 );
+                            const prevMedia = state.media[convoId];
+                            let nextMedia = prevMedia;
+                            if (prevMedia) {
+                                if (realMsg.type === 'image' && (realMsg.fileUrl || realMsg.filePublicId)) {
+                                    const exists = prevMedia.images.some((m) => m._id === realMsg._id);
+                                    if (!exists) {
+                                        nextMedia = {
+                                            ...prevMedia,
+                                            images: [realMsg, ...prevMedia.images].slice(0, 8),
+                                        };
+                                    }
+                                } else if (realMsg.type === 'file' && (realMsg.fileUrl || realMsg.filePublicId)) {
+                                    const exists = prevMedia.files.some((m) => m._id === realMsg._id);
+                                    if (!exists) {
+                                        nextMedia = {
+                                            ...prevMedia,
+                                            files: [realMsg, ...prevMedia.files].slice(0, 3),
+                                        };
+                                    }
+                                } else if (realMsg.type === 'link' && realMsg.content) {
+                                    const exists = prevMedia.links.some((m) => m._id === realMsg._id);
+                                    if (!exists) {
+                                        nextMedia = {
+                                            ...prevMedia,
+                                            links: [realMsg, ...prevMedia.links].slice(0, 3),
+                                        };
+                                    }
+                                }
+                            }
 
                             return {
                                 messages: { ...state.messages, [convoId]: { ...prev, items } },
+                                ...(nextMedia !== prevMedia
+                                    ? { media: { ...state.media, [convoId]: nextMedia } }
+                                    : {}),
                             };
                         });
                     }
+
 
                     set((state) => ({
                         conversations: state.conversations.map((c) =>
@@ -352,12 +391,12 @@ export const useChatStore = create<ChatState>()(
                         let nextMediaPagination = prevMediaPagination;
                         if (prevMedia) {
                             const mediaType = message.type;
-                            if (mediaType === 'image' && message.fileUrl) {
+                            if (mediaType === 'image' && (message.fileUrl || message.filePublicId)) {
                                 const alreadyExists = prevMedia.images.some((m) => m._id === message._id);
                                 if (!alreadyExists) {
                                     nextMedia = { ...prevMedia, images: [message, ...prevMedia.images].slice(0, 8) };
                                 }
-                            } else if (mediaType === 'file' && message.fileUrl) {
+                            } else if (mediaType === 'file' && (message.fileUrl || message.filePublicId)) {
                                 const alreadyExists = prevMedia.files.some((m) => m._id === message._id);
                                 if (!alreadyExists) {
                                     nextMedia = { ...prevMedia, files: [message, ...prevMedia.files].slice(0, 3) };
@@ -371,7 +410,7 @@ export const useChatStore = create<ChatState>()(
                         }
 
                         if (prevMediaPagination) {
-                            if (message.type === 'image' && message.fileUrl) {
+                            if (message.type === 'image' && (message.fileUrl || message.filePublicId)) {
                                 const exists = prevMediaPagination.image.items.some((m) => m._id === message._id);
                                 if (!exists) {
                                     nextMediaPagination = {
@@ -382,7 +421,7 @@ export const useChatStore = create<ChatState>()(
                                         },
                                     };
                                 }
-                            } else if (message.type === 'file' && message.fileUrl) {
+                            } else if (message.type === 'file' && (message.fileUrl || message.filePublicId)) {
                                 const exists = prevMediaPagination.file.items.some((m) => m._id === message._id);
                                 if (!exists) {
                                     nextMediaPagination = {
@@ -435,7 +474,16 @@ export const useChatStore = create<ChatState>()(
                         const existingConv = state.conversations.find((c) => c._id === conversation._id);
                         if (!existingConv) return state;
 
-                        const updatedConv = { ...existingConv, ...conversation, participants: existingConv.participants };
+                        // Only update participants if the new payload has fully populated participants
+                        // (i.e., userId is an object with displayName, not a raw ObjectId string)
+                        const newParticipants = conversation.participants;
+                        const isPopulated = newParticipants?.[0]?.userId?.displayName !== undefined;
+
+                        const updatedConv = {
+                            ...existingConv,
+                            ...conversation,
+                            participants: (isPopulated ? newParticipants : null) || existingConv.participants
+                        };
 
                         const updatedConversations = state.conversations.map((c) =>
                             c._id === conversation._id ? updatedConv : c
@@ -447,7 +495,13 @@ export const useChatStore = create<ChatState>()(
                             return dateB - dateA;
                         });
 
-                        return { conversations: updatedConversations };
+                        // Also update selectedConvo if it's the active one
+                        const isActive = state.activeConversationId === conversation._id;
+
+                        return {
+                            conversations: updatedConversations,
+                            ...(isActive ? { selectedConvo: updatedConv } : {})
+                        };
                     });
                 }
             },
@@ -461,12 +515,8 @@ export const useChatStore = create<ChatState>()(
                     if (!convo || !convo.lastMessage) return;
 
                     const isUnread = (convo.unreadCounts?.[user._id] ?? 0) > 0;
-                    const isSeen = convo.seenBy?.some((s: any) => {
-                        const id = typeof s === "string" ? s : s._id?.toString();
-                        return id === user._id;
-                    });
-
-                    if (!isUnread && isSeen) return;
+                    
+                    if (!isUnread) return;
 
                     await chatService.markAsSeen(activeConversationId);
                     set((state) => ({
@@ -494,6 +544,27 @@ export const useChatStore = create<ChatState>()(
                     }))
                 } catch (error) {
                     console.error("Lỗi khi cập nhật tên nhóm:", error);
+                }
+            },
+            updateGroupSettings: async (conversationId: string, isApprovalRequired: boolean) => {
+                try {
+                    await chatService.updateGroupSettings(conversationId, isApprovalRequired);
+                    set((state) => ({
+                        conversations: state.conversations.map((c) =>
+                            c._id === conversationId ? { ...c, group: { ...c.group, isApprovalRequired } } : c
+                        )
+                    }));
+                } catch (error) {
+                    console.error("Lỗi khi cập nhật cài đặt nhóm:", error);
+                    throw error;
+                }
+            },
+            handleApproval: async (conversationId: string, userId: string, action: 'approve' | 'reject') => {
+                try {
+                    await chatService.handleApproval(conversationId, userId, action);
+                } catch (error) {
+                    console.error("Lỗi khi duyệt thành viên:", error);
+                    throw error;
                 }
             },
             openChat: async ({ userId, conversationId }: { userId?: string, conversationId?: string }) => {
@@ -539,6 +610,29 @@ export const useChatStore = create<ChatState>()(
                     }
                 } catch (error) {
                     console.error('Lỗi khi tạo nhóm:', error);
+                    throw error;
+                }
+            },
+            clearConversation: async (conversationId: string) => {
+                try {
+                    await chatService.clearConversation(conversationId);
+                    set((state) => {
+                        const nextConversations = state.conversations.filter(c => c._id !== conversationId);
+                        const isActive = state.activeConversationId === conversationId;
+                        const isFocused = state.focusedConversationId === conversationId;
+
+                        const nextMessages = { ...state.messages };
+                        delete nextMessages[conversationId];
+
+                        return {
+                            conversations: nextConversations,
+                            activeConversationId: isActive ? null : state.activeConversationId,
+                            focusedConversationId: isFocused ? null : state.focusedConversationId,
+                            messages: nextMessages,
+                        };
+                    });
+                } catch (error) {
+                    console.error("Lỗi khi xóa cuộc trò chuyện:", error);
                     throw error;
                 }
             },
@@ -728,7 +822,76 @@ export const useChatStore = create<ChatState>()(
                     console.error('Failed to fetch media:', error);
                 }
             },
-            fetchMediaPage: async (conversationId, type, limit) => {
+            fetchMediaPage: async (conversationId, type, limit, force) => {
+                const defaultLimit = type === 'image' ? 24 : 20;
+                const resolvedLimit = limit ?? defaultLimit;
+
+                if (force) {
+                    set((state) => {
+                        const prevConvo = state.mediaPagination[conversationId];
+                        return {
+                            mediaPagination: {
+                                ...state.mediaPagination,
+                                [conversationId]: {
+                                    image: { items: [], page: 0, hasMore: true, isFetching: false, nextCursor: '' as string | null, limit: 24 },
+                                    file: { items: [], page: 0, hasMore: true, isFetching: false, nextCursor: '' as string | null, limit: 20 },
+                                    link: { items: [], page: 0, hasMore: true, isFetching: false, nextCursor: '' as string | null, limit: 20 },
+                                    ...(prevConvo ? { ...prevConvo } : {}),
+                                    [type]: {
+                                        items: [],
+                                        page: 0,
+                                        hasMore: true,
+                                        isFetching: true,
+                                        nextCursor: '' as string | null,
+                                        limit: resolvedLimit,
+                                    },
+                                },
+                            },
+                        };
+                    });
+                    try {
+                        const res = await chatService.fetchMedia(conversationId, type, resolvedLimit, undefined);
+                        const fetched = res.messages ?? [];
+                        const noMoreData = fetched.length === 0 || fetched.length < resolvedLimit || !res.nextCursor;
+                        set((state) => {
+                            const prevConvo = state.mediaPagination[conversationId];
+                            if (!prevConvo) return state;
+                            return {
+                                mediaPagination: {
+                                    ...state.mediaPagination,
+                                    [conversationId]: {
+                                        ...prevConvo,
+                                        [type]: {
+                                            ...prevConvo[type],
+                                            items: fetched,
+                                            page: 1,
+                                            hasMore: !noMoreData,
+                                            isFetching: false,
+                                            nextCursor: noMoreData ? null : res.nextCursor,
+                                        },
+                                    },
+                                },
+                            };
+                        });
+                    } catch (error) {
+                        console.error('Failed to fetch media page (force):', error);
+                        set((state) => {
+                            const prevConvo = state.mediaPagination[conversationId];
+                            if (!prevConvo) return state;
+                            return {
+                                mediaPagination: {
+                                    ...state.mediaPagination,
+                                    [conversationId]: {
+                                        ...prevConvo,
+                                        [type]: { ...prevConvo[type], isFetching: false },
+                                    },
+                                },
+                            };
+                        });
+                    }
+                    return;
+                }
+
                 const current = get().mediaPagination[conversationId]?.[type];
                 if (current?.isFetching || current?.hasMore === false) {
                     return;
@@ -962,6 +1125,22 @@ export const useChatStore = create<ChatState>()(
                     get().updateMessageReaction(messageId, reactions);
                 } catch (error) {
                     console.error('Failed to react to message:', error);
+                    throw error;
+                }
+            },
+            markGroupAsDisbanded: (conversationId: string) => {
+                set((state) => ({
+                    conversations: state.conversations.map((c) =>
+                        c._id === conversationId ? { ...c, disbanded: true } : c
+                    )
+                }));
+            },
+            disbandGroup: async (conversationId: string) => {
+                get().markGroupAsDisbanded(conversationId);
+                try {
+                    await chatService.disbandGroup(conversationId);
+                } catch (error) {
+                    console.error("Lỗi khi giải tán nhóm:", error);
                     throw error;
                 }
             },

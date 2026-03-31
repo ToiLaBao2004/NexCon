@@ -8,7 +8,7 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2 } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2 } from "lucide-react";
 import { isUrl } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -28,10 +28,11 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { UserActionDropdown } from "../shared/UserActionDropdown";
 import { useEffect, useMemo, useState } from "react";
+import { ConfirmationModal } from "../shared/ConfirmationModal";
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations } = useChatStore();
+  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation } = useChatStore();
   const { onlineUsers } = useSocketStore();
   const { setNickName, loading } = useFriendStore();
   const active = focusedConversationId === convo._id;
@@ -39,6 +40,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const [openRename, setOpenRename] = useState(false);
   const [nickname, setNicknameValue] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [openClearConfirm, setOpenClearConfirm] = useState(false);
 
   const currentNickname = useMemo(() => {
     const otherUser = convo.participants.find((p) => p.userId?._id?.toString() !== user?._id?.toString());
@@ -99,85 +101,117 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     }
   }
 
+  const handleClearConversation = async () => {
+    try {
+      setOpenClearConfirm(false);
+      await clearConversation(convo._id);
+    } catch (error) {
+      console.error("Xóa cuộc trò chuyện thất bại:", error);
+    }
+  };
+
   const menuNode = (
-    <Dialog open={openRename} onOpenChange={setOpenRename}>
-      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            className="p-1 rounded hover:bg-muted opacity-100 transition"
-            aria-label="More actions"
+    <>
+      <Dialog open={openRename} onOpenChange={setOpenRename}>
+        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="p-1 rounded hover:bg-muted opacity-100 transition"
+              aria-label="More actions"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <MoreHorizontal className="size-4 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent
+            align="end"
+            sideOffset={6}
+            onCloseAutoFocus={(e) => e.preventDefault()}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <MoreHorizontal className="size-4 text-muted-foreground" />
-          </button>
-        </DropdownMenuTrigger>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                onChangeNickname();
+              }}
+            >
+              <PencilLine className="h-4 w-4 mr-2" />
+              Đổi nickname
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onSelect={(e) => {
+                e.preventDefault();
+                setDropdownOpen(false);
+                setOpenClearConfirm(true);
+              }}
+            >
+              <Trash2 className="size-4 mr-2" />
+              Xóa cuộc trò chuyện
+            </DropdownMenuItem>
+            <UserActionDropdown
+              userId={otherUser.userId?._id}
+              displayName={displayName}
+              trigger={(isBlocked) => (
+                <DropdownMenuItem
+                  className={cn(
+                    "gap-2",
+                    isBlocked ? "text-primary focus:text-primary" : "text-destructive focus:text-destructive"
+                  )}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  <UserX className="h-4 w-4" />
+                  {isBlocked ? "Bỏ chặn" : "Chặn"}
+                </DropdownMenuItem>
+              )}
+            />
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-        <DropdownMenuContent
-          align="end"
-          sideOffset={6}
-          onCloseAutoFocus={(e) => e.preventDefault()}
+        <DialogContent
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-              onChangeNickname();
+          <DialogHeader>
+            <DialogTitle>Đổi nickname</DialogTitle>
+            <DialogDescription>Nickname chỉ áp dụng trong cuộc chat này.</DialogDescription>
+          </DialogHeader>
+
+          <Input
+            value={nickname}
+            onChange={(e) => setNicknameValue(e.target.value)}
+            placeholder="Nhập nickname mới"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !loading) onSubmitNickname()
             }}
-          >
-            <PencilLine className="h-4 w-4" />
-            Đổi nickname
-          </DropdownMenuItem>
-          <UserActionDropdown
-            userId={otherUser.userId?._id}
-            displayName={displayName}
-            trigger={(isBlocked) => (
-              <DropdownMenuItem
-                className={cn(
-                  "gap-2",
-                  isBlocked ? "text-primary focus:text-primary" : "text-destructive focus:text-destructive"
-                )}
-                onSelect={(e) => e.preventDefault()}
-              >
-                <UserX className="h-4 w-4" />
-                {isBlocked ? "Bỏ chặn" : "Chặn"}
-              </DropdownMenuItem>
-            )}
           />
-        </DropdownMenuContent>
-      </DropdownMenu>
 
-      <DialogContent
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        <DialogHeader>
-          <DialogTitle>Đổi nickname</DialogTitle>
-          <DialogDescription>Nickname chỉ áp dụng trong cuộc chat này.</DialogDescription>
-        </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>
+              Hủy
+            </Button>
+            <Button onClick={onSubmitNickname} disabled={loading}>
+              {loading ? "Đang lưu..." : "Lưu"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <Input
-          value={nickname}
-          onChange={(e) => setNicknameValue(e.target.value)}
-          placeholder="Nhập nickname mới"
-          autoFocus
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !loading) onSubmitNickname()
-          }}
-        />
-
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>
-            Hủy
-          </Button>
-          <Button onClick={onSubmitNickname} disabled={loading}>
-            {loading ? "Đang lưu..." : "Lưu"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <ConfirmationModal
+        isOpen={openClearConfirm}
+        onClose={() => setOpenClearConfirm(false)}
+        onConfirm={handleClearConversation}
+        title="Xóa toàn bộ cuộc trò chuyện?"
+        description="Hành động này không thể hoàn tác!"
+        variant="destructive"
+        confirmText="Xác nhận xóa"
+      />
+    </>
   );
 
   const lastMessageObj = convo.lastMessage as any;

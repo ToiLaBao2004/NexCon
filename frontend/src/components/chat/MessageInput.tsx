@@ -54,6 +54,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
     const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const imageInputRef = useRef<HTMLInputElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const textInputRef = useRef<HTMLInputElement>(null);
 
     if (!user) return null;
 
@@ -107,6 +108,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
             toast.error(error?.message ?? "Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại!");
         } finally {
             setSending(false);
+            setTimeout(() => textInputRef.current?.focus(), 0);
         }
     };
 
@@ -183,6 +185,14 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
                 </div>
             );
         }
+    }
+
+    if (selectedConvo.type === "group" && selectedConvo.disbanded === true) {
+        return (
+            <div className="flex items-center justify-center p-4 bg-red-50 dark:bg-red-950/20 border-t border-red-100 dark:border-red-900/30">
+                <p className="text-sm text-red-500 font-medium italic">Nhóm đã giải tán</p>
+            </div>
+        );
     }
 
     const canSend = !sending && (attachment !== null || value.trim().length > 0);
@@ -288,6 +298,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
                 <div className="flex-1 relative">
                     <Input
+                        ref={textInputRef}
                         onKeyDown={handleKeyDown}
                         value={value}
                         onChange={handleInputChange}

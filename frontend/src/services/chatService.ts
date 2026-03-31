@@ -84,6 +84,24 @@ export const chatService = {
 		return res.data;
 	},
 
+	async disbandGroup(conversationId: string) {
+		try {
+			const res = await api.delete(`/conversations/${conversationId}/disband-group`);
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async clearConversation(conversationId: string) {
+		try {
+			const res = await api.delete(`/conversations/${conversationId}/clear`);
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
 	async recallMessage(messageId: string) {
 		try {
 			const res = await api.put('/messages/recall', { messageId });
@@ -128,6 +146,42 @@ export const chatService = {
 		try {
 			const res = await api.get(`/messages/${messageId}/media-url`);
 			return res.data as { url: string };
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async addMembers(conversationId: string, userIds: string[]) {
+		try {
+			const res = await api.post(`/conversations/${conversationId}/add-members`, { userIds });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async updateGroupSettings(conversationId: string, isApprovalRequired: boolean) {
+		try {
+			const res = await api.patch(`/conversations/${conversationId}/settings`, { isApprovalRequired });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async getApprovalQueue(conversationId: string) {
+		try {
+			const res = await api.get(`/conversations/${conversationId}/approvals`);
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+
+	async handleApproval(conversationId: string, userId: string, action: 'approve' | 'reject') {
+		try {
+			const res = await api.post(`/conversations/${conversationId}/approvals`, { userId, action });
+			return res.data;
 		} catch (error: any) {
 			throw new Error(resolveErrorMessage(error));
 		}

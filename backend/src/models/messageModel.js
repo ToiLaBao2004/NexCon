@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 
-const MESSAGE_TYPES = ['text', 'image', 'file', 'link'];
+const MESSAGE_TYPES = ['text', 'image', 'file', 'link', 'system'];
 
 const messageSchema = new mongoose.Schema({
     conversationId: {
@@ -14,6 +14,10 @@ const messageSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    senderInfo: {
+        displayName: { type: String },
+        avatarUrl: { type: String }
+    },
     type: {
         type: String,
         enum: MESSAGE_TYPES,
@@ -23,6 +27,16 @@ const messageSchema = new mongoose.Schema({
     content: {
         type: String,
         trim: true,
+    },
+    systemType: {
+        type: String,
+        enum: ['member_added', 'member_kicked', 'member_left', 'group_disbanded', 'call_started', 'call_ended', 'chat_cleared', 'approval_mode_changed', null],
+        default: null
+    },
+    metadata: {
+        type: Map,
+        of: mongoose.Schema.Types.Mixed,
+        default: null
     },
     searchContent: {
         type: String,

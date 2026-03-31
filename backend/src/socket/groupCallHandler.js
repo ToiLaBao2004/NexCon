@@ -149,6 +149,9 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
             if (!conversation || conversation.type !== 'group') {
                 return socket.emit('group-call:error', { reason: 'not-a-group' });
             }
+            if (conversation.disbanded === true) {
+                return socket.emit('group-call:error', { reason: 'group-disbanded', message: 'Không thể gọi vì nhóm đã bị giải tán' });
+            }
             const isMember = conversation.participants.some(
                 p => p.userId._id.toString() === userId
             );

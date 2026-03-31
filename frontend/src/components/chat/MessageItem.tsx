@@ -227,6 +227,93 @@ function ReplyQuoteInline({
 	);
 }
 
+import { getSystemMessageText } from "@/utils/chatUtils";
+
+function SystemMessageComponent({
+	message,
+	selectedConvo,
+	currentUserId,
+}: {
+	message: Message;
+	selectedConvo: Conversation;
+	currentUserId: string;
+}) {
+	const text = getSystemMessageText(message, currentUserId);
+
+	const metadata = message.metadata || {};
+	const addedUserIds = Array.isArray(metadata.addedUserIds) ? metadata.addedUserIds : [];
+	const addedUsersInfo = Array.isArray(metadata.addedUsersInfo) ? metadata.addedUsersInfo : null;
+
+	const addedParticipants = useMemo(() => {
+		if (addedUsersInfo && addedUsersInfo.length > 0) {
+			// Using snapshot stored in metadata when the member was added
+			return addedUsersInfo.map((info: any) => ({
+				userId: {
+					_id: info._id,
+					displayName: info.displayName,
+					avatarUrl: info.avatarUrl
+				}
+			}));
+		}
+
+		// Fallback for older messages
+		if (!addedUserIds.length) return [];
+		return selectedConvo.participants.filter((p: any) =>
+			addedUserIds.some((id: any) => id.toString() === (p.userId?._id || p.userId)?.toString())
+		);
+	}, [addedUserIds, addedUsersInfo, selectedConvo.participants]);
+
+	const getAvatars = () => {
+		if (message.systemType === 'approval_mode_changed' || message.systemType === 'group_disbanded' || message.systemType === 'chat_cleared' || message.systemType === 'member_kicked' || message.systemType === 'member_left') {
+			return (
+				<UserAvatar
+					type="seen"
+					name={metadata.changedByName || metadata.kickedUserName || metadata.userName || message.senderInfo?.displayName || "Hệ thống"}
+					avatarUrl={message.senderInfo?.avatarUrl ?? undefined}
+					className="size-5 border-2 border-background shadow-sm"
+				/>
+			);
+		}
+
+		if (addedParticipants.length > 0) {
+			return addedParticipants.slice(0, 2).map((p: any, i: number) => (
+				<UserAvatar
+					key={p.userId?._id}
+					type="seen"
+					name={p.userId?.displayName || "User"}
+					avatarUrl={p.userId?.avatarUrl ?? undefined}
+					className={cn(
+						"size-5 border-2 border-background shadow-sm hover:z-20 transition-transform group-hover/sys:scale-105",
+						i > 0 && "z-10"
+					)}
+				/>
+			));
+		}
+
+		return (
+			<UserAvatar
+				type="seen"
+				name={(metadata.addedUserNames as string)?.split(',')[0]?.trim() || message.senderInfo?.displayName || "Hệ thống"}
+				avatarUrl={message.senderInfo?.avatarUrl ?? undefined}
+				className="size-5 border-2 border-background shadow-sm"
+			/>
+		);
+	};
+
+	return (
+		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
+			<div className="flex items-center gap-2.5 bg-white/95 dark:bg-gray-800/60 backdrop-blur-sm border border-black/5 dark:border-white/5 py-1.5 px-4 rounded-full max-w-[90%] shadow-[0_2px_12px_-3px_rgba(0,0,0,0.08)] hover:shadow-md transition-all group/sys font-medium">
+				<div className="flex -space-x-1.5 shrink-0">
+					{getAvatars()}
+				</div>
+				<p className="text-[13px] text-slate-600 dark:text-slate-300 truncate leading-tight tracking-tight">
+					{text}
+				</p>
+			</div>
+		</div>
+	);
+}
+
 const MessageItem = ({
 	message,
 	index,
@@ -236,21 +323,43 @@ const MessageItem = ({
 	isLast,
 	onReply,
 }: MessageItemProps) => {
+	if (message.type === "system") {
+		return <SystemMessageComponent message={message} selectedConvo={selectedConvo} currentUserId={currentUserId} />;
+	}
+
 	const prev = messages[index - 1];
+
+	// Handle populated senderId (from fallback or normally populated)
+	const senderObj = typeof message.senderId === "object" ? message.senderId as any : null;
+	const actualSenderId = senderObj ? senderObj._id : message.senderId;
 
 	const isGroupBreak =
 		index === 0 ||
-		message.senderId !== prev?.senderId ||
+		actualSenderId !== (typeof prev?.senderId === "object" ? (prev?.senderId as any)._id : prev?.senderId) ||
 		new Date(message.createdAt).getTime() - new Date(prev?.createdAt || 0).getTime() > 300000;
 
-	const participant = selectedConvo.participants.find(
-		(p: Participant) => p.userId?._id?.toString() === message.senderId?.toString()
+	// Determine participant. If populated object, mock the participant object. Otherwise, look up in selectedConvo.
+	let participant = selectedConvo.participants.find(
+		(p: Participant) => p.userId?._id?.toString() === actualSenderId?.toString()
 	);
 
-	const isOwn = message.senderId === currentUserId;
+	if (!participant && senderObj) {
+		participant = {
+			userId: {
+				_id: senderObj._id || "deleted",
+				displayName: senderObj.displayName || "Người dùng đã xóa",
+				avatarUrl: senderObj.avatarUrl || null,
+				email: ""
+			},
+			joinedAt: message.createdAt
+		};
+	}
+
+	const isOwn = actualSenderId?.toString() === currentUserId?.toString();
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
 	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
+	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
 	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
@@ -435,7 +544,7 @@ const MessageItem = ({
 						)}
 
 						{/* Hover Action Bar - Quick Reaction Button */}
-						{!isRecalled && !message.status && (
+						{!isRecalled && !message.status && !isDisbanded && (
 							<div className={cn(
 								"absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto z-30",
 								isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19"
@@ -496,10 +605,12 @@ const MessageItem = ({
 								</DropdownMenuTrigger>
 
 								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
-									<DropdownMenuItem onClick={() => onReply?.(message)}>
-										<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
-										Trả lời
-									</DropdownMenuItem>
+									{!isDisbanded && (
+										<DropdownMenuItem onClick={() => onReply?.(message)}>
+											<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											Trả lời
+										</DropdownMenuItem>
+									)}
 									{message.content && (
 										<DropdownMenuItem onClick={handleCopy}>
 											<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
@@ -514,15 +625,17 @@ const MessageItem = ({
 											</a>
 										</DropdownMenuItem>
 									)}
-									<DropdownMenuItem onClick={() => setShowPinOptions(true)}>
-										{isPinned ? (
-											<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
-										) : (
-											<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
-										)}
-										{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-									</DropdownMenuItem>
-									{isOwn && (
+									{!isDisbanded && (
+										<DropdownMenuItem onClick={() => setShowPinOptions(true)}>
+											{isPinned ? (
+												<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											) : (
+												<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											)}
+											{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+										</DropdownMenuItem>
+									)}
+									{isOwn && !isDisbanded && (
 										<DropdownMenuItem
 											className="text-destructive focus:text-destructive focus:bg-destructive/10"
 											onClick={() => setShowConfirmRecall(true)}

@@ -31,6 +31,10 @@ export async function checkMessagePermission(req, res, next) {
                 return res.status(404).json({ message: 'Conversation not found.' });
             }
 
+            if (conversation.type === 'group' && conversation.disbanded === true) {
+                return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
+            }
+
             const isMember = conversation.participants.some(
                 (p) => p.userId.toString() === senderId
             );
@@ -54,8 +58,12 @@ export async function checkMessagePermission(req, res, next) {
 
 export async function checkConversationMembership(req, res, next) {
     try {
-        const { messageId } = req.params;
+        const messageId = req.params.messageId || req.body.messageId;
         const userId = req.user._id.toString();
+
+        if (!messageId) {
+            return res.status(400).json({ message: 'messageId is required.' });
+        }
 
         const message = await Message.findById(messageId);
         if (!message) {
@@ -65,6 +73,10 @@ export async function checkConversationMembership(req, res, next) {
         const conversation = await Conversation.findById(message.conversationId);
         if (!conversation) {
             return res.status(404).json({ message: 'Conversation not found.' });
+        }
+
+        if (conversation.type === 'group' && conversation.disbanded === true) {
+            return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
         }
 
         const isMember = conversation.participants.some(

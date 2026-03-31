@@ -204,8 +204,8 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                 variant="ghost"
                 size="icon"
                 className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
-                disabled={groupCallStatus !== "idle"}
-                title="Gọi nhóm"
+                disabled={groupCallStatus !== "idle" || chat.disbanded === true}
+                title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi nhóm"}
                 onClick={() => startGroupCall(chat._id, "video")}
               >
                 <Video className="h-[19px] w-[19px] md:h-[22px] md:w-[22px]" strokeWidth={1.5} />

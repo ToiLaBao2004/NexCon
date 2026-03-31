@@ -17,15 +17,36 @@ export interface SeenUser {
   avatarUrl?: string | null;
 }
 
+export interface ApprovalQueueItem {
+  _id?: string;
+  userId: {
+    _id: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    email: string;
+  };
+  addedBy: {
+    _id: string;
+    displayName: string;
+    avatarUrl?: string | null;
+  };
+  createdAt: string;
+}
+
 export interface Group {
   name: string;
   createdBy: string;
+  admins?: string[];
+  isApprovalRequired?: boolean;
+  approvalQueue?: any[];
 }
 
 export interface LastMessage {
   _id: string;
   content: string;
   type?: MessageType;
+  systemType?: string | null;
+  metadata?: any;
   createdAt: string;
   sender: {
     _id: string;
@@ -45,13 +66,14 @@ export interface Conversation {
   unreadCounts: Record<string, number>;
   createdAt: string;
   updatedAt: string;
+  disbanded?: boolean;
 }
 
 export interface ConversationResponse {
   conversations: Conversation[];
 }
 
-export type MessageType = 'text' | 'image' | 'file' | 'link';
+export type MessageType = 'text' | 'image' | 'file' | 'link' | 'system';
 
 export interface ReplyToMessage {
   _id: string;
@@ -69,6 +91,8 @@ export interface Message {
   conversationId: string;
   senderId: string;
   type: MessageType;
+  systemType?: string | null;
+  metadata?: any;
   content?: string | null;
   fileUrl?: string | null;
   filePublicId?: string | null;
@@ -76,6 +100,11 @@ export interface Message {
   fileName?: string | null;
   fileSize?: number | null;
   mimeType?: string | null;
+  senderInfo?: {
+    _id?: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+  };
   isRecalled: boolean | null;
   isPinned: boolean | null;
   pinnedAt?: string | null;

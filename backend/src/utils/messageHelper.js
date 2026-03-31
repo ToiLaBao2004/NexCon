@@ -1,28 +1,56 @@
 import { v2 as cloudinary } from 'cloudinary';
 
 const resolveLastMessagePreview = (message) => {
-    if (message.content?.trim()) return message.content.trim();
+    if (message.type !== 'system' && message.content?.trim()) return message.content.trim();
 
     switch (message.type) {
         case 'image': return 'Đã gửi một ảnh';
-        case 'file': return message.fileName ?? 'Tệp đính kèm';
+        case 'file': return message.fileName || 'Tệp đính kèm';
         case 'link': return 'Đã gửi một liên kết';
-        default: return '';
+        case 'system': {
+            const systemType = message.systemType;
+            if (!systemType) return message.content || 'Thông báo hệ thống';
+
+            const metadata = message.metadata instanceof Map ? Object.fromEntries(message.metadata) : (message.metadata || {});
+
+            switch (systemType) {
+                case 'member_added':
+                    return `Đã thêm ${metadata.addedUserNames || 'thành viên mới'} vào nhóm`;
+                case 'member_kicked':
+                    return `Đã xóa ${metadata.kickedUserName || 'một thành viên'} khỏi nhóm`;
+                case 'group_disbanded':
+                    return `Nhóm đã bị giải tán`;
+                case 'member_left':
+                    return `${metadata.userName || 'Một thành viên'} đã rời khỏi nhóm`;
+                case 'call_started':
+                    return `Cuộc gọi đã bắt đầu`;
+                case 'call_ended':
+                    return `Cuộc gọi đã kết thúc`;
+                default:
+                    return message.content || 'Thông báo hệ thống';
+            }
+        }
+        default: return message.content?.trim() || '';
     }
 };
 
 export const updateConversationLastMessage = (conversation, message, senderId) => {
+    const metadata = message.metadata instanceof Map ? Object.fromEntries(message.metadata) : (message.metadata || null);
+
     conversation.set({
         lastMessage: {
             content: resolveLastMessagePreview(message),
             type: message.type ?? 'text',
+            systemType: message.systemType || null,
+            metadata: metadata,
             senderId: senderId,
             createdAt: message.createdAt,
         },
     });
 
     conversation.participants.forEach((participant) => {
-        const memberId = participant.userId.toString();
+        const userIdObj = participant.userId;
+        const memberId = (userIdObj._id || userIdObj).toString();
         const isSender = memberId === senderId.toString();
         const prevCount = conversation.unreadCounts?.get(memberId) || 0;
         conversation.unreadCounts.set(memberId, isSender ? 0 : prevCount + 1);
@@ -33,13 +61,22 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
 
 export const emitNewMessage = (io, conversation, message, signedUrl = null) => {
     const payloadMessage = typeof message.toObject === 'function' ? message.toObject() : { ...message };
+    if (payloadMessage.metadata instanceof Map) {
+        payloadMessage.metadata = Object.fromEntries(payloadMessage.metadata);
+    }
     payloadMessage.signedUrl = signedUrl ?? null;
+
+    const lastMsgRaw = conversation.lastMessage?.toObject?.() || conversation.lastMessage;
+    const lastMsgPayload = { ...lastMsgRaw };
+    if (lastMsgPayload?.metadata instanceof Map) {
+        lastMsgPayload.metadata = Object.fromEntries(lastMsgPayload.metadata);
+    }
 
     io.to(conversation._id.toString()).emit('new-message', {
         message: payloadMessage,
         conversation: {
             _id: conversation._id,
-            lastMessage: conversation.lastMessage,
+            lastMessage: lastMsgPayload,
             lastMessageAt: conversation.lastMessageAt,
         },
         unreadCounts: conversation.unreadCounts,
