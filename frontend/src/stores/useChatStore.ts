@@ -515,7 +515,6 @@ export const useChatStore = create<ChatState>()(
                     if (!convo || !convo.lastMessage) return;
 
                     const isUnread = (convo.unreadCounts?.[user._id] ?? 0) > 0;
-                    
                     if (!isUnread) return;
 
                     await chatService.markAsSeen(activeConversationId);
@@ -564,6 +563,35 @@ export const useChatStore = create<ChatState>()(
                     await chatService.handleApproval(conversationId, userId, action);
                 } catch (error) {
                     console.error("Lỗi khi duyệt thành viên:", error);
+                    throw error;
+                }
+            },
+            removeMember: async (conversationId: string, memberId: string) => {
+                try {
+                    const res = await chatService.removeMember(conversationId, memberId);
+                    set((state) => {
+                        const existingConv = state.conversations.find((c) => c._id === conversationId);
+                        if (!existingConv) return state;
+
+                        const updatedConv = {
+                            ...existingConv,
+                            participants: existingConv.participants.filter(p =>
+                                (p.userId?._id || p.userId)?.toString() !== memberId
+                            )
+                        };
+
+                        const updatedConversations = state.conversations.map((c) =>
+                            c._id === conversationId ? updatedConv : c
+                        );
+
+                        return {
+                            conversations: updatedConversations
+                        };
+                    });
+
+                    return res;
+                } catch (error) {
+                    console.error("Lỗi khi xóa thành viên:", error);
                     throw error;
                 }
             },

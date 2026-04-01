@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import UserAvatar from "./UserAvatar";
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { Users, ArrowLeft, MoreHorizontal, UserCircle, UserMinus, Check, X } from "lucide-react";
 import {
   DropdownMenu,
@@ -26,10 +27,14 @@ export default function MembersPanel({ conversationId, participants, memberCount
   const [open, setOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  
+
   const [approvalQueue, setApprovalQueue] = useState<any[]>([]);
   const [loadingApproval, setLoadingApproval] = useState(false);
-  const { handleApproval } = useChatStore();
+  const { handleApproval, removeMember } = useChatStore();
+
+  const [userToRemove, setUserToRemove] = useState<any>(null);
+  const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
+  const [removingUser, setRemovingUser] = useState(false);
 
   useEffect(() => {
     const fetchQueue = () => {
@@ -58,15 +63,34 @@ export default function MembersPanel({ conversationId, participants, memberCount
       await handleApproval(conversationId, userId, action);
       setApprovalQueue(prev => prev.filter(item => item.userId?._id !== userId));
     } catch (error) {
-       console.error(error);
+      console.error(error);
     } finally {
-       setLoadingApproval(false);
+      setLoadingApproval(false);
     }
   };
 
   const handleShowProfile = (user: any) => {
     setSelectedUser(user);
     setIsProfileOpen(true);
+  };
+
+  const confirmRemove = (user: any) => {
+    setUserToRemove(user);
+    setIsConfirmRemoveOpen(true);
+  };
+
+  const handleRemoveMember = async () => {
+    if (!conversationId || !userToRemove) return;
+    try {
+      setRemovingUser(true);
+      await removeMember(conversationId, userToRemove._id);
+      setIsConfirmRemoveOpen(false);
+      setUserToRemove(null);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setRemovingUser(false);
+    }
   };
 
   return (
@@ -104,44 +128,44 @@ export default function MembersPanel({ conversationId, participants, memberCount
               <div className="flex flex-col gap-0.5 pb-4">
                 {isGroupAdmin && (
                   <div className="mb-4">
-                     <div className="px-3 py-2 mt-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                       Yêu cầu tham gia ({approvalQueue?.length || 0})
-                     </div>
-                     {(!approvalQueue || approvalQueue.length === 0) ? (
-                        <div className="px-3 py-2 text-[13px] text-muted-foreground/70 italic">
-                          Hiện tại không có yêu cầu tham gia nhóm nào.
-                        </div>
-                     ) : (
-                       <div className="flex flex-col gap-0.5">
-                          {approvalQueue?.map((item: any) => {
-                             const u = item.userId;
-                             if (!u) return null;
-                             const name = u.displayName || u.email || "Người dùng";
-                             return (
-                               <div key={u._id} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-muted/10 text-left transition-colors group">
-                                  <div className="shrink-0 cursor-pointer" onClick={() => handleShowProfile(u)}>
-                                    <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" />
-                                  </div>
-                                  <div className="flex-1 cursor-pointer min-w-0" onClick={() => handleShowProfile(u)}>
-                                    <div className="font-medium text-[14px] text-foreground truncate">{name}</div>
-                                    <div className="text-[11.5px] text-muted-foreground truncate leading-tight">Thêm bởi: {item.addedBy?.displayName || 'Người dùng'}</div>
-                                  </div>
-                                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                    <button onClick={(e) => { e.stopPropagation(); onHandleApproval(u._id, 'approve'); }} disabled={loadingApproval} className="p-1.5 rounded-full bg-green-500/10 text-green-500 hover:bg-green-500/20 transition-colors focus:opacity-100">
-                                      <Check className="h-4 w-4" />
-                                    </button>
-                                    <button onClick={(e) => { e.stopPropagation(); onHandleApproval(u._id, 'reject'); }} disabled={loadingApproval} className="p-1.5 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors focus:opacity-100">
-                                      <X className="h-4 w-4" />
-                                    </button>
-                                  </div>
-                               </div>
-                             );
-                          })}
-                       </div>
-                     )}
+                    <div className="px-3 py-2 mt-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Yêu cầu tham gia ({approvalQueue?.length || 0})
+                    </div>
+                    {(!approvalQueue || approvalQueue.length === 0) ? (
+                      <div className="px-3 py-2 text-[13px] text-muted-foreground/70 italic">
+                        Hiện tại không có yêu cầu tham gia nhóm nào.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-0.5">
+                        {approvalQueue?.map((item: any) => {
+                          const u = item.userId;
+                          if (!u) return null;
+                          const name = u.displayName || u.email || "Người dùng";
+                          return (
+                            <div key={u._id} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-muted/10 text-left transition-colors group">
+                              <div className="shrink-0 cursor-pointer" onClick={() => handleShowProfile(u)}>
+                                <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" />
+                              </div>
+                              <div className="flex-1 cursor-pointer min-w-0" onClick={() => handleShowProfile(u)}>
+                                <div className="font-medium text-[14px] text-foreground truncate">{name}</div>
+                                <div className="text-[11.5px] text-muted-foreground truncate leading-tight">Thêm bởi: {item.addedBy?.displayName || 'Người dùng'}</div>
+                              </div>
+                              <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                <button onClick={(e) => { e.stopPropagation(); onHandleApproval(u._id, 'approve'); }} disabled={loadingApproval} className="p-1.5 rounded-full bg-green-500/10 text-green-500 hover:bg-green-500/20 transition-colors focus:opacity-100">
+                                  <Check className="h-4 w-4" />
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onHandleApproval(u._id, 'reject'); }} disabled={loadingApproval} className="p-1.5 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors focus:opacity-100">
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
-                
+
                 <div className="px-3 py-2 mt-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Danh sách thành viên
                 </div>
@@ -182,7 +206,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
                           </DropdownMenuItem>
 
                           {isGroupAdmin && !isMe && (
-                            <DropdownMenuItem className="text-destructive focus:text-destructive">
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => confirmRemove(u)}>
                               <UserMinus className="mr-2 h-4 w-4" />
                               <span>Xóa khỏi nhóm</span>
                             </DropdownMenuItem>
@@ -212,6 +236,17 @@ export default function MembersPanel({ conversationId, participants, memberCount
           }}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={isConfirmRemoveOpen}
+        onClose={() => setIsConfirmRemoveOpen(false)}
+        onConfirm={handleRemoveMember}
+        title="Xóa thành viên"
+        description={`Bạn có chắc chắn muốn xóa ${userToRemove?.displayName || userToRemove?.email || "người dùng này"} khỏi nhóm?`}
+        confirmText="Xóa khỏi nhóm"
+        variant="destructive"
+        isLoading={removingUser}
+      />
     </>
   );
 }

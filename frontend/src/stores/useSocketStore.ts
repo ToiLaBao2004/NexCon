@@ -167,6 +167,24 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       }
     });
 
+    socket.on("member-removed", ({ conversation }) => {
+      if (conversation) {
+        useChatStore.getState().updateConversation(conversation);
+      } else {
+        useChatStore.getState().fetchConversations();
+      }
+    });
+
+    socket.on("kicked-from-group", ({ conversationId }) => {
+      const chatState = useChatStore.getState();
+      const activeConvoId = chatState.activeConversationId;
+      chatState.fetchConversations();
+      if (activeConvoId === conversationId) {
+        toast.error("Bạn đã bị đưa ra khỏi nhóm.");
+        chatState.setActiveConversation(null);
+      }
+    });
+
     socket.on(
       "recall-message",
       ({ conversationId, messageId, content, isRecalled }) => {

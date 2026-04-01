@@ -657,39 +657,39 @@ export async function updateSettings(req, res) {
 		}
 
 		await conversation.save();
-        
-        if (isApprovalRequired !== undefined) {
-            io.to(conversationId.toString()).emit('approval-queue-updated', { conversationId });
+
+		if (isApprovalRequired !== undefined) {
+			io.to(conversationId.toString()).emit('approval-queue-updated', { conversationId });
 
 
-            const systemMessage = new Message({
-                conversationId,
-                senderId: userId,
-                senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
-                type: 'system',
-                systemType: 'approval_mode_changed',
-                metadata: {
-                    changedBy: userId,
-                    changedByName: req.user.displayName,
-                    isApprovalRequired: isApprovalRequired,
-                },
-                content: isApprovalRequired ? `Đã bật chế độ phê duyệt thành viên mới` : `Đã tắt chế độ phê duyệt thành viên mới`
-            });
+			const systemMessage = new Message({
+				conversationId,
+				senderId: userId,
+				senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+				type: 'system',
+				systemType: 'approval_mode_changed',
+				metadata: {
+					changedBy: userId,
+					changedByName: req.user.displayName,
+					isApprovalRequired: isApprovalRequired,
+				},
+				content: isApprovalRequired ? `Đã bật chế độ phê duyệt thành viên mới` : `Đã tắt chế độ phê duyệt thành viên mới`
+			});
 
-            const savedMsg = await systemMessage.save();
-            const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+			const savedMsg = await systemMessage.save();
+			const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
 
-            updateConversationLastMessage(conversation, finalMsg, userId);
-            await conversation.save();
+			updateConversationLastMessage(conversation, finalMsg, userId);
+			await conversation.save();
 
-            const updatedConversation = await Conversation.findById(conversationId).populate({
-                path: 'participants.userId',
-                select: 'displayName avatarUrl nickname email bio phone status lastSeen'
-            });
+			const updatedConversation = await Conversation.findById(conversationId).populate({
+				path: 'participants.userId',
+				select: 'displayName avatarUrl nickname email bio phone status lastSeen'
+			});
 
-            emitNewMessage(io, updatedConversation, finalMsg);
-        }
-        
+			emitNewMessage(io, updatedConversation, finalMsg);
+		}
+
 		return res.status(200).json({ success: true, message: 'Settings updated successfully.', group: conversation.group });
 	} catch (error) {
 		console.error('Error updating settings:', error);
@@ -735,7 +735,7 @@ export async function handleApproval(req, res) {
 						userInfo: { displayName: memberToAdd.displayName, avatarUrl: memberToAdd.avatarUrl },
 						joinedAt: new Date()
 					});
-					
+
 					conversation.unreadCounts.set(memberToAdd._id.toString(), 0);
 
 					// Save to assign _ids if needed
@@ -812,6 +812,96 @@ export async function getApprovalQueue(req, res) {
 		return res.status(200).json({ success: true, queue: conversation.group.approvalQueue });
 	} catch (error) {
 		console.error('Error getting approval queue:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+}
+
+export async function removeMember(req, res) {
+	try {
+		const { conversationId, memberId } = req.params;
+		const adminId = req.user._id.toString();
+
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+
+		if (conversation.type !== 'group') {
+			return res.status(400).json({ message: 'Only group conversations can have members removed.' });
+		}
+
+		if (conversation.disbanded) {
+			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
+		}
+
+		if (!conversation.group.admins.some(id => id.toString() === adminId)) {
+			return res.status(403).json({ message: 'Only admins can remove members.' });
+		}
+
+		if (memberId === adminId) {
+			return res.status(400).json({ message: 'Admin cannot remove themselves using this route.' });
+		}
+
+		if (conversation.group.admins.some(id => id.toString() === memberId)) {
+			return res.status(403).json({ message: 'Cannot remove another admin from the group.' });
+		}
+
+		const memberIndex = conversation.participants.findIndex(p => p.userId.toString() === memberId);
+		if (memberIndex === -1) {
+			return res.status(404).json({ message: 'Member not found in group.' });
+		}
+		const kickedUser = await User.findById(memberId).select('displayName avatarUrl');
+		// Remove from participants and unread counts
+		conversation.participants.splice(memberIndex, 1);
+		conversation.unreadCounts.delete(memberId);
+		// Record removal in a system message
+		const systemMessage = new Message({
+			conversationId,
+			senderId: adminId,
+			senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+			type: 'system',
+			systemType: 'member_kicked',
+			metadata: {
+				adminId: adminId,
+				adminName: req.user.displayName,
+				kickedUserId: memberId,
+				kickedUserName: kickedUser ? kickedUser.displayName : "Người dùng"
+			},
+			content: `Đã đưa ${kickedUser ? kickedUser.displayName : "Người dùng"} ra khỏi nhóm`
+		});
+
+		const savedMsg = await systemMessage.save();
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+
+		updateConversationLastMessage(conversation, finalMsg, adminId);
+		await conversation.save();
+
+		const updatedConversation = await Conversation.findById(conversationId).populate({
+			path: 'participants.userId',
+			select: 'displayName avatarUrl nickname email bio phone status lastSeen'
+		});
+
+		emitNewMessage(io, updatedConversation, finalMsg);
+
+		io.to(conversationId.toString()).emit('member-removed', {
+			conversationId,
+			conversation: updatedConversation,
+			removedUserId: memberId
+		});
+
+		const receiverSocketId = getReceiverSocketId(memberId.toString());
+		if (receiverSocketId) {
+			const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+			if (receiverSocket) {
+				receiverSocket.leave(conversationId.toString());
+			}
+			io.to(receiverSocketId).emit('kicked-from-group', { conversationId });
+		}
+
+		return res.status(200).json({ success: true, message: 'Member removed successfully.', conversation: updatedConversation });
+
+	} catch (error) {
+		console.error('Error removing member:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 }

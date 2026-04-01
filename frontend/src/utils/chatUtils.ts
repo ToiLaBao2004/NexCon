@@ -47,17 +47,17 @@ export const getSystemMessageText = (
         }
 
         case "member_kicked": {
-            const kickedUserId = meta.kickedUserId;
-            const adminId = meta.adminId;
+            const kickedUserId = meta.kickedUserId || meta.removedUserId;
+            const adminId = meta.adminId || meta.removedBy;
             const isMeKicking = adminId?.toString() === currentUserId;
             const isMeKicked = kickedUserId?.toString() === currentUserId;
 
-            const kickedName = meta.kickedUserName || "một thành viên";
-            const adminName = meta.adminName || "Quản trị viên";
+            const kickedName = meta.kickedUserName || meta.removedUserName || "một thành viên";
+            const adminName = meta.adminName || meta.removedByName || "Quản trị viên";
 
             if (isMeKicking) return `Bạn đã xóa ${kickedName} khỏi nhóm`;
             if (isMeKicked) return `Bạn đã bị xóa khỏi nhóm bởi ${adminName}`;
-            return `${adminName} đã xóa ${kickedName} khỏi nhóm`;
+            return `${adminName} đã đưa ${kickedName} ra khỏi nhóm`;
         }
 
         case "group_disbanded": {
