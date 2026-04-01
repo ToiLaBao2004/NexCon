@@ -26,6 +26,8 @@ const resolveLastMessagePreview = (message) => {
                     return `Cuộc gọi đã bắt đầu`;
                 case 'call_ended':
                     return `Cuộc gọi đã kết thúc`;
+                case 'admin_transferred':
+                    return `${metadata.appointedByInfo?.displayName || 'Một quản trị viên'} đã chuyển quyền trưởng nhóm cho ${metadata.appointedUserInfo?.displayName || 'một thành viên'}`;
                 default:
                     return message.content || 'Thông báo hệ thống';
             }

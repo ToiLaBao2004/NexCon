@@ -1,5 +1,5 @@
 import express from 'express';
-import { createConversation, getConversations, getMessages, getMediaByType, markAsSeen, updateGroupName, disbandGroupByAdmin, clearConversation, addMembers, updateSettings, handleApproval, getApprovalQueue, removeMember } from '../controllers/conversationController.js';
+import { createConversation, getConversations, getMessages, getMediaByType, markAsSeen, updateGroupName, disbandGroupByAdmin, clearConversation, addMembers, updateSettings, handleApproval, getApprovalQueue, transferAdminRole, removeMember } from '../controllers/conversationController.js';
 import { checkFriendship } from '../middlewares/friendMiddleware.js';
 
 const conversationRouter = express.Router();
@@ -16,6 +16,7 @@ conversationRouter.post('/:conversationId/add-members', addMembers);
 conversationRouter.patch('/:conversationId/settings', updateSettings);
 conversationRouter.post('/:conversationId/approvals', handleApproval);
 conversationRouter.get('/:conversationId/approvals', getApprovalQueue);
+conversationRouter.patch('/:conversationId/admins/:memberId', transferAdminRole);
 conversationRouter.delete('/:conversationId/members/:memberId', removeMember);
 
 export default conversationRouter;

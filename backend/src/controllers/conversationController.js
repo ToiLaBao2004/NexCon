@@ -905,3 +905,91 @@ export async function removeMember(req, res) {
 		res.status(500).json({ message: 'Internal server error' });
 	}
 }
+
+async function transferAdmin(conversation, newAdminId) {
+	conversation.group.admins = [newAdminId];
+
+	await conversation.save();
+
+	const newAdmin = await User.findById(newAdminId).select('displayName avatarUrl');
+
+	return {
+		displayName: newAdmin?.displayName || 'Người dùng',
+		avatarUrl: newAdmin?.avatarUrl || null
+	};
+}
+
+export async function transferAdminRole(req, res) {
+	try {
+		const { conversationId, memberId } = req.params;
+		const currentAdminId = req.user._id.toString();
+
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+
+		if (conversation.type !== 'group') {
+			return res.status(400).json({ message: 'Only group conversations can transfer admin role.' });
+		}
+
+		if (conversation.disbanded === true) {
+			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
+		}
+
+		if (!conversation.group.admins.some(adminId => adminId.toString() === currentAdminId)) {
+			return res.status(403).json({ message: 'Only admins can transfer admin role.' });
+		}
+
+		if (!conversation.participants.some(p => p.userId.toString() === memberId.toString())) {
+			return res.status(400).json({ message: 'User is not a participant in this group.' });
+		}
+
+		const appointedUserInfo = await transferAdmin(conversation, memberId);
+		const appointedByInfo = {
+			displayName: req.user.displayName,
+			avatarUrl: req.user.avatarUrl
+		};
+
+		const systemMessage = new Message({
+			conversationId,
+			senderId: req.user._id,
+			senderInfo: appointedByInfo,
+			type: 'system',
+			systemType: 'admin_transferred',
+			metadata: {
+				appointedBy: req.user._id,
+				appointedByInfo,
+				appointedUserId: memberId,
+				appointedUserInfo: {
+					displayName: appointedUserInfo.displayName,
+					avatarUrl: appointedUserInfo.avatarUrl
+				}
+			},
+			content: `${appointedByInfo.displayName} đã chuyển quyền trưởng nhóm cho ${appointedUserInfo.displayName}`
+		});
+
+		const savedMsg = await systemMessage.save();
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+
+		updateConversationLastMessage(conversation, finalMsg, req.user._id);
+		await conversation.save();
+
+		const updatedConversation = await Conversation.findById(conversationId).populate({
+			path: 'participants.userId',
+			select: 'displayName avatarUrl nickname email bio phone status lastSeen'
+		});
+
+		io.to(conversationId.toString()).emit('admin-transferred', {
+			conversationId,
+			newAdminId: memberId
+		});
+
+		emitNewMessage(io, updatedConversation, finalMsg);
+
+		return res.status(200).json({ success: true, message: 'Bổ nhiệm admin thành công' });
+	} catch (error) {
+		console.error('Error transferring admin role:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+}
