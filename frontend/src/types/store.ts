@@ -1,4 +1,5 @@
 import type { Socket } from "socket.io-client";
+import type { Room } from "livekit-client";
 import type { Conversation, Message, MessageType } from "./chat";
 import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
 import type { CallRecord } from "./call";
@@ -182,9 +183,9 @@ export interface CallState {
   isMuted: boolean;
   isVideoOff: boolean;
   isRemoteVideoOff: boolean;
-  _peerConnection: RTCPeerConnection | null;
-  _pendingOffer: RTCSessionDescriptionInit | null;
-  _iceCandidateQueue: RTCIceCandidateInit[];
+  _livekitRoom: Room | null;
+  _roomName: string | null;
+  _token: string | null;
   _callTimeout: ReturnType<typeof setTimeout> | null;
   startCall: (toUser: RemoteUser, callType: CallType) => Promise<void>;
   acceptCall: () => Promise<void>;
@@ -193,12 +194,13 @@ export interface CallState {
   toggleMute: () => void;
   toggleVideo: () => void;
   handleVideoToggle: (isVideoOff: boolean) => void;
-  handleIncomingCall: (from: RemoteUser, offer: RTCSessionDescriptionInit, callType: CallType) => void;
-  handleCallAnswered: (answer: RTCSessionDescriptionInit) => Promise<void>;
+  handleIncomingCall: (from: RemoteUser, callType: CallType, roomName: string) => void;
+  handleCallAnswered: (payload: { token: string; roomName: string }) => Promise<void>;
+  handleCallAccepted: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallRejected: () => void;
   handleCallEnded: () => void;
-  handleCallFailed: (reason: 'offline' | 'busy') => void;
-  handleIceCandidate: (candidate: RTCIceCandidateInit) => Promise<void>;
+  handleCallFailed: (reason: 'offline' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'server-error') => void;
+  handleIceCandidate: (_candidate: RTCIceCandidateInit) => Promise<void>;
 }
 
 export interface CallHistoryState {

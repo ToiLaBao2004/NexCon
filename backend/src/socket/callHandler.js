@@ -2,6 +2,10 @@ import Call from '../models/callModel.js';
 import Friend from '../models/friendModel.js';
 import BlockUser from '../models/blockUserModel.js';
 import Conversation from '../models/conversationModel.js';
+import { AccessToken } from 'livekit-server-sdk';
+
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
 
 // Sắp xếp cặp userId để query Friend (userA < userB)
 const sortPair = (a, b) => (a < b ? [a, b] : [b, a]);
@@ -11,6 +15,14 @@ async function areFriends(userId1, userId2) {
     const [userA, userB] = sortPair(userId1.toString(), userId2.toString());
     const friendship = await Friend.findOne({ userA, userB }).lean();
     return !!friendship;
+}
+
+async function hasDirectConversation(userId1, userId2) {
+    const conversation = await Conversation.findOne({
+        type: 'direct',
+        'participants.userId': { $all: [userId1, userId2] }
+    }).select('_id').lean();
+    return !!conversation;
 }
 
 // Kiểm tra có bị block (1 trong 2 )
@@ -145,11 +157,34 @@ async function finalizeCallRecord(callId, overallStatus) {
     return call;
 }
 
+async function generateLiveKitToken(roomName, identity, displayName, metadata) {
+    if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+        throw new Error('LiveKit credentials are missing');
+    }
+
+    const token = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+        identity,
+        name: displayName,
+        ttl: '2h',
+        metadata: metadata ?? '',
+    });
+
+    token.addGrant({
+        roomJoin: true,
+        room: roomName,
+        canPublish: true,
+        canSubscribe: true,
+        canPublishData: true,
+    });
+
+    return token.toJwt();
+}
+
 // Đăng ký socket events liên quan đến Call
 export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io, getReceiverSocketId) {
 
-    // A gọi B — gửi WebRTC offer
-    socket.on("call-offer", async ({ toUserId, offer, callType }) => {
+    // A gọi B — tạo call session và báo incoming-call
+    socket.on("call-offer", async ({ toUserId, callType }) => {
         const callerId = user._id.toString();
         const receiverId = toUserId.toString();
 
@@ -167,9 +202,12 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
                 return;
             }
 
-            // 3. Kiểm tra bạn bè
-            const friends = await areFriends(callerId, receiverId);
-            if (!friends) {
+            // 3. Chỉ cho phép gọi nếu là bạn bè HOẶC đã có direct conversation
+            const [friends, hasConversation] = await Promise.all([
+                areFriends(callerId, receiverId),
+                hasDirectConversation(callerId, receiverId)
+            ]);
+            if (!friends && !hasConversation) {
                 socket.emit("call-failed", { reason: "not-friends" });
                 return;
             }
@@ -227,6 +265,7 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
                 receiverId,
                 callType
             });
+            const roomName = `dm-call-${call._id.toString()}`;
 
             // 8. Đăng ký cuộc gọi đang chờ (in-memory)
             activeCalls.set(callerId, {
@@ -234,6 +273,9 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
                 receiverId,
                 callId: call._id.toString(),
                 conversationId: conversation._id.toString(),
+                roomName,
+                callerDisplayName: user.displayName,
+                callerAvatarUrl: user.avatarUrl || null,
                 status: "calling"
             });
 
@@ -244,8 +286,8 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
                     displayName: user.displayName,
                     avatarUrl: user.avatarUrl,
                 },
-                offer,
                 callType,
+                roomName,
                 callId: call._id.toString(),
                 conversationId: conversation._id.toString(),
             });
@@ -258,8 +300,8 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
         }
     });
 
-    // B chấp nhận — gửi WebRTC answer về A
-    socket.on("call-answer", async ({ toUserId, answer }) => {
+    // B chấp nhận — phát token LiveKit cho cả 2 bên
+    socket.on("call-answer", async ({ toUserId }) => {
         const callerId = toUserId.toString();
         const receiverId = user._id.toString();
 
@@ -269,6 +311,7 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
 
             const activeCall = activeCalls.get(callerId);
             if (!activeCall) return;
+            const roomName = activeCall.roomName || `dm-call-${activeCall.callId}`;
 
             // Cập nhật in-memory
             activeCalls.set(callerId, { ...activeCall, status: "in-call" });
@@ -288,20 +331,39 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
                 await call.save();
             }
 
-            io.to(callerSocketId).emit("call-answered", { answer });
+            const callerToken = await generateLiveKitToken(
+                roomName,
+                callerId,
+                activeCall.callerDisplayName || callerId,
+                JSON.stringify({
+                    displayName: activeCall.callerDisplayName || callerId,
+                    avatarUrl: activeCall.callerAvatarUrl || null,
+                })
+            );
+
+            const receiverToken = await generateLiveKitToken(
+                roomName,
+                receiverId,
+                user.displayName,
+                JSON.stringify({
+                    displayName: user.displayName,
+                    avatarUrl: user.avatarUrl || null,
+                })
+            );
+
+            io.to(callerSocketId).emit("call-answered", {
+                token: callerToken,
+                roomName,
+            });
+            socket.emit("call-accepted", {
+                token: receiverToken,
+                roomName,
+            });
 
             console.log(`${user.displayName} accepted call from ${callerId}`);
 
         } catch (error) {
             console.error("Error in call-answer:", error);
-        }
-    });
-
-    // Trao đổi ICE candidates
-    socket.on("ice-candidate", ({ toUserId, candidate }) => {
-        const receiverSocketId = getReceiverSocketId(toUserId.toString());
-        if (receiverSocketId) {
-            io.to(receiverSocketId).emit("ice-candidate", { candidate });
         }
     });
 
