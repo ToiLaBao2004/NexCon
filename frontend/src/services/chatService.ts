@@ -186,4 +186,13 @@ export const chatService = {
 			throw new Error(resolveErrorMessage(error));
 		}
 	},
+
+	async removeMember(conversationId: string, memberId: string) {
+		try {
+			const res = await api.delete(`/conversations/${conversationId}/members/${memberId}`);
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
 };
