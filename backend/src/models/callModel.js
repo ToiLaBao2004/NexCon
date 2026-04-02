@@ -23,11 +23,9 @@ const callParticipantSchema = new mongoose.Schema({
     },
     joinedAt: {
         type: Date,
-        default: null
     },
     leftAt: {
         type: Date,
-        default: null
     }
 }, { _id: false });
 
@@ -64,12 +62,10 @@ const callSchema = new mongoose.Schema({
     // Thời điểm bắt đầu thực sự (có người accepted)
     startedAt: {
         type: Date,
-        default: null
     },
     // Thời điểm kết thúc
     endedAt: {
         type: Date,
-        default: null
     }
 }, { timestamps: true });
 
