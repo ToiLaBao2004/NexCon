@@ -195,4 +195,12 @@ export const chatService = {
 			throw new Error(resolveErrorMessage(error));
 		}
 	},
-};
+	async transferAdminRole(conversationId: string, memberId: string) {
+		try {
+			const res = await api.patch(`/conversations/${conversationId}/admins/${memberId}`);
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+};

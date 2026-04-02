@@ -335,7 +335,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         toast.warning("Nhóm này đã bị giải tán.");
       }
     });
+    
+    socket.on("admin-transferred", ({ conversationId, newAdminId }) => {
+      useChatStore.getState().updateAdminLocal(conversationId, newAdminId);
+    });
   },
+
 
   joinConversation(conversationId: string) {
     const socket = get().socket;

@@ -92,6 +92,9 @@ export interface ChatState {
   updateMessageReaction: (messageId: string, reactions: { userId: string; emoji: string }[]) => void;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
   markGroupAsDisbanded: (conversationId: string) => void;
+  transferAdminRole: (conversationId: string, memberId: string) => Promise<void>;
+  updateAdminLocal: (conversationId: string, newAdminId: string) => void;
+
 
   // Sidebar
   activeSidebar: 'search' | 'info' | null;
