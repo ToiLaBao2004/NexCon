@@ -1,9 +1,10 @@
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, KeyRound } from "lucide-react";
 import { useChatStore } from "@/stores/useChatStore";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useState } from "react";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { TransferAdminModal } from "./TransferAdminModal";
 
 interface GroupManagementPanelProps {
   open: boolean;
@@ -19,9 +20,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 export function GroupManagementPanel({ open, onOpenChange, conversationId, isGroupAdmin }: GroupManagementPanelProps) {
   const { disbandGroup, updateGroupSettings, conversations } = useChatStore();
   const [showConfirmDisband, setShowConfirmDisband] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
 
   const conversation = conversations.find(c => c._id === conversationId);
   const isApprovalRequired = conversation?.group?.isApprovalRequired || false;
+  const participants = conversation?.participants || [];
 
   const handleDisband = async () => {
     try {
@@ -84,7 +87,15 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                     />
                   </div>
                   
-                  <div className="mt-auto w-full pt-4 border-t border-border/40">
+                  <div className="mt-auto w-full pt-4 border-t border-border/40 flex flex-col gap-3">
+                    <button
+                      onClick={() => setShowTransferModal(true)}
+                      className="flex items-center gap-3 w-full px-4 py-3 rounded-lg hover:bg-muted/10 transition-colors text-[15px] font-medium text-foreground border border-border/40"
+                    >
+                      <KeyRound className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+                      Chuyển quyền trưởng nhóm
+                    </button>
+
                     <button
                       onClick={() => setShowConfirmDisband(true)}
                       className="w-full text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 py-3 rounded-lg font-medium text-[15px] transition-colors"
@@ -102,6 +113,15 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
           </DialogPrimitive.Content>
         </DialogPortal>
       </Dialog>
+      
+      <TransferAdminModal
+        open={showTransferModal}
+        onOpenChange={setShowTransferModal}
+        conversationId={conversationId}
+        participants={participants}
+        onSuccess={() => onOpenChange(false)}
+      />
+
       <ConfirmationModal
         isOpen={showConfirmDisband}
         onClose={() => setShowConfirmDisband(false)}
@@ -114,3 +134,4 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
     </>
   );
 }
+

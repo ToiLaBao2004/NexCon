@@ -1172,7 +1172,24 @@ export const useChatStore = create<ChatState>()(
                     throw error;
                 }
             },
+            transferAdminRole: async (conversationId, memberId) => {
+                try {
+                    await chatService.transferAdminRole(conversationId, memberId);
+                    get().updateAdminLocal(conversationId, memberId);
+                } catch (error) {
+                    console.error("Lỗi khi chuyển quyền trưởng nhóm:", error);
+                    throw error;
+                }
+            },
+            updateAdminLocal: (conversationId, newAdminId) => {
+                set((state) => ({
+                    conversations: state.conversations.map((c) =>
+                        c._id === conversationId ? { ...c, group: { ...c.group, admins: [newAdminId] } } : c
+                    )
+                }));
+            },
         }),
+
         {
             name: "chat-storage",
             partialize: (state) => ({ conversations: state.conversations })

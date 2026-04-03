@@ -3,13 +3,9 @@ import { useSocketStore } from "./useSocketStore";
 import type { CallState, CallType, RemoteUser } from "@/types/store";
 import { toast } from "sonner";
 import { playRingtone, stopRingtone } from "@/utils/sound";
+import { Room, RoomEvent, Track } from "livekit-client";
 
-const ICE_SERVERS: RTCConfiguration = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-  ],
-};
+const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
 
 function emitCallEvent(event: string, payload?: object) {
   useSocketStore.getState().socket?.emit(event, payload);
@@ -21,9 +17,9 @@ const IDLE_STATE = {
   remoteUser: null,
   localStream: null,
   remoteStream: null,
-  _peerConnection: null,
-  _pendingOffer: null,
-  _iceCandidateQueue: [],
+  _livekitRoom: null,
+  _roomName: null,
+  _token: null,
   _callTimeout: null,
   isMuted: false,
   isVideoOff: false,
@@ -31,21 +27,111 @@ const IDLE_STATE = {
 };
 
 function cleanup(get: () => CallState) {
-  const { localStream, _peerConnection, _callTimeout } = get();
+  const { localStream, _livekitRoom, _callTimeout } = get();
   localStream?.getTracks().forEach((t) => t.stop()); // Stop camera/mic
-  _peerConnection?.close(); // Close WebRTC connection
+  if (_livekitRoom) {
+    _livekitRoom.disconnect(true);
+  }
   if (_callTimeout) clearTimeout(_callTimeout);
 }
 
-async function flushIceCandidateQueue(
-  pc: RTCPeerConnection,
+function buildLocalMediaStream(room: Room) {
+  const stream = new MediaStream();
+  room.localParticipant.trackPublications.forEach((pub) => {
+    if (!pub.track) return;
+    if (
+      pub.track.source === Track.Source.Microphone ||
+      pub.track.source === Track.Source.Camera
+    ) {
+      stream.addTrack(pub.track.mediaStreamTrack);
+    }
+  });
+  return stream;
+}
+
+async function connectLiveKitRoom(
+  token: string,
+  roomName: string,
+  callType: CallType,
+  set: (partial: Partial<CallState>) => void,
   get: () => CallState,
 ) {
-  const { _iceCandidateQueue } = get();
-  for (const candidate of _iceCandidateQueue) {
-    await pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => { });
-  }
-  return [];
+  const room = new Room();
+  const remoteMediaStream = new MediaStream();
+
+  const syncRemoteVideoState = () => {
+    const firstRemote = Array.from(room.remoteParticipants.values())[0];
+    if (!firstRemote) {
+      set({ remoteStream: null, isRemoteVideoOff: false });
+      return;
+    }
+    const cameraPub = firstRemote.getTrackPublication(Track.Source.Camera);
+    set({
+      isRemoteVideoOff: !cameraPub || cameraPub.isMuted,
+    });
+  };
+
+  room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+    if (participant.isLocal) return;
+    if (track.kind !== Track.Kind.Video && track.kind !== Track.Kind.Audio) return;
+    remoteMediaStream.addTrack(track.mediaStreamTrack);
+    set({ remoteStream: new MediaStream(remoteMediaStream.getTracks()) });
+    if (publication.source === Track.Source.Camera) {
+      syncRemoteVideoState();
+    }
+  });
+
+  room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+    if (participant.isLocal) return;
+    remoteMediaStream.removeTrack(track.mediaStreamTrack);
+    set({ remoteStream: new MediaStream(remoteMediaStream.getTracks()) });
+    if (publication.source === Track.Source.Camera) {
+      syncRemoteVideoState();
+    }
+  });
+
+  room.on(RoomEvent.TrackMuted, (_publication, participant) => {
+    if (!participant.isLocal) {
+      syncRemoteVideoState();
+    }
+  });
+
+  room.on(RoomEvent.TrackUnmuted, (_publication, participant) => {
+    if (!participant.isLocal) {
+      syncRemoteVideoState();
+    }
+  });
+
+  room.on(RoomEvent.ParticipantDisconnected, () => {
+    syncRemoteVideoState();
+  });
+
+  room.on(RoomEvent.Disconnected, () => {
+    if (get().status !== "idle") {
+      get().handleCallEnded();
+      toast.error("Kết nối bị gián đoạn.");
+    }
+  });
+
+  await room.connect(LIVEKIT_URL, token);
+  await room.localParticipant.setMicrophoneEnabled(true);
+  await room.localParticipant.setCameraEnabled(callType === "video");
+
+  const localStream = buildLocalMediaStream(room);
+  syncRemoteVideoState();
+
+  set({
+    status: "active",
+    _livekitRoom: room,
+    _roomName: roomName,
+    _token: token,
+    localStream,
+    remoteStream: remoteMediaStream.getTracks().length
+      ? new MediaStream(remoteMediaStream.getTracks())
+      : null,
+    isMuted: false,
+    isVideoOff: callType === "voice",
+  });
 }
 
 export const useCallStore = create<CallState>((set, get) => ({
@@ -57,55 +143,14 @@ export const useCallStore = create<CallState>((set, get) => ({
   async startCall(toUser: RemoteUser, callType: CallType) {
     if (get().status !== "idle") return;
 
-    let stream: MediaStream | null = null;
-    let pc: RTCPeerConnection | null = null;
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      });
-
-      // Voice call: tắt video track ngay (vẫn có track để toggle sau)
-      const startWithVideoOff = callType === "voice";
-      if (startWithVideoOff) {
-        stream.getVideoTracks().forEach((t) => (t.enabled = false));
-      }
-
-      pc = new RTCPeerConnection(ICE_SERVERS);
-      pc.onconnectionstatechange = () => {
-        if (!pc) return;
-
-        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-          get().endCall();
-          toast.error('Kết nối bị gián đoạn.');
-        }
-      };
-
-      stream.getTracks().forEach((track) => pc!.addTrack(track, stream!));
-
-      pc.ontrack = (e) => {
-        const [remoteStream] = e.streams;
-        set({ remoteStream });
-      };
-
-      pc.onicecandidate = (e) => {
-        if (e.candidate) {
-          emitCallEvent("ice-candidate", {
-            toUserId: toUser._id,
-            candidate: e.candidate,
-          });
-        }
-      };
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
       timeout = setTimeout(() => {
         if (get().status === "outgoing") {
           emitCallEvent("call-ended", { toUserId: toUser._id });
-          get().endCall();
+          cleanup(get);
+          set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
         }
       }, 30_000);
 
@@ -113,22 +158,18 @@ export const useCallStore = create<CallState>((set, get) => ({
         status: "outgoing",
         callType,
         remoteUser: toUser,
-        localStream: stream,
         remoteStream: null,
-        _peerConnection: pc,
         _callTimeout: timeout,
         isMuted: false,
-        isVideoOff: startWithVideoOff,
+        isVideoOff: callType === "voice",
       });
 
-      emitCallEvent("call-offer", { toUserId: toUser._id, offer, callType });
+      emitCallEvent("call-offer", { toUserId: toUser._id, callType });
       // Refresh sidebar
       const { useChatStore } = await import("./useChatStore");
       useChatStore.getState().fetchConversations();
     } catch (error) {
       console.error("Start call failed:", error);
-      stream?.getTracks().forEach((t) => t.stop());
-      pc?.close();
       if (timeout) clearTimeout(timeout);
       toast.error(
         "Không thể thiết lập cuộc gọi. Hãy kiểm tra thiết bị của bạn.",
@@ -138,75 +179,11 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   // Receiver: B accepts the incoming call
   async acceptCall() {
-    const { remoteUser, _pendingOffer, callType } = get();
-    if (!remoteUser || !_pendingOffer) return;
+    const { remoteUser } = get();
+    if (!remoteUser) return;
 
-    let stream: MediaStream | null = null;
-    let pc: RTCPeerConnection | null = null;
-
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      });
-
-      // Voice call: tắt video track ngay (vẫn có track để toggle sau)
-      const startWithVideoOff = callType === "voice";
-      if (startWithVideoOff) {
-        stream.getVideoTracks().forEach((t) => (t.enabled = false));
-      }
-
-      pc = new RTCPeerConnection(ICE_SERVERS);
-      pc.onconnectionstatechange = () => {
-        if (!pc) return;
-
-        if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-          get().endCall();
-          toast.error('Kết nối bị gián đoạn.');
-        }
-      };
-
-      stream.getTracks().forEach((track) => pc!.addTrack(track, stream!));
-
-      pc.ontrack = (e) => {
-        const [remoteStream] = e.streams;
-        set({ remoteStream });
-      };
-
-      pc.onicecandidate = (e) => {
-        if (e.candidate) {
-          emitCallEvent("ice-candidate", {
-            toUserId: remoteUser._id,
-            candidate: e.candidate,
-          });
-        }
-      };
-
-      await pc.setRemoteDescription(new RTCSessionDescription(_pendingOffer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-
-      const remaining = await flushIceCandidateQueue(pc, get);
-
-      set({
-        status: "active",
-        localStream: stream,
-        _peerConnection: pc,
-        _pendingOffer: null,
-        _iceCandidateQueue: remaining,
-        isMuted: false,
-        isVideoOff: startWithVideoOff,
-      });
-
-      emitCallEvent("call-answer", { toUserId: remoteUser._id, answer });
-      stopRingtone();
-    } catch (error) {
-      console.error("Accept call failed:", error);
-      stream?.getTracks().forEach((t) => t.stop());
-      pc?.close();
-      get().endCall();
-      toast.error("Không thể tham gia cuộc gọi.");
-    }
+    emitCallEvent("call-answer", { toUserId: remoteUser._id });
+    stopRingtone();
   },
 
   // Receiver: B rejects the incoming call
@@ -232,23 +209,31 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   // Media controls
   toggleMute() {
-    const { localStream, isMuted } = get();
-    localStream?.getAudioTracks().forEach((t) => {
-      t.enabled = isMuted;
-    });
-    set({ isMuted: !isMuted });
+    const { _livekitRoom, isMuted } = get();
+    if (!_livekitRoom) return;
+
+    const nextMuted = !isMuted;
+    void _livekitRoom.localParticipant
+      .setMicrophoneEnabled(!nextMuted)
+      .catch(() => toast.error("Không thể cập nhật trạng thái microphone."));
+
+    set({ isMuted: nextMuted });
   },
 
   toggleVideo() {
-    const { localStream, isVideoOff, remoteUser } = get();
-    localStream?.getVideoTracks().forEach((t) => {
-      t.enabled = isVideoOff;
-    });
-    const next = !isVideoOff;
-    set({ isVideoOff: next });
-    if (remoteUser) {
-      emitCallEvent("call-video-toggle", { toUserId: remoteUser._id, isVideoOff: next });
-    }
+    const { _livekitRoom, isVideoOff } = get();
+    if (!_livekitRoom) return;
+
+    const nextVideoOff = !isVideoOff;
+    void _livekitRoom.localParticipant
+      .setCameraEnabled(!nextVideoOff)
+      .then(() => {
+        const localStream = buildLocalMediaStream(_livekitRoom);
+        set({ localStream });
+      })
+      .catch(() => toast.error("Không thể cập nhật trạng thái camera."));
+
+    set({ isVideoOff: nextVideoOff });
   },
 
   handleVideoToggle(isVideoOff: boolean) {
@@ -257,11 +242,7 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   // Socket event handlers (called from useSocketStore)
 
-  handleIncomingCall(
-    from: RemoteUser,
-    offer: RTCSessionDescriptionInit,
-    callType: CallType,
-  ) {
+  handleIncomingCall(from: RemoteUser, callType: CallType, roomName: string) {
     if (get().status !== "idle") {
       emitCallEvent("call-rejected", { toUserId: from._id });
       return;
@@ -270,27 +251,43 @@ export const useCallStore = create<CallState>((set, get) => ({
       status: "incoming",
       callType,
       remoteUser: from,
-      _pendingOffer: offer,
+      _roomName: roomName,
     });
     console.log("[CallStore] handleIncomingCall triggered, starting ringtone");
     void playRingtone();
   },
 
-  async handleCallAnswered(answer: RTCSessionDescriptionInit) {
-    const { _peerConnection, _callTimeout } = get();
-    if (!_peerConnection) return;
+  async handleCallAnswered({ token, roomName }) {
+    const { _callTimeout, callType } = get();
+    if (!callType) return;
 
     if (_callTimeout) {
       clearTimeout(_callTimeout);
       set({ _callTimeout: null });
     }
 
-    await _peerConnection.setRemoteDescription(
-      new RTCSessionDescription(answer),
-    );
+    try {
+      await connectLiveKitRoom(token, roomName, callType, set, get);
+    } catch (error) {
+      console.error("Join LiveKit as caller failed:", error);
+      cleanup(get);
+      set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+      toast.error("Không thể tham gia cuộc gọi.");
+    }
+  },
 
-    const remaining = await flushIceCandidateQueue(_peerConnection, get);
-    set({ status: "active", _iceCandidateQueue: remaining });
+  async handleCallAccepted({ token, roomName }) {
+    const { callType } = get();
+    if (!callType) return;
+
+    try {
+      await connectLiveKitRoom(token, roomName, callType, set, get);
+    } catch (error) {
+      console.error("Join LiveKit as callee failed:", error);
+      cleanup(get);
+      set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+      toast.error("Không thể tham gia cuộc gọi.");
+    }
   },
 
   handleCallRejected() {
@@ -305,30 +302,24 @@ export const useCallStore = create<CallState>((set, get) => ({
     set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
   },
 
-  handleCallFailed(reason: "offline" | "busy") {
+  handleCallFailed(reason) {
     cleanup(get);
     stopRingtone();
-    const msg =
-      reason === "offline"
-        ? "Người dùng đang offline."
-        : "Người dùng đang bận.";
+    const reasonMap: Record<string, string> = {
+      offline: "Người dùng đang offline.",
+      busy: "Người dùng đang bận.",
+      "self-call": "Bạn không thể tự gọi chính mình.",
+      blocked: "Không thể gọi do trạng thái chặn.",
+      "not-friends": "Hai bạn chưa là bạn bè.",
+      "already-in-call": "Bạn đang ở trong một cuộc gọi khác.",
+      "server-error": "Lỗi hệ thống. Vui lòng thử lại.",
+    };
+    const msg = reasonMap[reason] ?? "Không thể thực hiện cuộc gọi.";
     toast.error(`Cuộc gọi thất bại: ${msg}`);
     set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
   },
 
-  async handleIceCandidate(candidate: RTCIceCandidateInit) {
-    const { _peerConnection } = get();
-    if (!_peerConnection) return;
-
-    if (!_peerConnection.remoteDescription) {
-      set((state) => ({
-        _iceCandidateQueue: [...state._iceCandidateQueue, candidate],
-      }));
-      return;
-    }
-
-    await _peerConnection
-      .addIceCandidate(new RTCIceCandidate(candidate))
-      .catch(() => { });
+  async handleIceCandidate(_candidate: RTCIceCandidateInit) {
+    // No-op: one-to-one calls now use LiveKit SFU.
   },
 }));

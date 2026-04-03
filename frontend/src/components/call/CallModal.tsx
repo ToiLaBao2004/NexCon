@@ -36,14 +36,14 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
     if (localVideoRef.current && localStream) {
       localVideoRef.current.srcObject = localStream;
     }
-  }, [localStream, isMinimized]);
+  }, [localStream, isMinimized, isVideoOff]);
 
   // Attach remote stream — luôn dùng <video> (video element chạy audio-only tốt)
   useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
     }
-  }, [remoteStream, isMinimized]);
+  }, [remoteStream, isMinimized, isRemoteVideoOff]);
 
   // Call duration timer
   useEffect(() => {

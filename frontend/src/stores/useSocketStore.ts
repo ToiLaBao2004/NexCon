@@ -245,13 +245,17 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useChatStore.getState().fetchConversations();
     };
 
-    socket.on("incoming-call", ({ from, offer, callType }) => {
-      useCallStore.getState().handleIncomingCall(from, offer, callType);
+    socket.on("incoming-call", ({ from, callType, roomName }) => {
+      useCallStore.getState().handleIncomingCall(from, callType, roomName);
       useChatStore.getState().fetchConversations();
     });
 
-    socket.on("call-answered", ({ answer }) => {
-      useCallStore.getState().handleCallAnswered(answer);
+    socket.on("call-answered", ({ token, roomName }) => {
+      useCallStore.getState().handleCallAnswered({ token, roomName });
+    });
+
+    socket.on("call-accepted", ({ token, roomName }) => {
+      useCallStore.getState().handleCallAccepted({ token, roomName });
     });
 
     socket.on("call-rejected", () => {
@@ -267,14 +271,6 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     socket.on("call-failed", ({ reason }) => {
       useCallStore.getState().handleCallFailed(reason);
       refreshCallHistory();
-    });
-
-    socket.on("call-video-toggle", ({ isVideoOff }: { isVideoOff: boolean }) => {
-      useCallStore.getState().handleVideoToggle(isVideoOff);
-    });
-
-    socket.on("ice-candidate", ({ candidate }) => {
-      useCallStore.getState().handleIceCandidate(candidate);
     });
 
     // Group call events
@@ -335,7 +331,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         toast.warning("Nhóm này đã bị giải tán.");
       }
     });
+    
+    socket.on("admin-transferred", ({ conversationId, newAdminId }) => {
+      useChatStore.getState().updateAdminLocal(conversationId, newAdminId);
+    });
   },
+
 
   joinConversation(conversationId: string) {
     const socket = get().socket;

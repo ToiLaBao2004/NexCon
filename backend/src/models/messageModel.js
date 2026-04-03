@@ -30,13 +30,13 @@ const messageSchema = new mongoose.Schema({
     },
     systemType: {
         type: String,
-        enum: ['member_added', 'member_kicked', 'member_left', 'group_disbanded', 'call_started', 'call_ended', 'chat_cleared', 'approval_mode_changed', 'admin_transferred', null],
-        default: null
+        enum: ['member_added', 'member_kicked', 'member_left', 'group_disbanded',
+            'call_started', 'call_ended', 'chat_cleared', 'approval_mode_changed',
+            'admin_transferred'],
     },
     metadata: {
         type: Map,
         of: mongoose.Schema.Types.Mixed,
-        default: null
     },
     searchContent: {
         type: String,
@@ -45,7 +45,6 @@ const messageSchema = new mongoose.Schema({
     },
     filePublicId: {
         type: String,
-        default: null,
     },
     fileName: {
         type: String,
@@ -70,7 +69,6 @@ const messageSchema = new mongoose.Schema({
     replyTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Message',
-        default: null,
     },
     reactions: [
         {

@@ -56,6 +56,7 @@ const MeetPage = () => {
                 roomName: meetingCode,
                 identity,
                 metadata: user?.avatarUrl ?? '',
+                mode: 'create',
             });
             useMeetStore.getState().joinMeeting(res.data.token, meetingCode, meetingTitle.trim());
         } catch (err: any) {
@@ -79,6 +80,7 @@ const MeetPage = () => {
                 roomName: code,
                 identity,
                 metadata: user?.avatarUrl ?? '',
+                mode: 'join',
             });
             useMeetStore.getState().joinMeeting(res.data.token, code, joinLabel.trim() || code);
         } catch (err: any) {

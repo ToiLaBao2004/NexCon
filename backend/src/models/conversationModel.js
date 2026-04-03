@@ -16,7 +16,6 @@ const participantSchema = new mongoose.Schema({
     },
     clearedAt: {
         type: Date,
-        default: null
     }
 }, { _id: false });
 
@@ -44,7 +43,6 @@ const groupSchema = new mongoose.Schema({
 const lastMessageSchema = new mongoose.Schema({
     content: {
         type: String,
-        default: null
     },
     type: {
         type: String,
@@ -52,12 +50,10 @@ const lastMessageSchema = new mongoose.Schema({
     },
     systemType: {
         type: String,
-        default: null
     },
     metadata: {
         type: Map,
         of: mongoose.Schema.Types.Mixed,
-        default: null
     },
     senderId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -87,7 +83,6 @@ const conversationSchema = new mongoose.Schema({
     },
     lastMessage: {
         type: lastMessageSchema,
-        default: null
     },
     seenBy: [{
         type: mongoose.Schema.Types.ObjectId,
