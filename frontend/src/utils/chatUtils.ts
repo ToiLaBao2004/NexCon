@@ -69,12 +69,22 @@ export const getSystemMessageText = (
         }
 
         case "member_left": {
-            const userId = metadata.userId;
-            const isMeLeaving = userId?.toString() === currentUserId;
-            const userName = metadata.userName || "Một thành viên";
+            const leftUserId = meta.leftUserId ?? meta.userId;
+            const isMeLeaving = leftUserId?.toString() === currentUserId;
+            const userName = meta.leftUserName ?? meta.userName ?? "Một thành viên";
+            return isMeLeaving ? "Bạn đã rời khỏi nhóm" : `${userName} đã rời khỏi nhóm`;
+        }
 
-            if (isMeLeaving) return "Bạn đã rời khỏi nhóm";
-            return `${userName} đã rời khỏi nhóm`;
+        case "admin_transferred": {
+            const appointedBy = meta.appointedBy;
+            const appointedUserId = meta.appointedUserId;
+            const appointedUserName = meta.appointedUserInfo?.displayName || "một thành viên";
+            const isMeAppointedBy = appointedBy?.toString() === currentUserId;
+            const isMeAppointed = appointedUserId?.toString() === currentUserId;
+
+            if (isMeAppointedBy) return `Bạn đã chuyển quyền trưởng nhóm cho ${appointedUserName}`;
+            if (isMeAppointed) return "Bạn đã trở thành trưởng nhóm mới";
+            return `${appointedUserName} đã trở thành trưởng nhóm mới`;
         }
 
         case "call_started":

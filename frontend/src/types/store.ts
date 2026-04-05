@@ -95,6 +95,7 @@ export interface ChatState {
   markGroupAsDisbanded: (conversationId: string) => void;
   transferAdminRole: (conversationId: string, memberId: string) => Promise<void>;
   updateAdminLocal: (conversationId: string, newAdminId: string) => void;
+  leaveGroup: (conversationId: string, silent?: boolean, newAdminId?: string) => Promise<void>;
 
 
   // Sidebar

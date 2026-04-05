@@ -47,43 +47,43 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 	if (type === "image" && (message.filePublicId || message.fileUrl)) {
 		return (
 			<div className="flex flex-col gap-1.5">
-			{message.filePublicId ? (
-				<button
-					type="button"
-					className="p-0 border-0 bg-transparent cursor-zoom-in"
-					onClick={() =>
-						useImageViewerStore.getState().openViewer({
-							messageId: message._id,
-							alt: message.fileName ?? "image",
-						})
-					}
-				>
-					<SecureImage
-						messageId={message._id}
-						alt={message.fileName ?? "image"}
-						className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
-					/>
-				</button>
-			) : (
-				<button
-					type="button"
-					className="p-0 border-0 bg-transparent cursor-zoom-in"
-					onClick={() =>
-						useImageViewerStore.getState().openViewer({
-							src: message.fileUrl!,
-							alt: message.fileName ?? "image",
-						})
-					}
-				>
-					<img
-						src={message.fileUrl!}
-						alt={message.fileName ?? "image"}
-						className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
-					/>
-				</button>
-			)}
-			{message.content && <p className="text-sm px-1">{message.content}</p>}
-		</div>
+				{message.filePublicId ? (
+					<button
+						type="button"
+						className="p-0 border-0 bg-transparent cursor-zoom-in"
+						onClick={() =>
+							useImageViewerStore.getState().openViewer({
+								messageId: message._id,
+								alt: message.fileName ?? "image",
+							})
+						}
+					>
+						<SecureImage
+							messageId={message._id}
+							alt={message.fileName ?? "image"}
+							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+						/>
+					</button>
+				) : (
+					<button
+						type="button"
+						className="p-0 border-0 bg-transparent cursor-zoom-in"
+						onClick={() =>
+							useImageViewerStore.getState().openViewer({
+								src: message.fileUrl!,
+								alt: message.fileName ?? "image",
+							})
+						}
+					>
+						<img
+							src={message.fileUrl!}
+							alt={message.fileName ?? "image"}
+							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+						/>
+					</button>
+				)}
+				{message.content && <p className="text-sm px-1">{message.content}</p>}
+			</div>
 		);
 	}
 
@@ -258,9 +258,17 @@ function SystemMessageComponent({
 }) {
 	const text = getSystemMessageText(message, currentUserId);
 
-	const metadata = message.metadata || {};
+	const metadata = message.metadata instanceof Map ? Object.fromEntries(message.metadata) : (message.metadata || {});
 	const addedUserIds = Array.isArray(metadata.addedUserIds) ? metadata.addedUserIds : [];
 	const addedUsersInfo = Array.isArray(metadata.addedUsersInfo) ? metadata.addedUsersInfo : null;
+	const participantsById = useMemo(() => {
+		const map = new Map<string, any>();
+		selectedConvo.participants.forEach((p: any) => {
+			const pid = (p.userId?._id || p.userId)?.toString?.();
+			if (pid) map.set(pid, p.userId);
+		});
+		return map;
+	}, [selectedConvo.participants]);
 
 	const addedParticipants = useMemo(() => {
 		if (addedUsersInfo && addedUsersInfo.length > 0) {
@@ -281,51 +289,191 @@ function SystemMessageComponent({
 		);
 	}, [addedUserIds, addedUsersInfo, selectedConvo.participants]);
 
-	const getAvatars = () => {
-		if (message.systemType === 'approval_mode_changed' || message.systemType === 'group_disbanded' || message.systemType === 'chat_cleared' || message.systemType === 'member_kicked' || message.systemType === 'member_left') {
-			return (
-				<UserAvatar
-					type="seen"
-					name={metadata.changedByName || metadata.kickedUserName || metadata.userName || message.senderInfo?.displayName || "Hệ thống"}
-					avatarUrl={message.senderInfo?.avatarUrl ?? undefined}
-					className="size-5 border-2 border-background shadow-sm"
-				/>
-			);
-		}
+	type Actor = { id: string; name: string; avatarUrl?: string | null };
 
-		if (addedParticipants.length > 0) {
-			return addedParticipants.slice(0, 2).map((p: any, i: number) => (
-				<UserAvatar
-					key={p.userId?._id}
-					type="seen"
-					name={p.userId?.displayName || "User"}
-					avatarUrl={p.userId?.avatarUrl ?? undefined}
-					className={cn(
-						"size-5 border-2 border-background shadow-sm hover:z-20 transition-transform group-hover/sys:scale-105",
-						i > 0 && "z-10"
-					)}
-				/>
-			));
-		}
+	const getViewerName = (actor: Actor) => {
+		const actorId = actor.id?.startsWith("name:") ? null : actor.id?.toString?.();
+		return actorId && actorId === currentUserId?.toString() ? "Bạn" : actor.name;
+	};
 
-		return (
+	const makeActor = (id: any, name: any, avatarUrl?: any): Actor | null => {
+		const normalizedId = id?.toString?.() || "";
+		const normalizedName = (name || "Người dùng").toString();
+		if (!normalizedId && !normalizedName) return null;
+		return {
+			id: normalizedId || `name:${normalizedName}`,
+			name: normalizedName,
+			avatarUrl: avatarUrl ?? undefined,
+		};
+	};
+
+	const actorBadge = (actor: Actor, key?: string) => (
+		<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap leading-none">
 			<UserAvatar
 				type="seen"
-				name={(metadata.addedUserNames as string)?.split(',')[0]?.trim() || message.senderInfo?.displayName || "Hệ thống"}
-				avatarUrl={message.senderInfo?.avatarUrl ?? undefined}
-				className="size-5 border-2 border-background shadow-sm"
+				name={getViewerName(actor)}
+				avatarUrl={actor.avatarUrl ?? undefined}
+				className="size-5 shrink-0 border border-background shadow-sm"
 			/>
+			<span className="font-semibold leading-none text-slate-700 dark:text-slate-200">{getViewerName(actor)}</span>
+		</span>
+	);
+
+	const textPart = (value: string, key?: string) => (
+		<span key={key || value} className="inline-flex items-center leading-none font-normal text-slate-600 dark:text-slate-300">
+			{value}
+		</span>
+	);
+
+	const renderAddedGroup = (actors: Actor[]) => {
+		const uniqueActors = actors.filter((actor, index, arr) => arr.findIndex((a) => a.id === actor.id) === index);
+		if (!uniqueActors.length) return null;
+
+		const MAX_VISIBLE = 3;
+		const visibleActors = uniqueActors.slice(0, MAX_VISIBLE);
+		const remainingCount = Math.max(0, uniqueActors.length - MAX_VISIBLE);
+		const visibleNames = visibleActors.map((actor) => getViewerName(actor)).join(", ");
+		const namesText = remainingCount > 0
+			? `${visibleNames} và ${remainingCount} người khác`
+			: visibleNames;
+
+		return (
+			<span className="inline-flex items-center gap-1.5 align-middle leading-none">
+				<span className="inline-flex -space-x-1 shrink-0">
+					{visibleActors.map((actor, idx) => (
+						<UserAvatar
+							key={`added-avatar-${actor.id}-${idx}`}
+							type="seen"
+							name={actor.name}
+							avatarUrl={actor.avatarUrl ?? undefined}
+							className="size-5 border border-background shadow-sm"
+						/>
+					))}
+					{remainingCount > 0 && (
+						<span className="inline-flex size-5 items-center justify-center rounded-full border border-background bg-slate-500 text-[10px] font-semibold text-white shadow-sm">
+							+{remainingCount}
+						</span>
+					)}
+				</span>
+				<span className="font-semibold leading-none text-slate-700 dark:text-slate-200">
+					{namesText}
+				</span>
+			</span>
 		);
 	};
 
+	const systemContent = useMemo(() => {
+		if (message.systemType === "member_added") {
+			const adder = makeActor(
+				metadata.addedBy,
+				metadata.addedByName || message.senderInfo?.displayName,
+				metadata.addedByInfo?.avatarUrl || message.senderInfo?.avatarUrl
+			);
+
+			const addedActors: Actor[] = [];
+			if (addedUsersInfo?.length) {
+				addedUsersInfo.forEach((u: any) => {
+					const actor = makeActor(u?._id, u?.displayName, u?.avatarUrl);
+					if (actor) addedActors.push(actor);
+				});
+			} else if (addedParticipants.length) {
+				addedParticipants.forEach((p: any) => {
+					const actor = makeActor(p.userId?._id, p.userId?.displayName, p.userId?.avatarUrl);
+					if (actor) addedActors.push(actor);
+				});
+			} else if (typeof metadata.addedUserNames === "string") {
+				metadata.addedUserNames
+					.split(",")
+					.map((n: string) => n.trim())
+					.filter(Boolean)
+					.forEach((n: string) => {
+						const actor = makeActor(`name:${n}`, n, undefined);
+						if (actor) addedActors.push(actor);
+					});
+			}
+
+			if (adder && addedActors.length) {
+				const addedGroup = renderAddedGroup(addedActors);
+				return (
+					<>
+						{addedGroup} {textPart("được")} {actorBadge(adder)} {textPart("thêm vào nhóm")}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "admin_transferred") {
+			const appointed = makeActor(
+				metadata.appointedUserId,
+				metadata.appointedUserInfo?.displayName,
+				metadata.appointedUserInfo?.avatarUrl
+			);
+			if (appointed) {
+				return (
+					<>
+						{actorBadge(appointed)} {textPart("đã trở thành trưởng nhóm mới")}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "member_left") {
+			const leftActor = makeActor(
+				metadata.leftUserId || metadata.userId,
+				metadata.leftUserName || metadata.userName || message.senderInfo?.displayName,
+				metadata.leftUserAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			if (leftActor) {
+				return (
+					<>
+						{actorBadge(leftActor)} {textPart("đã rời khỏi nhóm")}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "member_kicked") {
+			const adminActor = makeActor(
+				metadata.adminId || metadata.removedBy,
+				metadata.adminName || metadata.removedByName || "Quản trị viên",
+				metadata.adminAvatarUrl || metadata.removedByAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			const kickedId = (metadata.kickedUserId || metadata.removedUserId)?.toString?.();
+			const kickedFromParticipants = kickedId ? participantsById.get(kickedId) : null;
+			const kickedActor = makeActor(
+				metadata.kickedUserId || metadata.removedUserId,
+				metadata.kickedUserName || metadata.removedUserName || "Thành viên",
+				metadata.kickedUserAvatarUrl || metadata.removedUserAvatarUrl || kickedFromParticipants?.avatarUrl
+			);
+			if (adminActor && kickedActor) {
+				return (
+					<>
+						{actorBadge(adminActor)} {textPart("đã đưa")} {actorBadge(kickedActor)} {textPart("ra khỏi nhóm")}
+					</>
+				);
+			}
+		}
+
+		return textPart(text);
+	}, [
+		addedParticipants,
+		addedUsersInfo,
+		message.senderInfo?.avatarUrl,
+		message.senderInfo?.displayName,
+		message.systemType,
+		metadata,
+		participantsById,
+		currentUserId,
+		text,
+	]);
+
 	return (
 		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
-			<div className="flex items-center gap-2.5 bg-white/95 dark:bg-gray-800/60 backdrop-blur-sm border border-black/5 dark:border-white/5 py-1.5 px-4 rounded-full max-w-[90%] shadow-[0_2px_12px_-3px_rgba(0,0,0,0.08)] hover:shadow-md transition-all group/sys font-medium">
-				<div className="flex -space-x-1.5 shrink-0">
-					{getAvatars()}
-				</div>
-				<p className="text-[13px] text-slate-600 dark:text-slate-300 truncate leading-tight tracking-tight">
-					{text}
+			<div className="flex items-center gap-2 bg-white/95 dark:bg-gray-800/60 backdrop-blur-sm border border-black/5 dark:border-white/5 py-2 px-4 rounded-full max-w-[92%] shadow-[0_2px_12px_-3px_rgba(0,0,0,0.08)] hover:shadow-md transition-all group/sys">
+				<p className="text-[13px] font-normal tracking-normal break-words">
+					<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
+					{systemContent}
+					</span>
 				</p>
 			</div>
 		</div>

@@ -6,7 +6,7 @@ export async function checkFriendship(req, res, next) {
     try {
         const senderId = req.user._id.toString();
         const recipientId = req.body?.recipientId ?? null;
-        const memberIds = req.body?.memberIds ?? [];
+        const memberIds = req.body?.memberIds ?? req.body?.userIds ?? [];
 
         if (!recipientId && memberIds.length === 0) {
             return res.status(400).json({ message: 'Recipient ID or Member ID is required.' });
