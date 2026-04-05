@@ -301,3 +301,18 @@ export interface GroupCallState {
 
   reset: () => void;
 }
+
+export interface ImageViewerItem {
+  messageId?: string;
+  src?: string;
+  alt?: string;
+  downloadUrl?: string;
+}
+
+export interface ImageViewerState {
+  isOpen: boolean;
+  image: ImageViewerItem | null;
+
+  openViewer: (image: ImageViewerItem) => void;
+  closeViewer: () => void;
+}

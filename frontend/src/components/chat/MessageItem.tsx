@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import ReactionDetailModal from "./ReactionDetailModal";
+import { useImageViewerStore } from "@/stores/useImageViewerStore";
 
 interface MessageItemProps {
 	message: Message;
@@ -32,7 +33,6 @@ interface MessageItemProps {
 }
 
 
-// ── Content renderer ──────────────────────────────────────────────────────────
 function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isOwn: boolean; downloadUrl: string }) {
 	const type: MessageType = message.type ?? "text";
 
@@ -47,25 +47,43 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 	if (type === "image" && (message.filePublicId || message.fileUrl)) {
 		return (
 			<div className="flex flex-col gap-1.5">
-				{message.filePublicId ? (
-					<a href={downloadUrl} target="_blank" rel="noopener noreferrer">
-						<SecureImage
-							messageId={message._id}
-							alt={message.fileName ?? "image"}
-							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-						/>
-					</a>
-				) : (
-					<a href={message.fileUrl!} target="_blank" rel="noopener noreferrer">
-						<img
-							src={message.fileUrl!}
-							alt={message.fileName ?? "image"}
-							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-pointer hover:opacity-90 transition-opacity"
-						/>
-					</a>
-				)}
-				{message.content && <p className="text-sm px-1">{message.content}</p>}
-			</div>
+			{message.filePublicId ? (
+				<button
+					type="button"
+					className="p-0 border-0 bg-transparent cursor-zoom-in"
+					onClick={() =>
+						useImageViewerStore.getState().openViewer({
+							messageId: message._id,
+							alt: message.fileName ?? "image",
+						})
+					}
+				>
+					<SecureImage
+						messageId={message._id}
+						alt={message.fileName ?? "image"}
+						className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+					/>
+				</button>
+			) : (
+				<button
+					type="button"
+					className="p-0 border-0 bg-transparent cursor-zoom-in"
+					onClick={() =>
+						useImageViewerStore.getState().openViewer({
+							src: message.fileUrl!,
+							alt: message.fileName ?? "image",
+						})
+					}
+				>
+					<img
+						src={message.fileUrl!}
+						alt={message.fileName ?? "image"}
+						className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+					/>
+				</button>
+			)}
+			{message.content && <p className="text-sm px-1">{message.content}</p>}
+		</div>
 		);
 	}
 

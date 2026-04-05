@@ -6,9 +6,10 @@ interface SecureImageProps {
     messageId: string;
     alt?: string;
     className?: string;
+    onLoadCallback?: () => void;
 }
 
-export default function SecureImage({ messageId, alt, className }: SecureImageProps) {
+export default function SecureImage({ messageId, alt, className, onLoadCallback }: SecureImageProps) {
     const { cache, setUrl } = useMediaCacheStore();
     const [src, setSrc] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -63,6 +64,7 @@ export default function SecureImage({ messageId, alt, className }: SecureImagePr
             src={src}
             alt={alt || "Media"}
             className={className}
+            onLoad={onLoadCallback}
             onError={() => {
                 setSrc(null);
                 setIsLoading(false);
