@@ -39,7 +39,7 @@ export function TransferAdminModal({
       .map(p => p.userId || p)
       .filter(u => u._id !== currentUser?._id)
       .filter(u => {
-        const name = (u.displayName || u.email || "").toLowerCase();
+        const name = (u.displayName || "Người dùng").toLowerCase();
         return name.includes(searchQuery.toLowerCase());
       });
   }, [participants, currentUser?._id, searchQuery]);
@@ -109,7 +109,7 @@ export function TransferAdminModal({
 
                     <UserAvatar
                       type="sidebar"
-                      name={member.displayName || member.email}
+                      name={member.displayName || "Người dùng"}
                       avatarUrl={member.avatarUrl}
                       className="h-10 w-10 border border-border/10 ml-1"
                     />
@@ -117,7 +117,7 @@ export function TransferAdminModal({
 
                     <div className="flex-1 min-w-0">
                       <p className="text-[15px] font-medium text-foreground truncate">
-                        {member.displayName || member.email}
+                        {member.displayName || "Người dùng"}
                       </p>
                     </div>
                   </label>

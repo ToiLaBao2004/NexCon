@@ -21,6 +21,7 @@ import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import ReactionDetailModal from "./ReactionDetailModal";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
+import { useSocketStore } from "@/stores/useSocketStore";
 
 interface MessageItemProps {
 	message: Message;
@@ -364,10 +365,16 @@ function SystemMessageComponent({
 
 	const systemContent = useMemo(() => {
 		if (message.systemType === "member_added") {
+			const addedById = metadata.addedBy?.toString?.() || metadata.addedBy;
+			const addedByFromParticipants = addedById ? participantsById.get(addedById?.toString?.()) : null;
+			const isAddedBySender = addedById && message.senderId && addedById.toString() === message.senderId.toString();
+
 			const adder = makeActor(
-				metadata.addedBy,
+				addedById,
 				metadata.addedByName || message.senderInfo?.displayName,
-				metadata.addedByInfo?.avatarUrl || message.senderInfo?.avatarUrl
+				metadata.addedByInfo?.avatarUrl ||
+				addedByFromParticipants?.avatarUrl ||
+				(isAddedBySender ? message.senderInfo?.avatarUrl : undefined)
 			);
 
 			const addedActors: Actor[] = [];
@@ -454,6 +461,24 @@ function SystemMessageComponent({
 			}
 		}
 
+		if (message.systemType === "approval_mode_changed") {
+			const changedByActor = makeActor(
+				metadata.changedBy,
+				metadata.changedByName || message.senderInfo?.displayName || "Quản trị viên",
+				metadata.changedByInfo?.avatarUrl || message.senderInfo?.avatarUrl
+			);
+			if (changedByActor) {
+				const actionText = metadata.isApprovalRequired
+					? "đã bật chế độ phê duyệt thành viên mới"
+					: "đã tắt chế độ phê duyệt thành viên mới";
+				return (
+					<>
+						{actorBadge(changedByActor)} {textPart(actionText)}
+					</>
+				);
+			}
+		}
+
 		return textPart(text);
 	}, [
 		addedParticipants,
@@ -522,6 +547,7 @@ const MessageItem = ({
 	}
 
 	const isOwn = actualSenderId?.toString() === currentUserId?.toString();
+	const { onlineUsers } = useSocketStore();
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
 	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
@@ -529,6 +555,7 @@ const MessageItem = ({
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
 	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
+	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
 
 	// Automatically fetch signed URL for files if not cached
 	useEffect(() => {
@@ -619,6 +646,7 @@ const MessageItem = ({
 								type="chat"
 								name={participant?.userId.nickname ?? participant?.userId.displayName ?? "User"}
 								avatarUrl={participant?.userId.avatarUrl ?? undefined}
+								status={isSenderOnline ? "online" : "offline"}
 							/>
 						)}
 					</div>
