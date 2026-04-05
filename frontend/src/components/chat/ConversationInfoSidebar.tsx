@@ -292,10 +292,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   const isGroup = conversation.type === "group";
   const isDisbanded = isGroup && conversation.disbanded === true;
-  const isGroupAdmin = isGroup && (
-    conversation.group?.admins?.includes(user?._id || '') ||
-    conversation.group?.createdBy === user?._id
-  );
+  const isGroupAdmin = !!(isGroup && conversation.group?.admins?.some(
+    (adminId: any) => adminId?.toString?.() === user?._id?.toString()
+  ));
 
   return (
     <aside className="flex flex-col h-full min-w-[350px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
