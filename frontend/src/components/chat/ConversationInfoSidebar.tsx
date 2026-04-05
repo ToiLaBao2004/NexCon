@@ -6,11 +6,12 @@ import { useChatStore } from "@/stores/useChatStore";
 import UserAvatar from "./UserAvatar";
 import GroupChatAvatar from "./GroupChatAvatar";
 import NewGroupModal from "./NewGroupModal";
-import { Settings2, Clock, Users } from "lucide-react";
+import { Settings2, Clock, Users, LogOut } from "lucide-react";
 import { SidebarMediaLinks } from "./SidebarMediaLinks";
 import { cn } from "@/lib/utils";
 import { GroupManagementPanel } from "./GroupManagementPanel";
 import { AddMemberModal } from "./AddMemberModal";
+import { LeaveGroupModal } from "./LeaveGroupModal";
 
 function ActionBtnLocal({
   icon: Icon,
@@ -76,6 +77,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [manageGroupOpen, setManageGroupOpen] = useState(false);
 
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
 
   // refs for name elements (used for a11y / future enhancements)
   const nameRefDirect = useRef<HTMLSpanElement | null>(null);
@@ -290,10 +292,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   const isGroup = conversation.type === "group";
   const isDisbanded = isGroup && conversation.disbanded === true;
-  const isGroupAdmin = isGroup && (
-    conversation.group?.admins?.includes(user?._id || '') ||
-    conversation.group?.createdBy === user?._id
-  );
+  const isGroupAdmin = !!(isGroup && conversation.group?.admins?.some(
+    (adminId: any) => adminId?.toString?.() === user?._id?.toString()
+  ));
 
   return (
     <aside className="flex flex-col h-full min-w-[350px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
@@ -345,6 +346,16 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
       <ConversationLists conversation={conversation} mutualGroupCount={mutualGroupCount} memberCount={memberCount} />
 
+      {!isDisbanded && (
+        <button
+          onClick={() => setIsLeaveGroupModalOpen(true)}
+          className="flex w-full items-center gap-3 px-4 py-3 bg-card hover:bg-muted/10 transition-colors"
+        >
+          <LogOut className="h-5 w-5 text-red-500 shrink-0" strokeWidth={1.5} />
+          <span className="text-[15px] font-medium text-red-500">Rời nhóm</span>
+        </button>
+      )}
+
       {/* Group rename dialog */}
       <Dialog open={openGroupRename} onOpenChange={setOpenGroupRename}>
         <DialogContent>
@@ -392,6 +403,13 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
         open={isAddMemberModalOpen}
         onOpenChange={setIsAddMemberModalOpen}
         conversation={conversation}
+      />
+      <LeaveGroupModal
+        open={isLeaveGroupModalOpen}
+        onOpenChange={setIsLeaveGroupModalOpen}
+        conversationId={conversation._id}
+        isGroupAdmin={isGroupAdmin}
+        participants={conversation.participants}
       />
     </aside>
   );

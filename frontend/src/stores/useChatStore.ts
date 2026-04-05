@@ -1188,6 +1188,27 @@ export const useChatStore = create<ChatState>()(
                     )
                 }));
             },
+            leaveGroup: async (conversationId: string, silent?: boolean, newAdminId?: string) => {
+                try {
+                    await chatService.leaveGroup(conversationId, silent, newAdminId);
+                    set((state) => {
+                        const nextConversations = state.conversations.filter(c => c._id !== conversationId);
+                        const isActive = state.activeConversationId === conversationId;
+                        const isFocused = state.focusedConversationId === conversationId;
+                        const nextMessages = { ...state.messages };
+                        delete nextMessages[conversationId];
+                        return {
+                            conversations: nextConversations,
+                            activeConversationId: isActive ? null : state.activeConversationId,
+                            focusedConversationId: isFocused ? null : state.focusedConversationId,
+                            messages: nextMessages,
+                        };
+                    });
+                } catch (error) {
+                    console.error("Lỗi khi rời nhóm:", error);
+                    throw error;
+                }
+            },
         }),
 
         {

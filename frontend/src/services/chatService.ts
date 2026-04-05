@@ -203,4 +203,13 @@ export const chatService = {
 			throw new Error(resolveErrorMessage(error));
 		}
 	},
-};
+
+	async leaveGroup(conversationId: string, silent: boolean = false, newAdminId?: string) {
+		try {
+			const res = await api.delete(`/conversations/${conversationId}/leave`, { data: { silent, newAdminId } });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
+};

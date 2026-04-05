@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import UserAvatar from "./UserAvatar";
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
-import { Users, ArrowLeft, MoreHorizontal, UserCircle, UserMinus, Check, X } from "lucide-react";
+import { Users, ArrowLeft, MoreHorizontal, UserCircle, UserMinus, Check, X, KeyRound } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,9 +21,10 @@ interface Props {
   memberCount?: number;
   isGroupAdmin?: boolean;
   currentUserId?: string;
+  adminIds?: string[];
 }
 
-export default function MembersPanel({ conversationId, participants, memberCount, isGroupAdmin, currentUserId }: Props) {
+export default function MembersPanel({ conversationId, participants, memberCount, isGroupAdmin, currentUserId, adminIds = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -35,6 +36,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
   const [userToRemove, setUserToRemove] = useState<any>(null);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
   const [removingUser, setRemovingUser] = useState(false);
+  const { onlineUsers } = useSocketStore();
 
   useEffect(() => {
     const fetchQueue = () => {
@@ -140,11 +142,12 @@ export default function MembersPanel({ conversationId, participants, memberCount
                         {approvalQueue?.map((item: any) => {
                           const u = item.userId;
                           if (!u) return null;
-                          const name = u.displayName || u.email || "Người dùng";
+                          const name = u.displayName || "Người dùng";
+                          const isOnline = onlineUsers.includes(u._id?.toString?.() || "");
                           return (
                             <div key={u._id} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-muted/10 text-left transition-colors group">
                               <div className="shrink-0 cursor-pointer" onClick={() => handleShowProfile(u)}>
-                                <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" />
+                                <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" status={isOnline ? "online" : "offline"} />
                               </div>
                               <div className="flex-1 cursor-pointer min-w-0" onClick={() => handleShowProfile(u)}>
                                 <div className="font-medium text-[14px] text-foreground truncate">{name}</div>
@@ -171,8 +174,10 @@ export default function MembersPanel({ conversationId, participants, memberCount
                 </div>
                 {participants.map((p: any) => {
                   const u = p.userId || p;
-                  const name = u?.displayName || u?.email || "Người dùng";
+                  const name = u?.displayName || "Người dùng";
                   const isMe = u?._id?.toString() === currentUserId?.toString();
+                  const isOnline = onlineUsers.includes(u?._id?.toString?.() || "");
+                  const isLeader = adminIds.some((id) => id?.toString?.() === u?._id?.toString?.());
 
                   return (
                     <div
@@ -183,14 +188,25 @@ export default function MembersPanel({ conversationId, participants, memberCount
                         className="shrink-0 cursor-pointer"
                         onClick={() => handleShowProfile(u)}
                       >
-                        <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" />
+                        <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" status={isOnline ? "online" : "offline"} />
                       </div>
                       <div
                         className="flex-1 cursor-pointer min-w-0"
                         onClick={() => handleShowProfile(u)}
                       >
-                        <div className="font-medium text-[14px] text-foreground truncate">{name}</div>
-                        {u?.email && <div className="text-[11.5px] text-muted-foreground truncate leading-tight">{u.email}</div>}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className="font-medium text-[14px] text-foreground truncate">{name}</div>
+                          {isLeader && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 shrink-0">
+                              <KeyRound className="h-3 w-3" />
+                              Trưởng nhóm
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11.5px] text-muted-foreground truncate leading-tight flex items-center gap-1.5">
+                          <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
+                          {isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
+                        </div>
                       </div>
 
                       <DropdownMenu modal={false}>

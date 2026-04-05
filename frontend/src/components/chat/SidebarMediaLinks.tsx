@@ -7,6 +7,7 @@ import { formatBytes, formatMessageTime } from "@/lib/utils";
 import type { MediaKind } from "@/types/store";
 import { SidebarMediaViewerModal } from "./SidebarMediaViewerModal";
 import SecureImage from "../SecureImage";
+import { useImageViewerStore } from "@/stores/useImageViewerStore";
 
 const VIEW_ALL_LIMIT: Record<MediaKind, number> = {
   image: 24,
@@ -293,16 +294,24 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
       <Section title="Ảnh/Video" defaultOpen={true}>
         <div className="grid grid-cols-4 gap-[6px]">
           {imageMessages.map((msg, i) => (
-            <div
+            <button
               key={`img-${msg._id || i}`}
-              className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30 cursor-pointer"
+              type="button"
+              className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30 cursor-zoom-in hover:ring-2 hover:ring-primary/30 transition-all"
+              onClick={() =>
+                useImageViewerStore.getState().openViewer({
+                  messageId: msg.filePublicId ? msg._id : undefined,
+                  src: msg.filePublicId ? undefined : msg.fileUrl ?? undefined,
+                  alt: msg.fileName ?? "image",
+                })
+              }
             >
               {msg.filePublicId ? (
                 <SecureImage messageId={msg._id} alt="media" className="h-full w-full object-cover" />
               ) : (
                 <img src={msg.fileUrl!} alt="media" className="h-full w-full object-cover" />
               )}
-            </div>
+            </button>
           ))}
 
           {[...Array(placeholdersCount)].map((_, i) => (

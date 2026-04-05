@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     Dialog,
     DialogContent,
@@ -28,7 +28,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
     onOpenChange,
     conversation,
 }) => {
-    const { friends } = useFriendStore();
+    const { friends, fetchFriends } = useFriendStore();
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
@@ -53,6 +53,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
         });
     }, [friends, conversation.participants, search]);
 
+    useEffect(() => {
+        if (open) {
+            void fetchFriends();
+        }
+    }, [open, fetchFriends]);
+
     const handleToggle = (userId: string) => {
         setSelectedIds((prev) =>
             prev.includes(userId)
@@ -63,6 +69,14 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
     const handleAdd = async () => {
         if (selectedIds.length === 0) return;
+
+        const addableIdSet = new Set(addableFriends.map((f) => f.friendId?.toString()));
+        const invalidSelectedIds = selectedIds.filter((id) => !addableIdSet.has(id.toString()));
+        if (invalidSelectedIds.length > 0) {
+            toast.error('Danh sách bạn bè đã thay đổi. Vui lòng chọn lại thành viên cần thêm.');
+            setSelectedIds((prev) => prev.filter((id) => addableIdSet.has(id.toString())));
+            return;
+        }
 
         setLoading(true);
         try {

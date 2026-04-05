@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMeetStore } from '@/stores/useMeetStore';
 import { useGroupCallStore } from '@/stores/useGroupCallStore';
@@ -23,6 +23,10 @@ const MeetPage = () => {
     const [joinLabel, setJoinLabel] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const meetingLink = useMemo(() => {
+        if (!meetingCode) return '';
+        return `${window.location.origin}/meet?room=${encodeURIComponent(meetingCode)}`;
+    }, [meetingCode]);
 
     const identity = user?.displayName ?? 'Khách';
 
@@ -37,10 +41,36 @@ const MeetPage = () => {
         };
     }, []);
 
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const room = (params.get('room') || '').trim();
+        if (room) {
+            setJoinCode(room);
+            setMode('join');
+        }
+    }, []);
+
     const handleOpenCreate = () => {
         setMeetingCode(generateMeetingCode());
         setMeetingTitle('');
         setMode('create');
+    };
+
+    const parseMeetingInput = (input: string) => {
+        const raw = input.trim();
+        if (!raw) return '';
+
+        const maybeUrl = /^https?:\/\//i.test(raw) ? raw : null;
+        if (maybeUrl) {
+            try {
+                const url = new URL(maybeUrl);
+                const roomFromQuery = (url.searchParams.get('room') || '').trim().toLowerCase();
+                if (roomFromQuery) return roomFromQuery;
+            } catch {
+            }
+        }
+
+        return raw.toLowerCase();
     };
 
     const handleStart = async () => {
@@ -72,7 +102,8 @@ const MeetPage = () => {
             setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tham gia cuộc họp.');
             return;
         }
-        const code = joinCode.trim().toLowerCase();
+        const code = parseMeetingInput(joinCode);
+        if (!code) return;
         setLoading(true);
         setError('');
         try {
@@ -162,7 +193,7 @@ const MeetPage = () => {
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14" />
                             </svg>
-                            Tham gia bằng mã
+                            Tham gia bằng liên kết
                         </button>
                     </div>
                 )}
@@ -184,14 +215,14 @@ const MeetPage = () => {
                         </div>
 
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium text-white">Mã cuộc họp</label>
+                            <label className="text-sm font-medium text-white">Liên kết cuộc họp</label>
                             <div className="flex items-center gap-2">
                                 <div className="flex-1 h-10 rounded-xl border border-white/30 bg-white/10 px-3 flex items-center font-mono text-sm tracking-widest text-white select-all">
-                                    {meetingCode}
+                                    {meetingLink}
                                 </div>
                                 <button
-                                    onClick={() => navigator.clipboard.writeText(meetingCode)}
-                                    title="Sao chép mã"
+                                    onClick={() => navigator.clipboard.writeText(meetingLink)}
+                                    title="Sao chép liên kết"
                                     className="h-10 w-10 rounded-xl border border-white/30 bg-white/15 hover:bg-white/25 transition-colors flex items-center justify-center shrink-0"
                                 >
                                     <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -199,7 +230,7 @@ const MeetPage = () => {
                                     </svg>
                                 </button>
                             </div>
-                            <p className="text-xs text-blue-100">Chia sẻ mã này để mời người khác vào phòng</p>
+                            <p className="text-xs text-blue-100">Chia sẻ link này để mời người khác vào phòng</p>
                         </div>
 
                         <button
@@ -222,13 +253,13 @@ const MeetPage = () => {
                 {mode === 'join' && (
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-col gap-1.5">
-                            <label className="text-sm font-medium text-white">Nhập mã cuộc họp</label>
+                            <label className="text-sm font-medium text-white">Nhập liên kết cuộc họp</label>
                             <input
                                 type="text"
                                 value={joinCode}
                                 onChange={e => setJoinCode(e.target.value)}
                                 onKeyDown={e => e.key === 'Enter' && handleJoin()}
-                                placeholder="vd: abc-1234-xyz"
+                                placeholder="Dán đường dẫn cuộc họp vào đây!"
                                 autoFocus
                                 className="h-11 rounded-xl border border-white/30 bg-white/15 backdrop-blur-sm px-3 font-mono text-base tracking-wider text-white placeholder:font-sans placeholder:tracking-normal placeholder:text-sm placeholder:text-blue-200/60 focus:outline-none focus:ring-2 focus:ring-white/40"
                             />

@@ -59,6 +59,7 @@ export default function ConversationLists({ conversation, mutualGroupCount, memb
           memberCount={memberCount}
           currentUserId={user?._id}
           isGroupAdmin={conversation.group?.admins?.some(adminId => adminId.toString() === user?._id?.toString())}
+          adminIds={conversation.group?.admins || []}
         />
       ) : (
         <MutualGroupsPopover

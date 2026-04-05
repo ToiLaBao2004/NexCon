@@ -95,6 +95,7 @@ export interface ChatState {
   markGroupAsDisbanded: (conversationId: string) => void;
   transferAdminRole: (conversationId: string, memberId: string) => Promise<void>;
   updateAdminLocal: (conversationId: string, newAdminId: string) => void;
+  leaveGroup: (conversationId: string, silent?: boolean, newAdminId?: string) => Promise<void>;
 
 
   // Sidebar
@@ -300,4 +301,19 @@ export interface GroupCallState {
   handleGroupCallError: (payload: { reason: string }) => void;
 
   reset: () => void;
+}
+
+export interface ImageViewerItem {
+  messageId?: string;
+  src?: string;
+  alt?: string;
+  downloadUrl?: string;
+}
+
+export interface ImageViewerState {
+  isOpen: boolean;
+  image: ImageViewerItem | null;
+
+  openViewer: (image: ImageViewerItem) => void;
+  closeViewer: () => void;
 }

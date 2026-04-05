@@ -1,6 +1,7 @@
 import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import Friend from '../models/friendModel.js';
+import BlockUser from '../models/blockUserModel.js';
 import User from '../models/userModel.js';
 import { io, getReceiverSocketId } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
@@ -187,6 +188,11 @@ export async function getMessages(req, res) {
 		const clearedAt = me?.clearedAt ? new Date(me.clearedAt) : null;
 
 		const query = { conversationId };
+		query.$or = [
+			{ 'metadata.visibleToUserIds': { $exists: false } },
+			{ 'metadata.visibleToUserIds': { $size: 0 } },
+			{ 'metadata.visibleToUserIds': userId },
+		];
 		if (cursor) {
 			query.createdAt = { $lt: new Date(cursor) };
 		}
@@ -197,6 +203,7 @@ export async function getMessages(req, res) {
 		const pinnedQuery = {
 			conversationId: query.conversationId,
 			isPinned: true,
+			$or: query.$or,
 		};
 		if (clearedAt) {
 			pinnedQuery.createdAt = { $gt: clearedAt };
@@ -509,10 +516,55 @@ export async function addMembers(req, res) {
 		const filteredUserIds = userIds.filter(id =>
 			!conversation.participants.some(p => p.userId.toString() === id.toString())
 		);
+		const normalizedUserIds = filteredUserIds.map(id => id.toString());
 
 		if (filteredUserIds.length === 0) {
 			return res.status(400).json({ message: 'Tất cả người dùng được chọn đã là thành viên của nhóm.' });
 		}
+
+		const friendshipEdges = await Friend.find({
+			$or: [
+				{ userA: currentUserId, userB: { $in: normalizedUserIds } },
+				{ userB: currentUserId, userA: { $in: normalizedUserIds } },
+			],
+		}).select('userA userB').lean();
+
+		const friendIdSet = new Set();
+		friendshipEdges.forEach((edge) => {
+			const a = edge.userA.toString();
+			const b = edge.userB.toString();
+			friendIdSet.add(a === currentUserId ? b : a);
+		});
+
+		const notFriendIds = normalizedUserIds.filter((id) => !friendIdSet.has(id));
+		if (notFriendIds.length > 0) {
+			return res.status(403).json({
+				message: 'Bạn chỉ có thể thêm bạn bè vào nhóm.',
+				notFriends: notFriendIds,
+			});
+		}
+
+		const blockedRelations = await BlockUser.find({
+			$or: [
+				{ from: currentUserId, to: { $in: normalizedUserIds } },
+				{ to: currentUserId, from: { $in: normalizedUserIds } },
+			],
+		}).select('from to').lean();
+
+		if (blockedRelations.length > 0) {
+			const blockedIds = new Set();
+			blockedRelations.forEach((row) => {
+				const from = row.from.toString();
+				const to = row.to.toString();
+				blockedIds.add(from === currentUserId ? to : from);
+			});
+
+			return res.status(403).json({
+				message: 'Không thể thêm người dùng đã chặn bạn hoặc bị bạn chặn.',
+				blockedUserIds: Array.from(blockedIds),
+			});
+		}
+
 		const MAX_MEMBERS = 100;
 		if (conversation.participants.length + filteredUserIds.length > MAX_MEMBERS) {
 			return res.status(400).json({ message: `Nhóm chỉ có thể chứa tối đa ${MAX_MEMBERS} thành viên.` });
@@ -584,6 +636,10 @@ export async function addMembers(req, res) {
 			metadata: {
 				addedBy: currentUserId,
 				addedByName: req.user.displayName,
+				addedByInfo: {
+					displayName: req.user.displayName,
+					avatarUrl: req.user.avatarUrl
+				},
 				addedUserIds: filteredUserIds,
 				addedUserNames: addedUserNamesString,
 				addedUsersInfo: addedUsersInfo
@@ -728,7 +784,7 @@ export async function handleApproval(req, res) {
 		if (action === 'approve') {
 			if (!conversation.participants.some(p => p.userId.toString() === userId.toString())) {
 				const memberToAdd = await User.findById(userId).select('displayName avatarUrl');
-				const addedByUser = await User.findById(originalAddedById).select('displayName');
+				const addedByUser = await User.findById(originalAddedById).select('displayName avatarUrl');
 				if (memberToAdd) {
 					conversation.participants.push({
 						userId: memberToAdd._id,
@@ -752,6 +808,10 @@ export async function handleApproval(req, res) {
 						metadata: {
 							addedBy: originalAddedById,
 							addedByName: addedByUser ? addedByUser.displayName : 'Một người dùng',
+							addedByInfo: {
+								displayName: addedByUser ? addedByUser.displayName : 'Một người dùng',
+								avatarUrl: addedByUser?.avatarUrl || null
+							},
 							addedUserIds: [memberToAdd._id],
 							addedUserNames: memberToAdd.displayName,
 							addedUsersInfo: [{ _id: memberToAdd._id, displayName: memberToAdd.displayName, avatarUrl: memberToAdd.avatarUrl }]
@@ -865,7 +925,8 @@ export async function removeMember(req, res) {
 				adminId: adminId,
 				adminName: req.user.displayName,
 				kickedUserId: memberId,
-				kickedUserName: kickedUser ? kickedUser.displayName : "Người dùng"
+				kickedUserName: kickedUser ? kickedUser.displayName : "Người dùng",
+				kickedUserAvatarUrl: kickedUser?.avatarUrl || null
 			},
 			content: `Đã đưa ${kickedUser ? kickedUser.displayName : "Người dùng"} ra khỏi nhóm`
 		});
@@ -990,6 +1051,207 @@ export async function transferAdminRole(req, res) {
 		return res.status(200).json({ success: true, message: 'Bổ nhiệm admin thành công' });
 	} catch (error) {
 		console.error('Error transferring admin role:', error);
+		res.status(500).json({ message: 'Internal server error' });
+	}
+}
+
+export async function leaveGroup(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const { silent = false, newAdminId } = req.body;
+		const userId = req.user._id.toString();
+
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+		if (conversation.type !== 'group') {
+			return res.status(400).json({ message: 'Only group conversations can be left.' });
+		}
+		if (conversation.disbanded) {
+			return res.status(403).json({ message: 'Nhóm này đã bị giải tán.' });
+		}
+
+		const memberIndex = conversation.participants.findIndex(p => p.userId.toString() === userId);
+		if (memberIndex === -1) {
+			return res.status(400).json({ message: 'Bạn không phải thành viên của nhóm này.' });
+		}
+
+		const isAdmin = conversation.group.admins.some(id => id.toString() === userId);
+		const remainingParticipants = conversation.participants.filter((_, i) => i !== memberIndex);
+		let promotedAdminId = null;
+		let promotedAdminName = null;
+		let promotedAdminAvatarUrl = null;
+
+		if (remainingParticipants.length === 0) {
+			await disbandGroup(conversation, req.user);
+			return res.status(200).json({ success: true, message: 'Rời nhóm và giải tán nhóm thành công.' });
+		}
+
+		if (isAdmin) {
+			if (!newAdminId) {
+				return res.status(400).json({ message: 'Bạn cần chọn trưởng nhóm mới trước khi rời nhóm.' });
+			}
+
+			const newAdminParticipant = remainingParticipants.find(
+				(p) => p.userId.toString() === newAdminId.toString()
+			);
+
+			if (!newAdminParticipant) {
+				return res.status(400).json({ message: 'Trưởng nhóm mới phải là thành viên còn lại trong nhóm.' });
+			}
+
+			conversation.group.admins = [newAdminParticipant.userId];
+			promotedAdminId = newAdminParticipant.userId.toString();
+			const promotedAdminUser = await User.findById(newAdminParticipant.userId).select('displayName avatarUrl');
+			promotedAdminName =
+				newAdminParticipant.userInfo?.displayName ||
+				promotedAdminUser?.displayName ||
+				'Một thành viên';
+			promotedAdminAvatarUrl =
+				newAdminParticipant.userInfo?.avatarUrl ||
+				promotedAdminUser?.avatarUrl ||
+				null;
+		}
+
+		conversation.participants.splice(memberIndex, 1);
+		conversation.unreadCounts.delete(userId);
+
+		if (!silent) {
+			const leaveMessage = new Message({
+				conversationId,
+				senderId: userId,
+				senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+				type: 'system',
+				systemType: 'member_left',
+				metadata: {
+					leftUserId: userId,
+					leftUserName: req.user.displayName,
+					isSilentLeave: false,
+				},
+				content: `${req.user.displayName} đã rời khỏi nhóm`
+			});
+
+			const savedLeaveMsg = await leaveMessage.save();
+			const finalLeaveMsg = await Message.findById(savedLeaveMsg._id).populate('senderId', 'displayName avatarUrl');
+			updateConversationLastMessage(conversation, finalLeaveMsg, userId);
+			await conversation.save();
+
+			const updatedConversationForLeave = await Conversation.findById(conversationId).populate({
+				path: 'participants.userId',
+				select: 'displayName avatarUrl nickname email bio phone status lastSeen'
+			});
+
+			emitNewMessage(io, updatedConversationForLeave, finalLeaveMsg);
+
+			if (promotedAdminId) {
+				const transferMessage = new Message({
+					conversationId,
+					senderId: userId,
+					senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+					type: 'system',
+					systemType: 'admin_transferred',
+					metadata: {
+						appointedBy: userId,
+						appointedByInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+						appointedUserId: promotedAdminId,
+						appointedUserInfo: { displayName: promotedAdminName, avatarUrl: promotedAdminAvatarUrl }
+					},
+					content: `${promotedAdminName} đã trở thành trưởng nhóm mới`
+				});
+
+				const savedTransferMsg = await transferMessage.save();
+				const finalTransferMsg = await Message.findById(savedTransferMsg._id).populate('senderId', 'displayName avatarUrl');
+				updateConversationLastMessage(conversation, finalTransferMsg, userId);
+				await conversation.save();
+
+				const updatedConversationForTransfer = await Conversation.findById(conversationId).populate({
+					path: 'participants.userId',
+					select: 'displayName avatarUrl nickname email bio phone status lastSeen'
+				});
+
+				emitNewMessage(io, updatedConversationForTransfer, finalTransferMsg);
+			}
+		} else {
+			await conversation.save();
+		}
+
+		const updatedConversation = await Conversation.findById(conversationId).populate({
+			path: 'participants.userId',
+			select: 'displayName avatarUrl nickname email bio phone status lastSeen'
+		});
+
+		if (silent) {
+			const adminIds = Array.from(new Set((conversation.group?.admins || []).map((id) => id.toString())));
+
+			const silentLeaveMessage = new Message({
+				conversationId,
+				senderId: userId,
+				senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+				type: 'system',
+				systemType: 'member_left',
+				metadata: {
+					leftUserId: userId,
+					leftUserName: req.user.displayName,
+					leftUserAvatarUrl: req.user.avatarUrl,
+					isSilentLeave: true,
+					visibleToUserIds: adminIds,
+				},
+				content: `${req.user.displayName} đã rời khỏi nhóm trong im lặng`,
+			});
+
+			const savedSilentMsg = await silentLeaveMessage.save();
+			const finalSilentMsg = await Message.findById(savedSilentMsg._id).populate('senderId', 'displayName avatarUrl');
+
+			const payloadMessage = typeof finalSilentMsg.toObject === 'function' ? finalSilentMsg.toObject() : { ...finalSilentMsg };
+			if (payloadMessage.metadata instanceof Map) {
+				payloadMessage.metadata = Object.fromEntries(payloadMessage.metadata);
+			}
+
+			const lastMsgRaw = updatedConversation.lastMessage?.toObject?.() || updatedConversation.lastMessage;
+			const lastMsgPayload = { ...lastMsgRaw };
+			if (lastMsgPayload?.metadata instanceof Map) {
+				lastMsgPayload.metadata = Object.fromEntries(lastMsgPayload.metadata);
+			}
+
+			adminIds.forEach((adminId) => {
+				const adminSocketId = getReceiverSocketId(adminId);
+				if (!adminSocketId) return;
+				io.to(adminSocketId).emit('new-message', {
+					message: payloadMessage,
+					conversation: {
+						_id: updatedConversation._id,
+						lastMessage: lastMsgPayload,
+						lastMessageAt: updatedConversation.lastMessageAt,
+					},
+					unreadCounts: updatedConversation.unreadCounts,
+				});
+			});
+		}
+
+		io.to(conversationId.toString()).emit('member-left', {
+			conversationId,
+			conversation: updatedConversation,
+			leftUserId: userId,
+		});
+
+		if (promotedAdminId) {
+			io.to(conversationId.toString()).emit('admin-transferred', {
+				conversationId,
+				newAdminId: promotedAdminId
+			});
+		}
+
+		const userSocketId = getReceiverSocketId(userId);
+		if (userSocketId) {
+			const userSocket = io.sockets.sockets.get(userSocketId);
+			if (userSocket) userSocket.leave(conversationId.toString());
+			io.to(userSocketId).emit('left-group', { conversationId });
+		}
+
+		return res.status(200).json({ success: true, message: 'Rời nhóm thành công.' });
+	} catch (error) {
+		console.error('Error leaving group:', error);
 		res.status(500).json({ message: 'Internal server error' });
 	}
 }

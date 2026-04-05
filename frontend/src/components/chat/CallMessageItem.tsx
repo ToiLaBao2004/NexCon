@@ -3,6 +3,7 @@ import type { CallRecord } from "@/types/call";
 import type { Conversation, Participant } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import CallMessageBubble from "./CallMessageBubble";
+import { useSocketStore } from "@/stores/useSocketStore";
 
 interface CallMessageItemProps {
   call: CallRecord;
@@ -22,12 +23,22 @@ const CallMessageItem = ({
   isLast,
 }: CallMessageItemProps) => {
   const isInitiator = call.initiatorUser._id === currentUserId;
+  const { onlineUsers } = useSocketStore();
 
-  // Tìm participant đối phương để lấy avatar
-  const otherParticipant = selectedConvo.participants.find(
-    (p: Participant) =>
-      p.userId?._id?.toString() !== currentUserId
-  );
+  // Với item cuộc gọi đến (không phải do mình khởi tạo), người hiển thị avatar luôn là initiatorUser.
+  // Điều này ổn định hơn participants vì participants có thể trả về shape không đồng nhất ở một số record cũ.
+  const otherCallParticipant = call.participants.find(
+    (p) => (p.userId?._id || p.userId)?.toString?.() !== currentUserId?.toString()
+  )?.userId;
+  const otherConversationParticipant = selectedConvo.participants.find(
+    (p: Participant) => p.userId?._id?.toString() !== currentUserId
+  )?.userId;
+
+  const avatarUser = !isInitiator
+    ? (call.initiatorUser || otherCallParticipant || otherConversationParticipant)
+    : (otherCallParticipant || otherConversationParticipant || call.initiatorUser);
+  const avatarUserId = avatarUser?._id?.toString?.() || "";
+  const avatarStatus = avatarUserId && onlineUsers.includes(avatarUserId) ? "online" : "offline";
 
   const seenByOthers =
     selectedConvo.seenBy?.filter(
@@ -46,8 +57,9 @@ const CallMessageItem = ({
         <div className="w-8 shrink-0 pt-0.5">
           <UserAvatar
             type="chat"
-            name={otherParticipant?.userId?.displayName ?? "User"}
-            avatarUrl={otherParticipant?.userId?.avatarUrl ?? undefined}
+            name={avatarUser?.displayName ?? "User"}
+            avatarUrl={avatarUser?.avatarUrl ?? undefined}
+            status={avatarStatus}
           />
         </div>
       )}

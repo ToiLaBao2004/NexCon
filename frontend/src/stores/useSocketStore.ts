@@ -144,7 +144,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     socket.on("unfriended", ({ friendId }) => {
-      useFriendStore.getState().removeFriend(friendId);
+      const normalizedFriendId = friendId?.toString?.() || friendId;
+      if (normalizedFriendId) {
+        useFriendStore.getState().removeFriend(normalizedFriendId);
+      }
     });
 
     socket.on("new-notification", ({ notification }) => {
@@ -221,7 +224,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     socket.on("user-blocked", ({ blockedBy }) => {
-      useFriendStore.getState().addBlockedBy(blockedBy);
+      const blockerId = blockedBy?.toString?.() || blockedBy;
+      if (!blockerId) return;
+      useFriendStore.getState().addBlockedBy(blockerId);
+      useFriendStore.getState().removeFriend(blockerId);
     });
 
     socket.on("user-unblocked", ({ unblockedBy }) => {
@@ -334,6 +340,22 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     
     socket.on("admin-transferred", ({ conversationId, newAdminId }) => {
       useChatStore.getState().updateAdminLocal(conversationId, newAdminId);
+    });
+
+    socket.on("member-left", ({ conversation }) => {
+      if (conversation) {
+        useChatStore.getState().updateConversation(conversation);
+      } else {
+        useChatStore.getState().fetchConversations();
+      }
+    });
+
+    socket.on("left-group", ({ conversationId }) => {
+      const chatState = useChatStore.getState();
+      chatState.fetchConversations();
+      if (chatState.activeConversationId === conversationId) {
+        chatState.setActiveConversation(null);
+      }
     });
   },
 
