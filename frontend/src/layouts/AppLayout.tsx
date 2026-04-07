@@ -2,18 +2,25 @@ import MainSidebar from "@/components/sidebar/MainSidebar";
 import MobileBottomNav from "@/components/sidebar/MobileBottomNav";
 import { useChatStore } from "@/stores/useChatStore";
 import { useMeetStore } from "@/stores/useMeetStore";
+import { useReminderStore } from "@/stores/useReminderStore";
 import { cn } from "@/lib/utils";
 import { Outlet, useLocation } from "react-router";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useEffect } from "react";
 
 const AppLayout = () => {
     const location = useLocation();
     const isMobile = useIsMobile();
     const { activeConversationId } = useChatStore();
     const { isInMeeting, isMinimized: isMeetMinimized } = useMeetStore();
+    const { fetchUpcomingCount } = useReminderStore();
 
     const isChatRoute = location.pathname === "/" || location.pathname === "/chat";
     const shouldHideMobileBottomNav = isMobile && ((isInMeeting && !isMeetMinimized) || (isChatRoute && !!activeConversationId));
+
+    useEffect(() => {
+        void fetchUpcomingCount();
+    }, [fetchUpcomingCount]);
 
     return (
         <div className="flex bg-background h-svh w-full overflow-hidden p-0 md:p-2 md:gap-2 relative">

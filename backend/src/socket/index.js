@@ -30,6 +30,16 @@ function getReceiverSocketId(userId) {
     return onlineUsers.get(userId);
 }
 
+function emitToUser(userId, event, data) {
+    const socketId = onlineUsers.get(userId.toString());
+    if (!socketId) {
+        return false;
+    }
+
+    io.to(socketId).emit(event, data);
+    return true;
+}
+
 io.on("connection", async (socket) => {
     const user = socket.user;
 
@@ -88,4 +98,4 @@ io.on("connection", async (socket) => {
     });
 });
 
-export { io, app, server, getReceiverSocketId };
+export { io, app, server, getReceiverSocketId, emitToUser };

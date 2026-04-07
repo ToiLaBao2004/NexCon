@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button"
 import { UserActionDropdown } from "../shared/UserActionDropdown";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmationModal } from "../shared/ConfirmationModal";
+import { getSystemMessageText } from '@/utils/chatUtils';
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
@@ -271,6 +272,11 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
             const msgObj = convo.lastMessage as any;
             const content = msgObj.content ?? "";
             const type = msgObj.type ?? "text";
+
+            if (type === "system") {
+              return <span className="truncate italic">{getSystemMessageText(msgObj, user._id)}</span>;
+            }
+
             const prefix = isMyLastMessage ? "Bạn " : "";
 
             let cleanMsg = content;

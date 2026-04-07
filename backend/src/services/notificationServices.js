@@ -1,5 +1,5 @@
 import Notification from '../models/notificationModel.js';
-import { io, getReceiverSocketId } from '../socket/index.js';
+import { emitToUser } from '../socket/index.js';
 
 export async function createNotification(userId, title, content, linkUrl) {
     const notification = new Notification({
@@ -11,10 +11,7 @@ export async function createNotification(userId, title, content, linkUrl) {
     });
     await notification.save();
 
-    const receiverSocketId = getReceiverSocketId(userId.toString());
-    if (receiverSocketId) {
-        io.to(receiverSocketId).emit("new-notification", { notification });
-    }
+    emitToUser(userId.toString(), 'new-notification', { notification });
 
     return notification;
 };

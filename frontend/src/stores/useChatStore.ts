@@ -4,6 +4,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
 import useMediaCacheStore from './useMediaCacheStore';
+import type { Reminder } from '@/types/reminder';
+
+const getReminderContent = (reminder: Reminder): string => {
+    const content = String(reminder.content || '').trim();
+    if (content) return content;
+    return [reminder.title, reminder.note].filter(Boolean).join('\n').trim();
+};
 
 export const useChatStore = create<ChatState>()(
     persist(
@@ -157,6 +164,8 @@ export const useChatStore = create<ChatState>()(
 
                         const prevItems = prevState.items ?? [];
                         const merged = prevItems.length > 0 ? [...processed, ...prevItems] : processed;
+
+                        merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
                         return {
                             messages: {
@@ -461,6 +470,29 @@ export const useChatStore = create<ChatState>()(
                     });
                 } catch (error) {
                     console.error(error, "Lỗi khi thêm tin nhắn");
+                }
+            },
+            createReminderSystemMessage: async (conversationId, reminder) => {
+                try {
+                    const reminderContent = getReminderContent(reminder);
+                    const response = await chatService.createReminderSystemMessage({
+                        conversationId,
+                        reminderId: reminder._id,
+                        reminderContent,
+                        remindAt: reminder.remindAt,
+                    });
+
+                    await get().addMessage(response.message as any);
+
+                    get().updateConversation({
+                        _id: response.conversation._id,
+                        lastMessage: response.conversation.lastMessage,
+                        lastMessageAt: response.conversation.lastMessageAt,
+                        unreadCounts: response.unreadCounts,
+                    } as any);
+                } catch (error) {
+                    console.error('Lỗi khi tạo system message reminder:', error);
+                    throw error;
                 }
             },
             updateConversation: (conversation) => {
@@ -1213,7 +1245,9 @@ export const useChatStore = create<ChatState>()(
 
         {
             name: "chat-storage",
-            partialize: (state) => ({ conversations: state.conversations })
+            partialize: (state) => ({
+                conversations: state.conversations,
+            })
         }
     )
 )

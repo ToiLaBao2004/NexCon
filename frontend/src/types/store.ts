@@ -3,6 +3,15 @@ import type { Room } from "livekit-client";
 import type { Conversation, Message, MessageType } from "./chat";
 import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
 import type { CallRecord } from "./call";
+import type {
+  Reminder,
+  GetRemindersParams,
+  CreateReminderPayload,
+  CreateSharedReminderFromMessagePayload,
+  UpdateReminderPayload,
+  DeleteReminderResponse,
+  BulkDeleteRemindersResponse,
+} from "./reminder";
 
 export interface SendMessagePayload {
   type: MessageType;
@@ -73,6 +82,7 @@ export interface ChatState {
   fetchMessages: (conversationId?: string) => Promise<void>;
   sendMessage: (payload: SendMessagePayload, onProgress?: (pct: number) => void) => Promise<void>;
   addMessage: (message: Message) => Promise<void>;
+  createReminderSystemMessage: (conversationId: string, reminder: Reminder) => Promise<void>;
   updateConversation: (conversation: Conversation) => void;
   markAsSeen: () => Promise<void>;
   updateGroupName: (conversationId: string, name: string) => Promise<void>;
@@ -316,4 +326,53 @@ export interface ImageViewerState {
 
   openViewer: (image: ImageViewerItem) => void;
   closeViewer: () => void;
+}
+
+export interface ReminderState {
+  reminders: Reminder[];
+  removedReminderIds: string[];
+  hasMore: boolean;
+  nextCursor: string | null;
+  isLoading: boolean;
+  isLoadingMore: boolean;
+  upcomingCount: number;
+  fetchUpcomingCount: () => Promise<void>;
+  fetchReminders: (params?: GetRemindersParams) => Promise<void>;
+  fetchMoreReminders: (params?: GetRemindersParams) => Promise<void>;
+  createReminderAsync: (
+    payload: CreateReminderPayload,
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<Reminder>;
+  createSharedReminderFromMessageAsync: (
+    payload: CreateSharedReminderFromMessagePayload,
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<Reminder>;
+  updateReminderAsync: (
+    id: string,
+    payload: UpdateReminderPayload,
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<Reminder>;
+  snoozeReminderAsync: (
+    id: string,
+    minutes: 5 | 10 | 30 | 60,
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<Reminder>;
+  updateSharedReminderParticipationAsync: (
+    sharedKey: string,
+    participate: boolean,
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<Reminder>;
+  deleteReminderAsync: (
+    id: string,
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<DeleteReminderResponse>;
+  deleteRemindersByScopeAsync: (
+    scope: 'upcoming' | 'past' | 'all',
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<BulkDeleteRemindersResponse>;
+  addReminder: (reminder: Reminder) => void;
+  updateReminderInStore: (reminder: Reminder) => void;
+  removeRemindersByScope: (scope: 'upcoming' | 'past' | 'all') => void;
+  removeRemindersBySharedKey: (sharedKey: string) => void;
+  removeReminder: (id: string) => void;
 }

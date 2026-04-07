@@ -11,6 +11,8 @@ import { useGroupCallStore } from "./useGroupCallStore";
 import { toast } from "sonner";
 import { playMessageSound, playNotificationSound } from "@/utils/sound";
 import useMediaCacheStore from "./useMediaCacheStore";
+import { useReminderStore } from "./useReminderStore";
+import { showReminderToast } from "@/components/reminder/showReminderToast";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -155,6 +157,54 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       void playNotificationSound();
     });
 
+    socket.on("reminder-triggered", ({ reminder }) => {
+      useReminderStore.getState().updateReminderInStore(reminder);
+      void useReminderStore.getState().fetchUpcomingCount();
+      showReminderToast(reminder);
+    });
+
+    socket.on("reminder-created", ({ reminder }) => {
+      useReminderStore.getState().updateReminderInStore(reminder);
+      void useReminderStore.getState().fetchUpcomingCount();
+    });
+
+    socket.on("reminder-snoozed", ({ reminder }) => {
+      useReminderStore.getState().updateReminderInStore(reminder);
+      void useReminderStore.getState().fetchUpcomingCount();
+    });
+
+    socket.on("reminder-updated", ({ reminder }) => {
+      useReminderStore.getState().updateReminderInStore(reminder);
+      void useReminderStore.getState().fetchUpcomingCount();
+    });
+
+    socket.on("reminder-deleted", ({ id }) => {
+      const reminderId = typeof id === 'string' ? id.trim() : '';
+      if (reminderId) {
+        useReminderStore.getState().removeReminder(reminderId);
+      }
+      void useReminderStore.getState().fetchUpcomingCount();
+    });
+
+    socket.on("reminder-participation-updated", ({ reminder }) => {
+      useReminderStore.getState().updateReminderInStore(reminder);
+      void useReminderStore.getState().fetchUpcomingCount();
+    });
+
+    socket.on("reminders-bulk-deleted", ({ scope }) => {
+      if (scope === 'upcoming' || scope === 'past' || scope === 'all') {
+        useReminderStore.getState().removeRemindersByScope(scope);
+      }
+      void useReminderStore.getState().fetchUpcomingCount();
+    });
+
+    socket.on("shared-reminder-cancelled", ({ sharedKey }) => {
+      if (typeof sharedKey === 'string' && sharedKey.trim()) {
+        useReminderStore.getState().removeRemindersBySharedKey(sharedKey);
+      }
+      void useReminderStore.getState().fetchUpcomingCount();
+    });
+
     socket.on("new-conversation", ({ conversation }) => {
       useChatStore.getState().updateConversation(conversation);
       get().joinConversation(conversation._id);
@@ -242,7 +292,6 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       get().setTypingUser(conversationId, userId, false);
     });
 
-
     const refreshCallHistory = () => {
       const activeConvoId = useChatStore.getState().activeConversationId;
       if (activeConvoId) {
@@ -327,8 +376,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       }
     });
 
-    socket.on("approval-queue-updated", () => {
-    });
+    socket.on("approval-queue-updated", () => {});
 
     socket.on("group-disbanded", ({ conversationId }) => {
       useChatStore.getState().markGroupAsDisbanded(conversationId);
@@ -358,7 +406,6 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       }
     });
   },
-
 
   joinConversation(conversationId: string) {
     const socket = get().socket;

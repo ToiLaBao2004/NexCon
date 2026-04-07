@@ -104,6 +104,66 @@ export const getSystemMessageText = (
             return `${name} đã ${statusStr} chế độ phê duyệt thành viên mới`;
         }
 
+        case "reminder_created_local": {
+            const reminderContent = String(meta.reminderContent || "").trim();
+            return reminderContent
+                ? `Bạn đã tạo nhắc hẹn mới: ${reminderContent}`
+                : "Bạn đã tạo nhắc hẹn mới";
+        }
+
+        case "shared_reminder_created": {
+            const reminderContent = String(meta.reminderContent || "").trim();
+            const creatorId = String(meta.creatorId || "").trim();
+            const creatorName = String(meta.creatorName || "Một thành viên").trim();
+            const actor = creatorId && creatorId === currentUserId ? "Bạn" : creatorName;
+
+            return reminderContent
+                ? `${actor} đã tạo nhắc hẹn chung: ${reminderContent}`
+                : `${actor} đã tạo nhắc hẹn chung`;
+        }
+
+        case "shared_reminder_participation_changed": {
+            const actorId = String(meta.actorId || "").trim();
+            const actorNameRaw = String(meta.actorName || "Một thành viên").trim();
+            const actorName = actorId && actorId === currentUserId ? "Bạn" : actorNameRaw;
+            const action = String(meta.action || "").trim().toLowerCase();
+            const reminderContent = String(meta.reminderContent || "").trim();
+
+            if (action === 'joined') {
+                return reminderContent
+                    ? `${actorName} đã tham gia nhắc hẹn: ${reminderContent}`
+                    : `${actorName} đã tham gia nhắc hẹn`;
+            }
+
+            if (action === 'declined') {
+                return reminderContent
+                    ? `${actorName} đã rời nhắc hẹn: ${reminderContent}`
+                    : `${actorName} đã rời nhắc hẹn`;
+            }
+
+            return content || "Cập nhật tham gia nhắc hẹn chung";
+        }
+
+        case "shared_reminder_cancelled": {
+            const actorId = String(meta.actorId || "").trim();
+            const actorNameRaw = String(meta.actorName || "Một thành viên").trim();
+            const actorName = actorId && actorId === currentUserId ? "Bạn" : actorNameRaw;
+            const reminderContent = String(meta.reminderContent || "").trim();
+            return reminderContent
+                ? `${actorName} đã hủy nhắc hẹn chung: ${reminderContent}`
+                : `${actorName} đã hủy nhắc hẹn chung`;
+        }
+
+        case "shared_reminder_updated": {
+            const actorId = String(meta.actorId || "").trim();
+            const actorNameRaw = String(meta.actorName || "Một thành viên").trim();
+            const actorName = actorId && actorId === currentUserId ? "Bạn" : actorNameRaw;
+            const reminderContent = String(meta.reminderContent || "").trim();
+            return reminderContent
+                ? `${actorName} đã chỉnh sửa nhắc hẹn chung: ${reminderContent}`
+                : `${actorName} đã chỉnh sửa nhắc hẹn chung`;
+        }
+
         default:
             return content || "Thông báo hệ thống";
     }

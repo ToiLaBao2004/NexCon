@@ -1,7 +1,7 @@
 import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
 import { emitNewMessage, updateConversationLastMessage, generateSignedUrl } from '../utils/messageHelper.js';
-import { io, getReceiverSocketId } from '../socket/index.js';
+import { io, getReceiverSocketId, emitToUser } from '../socket/index.js';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
     uploadChatImageFromBuffer,
@@ -155,6 +155,75 @@ export async function sendMessage(req, res) {
         const statusCode = error.statusCode ?? 500;
         const message = statusCode !== 500 ? error.message : 'Internal server error.';
         return res.status(statusCode).json({ message });
+    }
+}
+
+export async function createReminderSystemMessage(req, res) {
+    try {
+        const senderId = req.user._id;
+        const { reminderId, reminderContent, remindAt } = req.body;
+        const conversation = req.conversation;
+
+        if (!conversation) {
+            return res.status(404).json({ message: 'Conversation not found.' });
+        }
+
+        const normalizedReminderId = String(reminderId || '').trim();
+        const normalizedReminderContent = String(reminderContent || '').trim();
+        const normalizedRemindAt = String(remindAt || '').trim();
+
+        const metadata = {
+            visibleToUserIds: [senderId.toString()],
+            ...(normalizedReminderId ? { reminderId: normalizedReminderId } : {}),
+            ...(normalizedReminderContent ? { reminderContent: normalizedReminderContent } : {}),
+            ...(normalizedRemindAt ? { remindAt: normalizedRemindAt } : {}),
+        };
+
+        const messageData = {
+            conversationId: conversation._id,
+            senderId,
+            senderInfo: {
+                displayName: req.user.displayName,
+                avatarUrl: req.user.avatarUrl,
+            },
+            type: 'system',
+            systemType: 'reminder_created_local',
+            content: 'Bạn đã tạo nhắc hẹn mới',
+            metadata,
+        };
+
+        const message = await Message.create(messageData);
+
+        updateConversationLastMessage(conversation, message, senderId);
+        await conversation.save();
+
+        const payloadMessage = typeof message.toObject === 'function' ? message.toObject() : { ...message };
+        if (payloadMessage.metadata instanceof Map) {
+            payloadMessage.metadata = Object.fromEntries(payloadMessage.metadata);
+        }
+
+        const lastMsgRaw = conversation.lastMessage?.toObject?.() || conversation.lastMessage;
+        const lastMsgPayload = { ...lastMsgRaw };
+        if (lastMsgPayload?.metadata instanceof Map) {
+            lastMsgPayload.metadata = Object.fromEntries(lastMsgPayload.metadata);
+        }
+
+        const payload = {
+            message: payloadMessage,
+            conversation: {
+                _id: conversation._id,
+                lastMessage: lastMsgPayload,
+                lastMessageAt: conversation.lastMessage?.createdAt || conversation.updatedAt,
+            },
+            unreadCounts: conversation.unreadCounts,
+        };
+
+        emitToUser(senderId.toString(), 'new-message', payload);
+
+        return res.status(201).json(payload);
+    } catch (error) {
+        console.error('Error creating reminder system message:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
     }
 }
 
@@ -340,6 +409,7 @@ export async function searchMessages(req, res) {
     try {
         const { conversationId, senderId, fromDate, toDate } = req.query;
         const q = req.query.keyword || req.query.q;
+        const userId = req.user._id.toString();
 
         if (!q || !q.trim()) {
             return res.status(400).json({ message: 'ChÆ°a nháº­p tá»« khÃ³a tÃ¬m kiáº¿m.' });
@@ -354,6 +424,11 @@ export async function searchMessages(req, res) {
             conversationId,
             searchContent: { $regex: normalizeVietnamese(q), $options: 'i' },
             isRecalled: { $ne: true },
+            $or: [
+                { 'metadata.visibleToUserIds': { $exists: false } },
+                { 'metadata.visibleToUserIds': { $size: 0 } },
+                { 'metadata.visibleToUserIds': userId },
+            ],
         };
 
         // Optional: filter by sender

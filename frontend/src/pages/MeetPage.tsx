@@ -3,14 +3,19 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { useMeetStore } from '@/stores/useMeetStore';
 import { useGroupCallStore } from '@/stores/useGroupCallStore';
 import api from '@/lib/axios';
+import ReminderFormModal from '@/components/reminder/ReminderFormModal';
+import type { CreateReminderPayload } from '@/types/reminder';
+import { buildMeetingUrl, extractMeetingCode, extractMeetingTitle, generateMeetingCode, getRememberedMeetingTitle } from '@/utils/meetingLink';
 
 type Mode = 'select' | 'create' | 'join';
 
-const generateMeetingCode = () => {
-    const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
-    const segment = (len: number) =>
-        Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    return `${segment(3)}-${segment(4)}-${segment(3)}`;
+const getApiErrorMessage = (error: unknown, fallback = 'Không thể kết nối') => {
+    if (typeof error === 'object' && error !== null) {
+        const maybeError = error as { response?: { data?: { message?: string } } };
+        const message = maybeError.response?.data?.message;
+        if (message) return message;
+    }
+    return fallback;
 };
 
 const MeetPage = () => {
@@ -23,9 +28,11 @@ const MeetPage = () => {
     const [joinLabel, setJoinLabel] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showMeetingReminderModal, setShowMeetingReminderModal] = useState(false);
+    const [meetingReminderPrefill, setMeetingReminderPrefill] = useState<Partial<CreateReminderPayload> | undefined>(undefined);
     const meetingLink = useMemo(() => {
         if (!meetingCode) return '';
-        return `${window.location.origin}/meet?room=${encodeURIComponent(meetingCode)}`;
+        return buildMeetingUrl(meetingCode);
     }, [meetingCode]);
 
     const identity = user?.displayName ?? 'Khách';
@@ -44,8 +51,11 @@ const MeetPage = () => {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const room = (params.get('room') || '').trim();
+        const title = (params.get('title') || '').trim();
         if (room) {
-            setJoinCode(room);
+            setJoinCode(buildMeetingUrl(room));
+            const rememberedTitle = getRememberedMeetingTitle(room);
+            setJoinLabel(title || rememberedTitle || '');
             setMode('join');
         }
     }, []);
@@ -59,18 +69,25 @@ const MeetPage = () => {
     const parseMeetingInput = (input: string) => {
         const raw = input.trim();
         if (!raw) return '';
+        return extractMeetingCode(raw) || raw.toLowerCase();
+    };
 
-        const maybeUrl = /^https?:\/\//i.test(raw) ? raw : null;
-        if (maybeUrl) {
-            try {
-                const url = new URL(maybeUrl);
-                const roomFromQuery = (url.searchParams.get('room') || '').trim().toLowerCase();
-                if (roomFromQuery) return roomFromQuery;
-            } catch {
-            }
-        }
+    const openMeetingReminderModal = (rawCode: string, rawLabel?: string) => {
+        const code = parseMeetingInput(rawCode);
+        const label = rawLabel?.trim() || code || 'cuộc họp';
+        const meetingUrl = code ? buildMeetingUrl(code) : '';
+        const content = meetingUrl
+            ? `Nhắc về cuộc họp: ${label}\nLink cuộc họp: ${meetingUrl}`
+            : `Nhắc về cuộc họp: ${label}`;
 
-        return raw.toLowerCase();
+        setMeetingReminderPrefill({
+            content,
+            source: {
+                type: 'meeting',
+                ...(code ? { refId: code } : {}),
+            },
+        });
+        setShowMeetingReminderModal(true);
     };
 
     const handleStart = async () => {
@@ -89,8 +106,8 @@ const MeetPage = () => {
                 mode: 'create',
             });
             useMeetStore.getState().joinMeeting(res.data.token, meetingCode, meetingTitle.trim());
-        } catch (err: any) {
-            setError(err.response?.data?.message ?? 'Không thể kết nối');
+        } catch (err) {
+            setError(getApiErrorMessage(err));
         } finally {
             setLoading(false);
         }
@@ -103,6 +120,7 @@ const MeetPage = () => {
             return;
         }
         const code = parseMeetingInput(joinCode);
+        const titleFromLink = extractMeetingTitle(joinCode) || '';
         if (!code) return;
         setLoading(true);
         setError('');
@@ -113,9 +131,28 @@ const MeetPage = () => {
                 metadata: user?.avatarUrl ?? '',
                 mode: 'join',
             });
-            useMeetStore.getState().joinMeeting(res.data.token, code, joinLabel.trim() || code);
-        } catch (err: any) {
-            setError(err.response?.data?.message ?? 'Không thể kết nối');
+            useMeetStore.getState().joinMeeting(res.data.token, code, joinLabel.trim() || titleFromLink || code);
+        } catch (err) {
+            const joinErrorMessage = getApiErrorMessage(err);
+            const canFallbackToCreate = /khong ton tai|không tồn tại|chua duoc tao|chưa được tạo/i.test(joinErrorMessage);
+
+            if (canFallbackToCreate) {
+                try {
+                    const createRes = await api.post('/livekit/token', {
+                        roomName: code,
+                        identity,
+                        metadata: user?.avatarUrl ?? '',
+                        mode: 'create',
+                    });
+                    useMeetStore.getState().joinMeeting(createRes.data.token, code, joinLabel.trim() || titleFromLink || code);
+                    return;
+                } catch (createErr) {
+                    setError(getApiErrorMessage(createErr, joinErrorMessage));
+                    return;
+                }
+            }
+
+            setError(joinErrorMessage);
         } finally {
             setLoading(false);
         }
@@ -140,6 +177,12 @@ const MeetPage = () => {
                         className="h-11 px-6 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
                     >
                         Quay lại cuộc họp
+                    </button>
+                    <button
+                        onClick={() => openMeetingReminderModal(activeRoomName || activeRoomLabel || '', activeRoomLabel || activeRoomName || 'cuộc họp hiện tại')}
+                        className="h-10 px-5 rounded-xl border border-primary/40 text-primary font-semibold text-sm hover:bg-primary/10 transition-colors"
+                    >
+                        Tạo nhắc hẹn cho cuộc họp này
                     </button>
                 </div>
             </div>
@@ -241,6 +284,12 @@ const MeetPage = () => {
                             {loading ? 'Đang kết nối...' : 'Bắt đầu cuộc họp'}
                         </button>
                         <button
+                            onClick={() => openMeetingReminderModal(meetingCode, meetingTitle || meetingCode)}
+                            className="h-10 rounded-xl border border-white/40 text-white font-semibold text-sm hover:bg-white/15 transition-colors"
+                        >
+                            Tạo nhắc hẹn cuộc họp
+                        </button>
+                        <button
                             onClick={() => setMode('select')}
                             className="text-sm text-blue-100 hover:text-white transition-colors"
                         >
@@ -287,6 +336,13 @@ const MeetPage = () => {
                             {loading ? 'Đang kết nối...' : 'Tham gia'}
                         </button>
                         <button
+                            disabled={!joinCode.trim()}
+                            onClick={() => openMeetingReminderModal(joinCode, joinLabel || extractMeetingTitle(joinCode) || joinCode)}
+                            className="h-10 rounded-xl border border-white/40 text-white font-semibold text-sm hover:bg-white/15 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            Tạo nhắc hẹn cuộc họp
+                        </button>
+                        <button
                             onClick={() => { setMode('select'); setJoinLabel(''); }}
                             className="text-sm text-blue-100 hover:text-white transition-colors"
                         >
@@ -295,6 +351,18 @@ const MeetPage = () => {
                     </div>
                 )}
             </div>
+
+            <ReminderFormModal
+                open={showMeetingReminderModal}
+                onOpenChange={(nextOpen) => {
+                    setShowMeetingReminderModal(nextOpen);
+                    if (!nextOpen) {
+                        setMeetingReminderPrefill(undefined);
+                    }
+                }}
+                mode="create"
+                prefillData={meetingReminderPrefill}
+            />
         </div>
     );
 };

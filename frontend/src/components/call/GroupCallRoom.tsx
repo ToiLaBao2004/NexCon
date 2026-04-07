@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import '@livekit/components-styles';
 import {
   LiveKitRoom,
   VideoTrack,
   RoomAudioRenderer,
   useTracks,
+  useLocalParticipant,
   useParticipants,
   useTrackToggle,
   useDisconnectButton,
@@ -89,9 +91,9 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
       )}
 
       {isScreenShare && (
-        <div className="absolute top-2.5 left-2.5 flex items-center gap-1 bg-primary text-primary-foreground text-[10px] font-semibold px-2.5 py-1 rounded-full shadow-md">
-          <Monitor size={10} />
-          Màn hình
+        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 bg-primary text-primary-foreground text-[10px] font-bold px-3 py-1.5 rounded-full shadow-lg border border-primary-foreground/20 backdrop-blur-sm z-10">
+          <Monitor size={12} className="animate-pulse" />
+          Đang chia sẻ màn hình
         </div>
       )}
 
@@ -120,6 +122,40 @@ const Stage = () => {
     { onlySubscribed: false },
   );
 
+  const screenShareTracks = tracks.filter((t) => t.source === Track.Source.ScreenShare);
+  const cameraTracks = tracks.filter((t) => t.source === Track.Source.Camera);
+  if (screenShareTracks.length > 0) {
+    const primaryShare = screenShareTracks[0];
+    const otherTracks = [...screenShareTracks.slice(1), ...cameraTracks];
+
+    return (
+      <div className="h-full w-full flex flex-col lg:flex-row gap-3 p-3 bg-background overflow-hidden">
+        {/* Main Screen Share Area */}
+        <div className="flex-[3] relative min-h-0 min-w-0">
+          <ParticipantCardInner trackRef={primaryShare} />
+        </div>
+
+        {/* Sidebar for other participants */}
+        {otherTracks.length > 0 && (
+          <div className={cn(
+            "flex gap-3 overflow-auto lg:h-full lg:w-72 scrollbar-hide",
+            "flex-row lg:flex-col shrink-0"
+          )}>
+            {otherTracks.map((trackRef) => (
+              <div
+                key={`${trackRef.participant.identity}-${trackRef.source}`}
+                className="aspect-video w-48 lg:w-full shrink-0"
+              >
+                <ParticipantCardInner trackRef={trackRef} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Default Grid Layout
   const count = tracks.length;
   const cols = count <= 1 ? 1 : count <= 4 ? 2 : 3;
 
@@ -176,9 +212,25 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
   const { toggle: toggleCam, enabled: camOn, pending: camPending } = useTrackToggle({
     source: Track.Source.Camera,
   });
-  const { toggle: toggleScreen, enabled: screenOn, pending: screenPending } = useTrackToggle({
-    source: Track.Source.ScreenShare,
-  });
+
+  const { localParticipant } = useLocalParticipant();
+  const screenOn = localParticipant.isScreenShareEnabled;
+  const [screenPending, setScreenPending] = useState(false);
+
+  // Check for screen share support
+  const isScreenShareSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
+
+  const toggleScreen = async () => {
+    if (!isScreenShareSupported || screenPending) return;
+    try {
+      setScreenPending(true);
+      await localParticipant.setScreenShareEnabled(!screenOn);
+    } catch (e) {
+      console.error('Failed to toggle screen share:', e);
+    } finally {
+      setScreenPending(false);
+    }
+  };
   const { buttonProps: leaveProps } = useDisconnectButton({ stopTracks: true });
 
   const handleLeave = () => {
@@ -216,19 +268,22 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
         {camOn ? <Video size={20} /> : <VideoOff size={20} />}
       </button>
 
-      <button
-        className={cn(
-          'p-3.5 rounded-full transition-all duration-150',
-          screenOn
-            ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-            : 'bg-muted hover:bg-muted/70 text-foreground',
-        )}
-        onClick={() => toggleScreen()}
-        disabled={screenPending}
-        title={screenOn ? 'Dừng chia sẻ màn hình' : 'Chia sẻ màn hình'}
-      >
-        {screenOn ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
-      </button>
+      {isScreenShareSupported && (
+        <button
+          className={cn(
+            'p-3.5 rounded-full transition-all duration-150',
+            screenOn
+              ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+              : 'bg-muted hover:bg-muted/70 text-foreground',
+            screenPending && 'opacity-50 cursor-not-allowed'
+          )}
+          onClick={toggleScreen}
+          disabled={screenPending}
+          title={screenOn ? 'Dừng chia sẻ màn hình' : 'Chia sẻ màn hình'}
+        >
+          {screenOn ? <MonitorOff size={20} /> : <MonitorUp size={20} />}
+        </button>
+      )}
 
       <button
         className="p-3.5 rounded-full bg-destructive hover:bg-destructive/90 text-destructive-foreground transition-colors ml-2"
@@ -245,7 +300,20 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
 const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => void; onLeave?: () => void; roomLabel?: string }) => {
   const { toggle: toggleMic, enabled: micOn } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn } = useTrackToggle({ source: Track.Source.Camera });
-  const { toggle: toggleScreen, enabled: screenOn } = useTrackToggle({ source: Track.Source.ScreenShare });
+
+  const { localParticipant } = useLocalParticipant();
+  const screenOn = localParticipant.isScreenShareEnabled;
+  const isScreenShareSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getDisplayMedia;
+
+  const toggleScreen = async () => {
+    if (!isScreenShareSupported) return;
+    try {
+      await localParticipant.setScreenShareEnabled(!screenOn);
+    } catch (e) {
+      console.error('Failed to toggle screen share:', e);
+    }
+  };
+
   const participants = useParticipants();
   const { buttonProps: leaveProps } = useDisconnectButton({ stopTracks: true });
 
@@ -282,13 +350,15 @@ const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => v
         >
           {camOn ? <Video size={16} /> : <VideoOff size={16} />}
         </button>
-        <button
-          onClick={() => toggleScreen()}
-          className={cn('p-2 rounded-full transition-colors', screenOn ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-muted')}
-          title={screenOn ? 'Dừng chia sẻ' : 'Chia sẻ màn hình'}
-        >
-          {screenOn ? <MonitorOff size={16} /> : <MonitorUp size={16} />}
-        </button>
+        {isScreenShareSupported && (
+          <button
+            onClick={toggleScreen}
+            className={cn('p-2 rounded-full transition-colors', screenOn ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-muted')}
+            title={screenOn ? 'Dừng chia sẻ' : 'Chia sẻ màn hình'}
+          >
+            {screenOn ? <MonitorOff size={16} /> : <MonitorUp size={16} />}
+          </button>
+        )}
         <button
           onClick={handleLeave}
           className="p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
@@ -308,6 +378,18 @@ const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => v
   );
 };
 
+const ScreenShareCleanup = () => {
+  const { localParticipant } = useLocalParticipant();
+  useEffect(() => {
+    return () => {
+      if (localParticipant.isScreenShareEnabled) {
+        localParticipant.setScreenShareEnabled(false).catch(console.error);
+      }
+    };
+  }, [localParticipant]);
+  return null;
+};
+
 /* ─── Main Component ─── */
 const GroupCallRoom = ({ roomName, roomLabel, token, onLeave, minimized, onMinimize, onMaximize }: GroupCallRoomProps) => {
   return (
@@ -322,6 +404,7 @@ const GroupCallRoom = ({ roomName, roomLabel, token, onLeave, minimized, onMinim
         !minimized && 'h-full',
       )}
     >
+      <ScreenShareCleanup />
       <RoomAudioRenderer />
       {minimized ? (
         <MiniControls onMaximize={onMaximize} onLeave={onLeave} roomLabel={roomLabel} />
