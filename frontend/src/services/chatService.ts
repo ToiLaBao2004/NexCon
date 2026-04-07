@@ -62,6 +62,24 @@ export const chatService = {
 		}
 	},
 
+	async createReminderSystemMessage(payload: {
+		conversationId: string;
+		reminderId?: string;
+		reminderContent?: string;
+		remindAt?: string;
+	}) {
+		const res = await api.post('/messages/system/reminder-created', payload);
+		return res.data as {
+			message: Message;
+			conversation: {
+				_id: string;
+				lastMessage: any;
+				lastMessageAt?: string;
+			};
+			unreadCounts: Record<string, number>;
+		};
+	},
+
 	async fetchMedia(conversationId: string, type: 'image' | 'file' | 'link', limit = 8, cursor?: string) {
 		const params = new URLSearchParams({ type, limit: String(limit) });
 		if (cursor) params.append('cursor', cursor);

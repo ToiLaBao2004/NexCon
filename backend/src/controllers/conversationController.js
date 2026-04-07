@@ -79,12 +79,64 @@ export async function getConversations(req, res) {
 	try {
 		const myId = req.user._id.toString();
 
+		const visibleMessageFilter = {
+			$or: [
+				{ 'metadata.visibleToUserIds': { $exists: false } },
+				{ 'metadata.visibleToUserIds': { $size: 0 } },
+				{ 'metadata.visibleToUserIds': myId },
+			],
+		};
+
 		let conversations = await Conversation.find({ "participants.userId": myId })
 			.sort({ "lastMessage.createdAt": -1, updatedAt: -1 })
 			.populate("participants.userId", "displayName avatarUrl email bio phone")
 			.populate("lastMessage.senderId", "displayName avatarUrl")
 			.populate("seenBy", "displayName avatarUrl")
 			.lean();
+
+		conversations = await Promise.all(conversations.map(async (conversation) => {
+			const lastMetadata = conversation.lastMessage?.metadata instanceof Map
+				? Object.fromEntries(conversation.lastMessage.metadata)
+				: (conversation.lastMessage?.metadata || {});
+			const visibleToUserIds = Array.isArray(lastMetadata?.visibleToUserIds)
+				? lastMetadata.visibleToUserIds.map((id) => id.toString())
+				: [];
+
+			if (!visibleToUserIds.length || visibleToUserIds.includes(myId)) {
+				return conversation;
+			}
+
+			const fallback = await Message.findOne({ conversationId: conversation._id, ...visibleMessageFilter })
+				.sort({ createdAt: -1 })
+				.populate('senderId', 'displayName avatarUrl')
+				.lean();
+
+			if (!fallback) {
+				return {
+					...conversation,
+					lastMessage: null,
+					seenBy: [],
+				};
+			}
+
+			const fallbackMetadata = fallback.metadata instanceof Map
+				? Object.fromEntries(fallback.metadata)
+				: (fallback.metadata || null);
+
+			return {
+				...conversation,
+				lastMessage: {
+					_id: fallback._id,
+					content: fallback.content,
+					type: fallback.type,
+					systemType: fallback.systemType || null,
+					metadata: fallbackMetadata,
+					createdAt: fallback.createdAt,
+					senderId: fallback.senderId,
+				},
+				seenBy: [],
+			};
+		}));
 
 		conversations = conversations.filter(c => {
 			const me = c.participants?.find(p => p.userId?._id?.toString() === myId);
@@ -169,6 +221,12 @@ export async function getConversations(req, res) {
 				}),
 			unreadCounts: c.unreadCounts || {},
 		}));
+
+		formatted.sort((a, b) => {
+			const dateA = new Date(a.lastMessage?.createdAt || a.updatedAt || 0).getTime();
+			const dateB = new Date(b.lastMessage?.createdAt || b.updatedAt || 0).getTime();
+			return dateB - dateA;
+		});
 
 		return res.status(200).json({ conversations: formatted });
 	} catch (error) {

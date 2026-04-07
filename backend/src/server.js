@@ -13,11 +13,11 @@ import conversationRouter from './routes/conversationRoute.js';
 import notificationRouter from './routes/notificationRoute.js';
 import callRouter from './routes/callRoute.js';
 import livekitRouter from './routes/livekitRoute.js';
+import reminderRouter from './routes/reminderRoute.js';
 import { app, server } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
+import { startReminderCron } from './utils/reminderCron.js';
 
-
-// const app = express();    
 const PORT = process.env.PORT;
 
 
@@ -46,8 +46,10 @@ app.use('/api/conversations', conversationRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/calls', callRouter);
 app.use('/api/livekit', livekitRouter);
+app.use('/api/reminders', reminderRouter);
 
 connectDB().then(() => {
+    startReminderCron();
     server.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
     });

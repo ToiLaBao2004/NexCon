@@ -71,10 +71,10 @@ const MainSidebar = () => {
     };
 
     const navItems = [
-        { icon: Video, label: "Cuộc họp", id: "meet", path: "/meet" },
-        { icon: Users, label: "Mọi người", id: "people", path: "/people" },
-        { icon: Calendar, label: "Lời nhắc", id: "reminder", path: "/reminder" },
-        { icon: Bell, label: "Thông báo", id: "notification", path: "/notification" },
+        { icon: Video, label: "Cuộc họp", id: "meet", path: "/meet", badge: 0 },
+        { icon: Users, label: "Mọi người", id: "people", path: "/people", badge: friendRequestCount },
+        { icon: Calendar, label: "Lời nhắc", id: "reminder", path: "/reminder", badge: 0 },
+        { icon: Bell, label: "Thông báo", id: "notification", path: "/notification", badge: totalNotificationCount },
     ];
 
     const isPathActive = (path: string) => {
@@ -185,9 +185,7 @@ const MainSidebar = () => {
 
                     {navItems.map((item) => {
                         const active = isPathActive(item.path);
-                        let badgeCount = 0;
-                        if (item.id === "people") badgeCount = friendRequestCount;
-                        if (item.id === "notification") badgeCount = totalNotificationCount;
+                        const badgeCount = item.badge;
 
                         return (
                             <Tooltip key={item.id}>

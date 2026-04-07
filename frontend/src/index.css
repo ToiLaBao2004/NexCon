@@ -398,3 +398,20 @@
   animation: highlight-flash 2s ease-in-out;
   border-radius: 12px;
 }
+
+@keyframes ring {
+  0%, 100% { transform: rotate(0deg); }
+  10% { transform: rotate(15deg); }
+  20% { transform: rotate(-12deg); }
+  30% { transform: rotate(10deg); }
+  40% { transform: rotate(-8deg); }
+  50% { transform: rotate(6deg); }
+  60% { transform: rotate(-4deg); }
+  70% { transform: rotate(2deg); }
+  80% { transform: rotate(0deg); }
+}
+
+.animate-ring {
+  animation: ring 1s ease-in-out 0.3s infinite;
+  transform-origin: top center;
+}

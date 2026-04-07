@@ -9,19 +9,28 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useChatStore } from "@/stores/useChatStore";
+import { useReminderStore } from "@/stores/useReminderStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import SecureImage from "../SecureImage";
+import { Input } from "@/components/ui/input";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { chatService } from "@/services/chatService";
-import { FileText, Link2, ExternalLink, Clock, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download } from "lucide-react";
+import { reminderService } from "@/services/reminderService";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import ReactionDetailModal from "./ReactionDetailModal";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
 import { useSocketStore } from "@/stores/useSocketStore";
+import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
+import ReminderFormModal from "@/components/reminder/ReminderFormModal";
+import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder";
+
+const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
 interface MessageItemProps {
 	message: Message;
@@ -32,7 +41,6 @@ interface MessageItemProps {
 	isLast?: boolean;
 	onReply?: (message: Message) => void;
 }
-
 
 function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isOwn: boolean; downloadUrl: string }) {
 	const type: MessageType = message.type ?? "text";
@@ -89,7 +97,6 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 	}
 
 	if (type === "file" && (message.filePublicId || message.fileUrl)) {
-		// Temporary fallback for downloading file. Ideally we also do signed URL for files if needed.
 		return (
 			<a
 				href={downloadUrl}
@@ -260,6 +267,51 @@ function SystemMessageComponent({
 	const text = getSystemMessageText(message, currentUserId);
 
 	const metadata = message.metadata instanceof Map ? Object.fromEntries(message.metadata) : (message.metadata || {});
+	const reminders = useReminderStore((state) => state.reminders);
+	const removedReminderIds = useReminderStore((state) => state.removedReminderIds);
+	const convoMessages = useChatStore((state) => state.messages[selectedConvo._id]?.items ?? []);
+	const updateSharedReminderParticipationAsync = useReminderStore((state) => state.updateSharedReminderParticipationAsync);
+	const sharedKey = String(metadata.sharedKey || '').trim();
+	const reminderIdFromMeta = String(metadata.reminderId || '').trim();
+	const hasLinkedReminder = useMemo(() => {
+		if (reminderIdFromMeta && reminders.some((item) => item._id === reminderIdFromMeta)) {
+			return true;
+		}
+
+		if (sharedKey && reminders.some((item) => item.sharedKey === sharedKey)) {
+			return true;
+		}
+
+		return false;
+	}, [reminderIdFromMeta, reminders, sharedKey]);
+	const [isUpdatingParticipation, setIsUpdatingParticipation] = useState(false);
+	const [sharedOverview, setSharedOverview] = useState<SharedReminderOverviewResponse | null>(null);
+	const [isLoadingSharedOverview, setIsLoadingSharedOverview] = useState(false);
+	const [isParticipantDialogOpen, setIsParticipantDialogOpen] = useState(false);
+	const [participantSearchTerm, setParticipantSearchTerm] = useState('');
+	const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
+	const [isSharedReminderUnavailable, setIsSharedReminderUnavailable] = useState(false);
+	const lastSharedOverviewRefreshTriggerRef = useRef<string | null>(null);
+	const isSharedReminderCancelled = useMemo(() => {
+		if (!sharedKey) return false;
+
+		return convoMessages.some((item) => {
+			if (item.type !== 'system' || item.systemType !== 'shared_reminder_cancelled') return false;
+			const itemMetadata = item.metadata instanceof Map ? Object.fromEntries(item.metadata) : (item.metadata || {});
+			return String(itemMetadata.sharedKey || '').trim() === sharedKey;
+		});
+	}, [convoMessages, sharedKey]);
+
+	useEffect(() => {
+		if (!isSharedReminderCancelled && !isSharedReminderUnavailable) return;
+		setIsParticipantDialogOpen(false);
+	}, [isSharedReminderCancelled, isSharedReminderUnavailable]);
+
+	useEffect(() => {
+		if (isParticipantDialogOpen) return;
+		setParticipantSearchTerm('');
+	}, [isParticipantDialogOpen]);
+
 	const addedUserIds = Array.isArray(metadata.addedUserIds) ? metadata.addedUserIds : [];
 	const addedUsersInfo = Array.isArray(metadata.addedUsersInfo) ? metadata.addedUsersInfo : null;
 	const participantsById = useMemo(() => {
@@ -325,6 +377,60 @@ function SystemMessageComponent({
 			{value}
 		</span>
 	);
+
+	const scrollToReminderCard = useCallback(() => {
+		const targets: Array<HTMLElement | null> = [];
+
+		if (sharedKey) {
+			const sharedAnchorId = `shared-reminder-card-${sharedKey}`;
+			targets.push(document.getElementById(sharedAnchorId) as HTMLElement | null);
+			targets.push(document.querySelector(`[data-shared-reminder-card=\"${sharedKey}\"]`) as HTMLElement | null);
+		}
+
+		if (reminderIdFromMeta) {
+			const personalAnchorId = `reminder-card-${reminderIdFromMeta}`;
+			targets.push(document.getElementById(personalAnchorId) as HTMLElement | null);
+			targets.push(document.querySelector(`[data-reminder-card=\"${reminderIdFromMeta}\"]`) as HTMLElement | null);
+		}
+
+		const target = targets.find((item): item is HTMLElement => Boolean(item));
+
+		if (!target) return false;
+
+		target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		target.classList.add('ring-2', 'ring-primary/40', 'ring-offset-1', 'rounded-md');
+		window.setTimeout(() => {
+			target.classList.remove('ring-2', 'ring-primary/40', 'ring-offset-1', 'rounded-md');
+		}, 1800);
+
+		return true;
+	}, [reminderIdFromMeta, sharedKey]);
+
+	const reminderLinkPart = useCallback((value: string, key?: string) => (
+		<button
+			type="button"
+			key={key || value}
+			onClick={(event) => {
+				event.stopPropagation();
+				scrollToReminderCard();
+			}}
+			className="inline-flex items-center leading-none font-medium text-sky-700 underline decoration-sky-500/60 underline-offset-2 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+		>
+			{value}
+		</button>
+	), [scrollToReminderCard]);
+
+	const reminderActionPart = useCallback((actionText: string, reminderContent: string, keyPrefix: string) => {
+		if (!reminderContent) {
+			return textPart(actionText, `${keyPrefix}-plain`);
+		}
+
+		return (
+			<>
+				{textPart(`${actionText}:`, `${keyPrefix}-label`)} {reminderLinkPart(reminderContent, `${keyPrefix}-value`)}
+			</>
+		);
+	}, [reminderLinkPart]);
 
 	const renderAddedGroup = (actors: Actor[]) => {
 		const uniqueActors = actors.filter((actor, index, arr) => arr.findIndex((a) => a.id === actor.id) === index);
@@ -479,22 +585,526 @@ function SystemMessageComponent({
 			}
 		}
 
+		if (message.systemType === "reminder_created_local") {
+			const creatorActor = makeActor(
+				metadata.creatorId || message.senderId,
+				metadata.creatorName || message.senderInfo?.displayName || "Một thành viên",
+				metadata.creatorAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			const reminderContent = String(metadata.reminderContent || "").trim();
+			if (creatorActor) {
+				return (
+					<>
+						{actorBadge(creatorActor)} {reminderActionPart("đã tạo nhắc hẹn mới", reminderContent, `local-created-${message._id}`)}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "shared_reminder_created") {
+			const creatorActor = makeActor(
+				metadata.creatorId || message.senderId,
+				metadata.creatorName || message.senderInfo?.displayName || "Một thành viên",
+				metadata.creatorAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			const reminderContent = String(metadata.reminderContent || "").trim();
+			if (creatorActor) {
+				return (
+					<>
+						{actorBadge(creatorActor)} {reminderActionPart("đã tạo nhắc hẹn chung", reminderContent, `shared-created-${message._id}`)}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "shared_reminder_participation_changed") {
+			const actor = makeActor(
+				metadata.actorId || message.senderId,
+				metadata.actorName || message.senderInfo?.displayName || "Một thành viên",
+				metadata.actorAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			const action = String(metadata.action || "").trim().toLowerCase();
+			const reminderContent = String(metadata.reminderContent || "").trim();
+
+			if (actor) {
+				const actionText = action === "joined"
+					? "đã tham gia nhắc hẹn"
+					: action === "declined"
+						? "đã rời nhắc hẹn"
+						: "đã cập nhật trạng thái nhắc hẹn";
+
+				return (
+					<>
+						{actorBadge(actor)} {reminderActionPart(actionText, reminderContent, `shared-participation-${message._id}`)}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "shared_reminder_cancelled") {
+			const actor = makeActor(
+				metadata.actorId || message.senderId,
+				metadata.actorName || message.senderInfo?.displayName || "Một thành viên",
+				metadata.actorAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			const reminderContent = String(metadata.reminderContent || "").trim();
+
+			if (actor) {
+				return (
+					<>
+						{actorBadge(actor)} {reminderActionPart("đã hủy nhắc hẹn chung", reminderContent, `shared-cancelled-${message._id}`)}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "shared_reminder_updated") {
+			const actor = makeActor(
+				metadata.actorId || message.senderId,
+				metadata.actorName || message.senderInfo?.displayName || "Một thành viên",
+				metadata.actorAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			const reminderContent = String(metadata.reminderContent || "").trim();
+
+			if (actor) {
+				return (
+					<>
+						{actorBadge(actor)} {reminderActionPart("đã chỉnh sửa nhắc hẹn chung", reminderContent, `shared-updated-${message._id}`)}
+					</>
+				);
+			}
+		}
+
 		return textPart(text);
 	}, [
 		addedParticipants,
 		addedUsersInfo,
 		message.senderInfo?.avatarUrl,
 		message.senderInfo?.displayName,
+		message.senderId,
 		message.systemType,
 		metadata,
 		participantsById,
+		reminderActionPart,
+		reminderLinkPart,
 		currentUserId,
 		text,
 	]);
 
+	const loadSharedOverview = useCallback(async (forceRefresh = false) => {
+		if (message.systemType !== 'shared_reminder_created' || !sharedKey || isSharedReminderCancelled) {
+			setSharedOverview(null);
+			if (isSharedReminderCancelled) {
+				setIsSharedReminderUnavailable(false);
+			}
+			return;
+		}
+
+		if (!forceRefresh) {
+			const cached = sharedReminderOverviewCache.get(sharedKey);
+			if (cached) {
+				setSharedOverview(cached);
+				setIsSharedReminderUnavailable(false);
+				return;
+			}
+		}
+
+		try {
+			setIsLoadingSharedOverview(true);
+			const overview = await reminderService.getSharedReminderOverview(sharedKey);
+			sharedReminderOverviewCache.set(sharedKey, overview);
+			setSharedOverview(overview);
+			setIsSharedReminderUnavailable(false);
+		} catch (error) {
+			console.error('Load shared reminder overview failed:', error);
+			const statusCode = typeof error === 'object' && error !== null
+				? (error as { response?: { status?: number } }).response?.status
+				: undefined;
+
+			if (statusCode === 404) {
+				sharedReminderOverviewCache.delete(sharedKey);
+				setSharedOverview(null);
+				setIsSharedReminderUnavailable(true);
+				return;
+			}
+
+			const cached = sharedReminderOverviewCache.get(sharedKey);
+			setSharedOverview(cached || null);
+			setIsSharedReminderUnavailable(false);
+		} finally {
+			setIsLoadingSharedOverview(false);
+		}
+	}, [isSharedReminderCancelled, message.systemType, sharedKey]);
+
+	useEffect(() => {
+		if (message.systemType !== 'shared_reminder_created') return;
+		if (isSharedReminderCancelled) {
+			setSharedOverview(null);
+			return;
+		}
+		if (!hasLinkedReminder || isParticipantDialogOpen) {
+			void loadSharedOverview();
+		}
+	}, [hasLinkedReminder, isParticipantDialogOpen, isSharedReminderCancelled, loadSharedOverview, message.systemType]);
+
+	useEffect(() => {
+		if (message.systemType !== 'shared_reminder_created' || !sharedKey) return;
+		if (isSharedReminderCancelled) return;
+
+		let latestEvent: Message | null = null;
+		for (let index = convoMessages.length - 1; index >= 0; index -= 1) {
+			const item = convoMessages[index];
+			if (item.type !== 'system') continue;
+			if (item.systemType !== 'shared_reminder_participation_changed' && item.systemType !== 'shared_reminder_updated') continue;
+
+			const itemMetadata = item.metadata instanceof Map ? Object.fromEntries(item.metadata) : (item.metadata || {});
+			const itemSharedKey = String(itemMetadata.sharedKey || '').trim();
+			if (itemSharedKey !== sharedKey) continue;
+
+			latestEvent = item;
+			break;
+		}
+
+		if (!latestEvent) return;
+		if (lastSharedOverviewRefreshTriggerRef.current === latestEvent._id) return;
+
+		lastSharedOverviewRefreshTriggerRef.current = latestEvent._id;
+		void loadSharedOverview(true);
+	}, [convoMessages, isSharedReminderCancelled, loadSharedOverview, message.systemType, sharedKey]);
+
+	const linkedReminder = useMemo(() => {
+		if (reminderIdFromMeta) {
+			const direct = reminders.find((item) => item._id === reminderIdFromMeta);
+			if (direct) return direct;
+		}
+
+		if (!sharedKey) return null;
+		return reminders.find((item) => item.sharedKey === sharedKey) || null;
+	}, [reminders, reminderIdFromMeta, sharedKey]);
+
+	const joinedParticipants = useMemo(
+		() => (sharedOverview?.participants || []).filter((participant) => participant.participationStatus === 'joined'),
+		[sharedOverview]
+	);
+
+	const filteredJoinedParticipants = useMemo(() => {
+		const keyword = participantSearchTerm.trim().toLowerCase();
+		if (!keyword) return joinedParticipants;
+
+		return joinedParticipants.filter((participant) => {
+			const displayName = participant.userId === currentUserId ? 'Bạn' : participant.displayName;
+			return displayName.toLowerCase().includes(keyword) || participant.displayName.toLowerCase().includes(keyword);
+		});
+	}, [currentUserId, joinedParticipants, participantSearchTerm]);
+
+	const isReminderCreationMessage = message.systemType === "reminder_created_local" || message.systemType === "shared_reminder_created";
+
+	if (isReminderCreationMessage) {
+		const isShared = message.systemType === 'shared_reminder_created';
+		const reminderContent = String(
+			(isShared ? (sharedOverview?.content || linkedReminder?.content) : linkedReminder?.content)
+				|| metadata.reminderContent
+				|| message.content
+				|| 'Nhắc hẹn mới'
+		).trim();
+		const remindAt = String(
+			(isShared ? (sharedOverview?.remindAt || linkedReminder?.remindAt) : linkedReminder?.remindAt)
+				|| metadata.remindAt
+				|| ''
+		).trim();
+		const creatorId = String(metadata.creatorId || message.senderId || '').trim();
+		const reminderAnchorId = isShared
+			? (sharedKey ? `shared-reminder-card-${sharedKey}` : '')
+			: ((linkedReminder?._id || reminderIdFromMeta) ? `reminder-card-${linkedReminder?._id || reminderIdFromMeta}` : '');
+		const isCancelled = isShared && (isSharedReminderCancelled || isSharedReminderUnavailable);
+		const isPersonalReminderCancelled = !isShared && Boolean(reminderIdFromMeta) && removedReminderIds.includes(reminderIdFromMeta);
+		const isReminderUnavailable = isShared ? isCancelled : isPersonalReminderCancelled;
+		const isCreator = creatorId === currentUserId;
+		const meParticipant = sharedOverview?.participants.find((item) => item.userId === currentUserId);
+		const participationStatus = meParticipant?.participationStatus || linkedReminder?.participationStatus || 'joined';
+		const joinedCount = sharedOverview?.joinedCount ?? Number(metadata.participantCount || 0);
+		const participantCount = sharedOverview?.participantCount || Number(metadata.participantCount || 0) || 0;
+		const canViewParticipants = isShared && !isCancelled && participantCount > 0;
+		const canEditSharedAsCreator = isShared && isCreator && Boolean(linkedReminder?._id);
+		const canOpenReminderEdit = !isShared || canEditSharedAsCreator;
+		const remindAtTimestamp = remindAt ? new Date(remindAt).getTime() : Number.NaN;
+		const isPastByTime = Number.isFinite(remindAtTimestamp) && remindAtTimestamp <= Date.now();
+		const isPastByStatus = linkedReminder?.status === 'triggered' || linkedReminder?.status === 'dismissed';
+		const targetDetailTab = (isPastByStatus || isPastByTime) ? 'past' : 'upcoming';
+
+		const clock = remindAt
+			? new Intl.DateTimeFormat('vi-VN', {
+				hour: '2-digit',
+				minute: '2-digit',
+				timeZone: 'Asia/Ho_Chi_Minh',
+			}).format(new Date(remindAt))
+			: '';
+
+		const dayLine = remindAt
+			? new Intl.DateTimeFormat('vi-VN', {
+				weekday: 'long',
+				day: '2-digit',
+				month: '2-digit',
+				timeZone: 'Asia/Ho_Chi_Minh',
+			}).format(new Date(remindAt))
+			: '';
+
+		const openReminder = () => {
+			if (isReminderUnavailable) return;
+
+			if (linkedReminder?._id) {
+				window.location.assign(`/reminder?tab=${targetDetailTab}&focus=${encodeURIComponent(linkedReminder._id)}`);
+				return;
+			}
+
+			if (sharedKey) {
+				window.location.assign(`/reminder?tab=${targetDetailTab}&shared=${encodeURIComponent(sharedKey)}`);
+				return;
+			}
+
+			if (reminderIdFromMeta) {
+				window.location.assign(`/reminder?tab=${targetDetailTab}&focus=${encodeURIComponent(reminderIdFromMeta)}`);
+				return;
+			}
+
+			window.location.assign(`/reminder?tab=${targetDetailTab}`);
+		};
+
+		const openReminderEdit = () => {
+			if (isReminderUnavailable) return;
+			if (!canOpenReminderEdit) return;
+
+			if (!linkedReminder?._id) {
+				toast.error('Không thể mở chỉnh sửa vì chưa tải được dữ liệu nhắc hẹn.');
+				return;
+			}
+
+			setEditingReminder(linkedReminder);
+		};
+
+		const updateParticipation = async (participate: boolean) => {
+			if (!sharedKey || isReminderUnavailable) return;
+			try {
+				setIsUpdatingParticipation(true);
+				await updateSharedReminderParticipationAsync(sharedKey, participate);
+				await loadSharedOverview(true);
+				toast.success(participate ? 'Bạn đã tham gia nhắc hẹn chung.' : 'Bạn đã không tham gia nhắc hẹn chung.');
+			} catch (error) {
+				console.error('Update shared reminder participation failed:', error);
+				toast.error('Không thể cập nhật trạng thái tham gia.');
+			} finally {
+				setIsUpdatingParticipation(false);
+			}
+		};
+
+		return (
+			<>
+				<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
+					<div className="flex items-center gap-2 border border-border/60 bg-muted/20 py-1.5 px-3 rounded-md max-w-[92%]">
+						<p className="text-[13px] font-normal tracking-normal break-words">
+							<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
+								{systemContent}
+							</span>
+						</p>
+					</div>
+				</div>
+
+				<div className="my-2 mx-auto w-full max-w-[520px] space-y-2 animate-in fade-in duration-300">
+					<div
+						id={reminderAnchorId || undefined}
+						data-shared-reminder-card={isShared && sharedKey ? sharedKey : undefined}
+						data-reminder-card={!isShared && (linkedReminder?._id || reminderIdFromMeta) ? (linkedReminder?._id || reminderIdFromMeta) : undefined}
+						className="w-full rounded-md border border-border bg-background p-3"
+					>
+						<div className="mx-auto h-9 w-9 rounded-md bg-muted/40 text-muted-foreground flex items-center justify-center">
+							<BellPlus className="h-5 w-5" />
+						</div>
+						<p className="mt-3 text-center text-sm font-medium text-foreground line-clamp-2 whitespace-pre-wrap">{reminderContent}</p>
+						{clock && (
+							<p className="mt-1 text-center text-xs text-muted-foreground inline-flex items-center justify-center gap-1.5 w-full">
+								<Clock className="h-4 w-4" />
+								{clock}{dayLine ? ` - ${dayLine}` : ''}
+							</p>
+						)}
+
+						{isShared && (
+							<div className="mt-2 space-y-1.5">
+								<p className="text-center text-xs text-muted-foreground">
+									{isCancelled
+										? 'Nhắc hẹn này đã bị hủy bởi người tạo.'
+										: isCreator
+										? 'Nhắc hẹn này áp dụng cho toàn bộ thành viên trong cuộc trò chuyện.'
+										: participationStatus === 'declined'
+											? 'Bạn đang không tham gia nhắc hẹn này.'
+											: 'Bạn đang tham gia nhắc hẹn này.'}
+								</p>
+								{canViewParticipants && (
+									<div className="flex items-center justify-between gap-2">
+										<p className="text-[11px] text-muted-foreground">
+											Đã tham gia: {joinedCount}/{participantCount}
+										</p>
+										<button
+											type="button"
+											onClick={() => {
+												setIsParticipantDialogOpen(true);
+												void loadSharedOverview();
+											}}
+											className="h-7 rounded-md border border-sky-200 bg-sky-50 px-2 text-[11px] text-sky-700 hover:bg-sky-100"
+										>
+											Xem người tham gia
+										</button>
+									</div>
+								)}
+							</div>
+						)}
+
+						{!isShared && isReminderUnavailable && (
+							<p className="mt-2 text-center text-xs text-muted-foreground">
+								Nhắc hẹn cá nhân này đã bị hủy.
+							</p>
+						)}
+
+						<div className="mt-3 flex flex-col gap-2">
+							{isReminderUnavailable ? (
+								<div className="w-full rounded-md border border-border bg-muted/20 text-muted-foreground text-sm font-medium py-2 text-center">
+									{isShared ? 'Nhắc hẹn đã bị hủy' : 'Nhắc hẹn cá nhân đã bị hủy'}
+								</div>
+							) : (
+								<>
+									{canOpenReminderEdit && (
+										<button
+											type="button"
+											onClick={openReminderEdit}
+											className="w-full rounded-md border border-sky-200 bg-sky-50 text-sky-700 font-medium py-2 hover:bg-sky-100 transition-colors"
+										>
+											Chỉnh sửa
+										</button>
+									)}
+
+									{isShared && !isCreator && sharedKey && (
+										participationStatus === 'declined' ? (
+											<button
+												type="button"
+												disabled={isUpdatingParticipation}
+												onClick={() => void updateParticipation(true)}
+												className="w-full rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 font-medium py-2 hover:bg-emerald-100 transition-colors disabled:opacity-60"
+											>
+												Tham gia lại
+											</button>
+										) : (
+											<button
+												type="button"
+												disabled={isUpdatingParticipation}
+												onClick={() => void updateParticipation(false)}
+												className="w-full rounded-md border border-amber-200 bg-amber-50 text-amber-700 font-medium py-2 hover:bg-amber-100 transition-colors disabled:opacity-60"
+											>
+												Không tham gia
+											</button>
+										)
+									)}
+
+									<button
+										type="button"
+										onClick={openReminder}
+										className="w-full rounded-md border border-sky-200 bg-sky-50 text-sky-700 font-medium py-2 hover:bg-sky-100 transition-colors"
+									>
+										Xem chi tiết
+									</button>
+								</>
+							)}
+						</div>
+					</div>
+				</div>
+
+				<Dialog open={isParticipantDialogOpen} onOpenChange={setIsParticipantDialogOpen}>
+					<DialogContent className="max-w-[440px] p-0 overflow-hidden border border-border shadow-lg [&>button]:right-3 [&>button]:top-3">
+						<DialogHeader className="px-4 py-3 border-b border-border bg-background">
+							<DialogTitle className="pr-10 text-base font-semibold">Thành viên tham gia nhắc hẹn</DialogTitle>
+							<p className="mt-1 text-xs text-muted-foreground">
+								Thành viên tham gia: {joinedCount}
+							</p>
+						</DialogHeader>
+
+						<div className="max-h-[420px] overflow-y-auto beautiful-scrollbar bg-background px-4 py-3">
+							{isLoadingSharedOverview ? (
+								<div className="rounded-md border border-border bg-muted/20 px-3 py-3 text-sm text-muted-foreground">Đang tải danh sách...</div>
+							) : joinedParticipants.length === 0 ? (
+								<div className="rounded-md border border-border bg-muted/20 px-3 py-3 text-sm text-muted-foreground">Chưa có thành viên tham gia.</div>
+							) : (
+								<div className="space-y-2">
+									<div className="relative">
+										<Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+										<Input
+											value={participantSearchTerm}
+											onChange={(event) => setParticipantSearchTerm(event.target.value)}
+											placeholder="Tìm theo tên thành viên"
+											className="h-8 rounded-md pl-8 text-xs"
+										/>
+									</div>
+
+									{filteredJoinedParticipants.length === 0 ? (
+										<div className="rounded-md border border-border bg-muted/20 px-3 py-3 text-sm text-muted-foreground">
+											Không tìm thấy thành viên phù hợp.
+										</div>
+									) : (
+										<div className="space-y-1.5">
+											{filteredJoinedParticipants.map((participant) => (
+												<div key={participant.userId} className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+													<UserAvatar
+														type="seen"
+														name={participant.userId === currentUserId ? 'Bạn' : participant.displayName}
+														avatarUrl={participant.avatarUrl || undefined}
+														className="size-8 ring-1 ring-border/40"
+													/>
+													<div className="min-w-0">
+														<p className="truncate text-sm font-medium text-foreground">
+															{participant.userId === currentUserId ? 'Bạn' : participant.displayName}
+															{participant.isCreator && (
+																<span className="ml-2 inline-flex items-center rounded-md border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 align-middle">
+																	Người tạo
+																</span>
+															)}
+														</p>
+													</div>
+												</div>
+											))}
+										</div>
+									)}
+								</div>
+							)}
+						</div>
+					</DialogContent>
+				</Dialog>
+
+				<ReminderFormModal
+					open={Boolean(editingReminder)}
+					onOpenChange={(nextOpen) => {
+						if (!nextOpen) {
+							setEditingReminder(null);
+						}
+					}}
+					mode="edit"
+					editScope={
+						editingReminder
+						&& editingReminder.scope === 'shared'
+						&& String(editingReminder.createdBy || '') !== String(currentUserId || '')
+							? 'notifyOnly'
+							: 'full'
+					}
+					reminder={editingReminder ?? undefined}
+					onSuccess={() => {
+						if (isShared) {
+							void loadSharedOverview(true);
+						}
+					}}
+				/>
+			</>
+		);
+	}
+
 	return (
 		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
-			<div className="flex items-center gap-2 bg-white/95 dark:bg-gray-800/60 backdrop-blur-sm border border-black/5 dark:border-white/5 py-2 px-4 rounded-full max-w-[92%] shadow-[0_2px_12px_-3px_rgba(0,0,0,0.08)] hover:shadow-md transition-all group/sys">
+			<div className="flex items-center gap-2 border border-border/60 bg-muted/20 py-1.5 px-3 rounded-md max-w-[92%]">
 				<p className="text-[13px] font-normal tracking-normal break-words">
 					<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
 					{systemContent}
@@ -577,12 +1187,13 @@ const MessageItem = ({
 			(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
 		) ?? [];
 
-	const { recallMessage, pinMessage, reactToMessage } = useChatStore();
+	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage } = useChatStore();
 	const [showConfirmRecall, setShowConfirmRecall] = useState(false);
 	const [showPinOptions, setShowPinOptions] = useState(false);
 	const [showReactionModal, setShowReactionModal] = useState(false);
 	const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 	const [isReacting, setIsReacting] = useState(false);
+	const [reminderTargetMessage, setReminderTargetMessage] = useState<{ messageId: string; messagePreview: string } | null>(null);
 
 	const reactionSummary = useMemo(() => {
 		if (!message.reactions?.length) return null;
@@ -629,6 +1240,8 @@ const MessageItem = ({
 		catch (e: any) { toast.error(e.message || "Thu hồi thất bại"); }
 		finally { setShowConfirmRecall(false); }
 	};
+
+	const canCreateReminder = !isDisbanded && !isRecalled && (message.type === "text" || message.type === "image");
 
 	return (
 		<>
@@ -829,6 +1442,19 @@ const MessageItem = ({
 											{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
 										</DropdownMenuItem>
 									)}
+									{canCreateReminder && (
+										<DropdownMenuItem
+											onClick={() => {
+												setReminderTargetMessage({
+													messageId: message._id,
+													messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
+												});
+											}}
+										>
+											<BellPlus className="w-4 h-4 mr-2" strokeWidth={1.6} />
+											Tạo nhắc hẹn
+										</DropdownMenuItem>
+									)}
 									{isOwn && !isDisbanded && (
 										<DropdownMenuItem
 											className="text-destructive focus:text-destructive focus:bg-destructive/10"
@@ -891,6 +1517,22 @@ const MessageItem = ({
 					isOpen={showReactionModal}
 					onClose={() => setShowReactionModal(false)}
 					reactions={message.reactions}
+				/>
+			)}
+
+			{reminderTargetMessage && (
+				<ReminderQuickModal
+					conversationId={message.conversationId}
+					messageId={reminderTargetMessage.messageId}
+					messagePreview={reminderTargetMessage.messagePreview}
+					onClose={() => setReminderTargetMessage(null)}
+					onCreated={(createdReminder) => {
+						if (createdReminder.scope !== 'personal') return;
+
+						void createReminderSystemMessage(message.conversationId, createdReminder).catch(() => {
+							toast.error('Không thể đồng bộ tin nhắn nhắc hẹn cá nhân');
+						});
+					}}
 				/>
 			)}
 		</>

@@ -10,15 +10,6 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-/**
- * Send email
- *
- * @param {string} to
- * @param {string} subject
- * @param {string} text
- * @param {string} html
- * @returns {Promise<boolean>}
- */
 export async function sendMail(to, subject, text = "", html = "") {
     try {
         const info = await transporter.sendMail({
@@ -37,12 +28,6 @@ export async function sendMail(to, subject, text = "", html = "") {
     }
 }
 
-/**
- * Send OTP email
- *
- * @param {string} to
- * @param {string} otp
- */
 export async function sendOtp(to, otp) {
     const subject = "Your OTP Code";
     const text = `Your OTP code is: ${otp}. It expires in 5 minutes.`;
@@ -54,4 +39,32 @@ export async function sendOtp(to, otp) {
     `;
 
     return await sendMail(to, subject, text, html);
+}
+
+export async function sendReminderEmail({ to, reminder }) {
+    const content = [reminder?.content, reminder?.title, reminder?.note]
+        .find((item) => typeof item === 'string' && item.trim())
+        ?.trim() || 'Nhắc nhở mới';
+
+    const formattedTime = new Date(reminder.remindAt).toLocaleString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'Asia/Ho_Chi_Minh',
+    });
+
+    await transporter.sendMail({
+        from: process.env.EMAIL_FROM,
+        to,
+        subject: `🔔 Nhắc nhở: ${content.slice(0, 120)}`,
+        html: `
+            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+                <h2 style="color: #0068ff;">🔔 Nhắc nhở của bạn</h2>
+                <p style="color: #444; white-space: pre-wrap;">${content}</p>
+                <p style="color: #888; font-size: 13px;">Thời gian: ${formattedTime}</p>
+            </div>
+        `,
+    });
 }
