@@ -69,7 +69,7 @@ const buildReminderFormSchema = (notifyOnly: boolean) => z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['remindAt'],
-        message: 'Thời gian nhắc cần cách hiện tại tối thiểu 1 phút',
+        message: 'Thời gian nhắc cần cách hiện tại tối thiểu 10 giây',
       });
     }
 
@@ -250,17 +250,15 @@ export default function ReminderFormModal({
             : 'max-w-[540px] max-h-[86vh]'
         )}
       >
-        <DialogHeader className="px-4 py-3 border-b border-border/40 bg-card/60">
-          <DialogTitle className="flex items-center gap-2.5">
-            <span>
-              {mode === 'create'
-                ? 'Tạo nhắc nhở mới'
-                : isNotifyOnlyEdit
-                  ? 'Tùy chỉnh thông báo cá nhân'
-                  : 'Chỉnh sửa nhắc nhở'}
-            </span>
+        <DialogHeader className="px-6 py-4 border-b border-border/40 bg-white">
+          <DialogTitle className="text-xl font-semibold text-slate-900">
+            {mode === 'create'
+              ? 'Tạo nhắc nhở mới'
+              : isNotifyOnlyEdit
+                ? 'Tùy chỉnh thông báo cá nhân'
+                : 'Chỉnh sửa nhắc nhở'}
           </DialogTitle>
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px] text-muted-foreground mt-1">
             {isNotifyOnlyEdit
               ? 'Bạn chỉ thay đổi kênh thông báo cho tài khoản của mình, không ảnh hưởng thành viên khác.'
               : 'Đặt thời gian phù hợp để không bỏ lỡ công việc quan trọng.'}
@@ -322,7 +320,7 @@ export default function ReminderFormModal({
                           : 'border-border/60 bg-background hover:bg-muted/40'
                       )}
                     >
-                      <p className="text-sm font-semibold">{option.label}</p>
+                      <p className="text-sm font-medium">{option.label}</p>
                       <p className="text-[11px] text-muted-foreground mt-0.5">{option.description}</p>
                     </button>
                   );
@@ -339,10 +337,10 @@ export default function ReminderFormModal({
           </div>
 
           <DialogFooter className="px-4 py-3 border-t border-border/40 bg-card/30 flex-row justify-end gap-2 shrink-0">
-            <Button type="button" variant="outline" className="rounded-md" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
-              Hủy
+            <Button type="button" variant="outline" className="rounded-md font-semibold" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
+              Hủy bỏ
             </Button>
-            <Button type="submit" className="rounded-md bg-sky-600 text-white hover:bg-sky-700" disabled={isSubmitting}>
+            <Button type="submit" className="rounded-md bg-primary text-white hover:bg-primary/90 font-semibold px-6" disabled={isSubmitting}>
               {isSubmitting
                 ? 'Đang lưu...'
                 : mode === 'create'

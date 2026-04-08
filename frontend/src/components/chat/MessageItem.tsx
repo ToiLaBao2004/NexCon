@@ -826,10 +826,15 @@ function SystemMessageComponent({
 		const participantCount = sharedOverview?.participantCount || Number(metadata.participantCount || 0) || 0;
 		const canViewParticipants = isShared && !isCancelled && participantCount > 0;
 		const canEditSharedAsCreator = isShared && isCreator && Boolean(linkedReminder?._id);
-		const canOpenReminderEdit = !isShared || canEditSharedAsCreator;
 		const remindAtTimestamp = remindAt ? new Date(remindAt).getTime() : Number.NaN;
 		const isPastByTime = Number.isFinite(remindAtTimestamp) && remindAtTimestamp <= Date.now();
 		const isPastByStatus = linkedReminder?.status === 'triggered' || linkedReminder?.status === 'dismissed';
+		const isEditableByStatus = linkedReminder?.status === 'pending' || linkedReminder?.status === 'snoozed';
+		const canOpenReminderEdit = Boolean(linkedReminder?._id)
+			&& !isPastByTime
+			&& !isPastByStatus
+			&& isEditableByStatus
+			&& (!isShared || canEditSharedAsCreator);
 		const targetDetailTab = (isPastByStatus || isPastByTime) ? 'past' : 'upcoming';
 
 		const clock = remindAt
@@ -851,19 +856,15 @@ function SystemMessageComponent({
 
 		const openReminder = () => {
 			if (isReminderUnavailable) return;
+			const focusId = String(linkedReminder?._id || reminderIdFromMeta || '').trim();
 
-			if (linkedReminder?._id) {
-				window.location.assign(`/reminder?tab=${targetDetailTab}&focus=${encodeURIComponent(linkedReminder._id)}`);
+			if (focusId) {
+				window.location.assign(`/reminder?tab=${targetDetailTab}&focus=${encodeURIComponent(focusId)}`);
 				return;
 			}
 
 			if (sharedKey) {
 				window.location.assign(`/reminder?tab=${targetDetailTab}&shared=${encodeURIComponent(sharedKey)}`);
-				return;
-			}
-
-			if (reminderIdFromMeta) {
-				window.location.assign(`/reminder?tab=${targetDetailTab}&focus=${encodeURIComponent(reminderIdFromMeta)}`);
 				return;
 			}
 
@@ -899,8 +900,8 @@ function SystemMessageComponent({
 
 		return (
 			<>
-				<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
-					<div className="flex items-center gap-2 border border-border/60 bg-muted/20 py-1.5 px-3 rounded-md max-w-[92%]">
+				<div className="my-4 flex w-full animate-in justify-center fade-in transition-all duration-300">
+					<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-slate-200/70 bg-white px-3 py-1.5 shadow-sm">
 						<p className="text-[13px] font-normal tracking-normal break-words">
 							<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
 								{systemContent}
@@ -914,22 +915,22 @@ function SystemMessageComponent({
 						id={reminderAnchorId || undefined}
 						data-shared-reminder-card={isShared && sharedKey ? sharedKey : undefined}
 						data-reminder-card={!isShared && (linkedReminder?._id || reminderIdFromMeta) ? (linkedReminder?._id || reminderIdFromMeta) : undefined}
-						className="w-full rounded-md border border-border bg-background p-3"
+						className="w-full rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
 					>
-						<div className="mx-auto h-9 w-9 rounded-md bg-muted/40 text-muted-foreground flex items-center justify-center">
+						<div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
 							<BellPlus className="h-5 w-5" />
 						</div>
-						<p className="mt-3 text-center text-sm font-medium text-foreground line-clamp-2 whitespace-pre-wrap">{reminderContent}</p>
+						<p className="mt-3 text-center text-base font-semibold text-slate-900 line-clamp-2 whitespace-pre-wrap">{reminderContent}</p>
 						{clock && (
-							<p className="mt-1 text-center text-xs text-muted-foreground inline-flex items-center justify-center gap-1.5 w-full">
-								<Clock className="h-4 w-4" />
+							<p className="mt-1 inline-flex w-full items-center justify-center gap-1.5 text-sm font-medium text-slate-600">
+								<Clock className="h-4 w-4 text-slate-500" />
 								{clock}{dayLine ? ` - ${dayLine}` : ''}
 							</p>
 						)}
 
 						{isShared && (
-							<div className="mt-2 space-y-1.5">
-								<p className="text-center text-xs text-muted-foreground">
+							<div className="mt-3 space-y-2">
+								<p className="text-center text-sm text-slate-500">
 									{isCancelled
 										? 'Nhắc hẹn này đã bị hủy bởi người tạo.'
 										: isCreator
@@ -940,7 +941,7 @@ function SystemMessageComponent({
 								</p>
 								{canViewParticipants && (
 									<div className="flex items-center justify-between gap-2">
-										<p className="text-[11px] text-muted-foreground">
+										<p className="text-xs font-medium text-slate-900">
 											Đã tham gia: {joinedCount}/{participantCount}
 										</p>
 										<button
@@ -949,7 +950,7 @@ function SystemMessageComponent({
 												setIsParticipantDialogOpen(true);
 												void loadSharedOverview();
 											}}
-											className="h-7 rounded-md border border-sky-200 bg-sky-50 px-2 text-[11px] text-sky-700 hover:bg-sky-100"
+											className="h-8 rounded-full border border-slate-200 bg-slate-100 px-3 text-xs font-medium text-black transition-colors hover:bg-slate-200"
 										>
 											Xem người tham gia
 										</button>
@@ -964,9 +965,9 @@ function SystemMessageComponent({
 							</p>
 						)}
 
-						<div className="mt-3 flex flex-col gap-2">
+						<div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4">
 							{isReminderUnavailable ? (
-								<div className="w-full rounded-md border border-border bg-muted/20 text-muted-foreground text-sm font-medium py-2 text-center">
+								<div className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 text-center text-sm font-medium text-slate-500">
 									{isShared ? 'Nhắc hẹn đã bị hủy' : 'Nhắc hẹn cá nhân đã bị hủy'}
 								</div>
 							) : (
@@ -975,7 +976,7 @@ function SystemMessageComponent({
 										<button
 											type="button"
 											onClick={openReminderEdit}
-											className="w-full rounded-md border border-sky-200 bg-sky-50 text-sky-700 font-medium py-2 hover:bg-sky-100 transition-colors"
+											className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
 										>
 											Chỉnh sửa
 										</button>
@@ -987,7 +988,7 @@ function SystemMessageComponent({
 												type="button"
 												disabled={isUpdatingParticipation}
 												onClick={() => void updateParticipation(true)}
-												className="w-full rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 font-medium py-2 hover:bg-emerald-100 transition-colors disabled:opacity-60"
+												className="w-full rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
 											>
 												Tham gia lại
 											</button>
@@ -996,7 +997,7 @@ function SystemMessageComponent({
 												type="button"
 												disabled={isUpdatingParticipation}
 												onClick={() => void updateParticipation(false)}
-												className="w-full rounded-md border border-amber-200 bg-amber-50 text-amber-700 font-medium py-2 hover:bg-amber-100 transition-colors disabled:opacity-60"
+												className="w-full rounded-xl border border-amber-200 bg-amber-50 py-2.5 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-60"
 											>
 												Không tham gia
 											</button>
@@ -1006,7 +1007,7 @@ function SystemMessageComponent({
 									<button
 										type="button"
 										onClick={openReminder}
-										className="w-full rounded-md border border-sky-200 bg-sky-50 text-sky-700 font-medium py-2 hover:bg-sky-100 transition-colors"
+										className="w-full rounded-xl border border-slate-200 bg-slate-100 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-slate-200"
 									>
 										Xem chi tiết
 									</button>
@@ -1104,7 +1105,7 @@ function SystemMessageComponent({
 
 	return (
 		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
-			<div className="flex items-center gap-2 border border-border/60 bg-muted/20 py-1.5 px-3 rounded-md max-w-[92%]">
+			<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-slate-200/70 bg-white px-3 py-1.5 shadow-sm">
 				<p className="text-[13px] font-normal tracking-normal break-words">
 					<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
 					{systemContent}

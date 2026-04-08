@@ -15,8 +15,8 @@ const NotificationPage = () => {
         <div className="flex-1 h-full flex flex-col bg-card/20 rounded-none md:rounded-2xl shadow-soft border-0 md:border border-border/40 overflow-hidden">
             <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Bell className="h-5 w-5 text-primary" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
+                        <Bell className="h-5 w-5 text-white" />
                     </div>
                     <div>
                         <h1 className="text-xl font-bold text-foreground">Thông báo</h1>

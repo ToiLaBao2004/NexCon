@@ -101,12 +101,12 @@ const PeoplePage = () => {
 	const headerConfig: Record<PeopleTabKey, { title: string; icon: ReactNode; desc: string }> = {
 		friends: {
 			title: "Bạn bè",
-			icon: <Users className="h-5 w-5 text-primary" />,
+			icon: <Users className="h-6 w-6 text-white" />,
 			desc: friends.length > 0 ? `${friends.length} bạn bè` : "Chưa có bạn bè nào",
 		},
 		requests: {
 			title: "Lời mời kết bạn",
-			icon: <UserPlus className="h-5 w-5 text-primary" />,
+			icon: <UserPlus className="h-6 w-6 text-white" />,
 			desc:
 				(incomingRequests.length + sentRequests.length) > 0
 					? `${incomingRequests.length} lời mời đã nhận, ${sentRequests.length} đã gửi`
@@ -114,12 +114,12 @@ const PeoplePage = () => {
 		},
 		groups: {
 			title: "Quản lý nhóm",
-			icon: <MessageSquare className="h-5 w-5 text-primary" />,
+			icon: <MessageSquare className="h-6 w-6 text-white" />,
 			desc: `${conversations.filter((c) => c.type === "group").length} nhóm`,
 		},
 		blocked: {
 			title: "Danh sách bị chặn",
-			icon: <UserX className="h-5 w-5 text-primary" />,
+			icon: <UserX className="h-6 w-6 text-white" />,
 			desc: "Người dùng bạn đã chặn",
 		},
 	};
@@ -145,12 +145,12 @@ const PeoplePage = () => {
 								<button
 									key={item.key}
 									onClick={() => handleTabChange(item.key)}
-									className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 ${tab === item.key ? "bg-primary/10 text-primary font-semibold" : "hover:bg-muted/30"}`}
+									className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-200 ${tab === item.key ? "bg-white text-slate-900 shadow-sm font-normal" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}
 								>
-									<Icon className="h-4 w-4" />
-									<span className="flex-1">{item.label}</span>
+									<Icon className={`h-4 w-4 transition-colors ${tab === item.key ? "text-indigo-600" : "text-slate-400"}`} />
+									<span className="flex-1 text-sm">{item.label}</span>
 									{badge > 0 && (
-										<span className="ml-auto text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{badge}</span>
+										<span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{badge}</span>
 									)}
 								</button>
 							);
@@ -173,7 +173,7 @@ const PeoplePage = () => {
 						)}
 
 						<div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm md:sticky md:top-0 md:z-20 shrink-0">
-							<div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+							<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
 								{header.icon}
 							</div>
 							<div>

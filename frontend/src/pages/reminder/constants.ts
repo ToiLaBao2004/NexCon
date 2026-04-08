@@ -21,13 +21,7 @@ export const STATUS_OPTIONS: Array<{ value: ReminderStatus; label: string }> = [
 ];
 
 export const REPEAT_MINUTE_OPTIONS = [5, 10, 15, 30, 60];
-export const REMINDER_MIN_LEAD_TIME_MS = 60 * 1000;
-
-export const SOURCE_OPTIONS: Array<{ value: ReminderSourceType; label: string }> = [
-  { value: 'message', label: 'Tin nhắn' },
-  { value: 'meeting', label: 'Cuộc họp' },
-  { value: 'manual', label: 'Thủ công' },
-];
+export const REMINDER_MIN_LEAD_TIME_MS = 10 * 1000;
 
 export const REPEAT_TEXT: Record<Reminder['repeatRule'], string> = {
   none: '',

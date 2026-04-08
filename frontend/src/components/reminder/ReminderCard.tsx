@@ -1,4 +1,4 @@
-import { CopyPlus, SquarePen, Trash2, UserMinus } from 'lucide-react';
+import { Bell, Check, Clock3, CopyPlus, SquarePen, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Reminder } from '@/types/reminder';
 import { REPEAT_MINUTE_OPTIONS, REPEAT_TEXT, SOURCE_TEXT } from '@/pages/reminder/constants';
-import { getReminderContent, getReminderMeetingTitle, getReminderMeetingUrl, formatClock, formatDayDate } from '@/pages/reminder/utils';
+import { getReminderContent, getReminderMeetingTitle, getReminderMeetingUrl, formatClock } from '@/pages/reminder/utils';
 import type { ReminderCardOptions, ReminderTab } from '@/pages/reminder/types';
 import { extractFirstHttpUrl, extractMeetingCode, rememberMeetingTitle } from '@/utils/meetingLink';
 
@@ -43,15 +43,17 @@ export default function ReminderCard({
   const showRepeat = options?.showRepeat ?? false;
   const showCancel = options?.showCancel ?? false;
   const cancelVariant = options?.cancelVariant ?? 'cancel';
-  const cancelLabel = options?.cancelLabel ?? 'Hủy';
   const isDeclineAction = cancelVariant === 'decline';
   const highlighted = options?.highlighted ?? false;
   const allowQuickDelete = !showCancel && reminder.scope !== 'shared';
-  const subtleBadgeClass = 'rounded-md border border-border/70 bg-muted/30 text-muted-foreground px-1.5 py-0.5 text-[10px] font-medium';
+  const showDeleteControl = showCancel || allowQuickDelete;
+  
+  const subtleBadgeClass = 'rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors group-hover:bg-slate-200';
+  const scopeBadgeClass = 'inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-black';
+  
   const hoverDeleteLabel = reminder.scope === 'shared'
     ? (isDeclineAction ? 'Không tham gia nhắc hẹn này' : 'Hủy nhắc hẹn chung cho tất cả thành viên')
     : 'Xóa nhắc nhở cá nhân';
-  const HoverDeleteIcon = reminder.scope === 'shared' && isDeclineAction ? UserMinus : Trash2;
 
   const reminderContent = getReminderContent(reminder);
   const reminderMeetingTitle = getReminderMeetingTitle(reminder);
@@ -65,6 +67,10 @@ export default function ReminderCard({
   const contentAfterMeetingUrl = hasInlineMeetingUrl && rawMeetingUrlInContent
     ? reminderContent.slice(meetingUrlIndex + rawMeetingUrlInContent.length)
     : '';
+  const reminderDate = new Date(reminder.remindAt);
+  const calendarWeekday = new Intl.DateTimeFormat('vi-VN', { weekday: 'short' }).format(reminderDate);
+  const calendarDay = new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(reminderDate);
+  const calendarMonth = new Intl.DateTimeFormat('vi-VN', { month: 'numeric' }).format(reminderDate);
 
   const handleMeetingLinkClick = (event: React.MouseEvent<HTMLAnchorElement>, targetUrl: string) => {
     event.preventDefault();
@@ -87,17 +93,30 @@ export default function ReminderCard({
         if (!editable) return;
         onEdit(reminder);
       }}
-      className={`group relative rounded-md border border-border/70 bg-card px-5 py-4 shadow-sm transition-all ${editable ? 'cursor-pointer hover:shadow-md hover:border-primary/30' : 'cursor-default'} ${faded ? 'opacity-65' : ''} ${highlighted ? 'ring-2 ring-primary/50 border-primary/40 bg-primary/5' : ''}`}
+      className={`group relative flex h-full w-full flex-col rounded-2xl border border-slate-200/80 bg-white p-5 font-sans shadow-sm transition-all duration-200 hover:shadow-md hover:border-slate-300 ${editable ? 'cursor-pointer' : 'cursor-default'} ${faded ? 'opacity-65' : ''} ${highlighted ? 'ring-2 ring-primary/45 border-primary/60 bg-primary/10 shadow-lg shadow-primary/20' : ''}`}
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h3 className="font-semibold text-[15px] leading-relaxed whitespace-pre-wrap break-words">
+      {/* Top Section */}
+      <div className="flex items-start gap-3.5">
+        <div className="w-[84px] shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-center gap-1 bg-primary px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+            <span className="h-1 w-1 rounded-full bg-white/90" />
+            {calendarWeekday}
+            <span className="h-1 w-1 rounded-full bg-white/90" />
+          </div>
+          <div className="flex flex-col items-center justify-center py-2.5">
+            <span className="text-[32px] font-semibold leading-none text-slate-900">{calendarDay}</span>
+            <span className="mt-1 text-xs font-semibold text-rose-500">Tháng {calendarMonth}</span>
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1 pt-0.5">
+          <h3 className="text-[17px] font-semibold leading-snug tracking-tight text-slate-900 whitespace-pre-wrap break-words">
             {contentBeforeMeetingUrl}
             {hasInlineMeetingUrl && rawMeetingUrlInContent && (
               <a
                 href={meetingUrl || rawMeetingUrlInContent}
                 onClick={(event) => handleMeetingLinkClick(event, meetingUrl || rawMeetingUrlInContent)}
-                className="underline text-primary break-all"
+                className="font-medium underline text-primary transition-colors hover:text-primary/80 break-all"
               >
                 {rawMeetingUrlInContent}
               </a>
@@ -109,13 +128,18 @@ export default function ReminderCard({
             <a
               href={meetingUrl}
               onClick={(event) => handleMeetingLinkClick(event, meetingUrl)}
-              className="mt-1 block text-xs underline text-primary break-all"
+                className="mt-1.5 block text-xs font-medium underline text-primary transition-colors hover:text-primary/80 break-all"
             >
               {meetingUrl}
             </a>
           )}
 
-          <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-slate-600">
+            <Clock3 className="h-3.5 w-3.5 text-slate-500" />
+            <span>{formatClock(reminder.remindAt)}</span>
+          </p>
+
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
             {reminder.repeatRule !== 'none' && (
               <span className={subtleBadgeClass}>
                 {REPEAT_TEXT[reminder.repeatRule]}
@@ -126,8 +150,15 @@ export default function ReminderCard({
                 {SOURCE_TEXT[reminder.source.type]}
               </span>
             )}
+            {reminder.scope === 'personal' && (
+              <span className={scopeBadgeClass}>
+                <Check className="h-3 w-3" />
+                Nhắc hẹn riêng
+              </span>
+            )}
             {reminder.scope === 'shared' && (
-              <span className={subtleBadgeClass}>
+              <span className={scopeBadgeClass}>
+                <Check className="h-3 w-3" />
                 Nhắc hẹn chung
               </span>
             )}
@@ -143,115 +174,92 @@ export default function ReminderCard({
             )}
           </div>
         </div>
-
-        <div className="shrink-0 min-w-[110px]">
-          <span className="text-right leading-none block">
-            <span className="block text-base font-semibold text-foreground/90">{formatClock(reminder.remindAt)}</span>
-            <span className="block mt-1 text-xs text-muted-foreground">{formatDayDate(reminder.remindAt)}</span>
-          </span>
-        </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        {showEdit && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs px-3 rounded-md border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100 hover:border-sky-300"
-            onClick={(event) => {
-              event.stopPropagation();
-              onEdit(reminder);
-            }}
-          >
-            <SquarePen className="h-3.5 w-3.5 mr-1" />
-            {editLabel}
-          </Button>
-        )}
-
-        {showRepeat && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="h-8 text-xs px-3 rounded-md border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300"
-                onClick={(event) => event.stopPropagation()}
-              >
-                Nhắc lại
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-44" onClick={(event) => event.stopPropagation()}>
-              <DropdownMenuLabel>Nhắc lại sau</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {REPEAT_MINUTE_OPTIONS.map((minutes) => (
-                <DropdownMenuItem
-                  key={minutes}
-                  onSelect={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    onRepeat(reminder, minutes);
-                  }}
+      <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap items-center gap-3">
+          {showRepeat && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-[12px] font-semibold text-white shadow-sm transition-all hover:bg-primary/90"
+                  onClick={(event) => event.stopPropagation()}
                 >
-                  {minutes} phút
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+                  <Bell className="h-4 w-4" />
+                  Nhắc lại
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-48" onClick={(event) => event.stopPropagation()}>
+                <DropdownMenuLabel>Nhắc lại sau</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {REPEAT_MINUTE_OPTIONS.map((minutes) => (
+                  <DropdownMenuItem
+                    key={minutes}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onRepeat(reminder, minutes);
+                    }}
+                  >
+                    {minutes} phút
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
-        {showReuse && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="h-8 text-xs px-3 rounded-md border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300"
-            onClick={(event) => {
-              event.stopPropagation();
-              onReuse(reminder);
-            }}
-          >
-            <CopyPlus className="h-3.5 w-3.5 mr-1" />
-            Dùng lại
-          </Button>
-        )}
+          {showReuse && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="flex h-9 items-center gap-2 rounded-md border-slate-200 bg-white px-4 text-[12px] font-semibold text-slate-800 transition-all hover:border-slate-300 hover:bg-slate-50"
+              onClick={(event) => {
+                event.stopPropagation();
+                onReuse(reminder);
+              }}
+            >
+              <CopyPlus className="h-4 w-4 text-black" />
+              Dùng lại
+            </Button>
+          )}
 
-        {showCancel && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className={isDeclineAction
-              ? 'h-8 text-xs px-3 rounded-md border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300'
-              : 'h-8 text-xs px-3 rounded-md border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-300'}
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(reminder._id);
-            }}
-          >
-            {cancelLabel}
-          </Button>
-        )}
+          {showEdit && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className="flex h-9 items-center gap-2 rounded-md px-3 text-[12px] font-semibold text-slate-800 transition-all hover:bg-slate-100 hover:text-slate-900"
+              onClick={(event) => {
+                event.stopPropagation();
+                onEdit(reminder);
+              }}
+            >
+              <SquarePen className="h-4 w-4 text-black" />
+              {editLabel}
+            </Button>
+          )}
+        </div>
 
-        {allowQuickDelete && (
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDelete(reminder._id);
-            }}
-            className={`ml-auto opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md ${isDeclineAction
-              ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-100/70'
-              : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
-            aria-label={hoverDeleteLabel}
-            title={hoverDeleteLabel}
-          >
-            <HoverDeleteIcon className="h-4 w-4" />
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {showDeleteControl && (
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onDelete(reminder._id);
+              }}
+              className="rounded-md p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              aria-label={hoverDeleteLabel}
+              title={hoverDeleteLabel}
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
-
