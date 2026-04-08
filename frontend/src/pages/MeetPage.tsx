@@ -161,8 +161,8 @@ const MeetPage = () => {
     // Already in a meeting
     if (isInMeeting) {
         return (
-            <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-[#f8fafc] md:rounded-2xl md:border md:border-slate-200/60">
-                <div className="border-b border-slate-200/70 bg-white px-4 py-4 md:px-6">
+            <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-background md:rounded-2xl md:border md:border-border/60">
+                <div className="border-b border-border/60 bg-card/80 px-4 py-4 backdrop-blur-sm md:px-6">
                     <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -170,8 +170,8 @@ const MeetPage = () => {
                             </svg>
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Meet</h1>
-                            <p className="text-sm text-slate-500">Quản lý cuộc họp video của bạn</p>
+                            <h1 className="text-2xl font-bold tracking-tight text-foreground">Meet</h1>
+                            <p className="text-sm text-muted-foreground">Quản lý cuộc họp video của bạn</p>
                         </div>
                     </div>
                 </div>
@@ -182,12 +182,12 @@ const MeetPage = () => {
                         style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '22px 22px' }}
                     />
 
-                    <div className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+                    <div className="relative w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
                         <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15">
                             <span className="h-3 w-3 animate-pulse rounded-full bg-emerald-500" />
                         </div>
-                        <h2 className="text-xl font-semibold text-slate-900">Bạn đang trong cuộc họp</h2>
-                        <p className="mt-1 text-sm text-slate-500">{activeRoomLabel || activeRoomName}</p>
+                        <h2 className="text-xl font-semibold text-foreground">Bạn đang trong cuộc họp</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">{activeRoomLabel || activeRoomName}</p>
 
                         <div className="mt-6 flex flex-col gap-3">
                             <button
@@ -198,7 +198,7 @@ const MeetPage = () => {
                             </button>
                             <button
                                 onClick={() => openMeetingReminderModal(activeRoomName || activeRoomLabel || '', activeRoomLabel || activeRoomName || 'cuộc họp hiện tại')}
-                                className="h-10 rounded-xl border border-primary/30 bg-white px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/5"
+                                className="h-10 rounded-xl border border-primary/30 bg-background px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
                             >
                                 Tạo nhắc hẹn cho cuộc họp này
                             </button>
@@ -210,8 +210,8 @@ const MeetPage = () => {
     }
 
     return (
-        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-[#f8fafc] md:rounded-2xl md:border md:border-slate-200/60">
-            <div className="border-b border-slate-200/70 bg-white px-4 py-4 md:px-6">
+        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-background md:rounded-2xl md:border md:border-border/60">
+            <div className="border-b border-border/60 bg-card/80 px-4 py-4 backdrop-blur-sm md:px-6">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -219,8 +219,8 @@ const MeetPage = () => {
                         </svg>
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Meet</h1>
-                        <p className="text-sm text-slate-500">Tạo và tham gia cuộc họp video nhanh chóng</p>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Meet</h1>
+                        <p className="text-sm text-muted-foreground">Tạo và tham gia cuộc họp video nhanh chóng</p>
                     </div>
                 </div>
             </div>
@@ -231,7 +231,7 @@ const MeetPage = () => {
                     style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '22px 22px' }}
                 />
 
-                <div className="relative z-10 w-full max-w-[560px] rounded-3xl border border-slate-200/20 p-8 shadow-[0_24px_60px_-24px_rgba(37,99,235,0.65)]"
+                <div className="relative z-10 w-full max-w-[560px] rounded-3xl border border-white/20 p-8 shadow-[0_24px_60px_-24px_rgba(37,99,235,0.65)] dark:border-white/15"
                     style={{ background: 'linear-gradient(135deg, #0ea5e9 0%, #2563eb 50%, #4f46e5 100%)' }}
                 >
 
@@ -257,7 +257,7 @@ const MeetPage = () => {
                         <div className="flex flex-col gap-3">
                             <button
                                 onClick={handleOpenCreate}
-                                className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white text-base font-semibold text-blue-600 shadow-lg shadow-black/10 transition-colors hover:bg-blue-50"
+                                className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/95 text-base font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
                             >
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -266,7 +266,7 @@ const MeetPage = () => {
                             </button>
                             <button
                                 onClick={() => setMode('join')}
-                                className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white text-base font-semibold text-blue-600 shadow-lg shadow-black/10 transition-colors hover:bg-blue-50"
+                                className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-white/95 text-base font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
                             >
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14" />
@@ -314,7 +314,7 @@ const MeetPage = () => {
                             <button
                                 disabled={!meetingTitle.trim() || loading}
                                 onClick={handleStart}
-                                className="h-12 rounded-xl bg-white text-sm font-semibold text-blue-600 shadow-lg shadow-black/10 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="h-12 rounded-xl bg-white/95 text-sm font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
                             >
                                 {loading ? 'Đang kết nối...' : 'Bắt đầu cuộc họp'}
                             </button>
@@ -366,7 +366,7 @@ const MeetPage = () => {
                             <button
                                 disabled={!joinCode.trim() || loading}
                                 onClick={handleJoin}
-                                className="h-12 rounded-xl bg-white text-sm font-semibold text-blue-600 shadow-lg shadow-black/10 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                                className="h-12 rounded-xl bg-white/95 text-sm font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
                             >
                                 {loading ? 'Đang kết nối...' : 'Tham gia'}
                             </button>
