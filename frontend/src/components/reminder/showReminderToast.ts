@@ -16,6 +16,7 @@ export function showReminderToast(reminder: Reminder): void {
       id: toastKey,
       duration: Number.POSITIVE_INFINITY,
       position: 'bottom-right',
+      className: 'reminder-fixed-toast',
     }
   );
 }

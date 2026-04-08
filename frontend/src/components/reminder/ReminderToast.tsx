@@ -105,30 +105,30 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
   };
 
   return (
-    <div className="relative w-[calc(100vw-1rem)] sm:w-[340px] rounded-md border border-border bg-background shadow-lg overflow-visible animate-in slide-in-from-right-4 fade-in duration-300 before:absolute before:inset-0 before:rounded-md before:border-[3px] before:border-primary/70 before:pointer-events-none before:animate-pulse">
+    <div className="relative w-[calc(100vw-1rem)] overflow-visible rounded-2xl border-2 border-black bg-white shadow-[0_18px_36px_-22px_rgba(15,23,42,0.45)] animate-in slide-in-from-right-4 fade-in duration-300 sm:w-[372px]">
       <button
         type="button"
         onClick={handleCloseToast}
         aria-label="Đóng thông báo"
-        className="absolute right-2.5 top-2.5 h-6 w-6 rounded-md border border-border/40 bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors inline-flex items-center justify-center"
+        className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-100 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700"
       >
-        <X className="h-3 w-3" />
+        <X className="h-3.5 w-3.5" />
       </button>
 
-      <div className="px-3.5 pt-3.5 pb-3">
+      <div className="p-4">
         {/* Header */}
-        <div className="flex items-start gap-2.5 pr-5">
-          <div className="mt-0.5 h-8 w-8 rounded-md border border-border/40 bg-muted/50 flex items-center justify-center shrink-0">
-            <Bell className="h-3.5 w-3.5 text-foreground animate-ring" />
+        <div className="flex items-start gap-3 pr-8">
+          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 text-black shadow-sm">
+            <Bell className="h-4 w-4 animate-ring" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold leading-snug text-foreground whitespace-pre-wrap break-words">
+            <p className="whitespace-pre-wrap break-words text-[15px] font-semibold leading-snug tracking-tight text-slate-900">
               {meetingUrlParts.before}
               {meetingUrlParts.url && (
                 <a
                   href={meetingUrl || meetingUrlParts.url}
                   onClick={(event) => handleMeetingLinkNavigate(event, meetingUrl ?? meetingUrlParts.url ?? '')}
-                  className="underline text-primary break-all"
+                  className="break-all font-medium text-slate-900 underline transition-colors hover:text-black"
                 >
                   {meetingUrlParts.url}
                 </a>
@@ -140,20 +140,20 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
               <a
                 href={meetingUrl}
                 onClick={(event) => handleMeetingLinkNavigate(event, meetingUrl)}
-                className="mt-0.5 block text-xs underline text-primary break-all"
+                className="mt-1 block break-all text-xs font-medium text-slate-900 underline transition-colors hover:text-black"
               >
                 {meetingUrl}
               </a>
             )}
 
             {/* Meta */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md">
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-900">
                 <CalendarClock className="h-3 w-3" />
                 {formatReminderTime(reminder.remindAt)}
               </span>
               {reminder.source?.type === 'message' && (
-                <span className="inline-flex items-center text-[11px] text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-md">
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-900">
                   Từ tin nhắn
                 </span>
               )}
@@ -162,13 +162,13 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
         </div>
 
         {/* Divider */}
-        <div className="my-2.5 border-t border-border/40" />
+        <div className="my-3 border-t border-slate-100" />
 
         {/* Actions */}
         <div ref={snoozeAreaRef}>
           {showSnoozeOptions && (
-            <div className="mb-2 rounded-md border border-border/40 bg-muted/30 p-2">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground mb-1.5">
+            <div className="mb-2.5 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Nhắc lại sau
               </p>
               <div className="grid grid-cols-4 gap-1">
@@ -178,7 +178,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
                     type="button"
                     disabled={loadingAction !== null}
                     onClick={() => void handleSnooze(minutes as 5 | 10 | 30 | 60)}
-                    className="h-7 rounded-md border border-amber-200 bg-amber-50 text-[11px] font-medium text-amber-700 hover:bg-amber-100 hover:border-amber-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-8 rounded-lg border border-slate-200 bg-slate-100 text-[11px] font-semibold text-black transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {minutes < 60 ? `${minutes}p` : '1 giờ'}
                   </button>
@@ -187,11 +187,11 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
             </div>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={handleView}
-              className="h-8 px-4 text-xs font-medium rounded-md inline-flex items-center gap-1.5 bg-sky-600 text-white hover:bg-sky-700 transition-colors"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-5 text-sm font-semibold text-black transition-colors hover:bg-slate-200"
             >
               Xem
             </button>
@@ -201,9 +201,9 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
               onClick={() => {
                 setShowSnoozeOptions((prev) => !prev);
               }}
-              className="h-8 px-3 text-xs font-medium rounded-md border border-amber-200 bg-amber-50 text-amber-700 inline-flex items-center gap-1.5 hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-black transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Clock3 className="h-3 w-3" />
+              <Clock3 className="h-3.5 w-3.5 text-black" />
               Nhắc lại
             </button>
           </div>

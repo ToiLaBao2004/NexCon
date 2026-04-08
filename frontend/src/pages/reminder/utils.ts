@@ -82,7 +82,11 @@ export const formatDayHeader = (date: Date): string =>
     weekday: 'short',
   }).format(date);
 
-export const formatHourAxisLabel = (hour: number): string => `${String(hour).padStart(2, '0')}:00`;
+export const formatHourAxisLabel = (hour: number): string => {
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour} ${ampm}`;
+};
 
 export const startOfMonth = (date: Date): Date => new Date(date.getFullYear(), date.getMonth(), 1);
 
@@ -150,10 +154,10 @@ export const getDefaultReuseRemindAt = (): string => {
 };
 
 export const formatClock = (iso: string): string =>
-  new Intl.DateTimeFormat('vi-VN', {
+  new Intl.DateTimeFormat('en-US', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: true,
     timeZone: CALENDAR_TIME_ZONE,
   }).format(new Date(iso));
 

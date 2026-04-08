@@ -37,6 +37,11 @@ const reminderSchema = new mongoose.Schema({
         type: String,
         trim: true,
         maxlength: 128,
+        set: (value) => {
+            if (value === null || value === undefined) return undefined;
+            const normalized = String(value).trim();
+            return normalized || undefined;
+        },
         index: true,
     },
     conversationId: {
@@ -131,8 +136,25 @@ reminderSchema.pre('validate', function syncLegacyContent(next) {
 });
 
 reminderSchema.index({ userId: 1, remindAt: 1, status: 1 });
-reminderSchema.index({ sharedKey: 1, userId: 1 }, { unique: true, sparse: true });
-reminderSchema.index({ conversationId: 1, sharedKey: 1 }, { sparse: true });
+reminderSchema.index(
+    { sharedKey: 1, userId: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            scope: 'shared',
+            sharedKey: { $exists: true, $type: 'string' },
+        },
+    }
+);
+reminderSchema.index(
+    { conversationId: 1, sharedKey: 1 },
+    {
+        partialFilterExpression: {
+            scope: 'shared',
+            sharedKey: { $exists: true, $type: 'string' },
+        },
+    }
+);
 
 const ReminderModel = mongoose.models.Reminder || mongoose.model('Reminder', reminderSchema);
 

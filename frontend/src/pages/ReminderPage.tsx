@@ -8,18 +8,12 @@ import {
     LayoutList,
     ListFilter,
     Plus,
+    Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { ConfirmationModal } from '@/components/shared/ConfirmationModal';
+import { removeAccents } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router';
 import { useReminderStore } from '@/stores/useReminderStore';
@@ -30,7 +24,6 @@ import type {
     CreateReminderPayload,
     GetRemindersParams,
     Reminder,
-    ReminderSourceType,
     ReminderStatus,
 } from '@/types/reminder';
 import ReminderFormModal from '@/components/reminder/ReminderFormModal';
@@ -45,8 +38,6 @@ import {
     CALENDAR_STACK_EVENT_GAP,
     CALENDAR_STACK_EVENT_HEIGHT,
     CALENDAR_START_HOUR,
-    SOURCE_OPTIONS,
-    STATUS_OPTIONS,
 } from '@/pages/reminder/constants';
 import {
     addDays,
@@ -80,6 +71,7 @@ const ReminderPage = () => {
         fetchMoreReminders,
         fetchUpcomingCount,
         createReminderAsync,
+        updateSharedReminderParticipationAsync,
         deleteReminderAsync,
         deleteRemindersByScopeAsync,
         updateReminderInStore,
@@ -109,9 +101,11 @@ const ReminderPage = () => {
     const [highlightedReminderId, setHighlightedReminderId] = useState<string | null>(null);
 
     const [selectedStatuses, setSelectedStatuses] = useState<ReminderStatus[]>(ALL_STATUSES);
-    const [sourceType, setSourceType] = useState<ReminderSourceType | ''>('');
     const [fromDate, setFromDate] = useState('');
     const [toDate, setToDate] = useState('');
+    const [searchReminderName, setSearchReminderName] = useState('');
+    const [includePersonalReminders, setIncludePersonalReminders] = useState(true);
+    const [includeSharedReminders, setIncludeSharedReminders] = useState(true);
     const [declinedSharedUpcomingReminders, setDeclinedSharedUpcomingReminders] = useState<Reminder[]>([]);
 
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -143,7 +137,6 @@ const ReminderPage = () => {
 
     const currentQueryParams = useMemo<GetRemindersParams>(() => {
         const sharedFilters = {
-            sourceType: sourceType || undefined,
             from: fromDate || undefined,
             to: toDate || undefined,
             sharedKey: focusSharedKey || undefined,
@@ -177,14 +170,14 @@ const ReminderPage = () => {
             sort: 'remindAt_desc',
             limit: 100,
         };
-    }, [activeTab, selectedStatuses, sourceType, fromDate, toDate, focusSharedKey]);
+    }, [activeTab, selectedStatuses, fromDate, toDate, focusSharedKey]);
 
     useEffect(() => {
         void fetchReminders(currentQueryParams);
     }, [fetchReminders, currentQueryParams]);
 
     useEffect(() => {
-        if (activeTab !== 'upcoming') {
+        if (activeTab !== 'upcoming' || !includeSharedReminders) {
             setDeclinedSharedUpcomingReminders([]);
             return;
         }
@@ -195,7 +188,6 @@ const ReminderPage = () => {
             try {
                 const { reminders: dismissedReminders } = await reminderService.getReminders({
                     status: 'dismissed',
-                    sourceType: sourceType || undefined,
                     from: fromDate || undefined,
                     to: toDate || undefined,
                     sharedKey: focusSharedKey || undefined,
@@ -224,7 +216,7 @@ const ReminderPage = () => {
         return () => {
             cancelled = true;
         };
-    }, [activeTab, sourceType, fromDate, toDate, focusSharedKey]);
+    }, [activeTab, fromDate, toDate, focusSharedKey, includeSharedReminders]);
 
     const shouldLoadMore = activeTab === 'past' || activeTab === 'all';
 
@@ -325,30 +317,61 @@ const ReminderPage = () => {
     }, [shouldOpenEditFromQuery, focusReminderId, reminders, handleEditReminder]);
 
     const normalizedReminders = useMemo(() => normalizeForSort(reminders), [reminders]);
+    const normalizedSearchReminderName = useMemo(
+        () => removeAccents(searchReminderName.trim().toLowerCase()),
+        [searchReminderName]
+    );
+
+    const filteredReminders = useMemo(
+        () => normalizedReminders.filter((item) => {
+            const normalizedName = removeAccents(getReminderContent(item).toLowerCase());
+            const matchedByName = !normalizedSearchReminderName || normalizedName.includes(normalizedSearchReminderName);
+
+            if (!matchedByName) return false;
+            if (item.scope === 'personal') return includePersonalReminders;
+            if (item.scope === 'shared') return includeSharedReminders;
+            return true;
+        }),
+        [normalizedReminders, includePersonalReminders, includeSharedReminders, normalizedSearchReminderName]
+    );
+
+    const filteredDeclinedSharedUpcomingReminders = useMemo(
+        () => (includeSharedReminders ? declinedSharedUpcomingReminders : []).filter((item) => {
+            if (!normalizedSearchReminderName) return true;
+            const normalizedName = removeAccents(getReminderContent(item).toLowerCase());
+            return normalizedName.includes(normalizedSearchReminderName);
+        }),
+        [declinedSharedUpcomingReminders, includeSharedReminders, normalizedSearchReminderName]
+    );
 
     const groupedUpcoming = useMemo(() => {
         const groups = new Map<string, Reminder[]>();
 
-        for (const reminder of normalizedReminders) {
+        for (const reminder of filteredReminders) {
             const key = toDateKey(new Date(reminder.remindAt));
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key)?.push(reminder);
         }
 
         return Array.from(groups.entries()).map(([key, items]) => ({ key, label: formatDayLabel(key), items }));
-    }, [normalizedReminders]);
+    }, [filteredReminders]);
 
     const groupedDeclinedSharedUpcoming = useMemo(() => {
         const groups = new Map<string, Reminder[]>();
 
-        for (const reminder of declinedSharedUpcomingReminders) {
+        for (const reminder of filteredDeclinedSharedUpcomingReminders) {
             const key = toDateKey(new Date(reminder.remindAt));
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key)?.push(reminder);
         }
 
         return Array.from(groups.entries()).map(([key, items]) => ({ key, label: formatDayLabel(key), items }));
-    }, [declinedSharedUpcomingReminders]);
+    }, [filteredDeclinedSharedUpcomingReminders]);
+
+    const visiblePersonalReminderCount = useMemo(
+        () => filteredReminders.filter((item) => item.scope === 'personal').length,
+        [filteredReminders]
+    );
 
     const hasUpcomingData = groupedUpcoming.length > 0 || groupedDeclinedSharedUpcoming.length > 0;
     const isAllTabStatusUnselected = activeTab === 'all' && selectedStatuses.length === 0;
@@ -535,7 +558,7 @@ const ReminderPage = () => {
             minorLineTops,
             eventsByDay,
         };
-    }, [calendarDays, calendarHourTicks, normalizedReminders]);
+    }, [calendarDays, calendarHourTicks, filteredReminders]);
 
     const calendarGridHeight = calendarLayout.gridHeight;
     const calendarEventsByDay = calendarLayout.eventsByDay;
@@ -609,6 +632,27 @@ const ReminderPage = () => {
         }
     };
 
+    const handleRejoinSharedReminder = async (reminder: Reminder) => {
+        const sharedKey = String(reminder.sharedKey || '').trim();
+        if (!sharedKey) {
+            toast.error('Không thể tham gia lại nhắc hẹn này');
+            return;
+        }
+
+        try {
+            await updateSharedReminderParticipationAsync(sharedKey, true, {
+                syncStore: false,
+                refreshSummary: false,
+            });
+            await fetchReminders(currentQueryParams);
+            void fetchUpcomingCount();
+            toast.success('Đã tham gia lại nhắc hẹn chung');
+        } catch (error) {
+            console.error('Rejoin shared reminder failed:', error);
+            toast.error('Không thể tham gia lại nhắc hẹn lúc này');
+        }
+    };
+
     const handleDeleteByScope = async () => {
         if (!deleteScope) return;
 
@@ -630,11 +674,6 @@ const ReminderPage = () => {
         }
     };
 
-    const toggleStatus = useCallback((status: ReminderStatus) => {
-        setSelectedStatuses((prev) =>
-            prev.includes(status) ? prev.filter((item) => item !== status) : [...prev, status]
-        );
-    }, []);
 
     const handleReuseReminder = (reminder: Reminder) => {
         setEditingReminder(null);
@@ -647,6 +686,15 @@ const ReminderPage = () => {
         });
         setShowCreateModal(true);
     };
+
+    const handleReminderPrimaryAction = useCallback((reminder: Reminder) => {
+        if (reminder.scope === 'shared' && reminder.participationStatus === 'declined') {
+            void handleRejoinSharedReminder(reminder);
+            return;
+        }
+
+        handleEditReminder(reminder);
+    }, [handleEditReminder, handleRejoinSharedReminder]);
 
     const isReminderEditable = (reminder: Reminder): boolean =>
         reminder.status === 'pending' || reminder.status === 'snoozed';
@@ -677,6 +725,9 @@ const ReminderPage = () => {
                 return {
                     faded: false,
                     editable: false,
+                    showCancel: Boolean(isSharedCreator) && shouldShowSharedCancel,
+                    cancelVariant: 'cancel',
+                    cancelLabel: 'Hủy cho tất cả',
                     showReuse: true,
                     showRepeat: true,
                     highlighted: highlightedReminderId === reminder._id,
@@ -685,14 +736,16 @@ const ReminderPage = () => {
 
             return {
                 faded: false,
-                editable: canEditSharedAsCreator || canEditSharedNotifyOnly,
-                showEdit: canEditSharedAsCreator || canEditSharedNotifyOnly,
-                editLabel: canEditSharedNotifyOnly ? 'Tùy chỉnh thông báo' : 'Chỉnh sửa',
-                showCancel: shouldShowSharedCancel,
+                editable: isSharedDeclined ? false : canEditSharedAsCreator || canEditSharedNotifyOnly,
+                showEdit: isSharedDeclined ? true : canEditSharedAsCreator || canEditSharedNotifyOnly,
+                editLabel: isSharedDeclined
+                    ? 'Tham gia lại'
+                    : (canEditSharedNotifyOnly ? 'Tùy chỉnh thông báo' : 'Chỉnh sửa'),
+                showCancel: isSharedDeclined ? false : shouldShowSharedCancel,
                 cancelVariant: isSharedCreator ? 'cancel' : 'decline',
                 cancelLabel: isSharedCreator ? 'Hủy cho tất cả' : 'Không tham gia',
-                showRepeat: reminder.status === 'triggered',
-                showReuse: reminder.status === 'triggered',
+                showRepeat: isSharedDeclined ? false : reminder.status === 'triggered',
+                showReuse: isSharedDeclined ? false : reminder.status === 'triggered',
                 highlighted: highlightedReminderId === reminder._id,
             };
         }
@@ -720,6 +773,7 @@ const ReminderPage = () => {
         return {
             faded: false,
             editable: isReminderEditable(reminder),
+            showEdit: isReminderEditable(reminder),
             showCancel: isReminderEditable(reminder),
             cancelVariant: 'cancel',
             showRepeat: reminder.status === 'triggered',
@@ -833,15 +887,15 @@ const ReminderPage = () => {
     const monthPickerTitle = useMemo(() => formatMonthYearLabel(monthPickerMonth), [monthPickerMonth]);
 
     return (
-        <div className="flex-1 h-full flex flex-col bg-gradient-to-b from-card/30 via-card/15 to-background rounded-none md:rounded-md shadow-soft border-0 md:border border-border/40 overflow-hidden">
-            <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-border/40 bg-card/60 backdrop-blur-sm">
+        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border border-slate-200/60 bg-slate-50/50 md:rounded-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200/60 bg-white px-4 py-4 md:px-6">
                 <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-md bg-primary/10 border border-primary/10 flex items-center justify-center">
-                        <CalendarDays className="h-5 w-5 text-primary" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
+                        <CalendarDays className="h-5 w-5" />
                     </div>
                     <div>
-                        <h1 className="text-xl font-bold">Lời nhắc</h1>
-                        <p className="text-xs text-muted-foreground">Quản lý các việc cần nhớ của bạn</p>
+                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Danh sách nhắc hẹn</h1>
+                        <p className="text-xs text-slate-500">Quản lý các việc cần nhớ của bạn</p>
                     </div>
                 </div>
 
@@ -851,70 +905,68 @@ const ReminderPage = () => {
                         setCreatePrefillData(undefined);
                         setShowCreateModal(true);
                     }}
-                    className="gap-2 rounded-md bg-sky-600 text-white hover:bg-sky-700"
+                    size="icon"
+                    variant="outline"
+                    title="Tạo nhắc nhở mới"
+                    className="h-10 w-10 rounded-lg border border-slate-200 bg-white text-slate-900 shadow-sm transition-all hover:bg-slate-50 hover:border-slate-300"
                 >
-                    <Plus className="h-4 w-4" />
-                    <span className="hidden sm:inline">Tạo nhắc nhở</span>
-                    <span className="sm:hidden">Tạo</span>
+                    <Plus className="h-6 w-6 stroke-2 text-slate-900" />
                 </Button>
             </div>
 
-            <div className="px-4 md:px-6 pt-3 pb-2 border-b border-border/30 bg-background/60">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant={activeTab === 'all' ? 'default' : 'outline'}
-                            size="sm"
-                            className="rounded-md"
-                            onClick={() => setActiveTab('all')}
-                        >
-                            Tất cả
-                        </Button>
-                        <Button
-                            variant={activeTab === 'upcoming' ? 'default' : 'outline'}
-                            size="sm"
-                            className="rounded-md"
-                            onClick={() => setActiveTab('upcoming')}
-                        >
-                            Sắp tới
-                        </Button>
-                        <Button
-                            variant={activeTab === 'past' ? 'default' : 'outline'}
-                            size="sm"
-                            className="rounded-md"
-                            onClick={() => setActiveTab('past')}
-                        >
-                            Đã qua
-                        </Button>
+            <div className="border-b border-slate-200/60 bg-white px-4 pb-3 pt-3 md:px-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="inline-flex items-center rounded-lg bg-slate-100 p-1">
+                            <button
+                                type="button"
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'all' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                onClick={() => setActiveTab('all')}
+                            >
+                                Tất cả
+                            </button>
+                            <button
+                                type="button"
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'upcoming' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                onClick={() => setActiveTab('upcoming')}
+                            >
+                                Sắp tới
+                            </button>
+                            <button
+                                type="button"
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'past' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                onClick={() => setActiveTab('past')}
+                            >
+                                Đã qua
+                            </button>
+                        </div>
+
+                        <div className="inline-flex items-center rounded-lg bg-slate-100 p-1">
+                            <button
+                                type="button"
+                                className={`h-8 rounded-md px-4 text-sm transition-colors flex items-center ${viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                onClick={() => setViewMode('list')}
+                            >
+                                <LayoutList className={`mr-2 h-4 w-4 transition-colors ${viewMode === 'list' ? 'text-slate-900' : 'text-slate-400'}`} />
+                                Danh sách
+                            </button>
+                            <button
+                                type="button"
+                                className={`h-8 rounded-md px-4 text-sm transition-colors flex items-center ${viewMode === 'calendar' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                onClick={() => setViewMode('calendar')}
+                            >
+                                <CalendarRange className={`mr-2 h-4 w-4 transition-colors ${viewMode === 'calendar' ? 'text-slate-900' : 'text-slate-400'}`} />
+                                Lịch biểu
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <div className="inline-flex items-center border border-border/70 bg-card p-1 rounded-md">
-                            <Button
-                                size="sm"
-                                variant={viewMode === 'list' ? 'default' : 'ghost'}
-                                className="h-7 px-2.5 rounded-md"
-                                onClick={() => setViewMode('list')}
-                            >
-                                <LayoutList className="h-3.5 w-3.5 mr-1" />
-                                Danh sách
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant={viewMode === 'calendar' ? 'default' : 'ghost'}
-                                className="h-7 px-2.5 rounded-md"
-                                onClick={() => setViewMode('calendar')}
-                            >
-                                <CalendarRange className="h-3.5 w-3.5 mr-1" />
-                                Lịch
-                            </Button>
-                        </div>
-
                         <Button
                             size="sm"
                             variant="outline"
-                            className="rounded-md border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100 hover:border-rose-300"
-                            disabled={isLoading || reminders.length === 0}
+                            className="h-10 rounded-lg border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+                            disabled={isLoading || !includePersonalReminders || visiblePersonalReminderCount === 0}
                             onClick={() => setDeleteScope(activeTab)}
                         >
                             Xóa tất cả
@@ -922,33 +974,9 @@ const ReminderPage = () => {
                     </div>
                 </div>
 
-                <div className="mt-3 border border-border/50 bg-card/60 p-2.5 flex flex-wrap items-center gap-2 rounded-md">
-                    {activeTab === 'all' && (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="gap-2 rounded-md">
-                                    <ListFilter className="h-3.5 w-3.5" />
-                                    Trạng thái ({selectedStatuses.length})
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="start" className="w-48">
-                                <DropdownMenuLabel>Chọn trạng thái</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                {STATUS_OPTIONS.map((option) => (
-                                    <DropdownMenuCheckboxItem
-                                        key={option.value}
-                                        checked={selectedStatuses.includes(option.value)}
-                                        onCheckedChange={() => toggleStatus(option.value)}
-                                    >
-                                        {option.label}
-                                    </DropdownMenuCheckboxItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    )}
-
-                    {isAllTabStatusUnselected && (
-                        <div className="w-full border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700 flex items-center justify-between gap-2 rounded-md">
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200/60 bg-white p-3">
+                    {isAllTabStatusUnselected && activeTab === 'all' && (
+                        <div className="flex w-full items-center justify-between gap-2 rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700">
                             <span>Chưa chọn trạng thái nào, hệ thống đang hiển thị tất cả trạng thái.</span>
                             <button
                                 type="button"
@@ -960,45 +988,64 @@ const ReminderPage = () => {
                         </div>
                     )}
 
-                    <select
-                        value={sourceType}
-                        onChange={(event) => setSourceType(event.target.value as ReminderSourceType | '')}
-                        className="h-9 border border-input bg-background px-3 text-sm rounded-md"
-                    >
-                        <option value="">Nguồn: Tất cả</option>
-                        {SOURCE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                                {option.label}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                            value={searchReminderName}
+                            onChange={(event) => setSearchReminderName(event.target.value)}
+                            placeholder="Tìm theo tên nhắc hẹn"
+                            className="h-10 w-[240px] rounded-lg border-slate-200 bg-white pl-9 text-sm placeholder:text-slate-400 placeholder:italic transition-colors hover:border-slate-300 focus-visible:ring-0"
+                        />
+                    </div>
 
                     <div className="flex items-center gap-2">
+                        <span className="text-sm font-normal text-slate-900">Từ</span>
                         <Input
                             type="date"
                             value={fromDate}
                             onChange={(event) => setFromDate(event.target.value)}
-                            className="h-9 w-[160px] rounded-md"
+                            className="h-10 w-[168px] rounded-lg border-slate-200 bg-white text-sm transition-colors hover:border-slate-300"
                         />
-                        <span className="text-xs text-muted-foreground">đến</span>
+                        <span className="text-sm font-normal text-slate-900">đến</span>
                         <Input
                             type="date"
                             value={toDate}
                             min={fromDate || undefined}
                             onChange={(event) => setToDate(event.target.value)}
-                            className="h-9 w-[160px] rounded-md"
+                            className="h-10 w-[168px] rounded-lg border-slate-200 bg-white text-sm transition-colors hover:border-slate-300"
                         />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <label className="inline-flex h-10 cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-normal text-slate-900 transition-colors hover:border-slate-300">
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 accent-slate-950"
+                                checked={includePersonalReminders}
+                                onChange={(event) => setIncludePersonalReminders(event.target.checked)}
+                            />
+                            Nhắc hẹn riêng
+                        </label>
+                        <label className="inline-flex h-10 cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-normal text-slate-900 transition-colors hover:border-slate-300">
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-slate-300 accent-slate-950"
+                                checked={includeSharedReminders}
+                                onChange={(event) => setIncludeSharedReminders(event.target.checked)}
+                            />
+                            Nhắc hẹn chung
+                        </label>
                     </div>
                 </div>
             </div>
 
-            <div className={`flex-1 min-h-0 p-4 md:p-6 ${viewMode === 'calendar' ? 'overflow-hidden' : 'overflow-y-auto beautiful-scrollbar'}`}>
+            <div className={`flex-1 min-h-0 bg-slate-50/50 p-6 md:p-8 ${viewMode === 'calendar' ? 'overflow-hidden' : 'overflow-y-auto beautiful-scrollbar'}`}>
                 {isLoading ? (
                     <div className="flex items-center justify-center py-14">
                         <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     </div>
                 ) : viewMode === 'calendar' ? (
-                    reminders.length === 0 ? (
+                    filteredReminders.length === 0 ? (
                         activeTab === 'upcoming' ? upcomingEmpty : activeTab === 'past' ? pastEmpty : allEmpty
                     ) : (
                         <ReminderCalendarView
@@ -1034,38 +1081,31 @@ const ReminderPage = () => {
                     !hasUpcomingData ? (
                         upcomingEmpty
                     ) : (
-                        <div className="space-y-5">
-                            {groupedUpcoming.map((group) => (
-                                <section key={group.key} className="space-y-2">
-                                    <div className="sticky top-0 z-10 bg-background/90 backdrop-blur py-1">
-                                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {group.items.map((item) => (
-                                            <ReminderCard
-                                                key={item._id}
-                                                reminder={item}
-                                                activeTab={activeTab}
-                                                options={getReminderCardOptions(item)}
-                                                onEdit={handleEditReminder}
-                                                onDelete={setDeleteReminderId}
-                                                onReuse={handleReuseReminder}
-                                                onRepeat={(reminder, minutes) => {
-                                                    void handleRepeatReminder(reminder, minutes);
-                                                }}
-                                                onBindRef={bindReminderCardRef}
-                                            />
-                                        ))}
-                                    </div>
-                                </section>
-                            ))}
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                                {filteredReminders.map((item) => (
+                                    <ReminderCard
+                                        key={item._id}
+                                        reminder={item}
+                                        activeTab={activeTab}
+                                        options={getReminderCardOptions(item)}
+                                        onEdit={handleReminderPrimaryAction}
+                                        onDelete={setDeleteReminderId}
+                                        onReuse={handleReuseReminder}
+                                        onRepeat={(reminder, minutes) => {
+                                            void handleRepeatReminder(reminder, minutes);
+                                        }}
+                                        onBindRef={bindReminderCardRef}
+                                    />
+                                ))}
+                            </div>
 
                             {groupedDeclinedSharedUpcoming.length > 0 && (
                                 <div className="pt-1">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                                        Đã từ chối (có thể tham gia lại từ thông báo trong chat)
-                                    </p>
-                                    <div className="space-y-2">
+                                    <div className="flex items-center pt-2 mb-2 border-b border-slate-100/50 pb-2">
+                                        <p className="text-[14px] font-normal text-slate-400">Đã từ chối (có thể tham gia lại từ thông báo trong chat)</p>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
                                         {groupedDeclinedSharedUpcoming.flatMap((group) =>
                                             group.items.map((item) => (
                                                 <ReminderCard
@@ -1075,12 +1115,13 @@ const ReminderPage = () => {
                                                     options={{
                                                         highlighted: highlightedReminderId === item._id,
                                                         editable: false,
-                                                        showEdit: false,
+                                                        showEdit: true,
+                                                        editLabel: 'Tham gia lại',
                                                         showCancel: false,
                                                         showRepeat: false,
                                                         showReuse: false,
                                                     }}
-                                                    onEdit={handleEditReminder}
+                                                    onEdit={handleRejoinSharedReminder}
                                                     onDelete={setDeleteReminderId}
                                                     onReuse={handleReuseReminder}
                                                     onRepeat={(reminder, minutes) => {
@@ -1096,17 +1137,17 @@ const ReminderPage = () => {
                         </div>
                     )
                 ) : activeTab === 'past' ? (
-                    reminders.length === 0 ? (
+                    filteredReminders.length === 0 ? (
                         pastEmpty
                     ) : (
-                        <div className="space-y-3">
-                            {normalizedReminders.map((item) => (
+                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                            {filteredReminders.map((item) => (
                                 <ReminderCard
                                     key={item._id}
                                     reminder={item}
                                     activeTab={activeTab}
                                     options={getReminderCardOptions(item)}
-                                    onEdit={handleEditReminder}
+                                    onEdit={handleReminderPrimaryAction}
                                     onDelete={setDeleteReminderId}
                                     onReuse={handleReuseReminder}
                                     onRepeat={(reminder, minutes) => {
@@ -1117,17 +1158,17 @@ const ReminderPage = () => {
                             ))}
                         </div>
                     )
-                ) : reminders.length === 0 ? (
+                ) : filteredReminders.length === 0 ? (
                     allEmpty
                 ) : (
-                    <div className="space-y-3">
-                        {normalizedReminders.map((item) => (
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                        {filteredReminders.map((item) => (
                             <ReminderCard
                                 key={item._id}
                                 reminder={item}
                                 activeTab={activeTab}
                                 options={getReminderCardOptions(item)}
-                                onEdit={handleEditReminder}
+                                onEdit={handleReminderPrimaryAction}
                                 onDelete={setDeleteReminderId}
                                 onReuse={handleReuseReminder}
                                 onRepeat={(reminder, minutes) => {
@@ -1158,8 +1199,8 @@ const ReminderPage = () => {
                 mode={editingReminder ? 'edit' : 'create'}
                 editScope={
                     editingReminder
-                    && editingReminder.scope === 'shared'
-                    && editingReminder.createdBy !== currentUserId
+                        && editingReminder.scope === 'shared'
+                        && editingReminder.createdBy !== currentUserId
                         ? 'notifyOnly'
                         : 'full'
                 }

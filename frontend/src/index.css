@@ -266,6 +266,10 @@
   z-index: 2147483647 !important;
 }
 
+[data-sonner-toaster][data-y-position="bottom"][data-x-position="right"][data-lifted="true"] {
+  transform: none !important;
+}
+
   /* Animations */
   .transition-bounce {
     transition: var(--transition-bounce);

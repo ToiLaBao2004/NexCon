@@ -6,9 +6,7 @@ import {
   MONTH_PICKER_WEEKDAYS,
 } from '@/pages/reminder/constants';
 import {
-  formatDayHeader,
   formatHourAxisLabel,
-  getCalendarEventTone,
   getReminderMeetingUrl,
 } from '@/pages/reminder/utils';
 import type { CalendarDay, CalendarDensity, CalendarEventLayout, MonthPickerRow } from '@/pages/reminder/types';
@@ -79,7 +77,7 @@ export default function ReminderCalendarView({
               type="button"
               size="sm"
               variant="outline"
-              className="h-8 px-2 rounded-md border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+              className="h-9 px-4 rounded-md border-border bg-white text-slate-900 hover:bg-muted font-bold transition-all text-base shadow-sm"
               onClick={onJumpCalendarToToday}
             >
               Hôm nay
@@ -109,10 +107,10 @@ export default function ReminderCalendarView({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-8 px-2.5 font-semibold text-sm md:text-base"
+                  className="h-8 px-2.5 font-bold text-base text-slate-800 hover:bg-muted/50 transition-colors"
                 >
                   {calendarHeaderLabel}
-                  <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 ml-1.5 transition-transform duration-200 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
                 </Button>
               </PopoverTrigger>
 
@@ -222,14 +220,13 @@ export default function ReminderCalendarView({
                     key={day.key}
                     type="button"
                     onClick={() => onSelectCalendarDay(day.key)}
-                    className={`h-16 border-b border-border/40 text-left px-3 transition-colors backdrop-blur ${active
-                      ? 'bg-primary/10'
-                      : 'bg-background/90 hover:bg-muted/30'
-                      }`}
+                    className={`relative h-16 border-b border-border/40 text-left px-4 transition-all bg-background/80 hover:bg-muted/30 ${active ? 'after:absolute after:top-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary' : ''}`}
                   >
-                    <p className="text-sm font-medium text-foreground">{formatDayHeader(day.date)}</p>
-                    <p className={`text-[12px] ${isToday ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+                    <p className={`text-2xl font-normal leading-none ${isToday || active ? 'text-primary' : 'text-slate-600'}`}>
                       {new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(day.date)}
+                    </p>
+                    <p className={`text-[11px] font-normal uppercase tracking-tight mt-1 ${isToday || active ? 'text-primary' : 'text-slate-500'}`}>
+                      {new Intl.DateTimeFormat('vi-VN', { weekday: 'long' }).format(day.date)}
                     </p>
                   </button>
                 );
@@ -249,8 +246,8 @@ export default function ReminderCalendarView({
                 {calendarHourTicks.map((hour, index) => (
                   <div
                     key={`axis-${hour}`}
-                    className="absolute left-2 text-[11px] text-muted-foreground"
-                    style={{ top: `${axisLabelTops[index]}px` }}
+                    className="absolute left-2 text-[11px] text-muted-foreground font-medium"
+                    style={{ top: `${axisLabelTops[index] - 6}px` }}
                   >
                     {formatHourAxisLabel(hour)}
                   </div>
@@ -312,42 +309,49 @@ export default function ReminderCalendarView({
                               onCalendarEventClick(entry, day.key);
                             }
                           }}
-                          className={`group absolute overflow-hidden rounded-md border px-2 py-1 pr-6 text-left shadow-sm hover:brightness-95 transition-all ${getCalendarEventTone(entry.reminder.status)}`}
+                          className={`group absolute overflow-hidden rounded-sm border-l-2 bg-indigo-100/60 border-primary px-2 py-1 pr-6 text-left shadow-none hover:bg-indigo-100/80 transition-colors pointer-events-auto`}
                           style={{
                             top: `${entry.topPx}px`,
-                            left: `calc(${leftOffset}% + 4px)`,
-                            width: `calc(${laneWidth}% - 8px)`,
+                            left: `calc(${leftOffset}% + 2px)`,
+                            width: `calc(${laneWidth}% - 4px)`,
                             height: `${entry.heightPx}px`,
                           }}
                         >
-                          {meetingUrl && (
+                          <div className="flex flex-col text-indigo-900">
+                             <span className="block text-[11px] font-semibold leading-tight truncate">
+                               {entry.preview}
+                             </span>
+                             <span className="block text-[10px] font-medium opacity-80">
+                               {entry.timeLabel}
+                             </span>
+                          </div>
+
+                          <div className="absolute right-0.5 top-0.5 flex flex-col gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {meetingUrl && (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onOpenReminderMeetingLink(entry.reminder);
+                                }}
+                                className="rounded-sm p-0.5 bg-black/5 hover:bg-black/15 text-indigo-700"
+                                aria-label="Mở link"
+                              >
+                                <Link2 className="h-3 w-3" />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={(event) => {
                                 event.stopPropagation();
-                                onOpenReminderMeetingLink(entry.reminder);
+                                onDeleteReminder(entry.reminder._id);
                               }}
-                              className="absolute right-5 top-1 rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100 bg-black/15 hover:bg-black/25"
-                              aria-label="Mở link cuộc họp"
+                              className="rounded-sm p-0.5 bg-black/5 hover:bg-black/15 text-rose-700"
+                              aria-label="Xóa"
                             >
-                              <Link2 className="h-3 w-3" />
+                              <Trash2 className="h-3 w-3" />
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onDeleteReminder(entry.reminder._id);
-                            }}
-                            className="absolute right-1 top-1 rounded-md p-0.5 opacity-0 transition-opacity group-hover:opacity-100 bg-black/15 hover:bg-black/25"
-                            aria-label="Xóa nhắc hẹn"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                          <span className="block text-[10px] font-semibold leading-none">{entry.timeLabel}</span>
-                          <span className="block mt-1 text-[11px] leading-snug whitespace-nowrap overflow-hidden text-ellipsis">
-                            {entry.preview}
-                          </span>
+                          </div>
                         </div>
                       );
                     })}
