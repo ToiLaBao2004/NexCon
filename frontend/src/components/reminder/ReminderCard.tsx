@@ -48,8 +48,8 @@ export default function ReminderCard({
   const allowQuickDelete = !showCancel && reminder.scope !== 'shared';
   const showDeleteControl = showCancel || allowQuickDelete;
   
-  const subtleBadgeClass = 'rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 transition-colors group-hover:bg-slate-200';
-  const scopeBadgeClass = 'inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-black';
+  const subtleBadgeClass = 'rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors group-hover:bg-muted/80';
+  const scopeBadgeClass = 'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground';
   
   const hoverDeleteLabel = reminder.scope === 'shared'
     ? (isDeclineAction ? 'Không tham gia nhắc hẹn này' : 'Hủy nhắc hẹn chung cho tất cả thành viên')
@@ -93,24 +93,24 @@ export default function ReminderCard({
         if (!editable) return;
         onEdit(reminder);
       }}
-      className={`group relative flex h-full w-full flex-col rounded-2xl border border-slate-200/80 bg-white p-5 font-sans shadow-sm transition-all duration-200 hover:shadow-md hover:border-slate-300 ${editable ? 'cursor-pointer' : 'cursor-default'} ${faded ? 'opacity-65' : ''} ${highlighted ? 'ring-2 ring-primary/45 border-primary/60 bg-primary/10 shadow-lg shadow-primary/20' : ''}`}
+      className={`group relative flex h-full w-full flex-col rounded-2xl border border-border/80 bg-card p-5 font-sans shadow-sm transition-all duration-200 hover:border-border hover:shadow-md ${editable ? 'cursor-pointer' : 'cursor-default'} ${faded ? 'opacity-65' : ''} ${highlighted ? 'ring-2 ring-primary/45 border-primary/60 bg-primary/10 shadow-lg shadow-primary/20' : ''}`}
     >
       {/* Top Section */}
       <div className="flex items-start gap-3.5">
-        <div className="w-[84px] shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+        <div className="w-[84px] shrink-0 overflow-hidden rounded-lg border border-border bg-muted/50">
           <div className="flex items-center justify-center gap-1 bg-primary px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
             <span className="h-1 w-1 rounded-full bg-white/90" />
             {calendarWeekday}
             <span className="h-1 w-1 rounded-full bg-white/90" />
           </div>
           <div className="flex flex-col items-center justify-center py-2.5">
-            <span className="text-[32px] font-semibold leading-none text-slate-900">{calendarDay}</span>
+            <span className="text-[32px] font-semibold leading-none text-foreground">{calendarDay}</span>
             <span className="mt-1 text-xs font-semibold text-rose-500">Tháng {calendarMonth}</span>
           </div>
         </div>
 
         <div className="min-w-0 flex-1 pt-0.5">
-          <h3 className="text-[17px] font-semibold leading-snug tracking-tight text-slate-900 whitespace-pre-wrap break-words">
+          <h3 className="text-[17px] font-semibold leading-snug tracking-tight text-foreground whitespace-pre-wrap break-words">
             {contentBeforeMeetingUrl}
             {hasInlineMeetingUrl && rawMeetingUrlInContent && (
               <a
@@ -134,8 +134,8 @@ export default function ReminderCard({
             </a>
           )}
 
-          <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-slate-600">
-            <Clock3 className="h-3.5 w-3.5 text-slate-500" />
+          <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
             <span>{formatClock(reminder.remindAt)}</span>
           </p>
 
@@ -176,7 +176,7 @@ export default function ReminderCard({
         </div>
       </div>
 
-      <div className="mt-auto flex items-center justify-between border-t border-slate-100 pt-4">
+      <div className="mt-auto flex items-center justify-between border-t border-border/60 pt-4">
         <div className="flex flex-wrap items-center gap-3">
           {showRepeat && (
             <DropdownMenu>
@@ -215,13 +215,13 @@ export default function ReminderCard({
               type="button"
               size="sm"
               variant="outline"
-              className="flex h-9 items-center gap-2 rounded-md border-slate-200 bg-white px-4 text-[12px] font-semibold text-slate-800 transition-all hover:border-slate-300 hover:bg-slate-50"
+              className="flex h-9 items-center gap-2 rounded-md border-border bg-background px-4 text-[12px] font-semibold text-foreground transition-all hover:border-border/80 hover:bg-muted/60"
               onClick={(event) => {
                 event.stopPropagation();
                 onReuse(reminder);
               }}
             >
-              <CopyPlus className="h-4 w-4 text-black" />
+              <CopyPlus className="h-4 w-4 text-foreground" />
               Dùng lại
             </Button>
           )}
@@ -231,13 +231,13 @@ export default function ReminderCard({
               type="button"
               size="sm"
               variant="ghost"
-              className="flex h-9 items-center gap-2 rounded-md px-3 text-[12px] font-semibold text-slate-800 transition-all hover:bg-slate-100 hover:text-slate-900"
+              className="flex h-9 items-center gap-2 rounded-md px-3 text-[12px] font-semibold text-foreground transition-all hover:bg-muted hover:text-foreground"
               onClick={(event) => {
                 event.stopPropagation();
                 onEdit(reminder);
               }}
             >
-              <SquarePen className="h-4 w-4 text-black" />
+              <SquarePen className="h-4 w-4 text-foreground" />
               {editLabel}
             </Button>
           )}
@@ -251,7 +251,7 @@ export default function ReminderCard({
                 event.stopPropagation();
                 onDelete(reminder._id);
               }}
-              className="rounded-md p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+              className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-500"
               aria-label={hoverDeleteLabel}
               title={hoverDeleteLabel}
             >

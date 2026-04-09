@@ -77,7 +77,7 @@ export default function ReminderCalendarView({
               type="button"
               size="sm"
               variant="outline"
-              className="h-9 px-4 rounded-md border-border bg-white text-slate-900 hover:bg-muted font-bold transition-all text-base shadow-sm"
+              className="h-9 rounded-md border-border bg-background px-4 text-base font-bold text-foreground shadow-sm transition-all hover:bg-muted"
               onClick={onJumpCalendarToToday}
             >
               Hôm nay
@@ -107,7 +107,7 @@ export default function ReminderCalendarView({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-8 px-2.5 font-bold text-base text-slate-800 hover:bg-muted/50 transition-colors"
+                  className="h-8 px-2.5 text-base font-bold text-foreground transition-colors hover:bg-muted/50"
                 >
                   {calendarHeaderLabel}
                   <ChevronDown className={`h-4 w-4 ml-1.5 transition-transform duration-200 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
@@ -203,7 +203,7 @@ export default function ReminderCalendarView({
         </div>
 
         <div className="relative z-0 flex-1 min-h-0 overflow-auto bg-background/60 overscroll-contain beautiful-scrollbar">
-          <div className="min-w-[920px]">
+          <div className="min-w-[760px] md:min-w-[920px]">
             <div
               className="sticky top-0 z-20 grid"
               style={{
@@ -222,10 +222,10 @@ export default function ReminderCalendarView({
                     onClick={() => onSelectCalendarDay(day.key)}
                     className={`relative h-16 border-b border-border/40 text-left px-4 transition-all bg-background/80 hover:bg-muted/30 ${active ? 'after:absolute after:top-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary' : ''}`}
                   >
-                    <p className={`text-2xl font-normal leading-none ${isToday || active ? 'text-primary' : 'text-slate-600'}`}>
+                    <p className={`text-2xl font-normal leading-none ${isToday || active ? 'text-primary' : 'text-muted-foreground'}`}>
                       {new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(day.date)}
                     </p>
-                    <p className={`text-[11px] font-normal uppercase tracking-tight mt-1 ${isToday || active ? 'text-primary' : 'text-slate-500'}`}>
+                    <p className={`text-[11px] font-normal uppercase tracking-tight mt-1 ${isToday || active ? 'text-primary' : 'text-muted-foreground'}`}>
                       {new Intl.DateTimeFormat('vi-VN', { weekday: 'long' }).format(day.date)}
                     </p>
                   </button>
@@ -309,7 +309,7 @@ export default function ReminderCalendarView({
                               onCalendarEventClick(entry, day.key);
                             }
                           }}
-                          className={`group absolute overflow-hidden rounded-sm border-l-2 bg-indigo-100/60 border-primary px-2 py-1 pr-6 text-left shadow-none hover:bg-indigo-100/80 transition-colors pointer-events-auto`}
+                          className="group pointer-events-auto absolute overflow-hidden rounded-sm border-l-2 border-primary bg-primary/15 px-2 py-1 pr-6 text-left shadow-none transition-colors hover:bg-primary/20"
                           style={{
                             top: `${entry.topPx}px`,
                             left: `calc(${leftOffset}% + 2px)`,
@@ -317,7 +317,7 @@ export default function ReminderCalendarView({
                             height: `${entry.heightPx}px`,
                           }}
                         >
-                          <div className="flex flex-col text-indigo-900">
+                          <div className="flex flex-col text-foreground">
                              <span className="block text-[11px] font-semibold leading-tight truncate">
                                {entry.preview}
                              </span>
@@ -334,7 +334,7 @@ export default function ReminderCalendarView({
                                   event.stopPropagation();
                                   onOpenReminderMeetingLink(entry.reminder);
                                 }}
-                                className="rounded-sm p-0.5 bg-black/5 hover:bg-black/15 text-indigo-700"
+                                className="rounded-sm bg-foreground/10 p-0.5 text-primary transition-colors hover:bg-foreground/20"
                                 aria-label="Mở link"
                               >
                                 <Link2 className="h-3 w-3" />
@@ -346,7 +346,7 @@ export default function ReminderCalendarView({
                                 event.stopPropagation();
                                 onDeleteReminder(entry.reminder._id);
                               }}
-                              className="rounded-sm p-0.5 bg-black/5 hover:bg-black/15 text-rose-700"
+                              className="rounded-sm bg-foreground/10 p-0.5 text-rose-600 transition-colors hover:bg-foreground/20"
                               aria-label="Xóa"
                             >
                               <Trash2 className="h-3 w-3" />

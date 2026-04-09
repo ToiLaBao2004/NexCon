@@ -250,8 +250,8 @@ export default function ReminderFormModal({
             : 'max-w-[540px] max-h-[86vh]'
         )}
       >
-        <DialogHeader className="px-6 py-4 border-b border-border/40 bg-white">
-          <DialogTitle className="text-xl font-semibold text-slate-900">
+        <DialogHeader className="border-b border-border/40 bg-card/80 px-6 py-4">
+          <DialogTitle className="text-xl font-semibold text-foreground">
             {mode === 'create'
               ? 'Tạo nhắc nhở mới'
               : isNotifyOnlyEdit

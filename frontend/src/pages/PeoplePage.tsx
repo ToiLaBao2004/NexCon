@@ -134,7 +134,7 @@ const PeoplePage = () => {
 			{!isMobile && (
 				<Sidebar
 					collapsible="offcanvas"
-					className="md:left-20 top-0 md:top-2 bottom-0 md:bottom-2 h-full md:h-[calc(100vh-16px)] bg-card/20 backdrop-blur border border-border/40 rounded-none md:rounded-2xl overflow-hidden"
+					className="md:left-20 top-0 md:top-2 bottom-0 md:bottom-2 h-full md:h-[calc(100vh-16px)] bg-card/60 backdrop-blur border border-border/40 rounded-none md:rounded-2xl overflow-hidden"
 				>
 					<div className="space-y-2 p-4">
 						{PEOPLE_TABS.map((item) => {
@@ -145,12 +145,12 @@ const PeoplePage = () => {
 								<button
 									key={item.key}
 									onClick={() => handleTabChange(item.key)}
-									className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-200 ${tab === item.key ? "bg-white text-slate-900 shadow-sm font-normal" : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"}`}
+									className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-200 ${tab === item.key ? "bg-background text-foreground shadow-sm font-normal" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
 								>
-									<Icon className={`h-4 w-4 transition-colors ${tab === item.key ? "text-indigo-600" : "text-slate-400"}`} />
+									<Icon className={`h-4 w-4 transition-colors ${tab === item.key ? "text-primary" : "text-muted-foreground"}`} />
 									<span className="flex-1 text-sm">{item.label}</span>
 									{badge > 0 && (
-										<span className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">{badge}</span>
+										<span className="ml-auto rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">{badge}</span>
 									)}
 								</button>
 							);

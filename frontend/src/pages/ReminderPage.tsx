@@ -9,15 +9,19 @@ import {
     ListFilter,
     Plus,
     Search,
+    SlidersHorizontal,
+    Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ConfirmationModal } from '@/components/shared/ConfirmationModal';
 import { removeAccents } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useSearchParams } from 'react-router';
 import { useReminderStore } from '@/stores/useReminderStore';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { reminderService } from '@/services/reminderService';
 import { extractMeetingCode, rememberMeetingTitle } from '@/utils/meetingLink';
 import type {
@@ -83,6 +87,7 @@ const ReminderPage = () => {
     const editQuery = (searchParams.get('edit') || '').trim().toLowerCase();
     const shouldOpenEditFromQuery = editQuery === '1' || editQuery === 'true' || editQuery === 'yes';
     const currentUserId = useAuthStore((state) => state.user?._id);
+    const isMobile = useIsMobile();
 
     const [activeTab, setActiveTab] = useState<ReminderTab>(() => tabQuery ?? 'all');
     const [viewMode, setViewMode] = useState<ReminderViewMode>('list');
@@ -99,6 +104,7 @@ const ReminderPage = () => {
     const [deleteScope, setDeleteScope] = useState<'upcoming' | 'past' | 'all' | null>(null);
     const [isDeletingScope, setIsDeletingScope] = useState(false);
     const [highlightedReminderId, setHighlightedReminderId] = useState<string | null>(null);
+    const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
     const [selectedStatuses, setSelectedStatuses] = useState<ReminderStatus[]>(ALL_STATUSES);
     const [fromDate, setFromDate] = useState('');
@@ -887,15 +893,15 @@ const ReminderPage = () => {
     const monthPickerTitle = useMemo(() => formatMonthYearLabel(monthPickerMonth), [monthPickerMonth]);
 
     return (
-        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border border-slate-200/60 bg-slate-50/50 md:rounded-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200/60 bg-white px-4 py-4 md:px-6">
+        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border border-border/60 bg-background md:rounded-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-card/80 px-4 py-4 backdrop-blur-sm md:px-6">
                 <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
                         <CalendarDays className="h-5 w-5" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Danh sách nhắc hẹn</h1>
-                        <p className="text-xs text-slate-500">Quản lý các việc cần nhớ của bạn</p>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Danh sách nhắc hẹn</h1>
+                        <p className="text-xs text-muted-foreground">Quản lý các việc cần nhớ của bạn</p>
                     </div>
                 </div>
 
@@ -908,73 +914,75 @@ const ReminderPage = () => {
                     size="icon"
                     variant="outline"
                     title="Tạo nhắc nhở mới"
-                    className="h-10 w-10 rounded-lg border border-slate-200 bg-white text-slate-900 shadow-sm transition-all hover:bg-slate-50 hover:border-slate-300"
+                    className="h-10 w-10 rounded-lg border border-border bg-background text-foreground shadow-sm transition-all hover:bg-muted/60 hover:border-border/80"
                 >
-                    <Plus className="h-6 w-6 stroke-2 text-slate-900" />
+                    <Plus className="h-6 w-6 stroke-2 text-foreground" />
                 </Button>
             </div>
 
-            <div className="border-b border-slate-200/60 bg-white px-4 pb-3 pt-3 md:px-6">
+            <div className="border-b border-border/60 bg-card/80 px-4 pb-3 pt-3 md:px-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="inline-flex items-center rounded-lg bg-slate-100 p-1">
+                    <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
+                        <div className="inline-flex w-full items-center rounded-lg bg-muted p-1 sm:w-auto">
                             <button
                                 type="button"
-                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'all' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'all' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
                                 onClick={() => setActiveTab('all')}
                             >
                                 Tất cả
                             </button>
                             <button
                                 type="button"
-                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'upcoming' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'upcoming' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
                                 onClick={() => setActiveTab('upcoming')}
                             >
                                 Sắp tới
                             </button>
                             <button
                                 type="button"
-                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'past' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'past' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
                                 onClick={() => setActiveTab('past')}
                             >
                                 Đã qua
                             </button>
                         </div>
 
-                        <div className="inline-flex items-center rounded-lg bg-slate-100 p-1">
+                        <div className="inline-flex w-full items-center rounded-lg bg-muted p-1 sm:w-auto">
                             <button
                                 type="button"
-                                className={`h-8 rounded-md px-4 text-sm transition-colors flex items-center ${viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                className={`flex h-8 items-center rounded-md px-4 text-sm transition-colors ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
                                 onClick={() => setViewMode('list')}
                             >
-                                <LayoutList className={`mr-2 h-4 w-4 transition-colors ${viewMode === 'list' ? 'text-slate-900' : 'text-slate-400'}`} />
+                                <LayoutList className={`mr-2 h-4 w-4 transition-colors ${viewMode === 'list' ? 'text-foreground' : 'text-muted-foreground'}`} />
                                 Danh sách
                             </button>
                             <button
                                 type="button"
-                                className={`h-8 rounded-md px-4 text-sm transition-colors flex items-center ${viewMode === 'calendar' ? 'bg-white text-slate-900 shadow-sm font-normal' : 'text-slate-500 hover:text-slate-800 hover:bg-transparent'}`}
+                                className={`flex h-8 items-center rounded-md px-4 text-sm transition-colors ${viewMode === 'calendar' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
                                 onClick={() => setViewMode('calendar')}
                             >
-                                <CalendarRange className={`mr-2 h-4 w-4 transition-colors ${viewMode === 'calendar' ? 'text-slate-900' : 'text-slate-400'}`} />
+                                <CalendarRange className={`mr-2 h-4 w-4 transition-colors ${viewMode === 'calendar' ? 'text-foreground' : 'text-muted-foreground'}`} />
                                 Lịch biểu
                             </button>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-10 rounded-lg border-slate-200 bg-white px-4 text-sm font-medium text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
-                            disabled={isLoading || !includePersonalReminders || visiblePersonalReminderCount === 0}
-                            onClick={() => setDeleteScope(activeTab)}
-                        >
-                            Xóa tất cả
-                        </Button>
+                    <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+                        {isMobile && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-10 rounded-lg border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:border-border/80 hover:bg-muted/60"
+                                onClick={() => setIsFilterSheetOpen(true)}
+                            >
+                                <SlidersHorizontal className="mr-1.5 h-4 w-4" />
+                                Bộ lọc
+                            </Button>
+                        )}
                     </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200/60 bg-white p-3">
+                <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border/60 bg-card/70 p-3 md:flex-row md:flex-wrap md:items-center">
                     {isAllTabStatusUnselected && activeTab === 'all' && (
                         <div className="flex w-full items-center justify-between gap-2 rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700">
                             <span>Chưa chọn trạng thái nào, hệ thống đang hiển thị tất cả trạng thái.</span>
@@ -988,58 +996,77 @@ const ReminderPage = () => {
                         </div>
                     )}
 
-                    <div className="relative">
-                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <div className="relative w-full md:w-auto">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
                             value={searchReminderName}
                             onChange={(event) => setSearchReminderName(event.target.value)}
                             placeholder="Tìm theo tên nhắc hẹn"
-                            className="h-10 w-[240px] rounded-lg border-slate-200 bg-white pl-9 text-sm placeholder:text-slate-400 placeholder:italic transition-colors hover:border-slate-300 focus-visible:ring-0"
+                            className="h-10 w-full rounded-lg border-border bg-background pl-9 text-sm placeholder:text-muted-foreground placeholder:italic transition-colors hover:border-border/80 focus-visible:ring-0 md:w-[240px]"
                         />
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-normal text-slate-900">Từ</span>
-                        <Input
-                            type="date"
-                            value={fromDate}
-                            onChange={(event) => setFromDate(event.target.value)}
-                            className="h-10 w-[168px] rounded-lg border-slate-200 bg-white text-sm transition-colors hover:border-slate-300"
-                        />
-                        <span className="text-sm font-normal text-slate-900">đến</span>
-                        <Input
-                            type="date"
-                            value={toDate}
-                            min={fromDate || undefined}
-                            onChange={(event) => setToDate(event.target.value)}
-                            className="h-10 w-[168px] rounded-lg border-slate-200 bg-white text-sm transition-colors hover:border-slate-300"
-                        />
-                    </div>
+                    {!isMobile && (
+                        <>
+                            <div className="flex w-full flex-wrap items-center gap-2 md:w-auto">
+                                <span className="text-sm font-normal text-foreground">Từ</span>
+                                <Input
+                                    type="date"
+                                    value={fromDate}
+                                    onChange={(event) => setFromDate(event.target.value)}
+                                    className="h-10 w-full rounded-lg border-border bg-background text-sm transition-colors hover:border-border/80 sm:w-[168px]"
+                                />
+                                <span className="text-sm font-normal text-foreground">đến</span>
+                                <Input
+                                    type="date"
+                                    value={toDate}
+                                    min={fromDate || undefined}
+                                    onChange={(event) => setToDate(event.target.value)}
+                                    className="h-10 w-full rounded-lg border-border bg-background text-sm transition-colors hover:border-border/80 sm:w-[168px]"
+                                />
+                            </div>
 
-                    <div className="flex items-center gap-2">
-                        <label className="inline-flex h-10 cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-normal text-slate-900 transition-colors hover:border-slate-300">
-                            <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-slate-300 accent-slate-950"
-                                checked={includePersonalReminders}
-                                onChange={(event) => setIncludePersonalReminders(event.target.checked)}
-                            />
-                            Nhắc hẹn riêng
-                        </label>
-                        <label className="inline-flex h-10 cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-normal text-slate-900 transition-colors hover:border-slate-300">
-                            <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-slate-300 accent-slate-950"
-                                checked={includeSharedReminders}
-                                onChange={(event) => setIncludeSharedReminders(event.target.checked)}
-                            />
-                            Nhắc hẹn chung
-                        </label>
-                    </div>
+                            <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
+                                <label className="inline-flex h-10 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-normal text-foreground transition-colors hover:border-border/80 sm:w-auto">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4 rounded border-input accent-primary"
+                                        checked={includePersonalReminders}
+                                        onChange={(event) => setIncludePersonalReminders(event.target.checked)}
+                                    />
+                                    Nhắc hẹn riêng
+                                </label>
+                                <label className="inline-flex h-10 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-normal text-foreground transition-colors hover:border-border/80 sm:w-auto">
+                                    <input
+                                        type="checkbox"
+                                        className="h-4 w-4 rounded border-input accent-primary"
+                                        checked={includeSharedReminders}
+                                        onChange={(event) => setIncludeSharedReminders(event.target.checked)}
+                                    />
+                                    Nhắc hẹn chung
+                                </label>
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
-            <div className={`flex-1 min-h-0 bg-slate-50/50 p-6 md:p-8 ${viewMode === 'calendar' ? 'overflow-hidden' : 'overflow-y-auto beautiful-scrollbar'}`}>
+            <div className={`flex-1 min-h-0 bg-muted/20 p-4 md:p-8 ${viewMode === 'calendar' ? 'overflow-hidden' : 'overflow-y-auto beautiful-scrollbar'}`}>
+                {viewMode === 'list' && (
+                    <div className="mb-3 flex justify-end">
+                        <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-9 w-9 rounded-lg border-border bg-background text-foreground transition-colors hover:border-border/80 hover:bg-muted/60"
+                            disabled={isLoading || !includePersonalReminders || visiblePersonalReminderCount === 0}
+                            onClick={() => setDeleteScope(activeTab)}
+                            title="Xóa tất cả"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                )}
+
                 {isLoading ? (
                     <div className="flex items-center justify-center py-14">
                         <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
@@ -1081,8 +1108,8 @@ const ReminderPage = () => {
                     !hasUpcomingData ? (
                         upcomingEmpty
                     ) : (
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="space-y-4 md:space-y-6">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
                                 {filteredReminders.map((item) => (
                                     <ReminderCard
                                         key={item._id}
@@ -1102,10 +1129,10 @@ const ReminderPage = () => {
 
                             {groupedDeclinedSharedUpcoming.length > 0 && (
                                 <div className="pt-1">
-                                    <div className="flex items-center pt-2 mb-2 border-b border-slate-100/50 pb-2">
-                                        <p className="text-[14px] font-normal text-slate-400">Đã từ chối (có thể tham gia lại từ thông báo trong chat)</p>
+                                    <div className="mb-2 flex items-center border-b border-border/40 pb-2 pt-2">
+                                        <p className="text-[14px] font-normal text-muted-foreground">Đã từ chối (có thể tham gia lại từ thông báo trong chat)</p>
                                     </div>
-                                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
                                         {groupedDeclinedSharedUpcoming.flatMap((group) =>
                                             group.items.map((item) => (
                                                 <ReminderCard
@@ -1140,7 +1167,7 @@ const ReminderPage = () => {
                     filteredReminders.length === 0 ? (
                         pastEmpty
                     ) : (
-                        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
                             {filteredReminders.map((item) => (
                                 <ReminderCard
                                     key={item._id}
@@ -1161,7 +1188,7 @@ const ReminderPage = () => {
                 ) : filteredReminders.length === 0 ? (
                     allEmpty
                 ) : (
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
                         {filteredReminders.map((item) => (
                             <ReminderCard
                                 key={item._id}
@@ -1186,6 +1213,70 @@ const ReminderPage = () => {
                     </div>
                 )}
             </div>
+
+            <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+                <SheetContent side="bottom" className="rounded-t-3xl p-0" showCloseButton={false}>
+                    <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-muted" />
+                    <SheetHeader className="border-b border-border/60 px-4 pb-3 pt-4">
+                        <SheetTitle>Bộ lọc nhắc hẹn</SheetTitle>
+                    </SheetHeader>
+
+                    <div className="space-y-3 px-4 py-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-foreground">Từ ngày</label>
+                            <Input
+                                type="date"
+                                value={fromDate}
+                                onChange={(event) => setFromDate(event.target.value)}
+                                className="h-10 rounded-lg border-border bg-background"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium text-foreground">Đến ngày</label>
+                            <Input
+                                type="date"
+                                value={toDate}
+                                min={fromDate || undefined}
+                                onChange={(event) => setToDate(event.target.value)}
+                                className="h-10 rounded-lg border-border bg-background"
+                            />
+                        </div>
+
+                        <div className="space-y-2 rounded-xl border border-border/60 bg-card/70 p-3">
+                            <label className="inline-flex h-10 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-normal text-foreground transition-colors hover:border-border/80">
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-input accent-primary"
+                                    checked={includePersonalReminders}
+                                    onChange={(event) => setIncludePersonalReminders(event.target.checked)}
+                                />
+                                Nhắc hẹn riêng
+                            </label>
+
+                            <label className="inline-flex h-10 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-normal text-foreground transition-colors hover:border-border/80">
+                                <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-input accent-primary"
+                                    checked={includeSharedReminders}
+                                    onChange={(event) => setIncludeSharedReminders(event.target.checked)}
+                                />
+                                Nhắc hẹn chung
+                            </label>
+                        </div>
+
+                        <div className="flex justify-end pt-1">
+                            <Button
+                                type="button"
+                                className="h-10 rounded-lg px-5"
+                                onClick={() => setIsFilterSheetOpen(false)}
+                            >
+                                Xong
+                            </Button>
+                        </div>
+                    </div>
+                </SheetContent>
+            </Sheet>
 
             <ReminderFormModal
                 open={showCreateModal || Boolean(editingReminder)}
