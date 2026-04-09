@@ -13,7 +13,7 @@ import { useNavigate } from "react-router"
 const signUpSchema = z.object({
   firstname: z.string().min(1, "Tên là bắt buộc"),
   lastname: z.string().min(1, "Họ là bắt buộc"),
-  email: z.string().email("Địa chỉ email không hợp lệ"),
+  email: z.string().trim().email("Địa chỉ email không hợp lệ"),
   password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
 })
 

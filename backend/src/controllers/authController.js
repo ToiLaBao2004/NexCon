@@ -11,7 +11,8 @@ const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 
 export async function verifyValidFieldsSignUp(req, res) {
     try {
-        const { email, password } = req.body;
+        let { email, password } = req.body;
+        email = email?.trim();
         if (!email || !password) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
@@ -34,7 +35,8 @@ export async function verifyValidFieldsSignUp(req, res) {
 
 export async function signUp(req, res) {
     try {
-        const { email, password, firstname, lastname, otp } = req.body;
+        let { email, password, firstname, lastname, otp } = req.body;
+        email = email?.trim();
         if (!email || !password || !firstname || !lastname) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
@@ -58,7 +60,8 @@ export async function signUp(req, res) {
 
 export async function signIn(req, res) {
     try {
-        const { email, password } = req.body;
+        let { email, password } = req.body;
+        email = email?.trim();
         if (!email || !password) {
             return res.status(400).json({ message: 'Email and password are required.' });
         }
@@ -111,7 +114,8 @@ export async function signOut(req, res) {
 
 export async function updateNewPassword(req, res) {
     try {
-        const { email, newPassword, confirmNewPassword } = req.body;
+        let { email, newPassword, confirmNewPassword } = req.body;
+        email = email?.trim();
         if (!email || !newPassword || !confirmNewPassword) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
