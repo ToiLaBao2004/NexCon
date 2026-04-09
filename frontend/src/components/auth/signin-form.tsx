@@ -12,7 +12,7 @@ import { useAuthStore } from "@/stores/useAuthStore"
 import { useNavigate } from "react-router"
 
 const signInSchema = z.object({
-  email: z.string().email("Địa chỉ email không hợp lệ"),
+  email: z.string().trim().email("Địa chỉ email không hợp lệ"),
   password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
 })
 

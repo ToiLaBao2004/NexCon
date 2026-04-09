@@ -5,7 +5,8 @@ import User from "../models/userModel.js";
 
 export async function sendOtpMakeUser(req, res) {
     try {
-        const { email } = req.body;
+        let { email } = req.body;
+        email = email?.trim();
         const latestOtp = await Otp.findOne({ email: email, type: 'verification' }).sort({ createdAt: -1 });
         if (latestOtp && (Date.now() - latestOtp.createdAt.getTime()) < 60000) { // 1 minute
             return res.status(429).json({ 
@@ -30,7 +31,8 @@ export async function sendOtpMakeUser(req, res) {
 
 export async function sendOtpResetPassword(req, res) {
     try {
-        const { email } = req.body;
+        let { email } = req.body;
+        email = email?.trim();
         const existingEmail = await User.findOne({ email:email });
         if (!existingEmail) {
             return res.status(404).json({ message: "User with this email does not exist."});
@@ -59,7 +61,8 @@ export async function sendOtpResetPassword(req, res) {
 
 export async function verifyOtpResetPassword(req, res) {
     try {
-        const { email, otp } = req.body;
+        let { email, otp } = req.body;
+        email = email?.trim();
         if (!email || !otp) {
             return res.status(400).json({ message: 'Email and OTP are required.' });
         }
