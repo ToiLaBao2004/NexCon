@@ -4,24 +4,12 @@ import { normalizeVietnamese } from './../../utils/vietnameseHelper.js';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 const LOCAL_BLOCKLIST = [
-    'địt',
-    'đụ',
-    'lồn',
-    'cặc',
-    'buồi',
-    'đéo',
-    'dm',
-    'vkl',
-    'cc',
-    'cút mẹ',
-    'óc chó',
-    'súc vật',
+    'địt', 'đụ', 'lồn', 'cặc', 'buồi', 'đéo', 'dm', 'vkl', 'cc', 'cút mẹ',
+    'óc chó', 'súc vật', 'vl', 'vcl', 'clgt', 'đmm'
 ];
 
 const SEVERE_BLOCK_PATTERNS = [
-    /\bgiết\b/iu,
-    /\bbom\b/iu,
-    /\bkhủng bố\b/iu,
+    /\bgiết\b/iu, /\bbom\b/iu, /\bkhủng bố\b/iu, /\btự sát\b/iu,
 ];
 
 function compactSpaces(text = '') {
@@ -37,63 +25,48 @@ function normalizeForModeration(text = '') {
 function containsBlockedKeyword(text) {
     const normalized = normalizeForModeration(text);
 
+    // Kiểm tra từ cấm
     for (const keyword of LOCAL_BLOCKLIST) {
         const normalizedKeyword = normalizeForModeration(keyword);
         if (normalized.includes(normalizedKeyword)) {
             return {
                 matched: true,
-                reason: `Matched blocked keyword: ${keyword}`,
+                reason: `Chứa từ vi phạm: "${keyword}"`,
+                userMessage: `Tin nhắn của bạn chứa từ ngữ không được phép (${keyword}).`,
                 category: 'abusive',
-                source: 'local',
+                source: 'local'
             };
         }
     }
 
+    // Kiểm tra pattern nghiêm trọng
     for (const pattern of SEVERE_BLOCK_PATTERNS) {
         if (pattern.test(text) || pattern.test(normalized)) {
             return {
                 matched: true,
-                reason: `Matched severe pattern: ${pattern}`,
+                reason: `Matched severe pattern`,
+                userMessage: "Tin nhắn chứa nội dung nguy hiểm không được phép.",
                 category: 'dangerous',
-                source: 'local',
+                source: 'local'
             };
         }
     }
 
-    return {
-        matched: false,
-        reason: null,
-        category: null,
-        source: 'local',
-    };
+    return { matched: false };
 }
 
-function shouldUseAI(text) {
+function shouldUseAI(text = '') {
     const normalized = normalizeForModeration(text);
+    if (!normalized || normalized.length < 12) return false;
+    if (normalized.length < 30) return false;
 
-    if (!normalized) return false;
-    if (normalized.length < 8) return false;
-
-    // Những case nên nhờ AI đọc ngữ cảnh:
-    // - có dấu hiệu công kích nhưng không rõ
-    // - có từ lóng, biến thể, viết né từ cấm
-    // - text dài, có thể chứa đe doạ / quấy rối / kích động
-    const suspiciousSignals = [
-        'chet',
-        'die',
-        'tu sat',
-        'danh',
-        'ham doa',
-        'doa',
-        'sex',
-        'au dam',
-        'tre em',
-        'ban ma tuy',
-        'hack',
-        'lua dao',
+    const suspicious = [
+        'đm', 'dm', 'vcl', 'vl', 'cc', 'cl', 'óc chó', 'súc vật', 'địt', 'lồn', 'cặc',
+        'giết', 'chết', 'tự sát', 'đánh', 'đe dọa', 'hack', 'lừa', 'dụ dỗ', 'sex', 'nứng',
+        'trẻ em', 'con nít', 'ma túy', 'khủng bố'
     ];
 
-    return suspiciousSignals.some(s => normalized.includes(s)) || normalized.length > 80;
+    return suspicious.some(word => normalized.includes(word)) || normalized.length > 65;
 }
 
 let model = null;
@@ -102,120 +75,151 @@ function getGeminiModel() {
     if (!GEMINI_API_KEY) return null;
     if (!model) {
         const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     }
     return model;
 }
 
 async function checkWithGemini(text) {
     const geminiModel = getGeminiModel();
-
     if (!geminiModel) {
         return {
             blocked: false,
-            category: null,
+            category: 'safe',
             confidence: 0,
-            reason: 'Gemini disabled: GEMINI_API_KEY missing',
-            source: 'gemini',
+            reason: 'Gemini disabled',
+            userMessage: null,
+            source: 'gemini'
         };
     }
 
-    const prompt = `
-Bạn là bộ lọc kiểm duyệt tin nhắn cho ứng dụng chat.
-Hãy đánh giá nội dung sau có vi phạm tiêu chuẩn cộng đồng hay không.
+    const prompt = `Bạn là AI kiểm duyệt tin nhắn chat tiếng Việt nghiêm ngặt nhưng công bằng.
 
-Các nhóm vi phạm cần chặn:
-- thù ghét, xúc phạm nghiêm trọng, quấy rối
-- đe doạ bạo lực, kích động nguy hiểm
-- nội dung tình dục không phù hợp
-- lừa đảo / dụ dỗ / nội dung nguy hiểm rõ ràng
+Nhiệm vụ: Phân tích tin nhắn sau và quyết định có VI PHẠM tiêu chuẩn cộng đồng hay không.
 
-Yêu cầu:
-- Trả về JSON hợp lệ duy nhất, không markdown, không giải thích thêm.
-- Schema:
+Các loại vi phạm phải chặn (blocked = true):
+- Từ ngữ thô tục, chửi thề nặng (kể cả viết né)
+- Xúc phạm, công kích, body shaming, kỳ thị
+- Đe dọa bạo lực, tự hại, giết chóc
+- Nội dung tình dục rõ ràng hoặc gợi dục mạnh
+- Lừa đảo, dụ dỗ, ma túy, khủng bố
+- Spam, nội dung nguy hiểm
+
+Hướng dẫn:
+- Xem xét slang tiếng Việt, nói đùa thô, sarcasm.
+- Chỉ blocked khi rõ ràng vi phạm nghiêm trọng.
+- Nói đùa nhẹ, chửi vui bạn bè → cho qua.
+
+Trả về đúng JSON không thêm gì khác:
+
 {
-  "blocked": boolean,
-  "category": "abusive" | "harassment" | "hate" | "sexual" | "dangerous" | "scam" | "self_harm" | "safe",
+  "blocked": true/false,
+  "category": "abusive"|"harassment"|"hate"|"sexual"|"dangerous"|"scam"|"self_harm"|"spam"|"safe",
   "confidence": number,
-  "reason": string
+  "reason": "Giải thích ngắn gọn bằng tiếng Việt"
 }
 
-Tin nhắn:
-"""${text}"""
-`;
+Tin nhắn: """${text}"""`;
 
     try {
-        const result = await geminiModel.generateContent(prompt);
-        const raw = result.response.text().trim();
+        const result = await geminiModel.generateContent({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 280,
+                responseMimeType: "application/json"
+            }
+        });
+
+        let raw = result.response.text().trim();
+
+        if (raw.includes('```')) {
+            raw = raw.split('```')[1]?.replace(/^json\s*/i, '').trim() || raw;
+        }
 
         const parsed = JSON.parse(raw);
 
         return {
             blocked: Boolean(parsed.blocked),
             category: parsed.category || 'safe',
-            confidence: Number(parsed.confidence || 0),
+            confidence: Number(parsed.confidence) || 0,
             reason: parsed.reason || '',
-            source: 'gemini',
+            userMessage: parsed.blocked
+                ? `Tin nhắn vi phạm: ${parsed.reason || 'Nội dung không phù hợp với tiêu chuẩn cộng đồng.'}`
+                : null,
+            source: 'gemini'
         };
+
     } catch (error) {
-        console.error('Gemini moderation error:', error);
+        console.error('Gemini moderation error:', error.message);
         return {
             blocked: false,
-            category: null,
+            category: 'safe',
             confidence: 0,
-            reason: 'Gemini parsing/request failed',
+            reason: 'AI error',
+            userMessage: null,
             source: 'gemini',
-            error: error.message,
+            error: true
         };
     }
 }
 
 export async function moderateTextMessage(text) {
     const cleaned = compactSpaces(text || '');
-
     if (!cleaned) {
         return {
             allowed: false,
             blocked: true,
             category: 'invalid',
             reason: 'Empty content',
-            source: 'system',
+            userMessage: 'Tin nhắn không được để trống.',
+            source: 'system'
         };
     }
 
-    // Tầng 1: local filter
+    // === Tầng 1: Local Blocklist ===
     const localResult = containsBlockedKeyword(cleaned);
     if (localResult.matched) {
+        console.log(`[Moderation] Blocked by LOCAL: ${localResult.reason}`);
+
         return {
             allowed: false,
             blocked: true,
             category: localResult.category,
             reason: localResult.reason,
-            source: localResult.source,
+            userMessage: localResult.userMessage || "Tin nhắn chứa từ ngữ vi phạm tiêu chuẩn cộng đồng.",
+            source: 'local'
         };
     }
 
-    // Tầng 2: AI khi cần
+    // === Tầng 2: AI Moderation ===
     if (shouldUseAI(cleaned)) {
+        console.log(`[Moderation] Calling Gemini for: ${cleaned.substring(0, 90)}...`);
+
         const aiResult = await checkWithGemini(cleaned);
 
-        if (aiResult.blocked && aiResult.confidence >= 0.7) {
+        if (aiResult.blocked && aiResult.confidence >= 0.62) {
+            console.log(`[Moderation] Blocked by GEMINI: ${aiResult.reason}`);
+
             return {
                 allowed: false,
                 blocked: true,
                 category: aiResult.category,
                 reason: aiResult.reason,
-                source: aiResult.source,
-                confidence: aiResult.confidence,
+                userMessage: aiResult.userMessage || "Tin nhắn vi phạm tiêu chuẩn cộng đồng theo đánh giá của AI.",
+                source: 'gemini',
+                confidence: aiResult.confidence
             };
         }
     }
 
+    // === An toàn ===
     return {
         allowed: true,
         blocked: false,
         category: 'safe',
         reason: null,
-        source: 'system',
+        userMessage: null,
+        source: 'combined'
     };
 }
