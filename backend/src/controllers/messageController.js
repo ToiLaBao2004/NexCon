@@ -12,7 +12,7 @@ import {
 } from '../middlewares/uploadMiddleware.js';
 import { safeUpload } from '../utils/messageHelper.js';
 import { v2 as cloudinary } from 'cloudinary';
-
+import { moderateTextMessage } from '../services/moderation/moderationService.js';
 
 
 export async function sendMessage(req, res) {
@@ -55,7 +55,24 @@ export async function sendMessage(req, res) {
                 if (!content || !content.trim()) {
                     return res.status(400).json({ message: 'Content is required for text messages.' });
                 }
-                messageData.content = content.trim();
+
+                const trimmedContent = content.trim();
+
+                const moderationResult = await moderateTextMessage(trimmedContent);
+
+                if (moderationResult.blocked) {
+                    return res.status(400).json({
+                        message: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng.',
+                        moderation: {
+                            category: moderationResult.category,
+                            reason: moderationResult.reason,
+                            source: moderationResult.source,
+                            confidence: moderationResult.confidence ?? null,
+                        },
+                    });
+                }
+
+                messageData.content = trimmedContent;
                 break;
             }
 
