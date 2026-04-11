@@ -1,6 +1,6 @@
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { Conversation, MessageType } from "@/types/chat";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import EmojiPicker from "./EmojiPicker";
@@ -150,6 +150,44 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 	};
 
+	useEffect(() => {
+		return () => {
+			if (attachment?.preview) {
+				URL.revokeObjectURL(attachment.preview);
+			}
+		};
+	}, [attachment]);
+
+	const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+		const items = Array.from(e.clipboardData?.items || []);
+
+		const imageItem = items.find((item) => item.type.startsWith("image/"));
+		if (!imageItem) return;
+
+		e.preventDefault();
+
+		const file = imageItem.getAsFile();
+		if (!file) {
+			toast.error("Không đọc được ảnh từ clipboard.");
+			return;
+		}
+
+		// Nếu đang có attachment cũ thì dọn preview cũ trước
+		if (attachment?.preview) {
+			URL.revokeObjectURL(attachment.preview);
+		}
+
+		// Đặt tên file dễ nhìn hơn
+		const extension = file.type.split("/")[1] || "png";
+		const pastedImage = new File(
+			[file],
+			`pasted-image-${Date.now()}.${extension}`,
+			{ type: file.type, lastModified: Date.now() }
+		);
+
+		attachImage(pastedImage);
+	};
+
 	const attachImage = (file: File) => {
 		if (!file.type.startsWith("image/")) {
 			toast.error("Chỉ hỗ trợ file ảnh (jpg, png, gif, webp…)");
@@ -158,6 +196,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		if (file.size > MAX_IMAGE_SIZE) {
 			toast.error(`Ảnh quá lớn — tối đa ${formatBytes(MAX_IMAGE_SIZE)}`);
 			return;
+		}
+
+		// cleanup preview cũ nếu có
+		if (attachment?.preview) {
+			URL.revokeObjectURL(attachment.preview);
 		}
 
 		setLoadingLocal(true);
@@ -321,6 +364,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						onKeyDown={handleKeyDown}
 						value={value}
 						onChange={handleInputChange}
+						onPaste={handlePaste}
 						onFocus={markAsSeen}
 						placeholder={
 							attachment
