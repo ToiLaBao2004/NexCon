@@ -210,6 +210,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       get().joinConversation(conversation._id);
     });
 
+    socket.on("conversation-updated", ({ conversation }) => {
+      if (conversation) {
+        useChatStore.getState().updateConversation(conversation);
+      }
+    });
+
     socket.on("members-added", ({ conversation }) => {
       if (conversation) {
         // Update the conversation with the fully-populated version from backend

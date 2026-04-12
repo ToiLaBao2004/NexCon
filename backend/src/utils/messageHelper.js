@@ -28,6 +28,8 @@ const resolveLastMessagePreview = (message) => {
                     return `Cuộc gọi đã kết thúc`;
                 case 'admin_transferred':
                     return `${metadata.appointedByInfo?.displayName || 'Một quản trị viên'} đã chuyển quyền trưởng nhóm cho ${metadata.appointedUserInfo?.displayName || 'một thành viên'}`;
+                case 'group_avatar_updated':
+                    return `${metadata.updatedByName || 'Một thành viên'} đã đổi ảnh đại diện nhóm`;
                 case 'reminder_created_local':
                     return metadata.reminderContent
                         ? `Bạn đã tạo nhắc hẹn mới: ${metadata.reminderContent}`

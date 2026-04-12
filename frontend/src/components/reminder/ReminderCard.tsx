@@ -47,10 +47,10 @@ export default function ReminderCard({
   const highlighted = options?.highlighted ?? false;
   const allowQuickDelete = !showCancel && reminder.scope !== 'shared';
   const showDeleteControl = showCancel || allowQuickDelete;
-  
+
   const subtleBadgeClass = 'rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors group-hover:bg-muted/80';
   const scopeBadgeClass = 'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground';
-  
+
   const hoverDeleteLabel = reminder.scope === 'shared'
     ? (isDeclineAction ? 'Không tham gia nhắc hẹn này' : 'Hủy nhắc hẹn chung cho tất cả thành viên')
     : 'Xóa nhắc nhở cá nhân';
@@ -128,7 +128,7 @@ export default function ReminderCard({
             <a
               href={meetingUrl}
               onClick={(event) => handleMeetingLinkClick(event, meetingUrl)}
-                className="mt-1.5 block text-xs font-medium underline text-primary transition-colors hover:text-primary/80 break-all"
+              className="mt-1.5 block text-xs font-medium underline text-primary transition-colors hover:text-primary/80 break-all"
             >
               {meetingUrl}
             </a>

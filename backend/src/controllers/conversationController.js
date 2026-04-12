@@ -3,6 +3,11 @@ import Message from '../models/messageModel.js';
 import Friend from '../models/friendModel.js';
 import BlockUser from '../models/blockUserModel.js';
 import User from '../models/userModel.js';
+import {
+	uploadImageFromBuffer,
+	deleteCloudinaryResource,
+	MAX_IMAGE_SIZE,
+} from '../middlewares/uploadMiddleware.js';
 import { io, getReceiverSocketId } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
 export async function createConversation(req, res) {
@@ -466,6 +471,102 @@ export async function updateGroupName(req, res) {
 	} catch (error) {
 		console.error("An error occurred while updating group name: ", error);
 		return res.status(500).json({ message: "Internal server error" });
+	}
+}
+
+export async function updateGroupAvatar(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const userId = req.user._id.toString();
+
+		if (!req.file) {
+			return res.status(400).json({ message: 'No file uploaded.' });
+		}
+
+		if (!req.file.mimetype?.startsWith('image/')) {
+			return res.status(400).json({ message: 'Uploaded file is not an image.' });
+		}
+
+		if (req.file.size > MAX_IMAGE_SIZE) {
+			return res.status(413).json({
+				message: `Ảnh quá lớn. Kích thước tối đa là ${MAX_IMAGE_SIZE / 1024 / 1024}MB.`,
+			});
+		}
+
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+
+		if (conversation.type !== 'group') {
+			return res.status(400).json({ message: 'Only group conversations can update avatar.' });
+		}
+
+		if (conversation.disbanded === true) {
+			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
+		}
+
+		if (!conversation.participants.some((p) => p.userId.toString() === userId)) {
+			return res.status(403).json({ message: 'Only group participants can update group avatar.' });
+		}
+
+		const previousAvatarId = conversation.group?.avatarId || null;
+		const uploadResult = await uploadImageFromBuffer(req.file.buffer, 'NexCon/groups/avatars');
+
+		conversation.group.avatarUrl = uploadResult.secure_url;
+		conversation.group.avatarId = uploadResult.public_id;
+
+		const systemMessage = new Message({
+			conversationId,
+			senderId: req.user._id,
+			senderInfo: {
+				displayName: req.user.displayName,
+				avatarUrl: req.user.avatarUrl,
+			},
+			type: 'system',
+			systemType: 'group_avatar_updated',
+			metadata: {
+				updatedBy: req.user._id,
+				updatedByName: req.user.displayName,
+				groupAvatarUrl: uploadResult.secure_url,
+			},
+			content: `${req.user.displayName} đã đổi ảnh đại diện nhóm`,
+		});
+
+		const savedMsg = await systemMessage.save();
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+
+		updateConversationLastMessage(conversation, finalMsg, req.user._id);
+		await conversation.save();
+
+		if (previousAvatarId && previousAvatarId !== uploadResult.public_id) {
+			try {
+				await deleteCloudinaryResource(previousAvatarId, 'image');
+			} catch (error) {
+				console.warn('Delete old group avatar warning:', error?.message || error);
+			}
+		}
+
+		const updatedConversation = await Conversation.findById(conversationId).populate({
+			path: 'participants.userId',
+			select: 'displayName avatarUrl nickname email bio phone status lastSeen',
+		});
+
+		emitNewMessage(io, updatedConversation, finalMsg);
+
+		io.to(conversationId.toString()).emit('conversation-updated', {
+			conversationId,
+			conversation: updatedConversation,
+		});
+
+		return res.status(200).json({
+			success: true,
+			message: 'Group avatar updated successfully.',
+			conversation: updatedConversation,
+		});
+	} catch (error) {
+		console.error('Error updating group avatar:', error);
+		return res.status(500).json({ message: 'Internal server error' });
 	}
 }
 

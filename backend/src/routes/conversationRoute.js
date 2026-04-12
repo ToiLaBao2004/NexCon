@@ -1,6 +1,7 @@
 import express from 'express';
-import { createConversation, getConversations, getMessages, getMediaByType, markAsSeen, updateGroupName, disbandGroupByAdmin, clearConversation, addMembers, updateSettings, handleApproval, getApprovalQueue, transferAdminRole, removeMember, leaveGroup } from '../controllers/conversationController.js';
+import { createConversation, getConversations, getMessages, getMediaByType, markAsSeen, updateGroupName, updateGroupAvatar, disbandGroupByAdmin, clearConversation, addMembers, updateSettings, handleApproval, getApprovalQueue, transferAdminRole, removeMember, leaveGroup } from '../controllers/conversationController.js';
 import { checkFriendship } from '../middlewares/friendMiddleware.js';
+import { upload } from '../middlewares/uploadMiddleware.js';
 
 const conversationRouter = express.Router();
 
@@ -10,6 +11,7 @@ conversationRouter.get('/:conversationId/messages', getMessages);
 conversationRouter.get('/:conversationId/media', getMediaByType);
 conversationRouter.patch('/:conversationId/mark-seen', markAsSeen);
 conversationRouter.put('/:conversationId/update-group-name', updateGroupName);
+conversationRouter.post('/:conversationId/update-group-avatar', upload.single('file'), updateGroupAvatar);
 conversationRouter.delete('/:conversationId/disband-group', disbandGroupByAdmin);
 conversationRouter.delete('/:conversationId/clear', clearConversation);
 conversationRouter.post('/:conversationId/add-members', checkFriendship, addMembers);

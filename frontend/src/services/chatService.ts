@@ -97,6 +97,17 @@ export const chatService = {
 		return res.data;
 	},
 
+	async updateGroupAvatar(conversationId: string, file: File) {
+		const formData = new FormData();
+		formData.append('file', file);
+
+		const res = await api.post(`/conversations/${conversationId}/update-group-avatar`, formData, {
+			headers: { 'Content-Type': 'multipart/form-data' },
+		});
+
+		return res.data;
+	},
+
 	async createConversation(type: 'direct' | 'group', memberIds: string[], name?: string) {
 		const res = await api.post('/conversations/create-conversation', { type, memberIds, name });
 		return res.data;

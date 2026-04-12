@@ -35,6 +35,8 @@ export interface ApprovalQueueItem {
 
 export interface Group {
   name: string;
+  avatarUrl?: string | null;
+  avatarId?: string | null;
   createdBy: string;
   admins?: string[];
   isApprovalRequired?: boolean;

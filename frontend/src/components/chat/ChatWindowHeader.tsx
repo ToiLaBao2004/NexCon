@@ -157,6 +157,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
               <GroupChatAvatar
                 participants={chat.participants}
                 type="sidebar"
+                groupAvatarUrl={chat.group?.avatarUrl}
               />
             )}
           </div>

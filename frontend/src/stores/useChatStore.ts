@@ -577,6 +577,20 @@ export const useChatStore = create<ChatState>()(
                     console.error("Lỗi khi cập nhật tên nhóm:", error);
                 }
             },
+            updateGroupAvatar: async (conversationId: string, file: File) => {
+                try {
+                    const response = await chatService.updateGroupAvatar(conversationId, file);
+                    if (response?.conversation) {
+                        get().updateConversation(response.conversation);
+                        return;
+                    }
+
+                    await get().fetchConversations();
+                } catch (error) {
+                    console.error("Lỗi khi cập nhật ảnh nhóm:", error);
+                    throw error;
+                }
+            },
             updateGroupSettings: async (conversationId: string, isApprovalRequired: boolean) => {
                 try {
                     await chatService.updateGroupSettings(conversationId, isApprovalRequired);
