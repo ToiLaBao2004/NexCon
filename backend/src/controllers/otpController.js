@@ -9,7 +9,7 @@ export async function sendOtpMakeUser(req, res) {
         email = email?.trim();
         const latestOtp = await Otp.findOne({ email: email, type: 'verification' }).sort({ createdAt: -1 });
         if (latestOtp && (Date.now() - latestOtp.createdAt.getTime()) < 60000) { // 1 minute
-            return res.status(429).json({ 
+            return res.status(429).json({
                 message: `Please wait ${Math.ceil(Date.now() - latestOtp.createdAt.getTime())} before requesting a new OTP.`
             });
         }
@@ -21,11 +21,11 @@ export async function sendOtpMakeUser(req, res) {
             type: 'verification',
             expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
         });
-        await sendOtp(email, otp);
+        sendOtp(email, otp);
         return res.json({ message: latestOtp ? "OTP resent to email" : "OTP sent to email." });
     } catch (err) {
         console.log("Error resending OTP:", err);
-        return res.status(500).json({ message: "Internal server error."});
+        return res.status(500).json({ message: "Internal server error." });
     }
 }
 
@@ -33,13 +33,13 @@ export async function sendOtpResetPassword(req, res) {
     try {
         let { email } = req.body;
         email = email?.trim();
-        const existingEmail = await User.findOne({ email:email });
+        const existingEmail = await User.findOne({ email: email });
         if (!existingEmail) {
-            return res.status(404).json({ message: "User with this email does not exist."});
+            return res.status(404).json({ message: "User with this email does not exist." });
         }
         const latestOtp = await Otp.findOne({ email: email, type: 'reset_password' }).sort({ createdAt: -1 });
         if (latestOtp && (Date.now() - latestOtp.createdAt.getTime()) < 60000) { // 1 minute
-            return res.status(429).json({ 
+            return res.status(429).json({
                 message: `Please wait ${Math.ceil(Date.now() - latestOtp.createdAt.getTime())} before requesting a new OTP.`
             });
         }
@@ -51,11 +51,11 @@ export async function sendOtpResetPassword(req, res) {
             type: 'reset_password',
             expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
         });
-        await sendOtp(email, otp);
+        sendOtp(email, otp);
         return res.json({ message: latestOtp ? "OTP resent to email" : "OTP sent to email." });
     } catch (err) {
         console.log("Error resending OTP:", err);
-        return res.status(500).json({ message: "Internal server error."});
+        return res.status(500).json({ message: "Internal server error." });
     }
 }
 
