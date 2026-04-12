@@ -1,35 +1,48 @@
-import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
-    host: "smtp-relay.brevo.com",
-    port: 587,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-    },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
-});
+const BREVO_API_URL = process.env.BREVO_API_URL;
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const EMAIL_FROM_EMAIL = process.env.EMAIL_FROM_EMAIL;
+const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || "NexCon App";
 
-transporter.verify()
-    .then(() => console.log("✅ Brevo SMTP ready"))
-    .catch((err) => console.error("❌ Brevo SMTP verify failed:", err));
+function ensureMailEnv() {
+    if (!BREVO_API_URL || !BREVO_API_KEY || !EMAIL_FROM_EMAIL) {
+        throw new Error("Missing Brevo mail environment variables.");
+    }
+}
 
 export async function sendMail(to, subject, text = "", html = "") {
     try {
-        const info = await transporter.sendMail({
-            from: process.env.EMAIL_FROM || `"NexCon App" <${process.env.EMAIL_USER}>`,
-            to,
-            subject,
-            text,
-            html,
+        ensureMailEnv();
+
+        const response = await fetch(BREVO_API_URL, {
+            method: "POST",
+            headers: {
+                accept: "application/json",
+                "api-key": BREVO_API_KEY,
+                "content-type": "application/json",
+            },
+            body: JSON.stringify({
+                sender: {
+                    name: EMAIL_FROM_NAME,
+                    email: EMAIL_FROM_EMAIL,
+                },
+                to: [{ email: to }],
+                subject,
+                textContent: text || undefined,
+                htmlContent: html || undefined,
+            }),
         });
 
-        console.log("📧 Email sent:", info.messageId);
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            console.error("❌ Brevo API error:", response.status, data);
+            return false;
+        }
+
+        console.log("📧 Email sent:", data);
         return true;
     } catch (err) {
         console.error("❌ Error sending email:", err);
