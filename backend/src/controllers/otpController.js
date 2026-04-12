@@ -21,7 +21,7 @@ export async function sendOtpMakeUser(req, res) {
             type: 'verification',
             expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
         });
-        sendOtp(email, otp);
+        await sendOtp(email, otp);
         return res.json({ message: latestOtp ? "OTP resent to email" : "OTP sent to email." });
     } catch (err) {
         console.log("Error resending OTP:", err);
@@ -51,7 +51,7 @@ export async function sendOtpResetPassword(req, res) {
             type: 'reset_password',
             expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes
         });
-        sendOtp(email, otp);
+        await sendOtp(email, otp);
         return res.json({ message: latestOtp ? "OTP resent to email" : "OTP sent to email." });
     } catch (err) {
         console.log("Error resending OTP:", err);
