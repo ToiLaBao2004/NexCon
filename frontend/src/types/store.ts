@@ -233,6 +233,8 @@ export interface NotificationState {
   notifications: Notification[];
   loading: boolean;
   unreadCount: number;
+  pendingReadIds: string[];
+  markAllPending: boolean;
   fetchNotifications: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
