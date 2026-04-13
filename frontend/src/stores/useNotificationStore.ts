@@ -7,12 +7,16 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     notifications: [],
     loading: false,
     unreadCount: 0,
+    pendingReadIds: [],
+    markAllPending: false,
 
     reset: () => {
         set({
             notifications: [],
             loading: false,
             unreadCount: 0,
+            pendingReadIds: [],
+            markAllPending: false,
         });
     },
 
@@ -21,7 +25,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             set({ loading: true });
             const notifications = await notificationService.getNotifications();
             const unreadCount = notifications.filter((n: Notification) => !n.isRead).length;
-            set({ notifications, unreadCount });
+            set({ notifications, unreadCount, pendingReadIds: [], markAllPending: false });
         } catch (error: any) {
             console.error('Lỗi khi tải thông báo:', error);
             toast.error('Không thể lấy thông báo');
@@ -31,40 +35,91 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     },
 
     markAsRead: async (id: string) => {
+        const { notifications, unreadCount, pendingReadIds, markAllPending } = get();
+        const targetNotification = notifications.find((notification) => notification._id === id);
+
+        if (!targetNotification || targetNotification.isRead || markAllPending || pendingReadIds.includes(id)) {
+            return;
+        }
+
+        const wasUnreadBeforeUpdate = !targetNotification.isRead;
+
+        set({
+            notifications: notifications.map((notification) =>
+                notification._id === id ? { ...notification, isRead: true } : notification
+            ),
+            unreadCount: Math.max(0, unreadCount - 1),
+            pendingReadIds: [...pendingReadIds, id],
+        });
+
         try {
             await notificationService.markAsRead(id);
-            const { notifications, unreadCount } = get();
-            const updatedNotifications = notifications.map((n) =>
-                n._id === id ? { ...n, isRead: true } : n
-            );
-            set({
-                notifications: updatedNotifications,
-                unreadCount: Math.max(0, unreadCount - 1)
-            });
         } catch (error: any) {
             console.error('Lỗi khi đánh dấu là đã đọc:', error);
             toast.error('Không thể đánh dấu thông báo là đã đọc');
+            set((state) => {
+                const shouldRollback =
+                    wasUnreadBeforeUpdate &&
+                    state.notifications.some((notification) => notification._id === id && notification.isRead);
+
+                if (!shouldRollback) {
+                    return {};
+                }
+
+                return {
+                    notifications: state.notifications.map((notification) =>
+                        notification._id === id ? { ...notification, isRead: false } : notification
+                    ),
+                    unreadCount: state.unreadCount + 1,
+                };
+            });
+        } finally {
+            set((state) => ({
+                pendingReadIds: state.pendingReadIds.filter((pendingId) => pendingId !== id),
+            }));
         }
     },
 
     markAllAsRead: async () => {
+        const { notifications, pendingReadIds, markAllPending } = get();
+        const unreadIds = notifications.filter((notification) => !notification.isRead).map((notification) => notification._id);
+
+        if (markAllPending || unreadIds.length === 0) {
+            return;
+        }
+
+        set({
+            notifications: notifications.map((notification) => ({ ...notification, isRead: true })),
+            unreadCount: 0,
+            markAllPending: true,
+            pendingReadIds: Array.from(new Set([...pendingReadIds, ...unreadIds])),
+        });
+
         try {
             await notificationService.markAllAsRead();
-            const { notifications } = get();
-            const updatedNotifications = notifications.map((n) => ({ ...n, isRead: true }));
-            set({ notifications: updatedNotifications, unreadCount: 0 });
             toast.success('Đã đánh dấu tất cả thông báo là đã đọc');
         } catch (error: any) {
             console.error('Lỗi khi đánh dấu tất cả là đã đọc:', error);
             toast.error('Không thể đánh dấu tất cả thông báo là đã đọc');
+            await get().fetchNotifications();
+        } finally {
+            set((state) => ({
+                markAllPending: false,
+                pendingReadIds: state.pendingReadIds.filter((pendingId) => !unreadIds.includes(pendingId)),
+            }));
         }
     },
 
     addNotification: (notification: Notification) => {
         const { notifications, unreadCount } = get();
+
+        if (notifications.some((existingNotification) => existingNotification._id === notification._id)) {
+            return;
+        }
+
         set({
             notifications: [notification, ...notifications],
-            unreadCount: unreadCount + 1,
+            unreadCount: notification.isRead ? unreadCount : unreadCount + 1,
         });
     },
 
