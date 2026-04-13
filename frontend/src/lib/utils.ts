@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export const formatOnlineTime = (date: Date) => {
   const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Math.max(0, now.getTime() - date.getTime());
 
   const diffMins = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
