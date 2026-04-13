@@ -4,11 +4,13 @@ import {
     createReminder,
     createSharedReminderFromMessage,
     getReminderSummary,
+    getMissedReminders,
     getSharedReminderOverview,
     getReminderById,
     getReminders,
     updateReminder,
     snoozeReminder,
+    dismissReminder,
     updateSharedReminderParticipation,
     deleteRemindersByScope,
     deleteReminder,
@@ -24,10 +26,12 @@ reminderRouter.patch('/shared/:sharedKey/participation', updateSharedReminderPar
 reminderRouter.get('/shared/:sharedKey/overview', getSharedReminderOverview);
 reminderRouter.get('/', getReminders);
 reminderRouter.get('/summary', getReminderSummary);
+reminderRouter.get('/missed', getMissedReminders);
 reminderRouter.delete('/bulk', deleteRemindersByScope);
 reminderRouter.get('/:id', getReminderById);
 reminderRouter.patch('/:id', updateReminder);
 reminderRouter.post('/:id/snooze', snoozeReminder);
+reminderRouter.post('/:id/dismiss', dismissReminder);
 reminderRouter.delete('/:id', deleteReminder);
 
 export default reminderRouter;

@@ -358,6 +358,10 @@ export interface ReminderState {
     minutes: 5 | 10 | 30 | 60,
     options?: { syncStore?: boolean; refreshSummary?: boolean }
   ) => Promise<Reminder>;
+  dismissReminderAsync: (
+    id: string,
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<Reminder>;
   updateSharedReminderParticipationAsync: (
     sharedKey: string,
     participate: boolean,

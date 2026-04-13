@@ -154,6 +154,20 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
     return reminder;
   },
 
+  dismissReminderAsync: async (id, options) => {
+    const { reminder } = await reminderService.dismissReminder(id);
+
+    if (options?.syncStore !== false) {
+      get().updateReminderInStore(reminder);
+    }
+
+    if (options?.refreshSummary !== false) {
+      await get().fetchUpcomingCount();
+    }
+
+    return reminder;
+  },
+
   updateSharedReminderParticipationAsync: async (sharedKey, participate, options) => {
     const { reminder } = await reminderService.updateSharedReminderParticipation(sharedKey, participate);
 
