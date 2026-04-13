@@ -25,11 +25,13 @@ import CallManager from "./components/call/CallManager";
 import GroupCallManager from "./components/call/GroupCallManager";
 import MeetManager from "./components/call/MeetManager";
 import ImageViewerModal from "./components/chat/ImageViewerModal";
+import { usePushNotification } from "./hooks/usePushNotification";
 
 function App() {
   const { isDark, setTheme } = useThemeStore();
   const { accessToken } = useAuthStore();
   const { connectSocket, disconnectSocket } = useSocketStore();
+  const { isSupported, requestPermission, subscribe } = usePushNotification();
 
   useEffect(() => {
     setTheme(isDark);
@@ -71,6 +73,46 @@ function App() {
     return () => disconnectSocket();
   }, [accessToken, connectSocket, disconnectSocket]);
 
+  useEffect(() => {
+    if (!accessToken || !isSupported()) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const setupPush = async () => {
+      try {
+        await navigator.serviceWorker.register('/sw.js');
+
+        if (cancelled) return;
+
+        if (Notification.permission === 'granted') {
+          await subscribe();
+          return;
+        }
+
+        if (Notification.permission === 'default') {
+          const askedKey = 'nexcon_push_permission_prompted';
+          if (localStorage.getItem(askedKey) !== '1') {
+            localStorage.setItem(askedKey, '1');
+            const permission = await requestPermission();
+            if (!cancelled && permission === 'granted') {
+              await subscribe();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[App] Push setup failed:', error);
+      }
+    };
+
+    void setupPush();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [accessToken, isSupported, requestPermission, subscribe]);
+
   return (
     <>
       <Toaster
@@ -99,6 +141,7 @@ function App() {
               <Route path="/meet" element={<MeetPage />} />
               <Route path="/people" element={<PeoplePage />} />
               <Route path="/reminder" element={<ReminderPage />} />
+              <Route path="/reminders" element={<ReminderPage />} />
               <Route path="/notification" element={<NotificationPage />} />
               <Route path="/" element={<Navigate to="/chat" replace />} />
             </Route>

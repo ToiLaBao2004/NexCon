@@ -54,10 +54,28 @@ const getFriendlyNotificationTitle = (title?: string) => {
         return 'Thông báo hệ thống';
     }
 
+    if (normalizedTitle === 'nhắc hẹn bị bỏ lỡ' || normalizedTitle === 'nhắc hẹn') {
+        return 'Nhắc hẹn';
+    }
+
     return FRIENDLY_NOTIFICATION_TITLE_MAP[normalizedTitle] ?? title;
 };
 
+const getFriendlyNotificationContent = (content?: string) => {
+    const safeContent = typeof content === 'string' ? content.trim() : '';
+    if (!safeContent) {
+        return 'Bạn có một thông báo mới';
+    }
+
+    return safeContent.replace(/Bạn có một nhắc hẹn bị bỏ lỡ lúc/gi, 'Bạn có một nhắc hẹn lúc');
+};
+
 const resolveNotificationPath = (notification: Notification) => {
+    const linkUrl = typeof notification.linkUrl === 'string' ? notification.linkUrl.trim() : '';
+    if (linkUrl.startsWith('/')) {
+        return linkUrl;
+    }
+
     const normalizedTitle = normalizeNotificationTitle(notification.title || '');
 
     if (normalizedTitle === 'new friend request' || normalizedTitle === 'friend request resent') {
@@ -68,7 +86,11 @@ const resolveNotificationPath = (notification: Notification) => {
         return '/people?tab=friends';
     }
 
-    return '/people';
+    if (normalizedTitle.includes('nhắc hẹn')) {
+        return '/reminders?tab=all';
+    }
+
+    return '/notification';
 };
 
 const NotificationCard: React.FC<NotificationCardProps> = ({ notification }) => {
@@ -121,7 +143,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({ notification }) => 
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                         <p className={cn('text-sm break-words', notification.isRead ? 'text-foreground/80' : 'font-semibold text-foreground')}>
-                            {notification.content}
+                            {getFriendlyNotificationContent(notification.content)}
                         </p>
                         {isUnread && (
                             <Badge

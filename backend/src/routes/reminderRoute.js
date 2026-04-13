@@ -4,7 +4,6 @@ import {
     createReminder,
     createSharedReminderFromMessage,
     getReminderSummary,
-    getMissedReminders,
     getSharedReminderOverview,
     getReminderById,
     getReminders,
@@ -26,7 +25,6 @@ reminderRouter.patch('/shared/:sharedKey/participation', updateSharedReminderPar
 reminderRouter.get('/shared/:sharedKey/overview', getSharedReminderOverview);
 reminderRouter.get('/', getReminders);
 reminderRouter.get('/summary', getReminderSummary);
-reminderRouter.get('/missed', getMissedReminders);
 reminderRouter.delete('/bulk', deleteRemindersByScope);
 reminderRouter.get('/:id', getReminderById);
 reminderRouter.patch('/:id', updateReminder);

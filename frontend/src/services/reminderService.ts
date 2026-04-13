@@ -4,7 +4,6 @@ import type {
   CreateReminderPayload,
   CreateSharedReminderFromMessagePayload,
   DeleteReminderResponse,
-  GetMissedRemindersResponse,
   GetRemindersParams,
   GetRemindersResponse,
   ReminderResponse,
@@ -66,11 +65,6 @@ export const reminderService = {
 
   async getReminderSummary(): Promise<ReminderSummaryResponse> {
     const response = await api.get<ReminderSummaryResponse>('/reminders/summary');
-    return response.data;
-  },
-
-  async getMissedReminders(): Promise<GetMissedRemindersResponse> {
-    const response = await api.get<GetMissedRemindersResponse>('/reminders/missed');
     return response.data;
   },
 

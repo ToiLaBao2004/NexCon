@@ -14,6 +14,7 @@ import notificationRouter from './routes/notificationRoute.js';
 import callRouter from './routes/callRoute.js';
 import livekitRouter from './routes/livekitRoute.js';
 import reminderRouter from './routes/reminderRoute.js';
+import pushRouter from './routes/pushRoute.js';
 import { app, server } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { startReminderCron } from './utils/reminderCron.js';
@@ -36,6 +37,7 @@ cloudinary.config({
 // public routes
 app.use('/api/auth', authRouter);
 app.use('/api/otp', otpRouter);
+app.use('/api/push', pushRouter);
 
 // private routes
 app.use(authMiddleware);
