@@ -184,7 +184,6 @@ export const useAuthStore = create<AuthState>()(
         }
       } catch (error) {
         console.error('Lỗi khi làm mới token:', error);
-        toast.error('Hết phiên làm việc. Vui lòng đăng nhập lại.');
         get().clearState();
         throw error;
       } finally {
