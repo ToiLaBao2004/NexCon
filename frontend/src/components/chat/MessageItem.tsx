@@ -1453,7 +1453,7 @@ const MessageItem = ({
 								shouldShowTouchActionControls
 									? "opacity-100 pointer-events-auto"
 									: "opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
-								isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19"
+								isOwn ? "-left-10" : "-right-10"
 							)}>
 								<div className="flex items-center gap-1 bg-background shadow-md border border-border/40 rounded-full px-0.5 py-0.5">
 									<Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
@@ -1493,7 +1493,7 @@ const MessageItem = ({
 									<button
 										className={cn(
 											"absolute top-1/2 -translate-y-1/2",
-											isOwn ? "-left-10 sm:-left-11" : "-right-10 sm:-right-11",
+											isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19",
 											shouldShowTouchActionControls ? "opacity-100" : "opacity-0 group-hover:opacity-70 hover:opacity-100",
 											"transition-opacity duration-150 ease-in-out",
 											"text-muted-foreground hover:text-foreground",
