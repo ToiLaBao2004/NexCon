@@ -86,6 +86,7 @@ export interface ChatState {
   updateConversation: (conversation: Conversation) => void;
   markAsSeen: () => Promise<void>;
   updateGroupName: (conversationId: string, name: string) => Promise<void>;
+  updateGroupAvatar: (conversationId: string, file: File) => Promise<void>;
   openChat: (params: { userId?: string; conversationId?: string }) => Promise<void>;
   createGroup: (name: string, members: string[]) => Promise<void>;
   recallMessage: (messageId: string) => Promise<void>;
@@ -355,6 +356,10 @@ export interface ReminderState {
   snoozeReminderAsync: (
     id: string,
     minutes: 5 | 10 | 30 | 60,
+    options?: { syncStore?: boolean; refreshSummary?: boolean }
+  ) => Promise<Reminder>;
+  dismissReminderAsync: (
+    id: string,
     options?: { syncStore?: boolean; refreshSummary?: boolean }
   ) => Promise<Reminder>;
   updateSharedReminderParticipationAsync: (

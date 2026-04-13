@@ -116,6 +116,11 @@ export interface ReminderSummaryResponse {
   upcomingCount: number;
 }
 
+export interface GetMissedRemindersResponse {
+  missedReminders: Reminder[];
+  count: number;
+}
+
 export interface DeleteReminderResponse {
   message: string;
   reminder?: Reminder;

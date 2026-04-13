@@ -13,8 +13,24 @@ import { playMessageSound, playNotificationSound } from "@/utils/sound";
 import useMediaCacheStore from "./useMediaCacheStore";
 import { useReminderStore } from "./useReminderStore";
 import { showReminderToast } from "@/components/reminder/showReminderToast";
+import { reminderService } from "@/services/reminderService";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
+
+const syncMissedRemindersOnReconnect = async () => {
+  try {
+    const { missedReminders } = await reminderService.getMissedReminders();
+    if (!Array.isArray(missedReminders) || missedReminders.length === 0) return;
+
+    const reminderStore = useReminderStore.getState();
+    for (const reminder of missedReminders) {
+      reminderStore.updateReminderInStore(reminder);
+      showReminderToast(reminder);
+    }
+  } catch (error) {
+    console.error("Load missed reminders error:", error);
+  }
+};
 
 export const useSocketStore = create<SocketState>((set, get) => ({
   socket: null,
@@ -68,6 +84,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("connect", () => {
       console.log("Connected to Socket");
+      void syncMissedRemindersOnReconnect();
     });
 
     socket.on("online-users", (userIds) => {
@@ -208,6 +225,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     socket.on("new-conversation", ({ conversation }) => {
       useChatStore.getState().updateConversation(conversation);
       get().joinConversation(conversation._id);
+    });
+
+    socket.on("conversation-updated", ({ conversation }) => {
+      if (conversation) {
+        useChatStore.getState().updateConversation(conversation);
+      }
     });
 
     socket.on("members-added", ({ conversation }) => {

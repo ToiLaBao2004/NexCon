@@ -100,6 +100,7 @@ const ReminderPage = () => {
     const [createPrefillData, setCreatePrefillData] = useState<Partial<CreateReminderPayload> | undefined>(undefined);
     const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
     const [deleteReminderId, setDeleteReminderId] = useState<string | null>(null);
+    const [reminderToConfirmDelete, setReminderToConfirmDelete] = useState<Reminder | null>(null);
     const [isDeletingReminder, setIsDeletingReminder] = useState(false);
     const [deleteScope, setDeleteScope] = useState<'upcoming' | 'past' | 'all' | null>(null);
     const [isDeletingScope, setIsDeletingScope] = useState(false);
@@ -125,6 +126,21 @@ const ReminderPage = () => {
         setCreatePrefillData(undefined);
         setEditingReminder(reminder);
     }, []);
+
+    const handleOpenDeleteConfirm = useCallback((reminderOrId: Reminder | string) => {
+        if (typeof reminderOrId === 'string') {
+            const found = reminders.find(r => r._id === reminderOrId);
+            if (found) {
+                setReminderToConfirmDelete(found);
+                setDeleteReminderId(reminderOrId);
+            } else {
+                setDeleteReminderId(reminderOrId);
+            }
+        } else {
+            setReminderToConfirmDelete(reminderOrId);
+            setDeleteReminderId(reminderOrId._id);
+        }
+    }, [reminders]);
 
     useEffect(() => {
         const deepLinkKey = `${tabQuery ?? ''}|${focusReminderId ?? ''}`;
@@ -382,10 +398,7 @@ const ReminderPage = () => {
     const hasUpcomingData = groupedUpcoming.length > 0 || groupedDeclinedSharedUpcoming.length > 0;
     const isAllTabStatusUnselected = activeTab === 'all' && selectedStatuses.length === 0;
 
-    const reminderPendingDelete = useMemo(() => {
-        if (!deleteReminderId) return null;
-        return reminders.find((item) => item._id === deleteReminderId) || null;
-    }, [deleteReminderId, reminders]);
+    const reminderPendingDelete = reminderToConfirmDelete;
 
     const deleteModalContext = useMemo(() => {
         const reminder = reminderPendingDelete;
@@ -410,9 +423,9 @@ const ReminderPage = () => {
 
         if (isCreator) {
             return {
-                title: 'Hủy nhắc hẹn chung?',
-                description: 'Nhắc hẹn chung sẽ bị hủy cho tất cả thành viên.',
-                confirmText: 'Hủy cho tất cả',
+                title: 'Hủy cho tất cả thành viên và xóa nhắc hẹn này?',
+                description: 'Nhắc hẹn chung sẽ bị hủy cho tất cả thành viên và bị xóa vĩnh viễn.',
+                confirmText: 'Hủy cho tất cả và xóa',
             };
         }
 
@@ -600,13 +613,14 @@ const ReminderPage = () => {
         setIsDeletingReminder(true);
         try {
             const result = await deleteReminderAsync(deleteReminderId, {
-                syncStore: false,
+                syncStore: true, // Sync store immediately to remove from UI
                 refreshSummary: false,
             });
-            await fetchReminders(currentQueryParams);
+            setDeleteReminderId(null);
+            setReminderToConfirmDelete(null);
+            
             void fetchUpcomingCount();
             toast.success(result.message || 'Đã xóa nhắc nhở');
-            setDeleteReminderId(null);
         } catch (error) {
             console.error('Delete reminder failed:', error);
             toast.error('Không thể xóa nhắc nhở');
@@ -1100,7 +1114,7 @@ const ReminderPage = () => {
                             calendarEventsByDay={calendarEventsByDay}
                             onSelectCalendarDay={setSelectedCalendarDayKey}
                             onCalendarEventClick={handleCalendarReminderClick}
-                            onDeleteReminder={setDeleteReminderId}
+                            onDeleteReminder={handleOpenDeleteConfirm}
                             onOpenReminderMeetingLink={openReminderMeetingLink}
                         />
                     )
@@ -1117,7 +1131,7 @@ const ReminderPage = () => {
                                         activeTab={activeTab}
                                         options={getReminderCardOptions(item)}
                                         onEdit={handleReminderPrimaryAction}
-                                        onDelete={setDeleteReminderId}
+                                        onDelete={handleOpenDeleteConfirm}
                                         onReuse={handleReuseReminder}
                                         onRepeat={(reminder, minutes) => {
                                             void handleRepeatReminder(reminder, minutes);
@@ -1149,7 +1163,7 @@ const ReminderPage = () => {
                                                         showReuse: false,
                                                     }}
                                                     onEdit={handleRejoinSharedReminder}
-                                                    onDelete={setDeleteReminderId}
+                                                    onDelete={handleOpenDeleteConfirm}
                                                     onReuse={handleReuseReminder}
                                                     onRepeat={(reminder, minutes) => {
                                                         void handleRepeatReminder(reminder, minutes);
@@ -1175,7 +1189,7 @@ const ReminderPage = () => {
                                     activeTab={activeTab}
                                     options={getReminderCardOptions(item)}
                                     onEdit={handleReminderPrimaryAction}
-                                    onDelete={setDeleteReminderId}
+                                    onDelete={handleOpenDeleteConfirm}
                                     onReuse={handleReuseReminder}
                                     onRepeat={(reminder, minutes) => {
                                         void handleRepeatReminder(reminder, minutes);
@@ -1196,7 +1210,7 @@ const ReminderPage = () => {
                                 activeTab={activeTab}
                                 options={getReminderCardOptions(item)}
                                 onEdit={handleReminderPrimaryAction}
-                                onDelete={setDeleteReminderId}
+                                onDelete={handleOpenDeleteConfirm}
                                 onReuse={handleReuseReminder}
                                 onRepeat={(reminder, minutes) => {
                                     void handleRepeatReminder(reminder, minutes);
@@ -1309,6 +1323,7 @@ const ReminderPage = () => {
                 onClose={() => {
                     if (isDeletingReminder) return;
                     setDeleteReminderId(null);
+                    setReminderToConfirmDelete(null);
                 }}
                 onConfirm={() => {
                     void handleDeleteReminder();

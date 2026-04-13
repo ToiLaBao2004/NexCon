@@ -87,6 +87,13 @@ export const getSystemMessageText = (
             return `${appointedUserName} đã trở thành trưởng nhóm mới`;
         }
 
+        case "group_avatar_updated": {
+            const updatedBy = meta.updatedBy;
+            const updatedByName = meta.updatedByName || "Một thành viên";
+            const isMe = updatedBy?.toString() === currentUserId;
+            return isMe ? "Bạn đã đổi ảnh đại diện nhóm" : `${updatedByName} đã đổi ảnh đại diện nhóm`;
+        }
+
         case "call_started":
             return "Cuộc gọi đã bắt đầu";
         case "call_ended":

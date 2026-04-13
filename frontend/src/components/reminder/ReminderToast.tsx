@@ -22,10 +22,11 @@ const formatReminderTime = (isoDate: string): string =>
   }).format(new Date(isoDate));
 
 export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps) {
-  const [loadingAction, setLoadingAction] = useState<'snooze' | null>(null);
+  const [loadingAction, setLoadingAction] = useState<'snooze' | 'dismiss' | null>(null);
   const [showSnoozeOptions, setShowSnoozeOptions] = useState(false);
   const snoozeAreaRef = useRef<HTMLDivElement | null>(null);
   const snoozeReminderAsync = useReminderStore((state) => state.snoozeReminderAsync);
+  const dismissReminderAsync = useReminderStore((state) => state.dismissReminderAsync);
   const reminderContent = String(reminder.content || '').trim() || [reminder.title, reminder.note].filter(Boolean).join('\n').trim();
   const reminderMeetingTitle = (reminderContent.match(/Nhắc về cuộc họp:\s*(.+)/i)?.[1] || '').trim();
   const meetingUrlInContent = extractFirstHttpUrl(reminderContent);
@@ -86,6 +87,21 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
     } catch (error) {
       console.error('Snooze reminder failed:', error);
       toast.error('Không thể nhắc lại lúc này');
+    } finally {
+      setLoadingAction(null);
+      setShowSnoozeOptions(false);
+    }
+  };
+
+  const handleDismissReminder = async () => {
+    try {
+      setLoadingAction('dismiss');
+      await dismissReminderAsync(reminder._id);
+      toast.dismiss(toastId);
+      toast.success('Đã bỏ qua nhắc hẹn');
+    } catch (error) {
+      console.error('Dismiss reminder failed:', error);
+      toast.error('Không thể bỏ qua nhắc hẹn lúc này');
     } finally {
       setLoadingAction(null);
       setShowSnoozeOptions(false);
@@ -191,9 +207,20 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
             <button
               type="button"
               onClick={handleView}
+              disabled={loadingAction !== null}
               className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-100 px-5 text-sm font-semibold text-black transition-colors hover:bg-slate-200"
             >
               Xem
+            </button>
+            <button
+              type="button"
+              disabled={loadingAction !== null}
+              onClick={() => {
+                void handleDismissReminder();
+              }}
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-4 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Bỏ qua
             </button>
             <button
               type="button"

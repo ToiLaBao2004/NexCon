@@ -608,6 +608,31 @@ export async function getReminderSummary(req, res) {
     }
 }
 
+export async function getMissedReminders(req, res) {
+    try {
+        const userId = req.user._id;
+
+        const reminders = await Reminder.find({
+            userId,
+            status: 'triggered',
+            $or: [
+                { scope: 'personal' },
+                { scope: 'shared', participationStatus: 'joined' },
+            ],
+        })
+            .sort({ remindAt: -1 })
+            .lean();
+
+        return res.status(200).json({
+            missedReminders: reminders.map((item) => normalizeReminderOutput(item)),
+            count: reminders.length,
+        });
+    } catch (error) {
+        console.error('Get missed reminders error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
 export async function getReminderById(req, res) {
     try {
         const userId = req.user._id;
@@ -894,6 +919,39 @@ export async function snoozeReminder(req, res) {
         return res.status(200).json({ reminder: outputReminder });
     } catch (error) {
         console.error('Snooze reminder error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function dismissReminder(req, res) {
+    try {
+        const userId = req.user._id;
+        const userIdStr = toObjectIdString(userId);
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ message: 'Invalid reminder id.' });
+        }
+
+        const reminder = await Reminder.findOne({ _id: id, userId });
+        if (!reminder) {
+            return res.status(404).json({ message: 'Reminder not found.' });
+        }
+
+        if (reminder.status === 'dismissed') {
+            return res.status(200).json({ reminder: normalizeReminderOutput(reminder) });
+        }
+
+        reminder.status = 'dismissed';
+        reminder.snoozeUntil = undefined;
+        await reminder.save();
+
+        const normalizedReminder = normalizeReminderOutput(reminder);
+        emitToUser(userIdStr, 'reminder-updated', { reminder: normalizedReminder });
+
+        return res.status(200).json({ reminder: normalizedReminder });
+    } catch (error) {
+        console.error('Dismiss reminder error:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }

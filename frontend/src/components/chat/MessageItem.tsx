@@ -530,6 +530,22 @@ function SystemMessageComponent({
 			}
 		}
 
+		if (message.systemType === "group_avatar_updated") {
+			const updatedByActor = makeActor(
+				metadata.updatedBy || message.senderId,
+				metadata.updatedByName || message.senderInfo?.displayName || "Một thành viên",
+				metadata.updatedByAvatarUrl || message.senderInfo?.avatarUrl
+			);
+
+			if (updatedByActor) {
+				return (
+					<>
+						{actorBadge(updatedByActor)} {textPart("đã đổi ảnh đại diện nhóm")}
+					</>
+				);
+			}
+		}
+
 		if (message.systemType === "member_left") {
 			const leftActor = makeActor(
 				metadata.leftUserId || metadata.userId,
@@ -803,14 +819,14 @@ function SystemMessageComponent({
 		const isShared = message.systemType === 'shared_reminder_created';
 		const reminderContent = String(
 			(isShared ? (sharedOverview?.content || linkedReminder?.content) : linkedReminder?.content)
-				|| metadata.reminderContent
-				|| message.content
-				|| 'Nhắc hẹn mới'
+			|| metadata.reminderContent
+			|| message.content
+			|| 'Nhắc hẹn mới'
 		).trim();
 		const remindAt = String(
 			(isShared ? (sharedOverview?.remindAt || linkedReminder?.remindAt) : linkedReminder?.remindAt)
-				|| metadata.remindAt
-				|| ''
+			|| metadata.remindAt
+			|| ''
 		).trim();
 		const creatorId = String(metadata.creatorId || message.senderId || '').trim();
 		const reminderAnchorId = isShared
@@ -934,10 +950,10 @@ function SystemMessageComponent({
 									{isCancelled
 										? 'Nhắc hẹn này đã bị hủy bởi người tạo.'
 										: isCreator
-										? 'Nhắc hẹn này áp dụng cho toàn bộ thành viên trong cuộc trò chuyện.'
-										: participationStatus === 'declined'
-											? 'Bạn đang không tham gia nhắc hẹn này.'
-											: 'Bạn đang tham gia nhắc hẹn này.'}
+											? 'Nhắc hẹn này áp dụng cho toàn bộ thành viên trong cuộc trò chuyện.'
+											: participationStatus === 'declined'
+												? 'Bạn đang không tham gia nhắc hẹn này.'
+												: 'Bạn đang tham gia nhắc hẹn này.'}
 								</p>
 								{canViewParticipants && (
 									<div className="flex items-center justify-between gap-2">
@@ -1087,8 +1103,8 @@ function SystemMessageComponent({
 					mode="edit"
 					editScope={
 						editingReminder
-						&& editingReminder.scope === 'shared'
-						&& String(editingReminder.createdBy || '') !== String(currentUserId || '')
+							&& editingReminder.scope === 'shared'
+							&& String(editingReminder.createdBy || '') !== String(currentUserId || '')
 							? 'notifyOnly'
 							: 'full'
 					}
@@ -1108,7 +1124,7 @@ function SystemMessageComponent({
 			<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-3 py-1.5 shadow-sm backdrop-blur-sm">
 				<p className="text-[13px] font-normal tracking-normal break-words">
 					<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
-					{systemContent}
+						{systemContent}
 					</span>
 				</p>
 			</div>
@@ -1194,7 +1210,68 @@ const MessageItem = ({
 	const [showReactionModal, setShowReactionModal] = useState(false);
 	const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 	const [isReacting, setIsReacting] = useState(false);
+	const [isCoarsePointer, setIsCoarsePointer] = useState(false);
+	const [showTouchActions, setShowTouchActions] = useState(false);
 	const [reminderTargetMessage, setReminderTargetMessage] = useState<{ messageId: string; messagePreview: string } | null>(null);
+	const messageRootRef = useRef<HTMLDivElement | null>(null);
+	const longPressTimeoutRef = useRef<number | null>(null);
+
+	const clearLongPressTimer = useCallback(() => {
+		if (longPressTimeoutRef.current !== null) {
+			window.clearTimeout(longPressTimeoutRef.current);
+			longPressTimeoutRef.current = null;
+		}
+	}, []);
+
+	useEffect(() => {
+		if (typeof window === "undefined") return;
+
+		const mediaQuery = window.matchMedia("(hover: none), (pointer: coarse)");
+		const updateMode = () => setIsCoarsePointer(mediaQuery.matches);
+
+		updateMode();
+		mediaQuery.addEventListener("change", updateMode);
+
+		return () => {
+			mediaQuery.removeEventListener("change", updateMode);
+		};
+	}, []);
+
+	useEffect(() => {
+		if (!showTouchActions) return;
+
+		const handleOutsidePointerDown = (event: PointerEvent) => {
+			if (!messageRootRef.current) return;
+			if (messageRootRef.current.contains(event.target as Node)) return;
+			setShowTouchActions(false);
+		};
+
+		window.addEventListener("pointerdown", handleOutsidePointerDown);
+		return () => {
+			window.removeEventListener("pointerdown", handleOutsidePointerDown);
+		};
+	}, [showTouchActions]);
+
+	useEffect(() => {
+		return () => {
+			clearLongPressTimer();
+		};
+	}, [clearLongPressTimer]);
+
+	const handlePointerDownForActions = (event: React.PointerEvent<HTMLDivElement>) => {
+		if (!isCoarsePointer) return;
+		if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+		if (isRecalled || message.status || isDisbanded) return;
+
+		clearLongPressTimer();
+		longPressTimeoutRef.current = window.setTimeout(() => {
+			setShowTouchActions(true);
+		}, 380);
+	};
+
+	const handlePointerEndForActions = () => {
+		clearLongPressTimer();
+	};
 
 	const reactionSummary = useMemo(() => {
 		if (!message.reactions?.length) return null;
@@ -1216,6 +1293,7 @@ const MessageItem = ({
 		setIsReacting(true);
 		try {
 			await reactToMessage(message._id, emoji.native);
+			setShowTouchActions(false);
 		} catch (error) {
 			console.error("Reaction failed:", error);
 		} finally {
@@ -1226,7 +1304,10 @@ const MessageItem = ({
 	const handlePin = async () => {
 		try { await pinMessage(message._id); }
 		catch (e) { console.error("Ghim thất bại:", e); }
-		finally { setShowPinOptions(false); }
+		finally {
+			setShowPinOptions(false);
+			setShowTouchActions(false);
+		}
 	};
 
 	const handleCopy = () => {
@@ -1239,19 +1320,33 @@ const MessageItem = ({
 	const handleRecall = async () => {
 		try { await recallMessage(message._id); }
 		catch (e: any) { toast.error(e.message || "Thu hồi thất bại"); }
-		finally { setShowConfirmRecall(false); }
+		finally {
+			setShowConfirmRecall(false);
+			setShowTouchActions(false);
+		}
 	};
 
 	const canCreateReminder = !isDisbanded && !isRecalled && (message.type === "text" || message.type === "image");
+	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
 	return (
 		<>
 			<div
+				ref={messageRootRef}
 				id={`msg-${message._id}`}
 				className={cn(
 					"group relative flex gap-2 mt-0.5 mx-2 px-1",
 					isOwn ? "justify-end" : "justify-start"
 				)}
+				onPointerDown={handlePointerDownForActions}
+				onPointerUp={handlePointerEndForActions}
+				onPointerCancel={handlePointerEndForActions}
+				onPointerLeave={handlePointerEndForActions}
+				onContextMenu={(event) => {
+					if (isCoarsePointer) {
+						event.preventDefault();
+					}
+				}}
 			>
 				{!isOwn && (
 					<div className="w-8 shrink-0 pt-0.5">
@@ -1354,7 +1449,10 @@ const MessageItem = ({
 						{/* Hover Action Bar - Quick Reaction Button */}
 						{!isRecalled && !message.status && !isDisbanded && (
 							<div className={cn(
-								"absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none group-hover:pointer-events-auto z-30",
+								"absolute top-1/2 -translate-y-1/2 transition-all duration-200 z-30",
+								shouldShowTouchActionControls
+									? "opacity-100 pointer-events-auto"
+									: "opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
 								isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19"
 							)}>
 								<div className="flex items-center gap-1 bg-background shadow-md border border-border/40 rounded-full px-0.5 py-0.5">
@@ -1396,13 +1494,18 @@ const MessageItem = ({
 										className={cn(
 											"absolute top-1/2 -translate-y-1/2",
 											isOwn ? "-left-10 sm:-left-11" : "-right-10 sm:-right-11",
-											"opacity-0 group-hover:opacity-70 hover:opacity-100",
+											shouldShowTouchActionControls ? "opacity-100" : "opacity-0 group-hover:opacity-70 hover:opacity-100",
 											"transition-opacity duration-150 ease-in-out",
 											"text-muted-foreground hover:text-foreground",
 											"p-1.5 rounded-full hover:bg-accent/40",
 											"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
 										)}
 										aria-label="Message actions"
+										onClick={() => {
+											if (isCoarsePointer) {
+												setShowTouchActions(true);
+											}
+										}}
 									>
 										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
 											<circle cx="12" cy="12" r="1" />
@@ -1414,27 +1517,27 @@ const MessageItem = ({
 
 								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
 									{!isDisbanded && (
-										<DropdownMenuItem onClick={() => onReply?.(message)}>
+										<DropdownMenuItem onClick={() => { setShowTouchActions(false); onReply?.(message); }}>
 											<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
 											Trả lời
 										</DropdownMenuItem>
 									)}
 									{message.content && (
-										<DropdownMenuItem onClick={handleCopy}>
+										<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
 											<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
 											Sao chép
 										</DropdownMenuItem>
 									)}
 									{(message.fileUrl || message.filePublicId) && (
 										<DropdownMenuItem asChild>
-											<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center">
+											<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center" onClick={() => setShowTouchActions(false)}>
 												<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
 												Tải xuống
 											</a>
 										</DropdownMenuItem>
 									)}
 									{!isDisbanded && (
-										<DropdownMenuItem onClick={() => setShowPinOptions(true)}>
+										<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }}>
 											{isPinned ? (
 												<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
 											) : (
@@ -1446,6 +1549,7 @@ const MessageItem = ({
 									{canCreateReminder && (
 										<DropdownMenuItem
 											onClick={() => {
+												setShowTouchActions(false);
 												setReminderTargetMessage({
 													messageId: message._id,
 													messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
@@ -1459,7 +1563,7 @@ const MessageItem = ({
 									{isOwn && !isDisbanded && (
 										<DropdownMenuItem
 											className="text-destructive focus:text-destructive focus:bg-destructive/10"
-											onClick={() => setShowConfirmRecall(true)}
+											onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }}
 										>
 											<Undo2 className="w-4 h-4 mr-2" strokeWidth={1.6} />
 											Thu hồi

@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { GroupManagementPanel } from "./GroupManagementPanel";
 import { AddMemberModal } from "./AddMemberModal";
 import { LeaveGroupModal } from "./LeaveGroupModal";
+import { toast } from "sonner";
 
 function ActionBtnLocal({
   icon: Icon,
@@ -40,7 +41,7 @@ function ActionBtnLocal({
     </button>
   );
 }
-import { Bell, Pin, UserPlus, Pencil } from "lucide-react";
+import { Bell, Pin, UserPlus, Pencil, Camera, Loader2 } from "lucide-react";
 import { MutualGroupsPanel } from "./MutualGroups";
 import ConversationLists from "./ConversationLists";
 import {
@@ -65,7 +66,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [mutualPopoverOpen, setMutualPopoverOpen] = useState(false);
   const { setNickName, loading: nicknameLoading, friends } = useFriendStore();
   const [newGroupInitialSelected, setNewGroupInitialSelected] = useState<string[] | undefined>(undefined);
-  const { fetchConversations, updateGroupName } = useChatStore();
+  const { fetchConversations, updateGroupName, updateGroupAvatar } = useChatStore();
 
   /* shared modal state */
   const [openNickname, setOpenNickname] = useState(false);
@@ -73,6 +74,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [openGroupRename, setOpenGroupRename] = useState(false);
   const [groupNameDraft, setGroupNameDraft] = useState("");
   const [groupRenameLoading, setGroupRenameLoading] = useState(false);
+  const [groupAvatarLoading, setGroupAvatarLoading] = useState(false);
   const [isNewGroupModalOpen, setIsNewGroupModalOpen] = useState(false);
   const [manageGroupOpen, setManageGroupOpen] = useState(false);
 
@@ -82,6 +84,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   // refs for name elements (used for a11y / future enhancements)
   const nameRefDirect = useRef<HTMLSpanElement | null>(null);
   const nameRefGroup = useRef<HTMLSpanElement | null>(null);
+  const groupAvatarInputRef = useRef<HTMLInputElement | null>(null);
 
   // helpers
   const otherParticipant = useMemo(() => {
@@ -165,6 +168,32 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
       fetchConversations();
     } finally {
       setGroupRenameLoading(false);
+    }
+  };
+
+  const handlePickGroupAvatar = () => {
+    groupAvatarInputRef.current?.click();
+  };
+
+  const handleGroupAvatarFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Vui lòng chọn tệp ảnh hợp lệ");
+      return;
+    }
+
+    try {
+      setGroupAvatarLoading(true);
+      await updateGroupAvatar(conversation._id, file);
+      toast.success("Đã cập nhật ảnh đại diện nhóm");
+    } catch {
+      toast.error("Không thể cập nhật ảnh nhóm");
+    } finally {
+      setGroupAvatarLoading(false);
     }
   };
 
@@ -300,8 +329,36 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
     <aside className="flex flex-col h-full min-w-[350px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
       <div className="flex flex-col items-center pt-6 pb-4 bg-card">
         <div className="w-[350px] flex flex-col items-center">
-          <div className="relative mb-1 h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
-            <GroupChatAvatar participants={conversation.participants} type="sidebar" />
+          <div className="relative mb-1">
+            <div className="h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
+              <GroupChatAvatar
+                participants={conversation.participants}
+                type="sidebar"
+                groupAvatarUrl={conversation.group?.avatarUrl}
+              />
+            </div>
+            {!isDisbanded && (
+              <button
+                type="button"
+                onClick={handlePickGroupAvatar}
+                disabled={groupAvatarLoading}
+                className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70 z-10"
+                title="Đổi ảnh đại diện nhóm"
+              >
+                {groupAvatarLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.8} />
+                ) : (
+                  <Camera className="h-3.5 w-3.5" strokeWidth={1.8} />
+                )}
+              </button>
+            )}
+            <input
+              ref={groupAvatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleGroupAvatarFileChange}
+            />
           </div>
 
           <div className="relative w-full mt-0 mb-3">

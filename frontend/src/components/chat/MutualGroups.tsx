@@ -33,7 +33,7 @@ function GroupItem({ group, onClick }: GroupItemProps) {
       className="flex items-center gap-3 w-full px-3 py-2 rounded hover:bg-muted/10 text-left"
     >
       <div className="shrink-0">
-        <GroupChatAvatar participants={group.participants} type="sidebar" />
+        <GroupChatAvatar participants={group.participants} type="sidebar" groupAvatarUrl={group.group?.avatarUrl} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="font-medium text-sm text-foreground truncate">
