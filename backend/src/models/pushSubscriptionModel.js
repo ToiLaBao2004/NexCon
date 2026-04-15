@@ -34,9 +34,6 @@ const pushSubscriptionSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-pushSubscriptionSchema.index({ endpoint: 1 }, { unique: true });
-pushSubscriptionSchema.index({ userId: 1 });
-
 const PushSubscriptionModel =
     mongoose.models.PushSubscription || mongoose.model('PushSubscription', pushSubscriptionSchema);
 

@@ -3,15 +3,37 @@ import { sendOtp } from "../utils/sendEmail.js";
 import crypto from "crypto";
 import User from "../models/userModel.js";
 
+function getCooldownMessage(remainingMs) {
+    const seconds = Math.ceil(remainingMs / 1000);
+
+    if (seconds >= 60) {
+        const minutes = Math.ceil(seconds / 60);
+        return `Please wait ${minutes} minute(s) before requesting a new OTP.`;
+    }
+
+    return `Please wait ${seconds} seconds before requesting a new OTP.`;
+}
+
+function checkOtpCooldown(latestOtp, cooldownMs = 60000) {
+    if (!latestOtp) return null;
+
+    const elapsedMs = Date.now() - latestOtp.createdAt.getTime();
+
+    if (elapsedMs < cooldownMs) {
+        return getCooldownMessage(cooldownMs - elapsedMs);
+    }
+
+    return null;
+}
+
 export async function sendOtpMakeUser(req, res) {
     try {
         let { email } = req.body;
         email = email?.trim();
         const latestOtp = await Otp.findOne({ email: email, type: 'verification' }).sort({ createdAt: -1 });
-        if (latestOtp && (Date.now() - latestOtp.createdAt.getTime()) < 60000) { // 1 minute
-            return res.status(429).json({
-                message: `Please wait ${Math.ceil(Date.now() - latestOtp.createdAt.getTime())} before requesting a new OTP.`
-            });
+        const cooldownMessage = checkOtpCooldown(latestOtp);
+        if (cooldownMessage) {
+            return res.status(429).json({ message: cooldownMessage });
         }
         // make a 6-digit OTP
         const otp = crypto.randomInt(100000, 999999).toString();
@@ -38,10 +60,9 @@ export async function sendOtpResetPassword(req, res) {
             return res.status(404).json({ message: "User with this email does not exist." });
         }
         const latestOtp = await Otp.findOne({ email: email, type: 'reset_password' }).sort({ createdAt: -1 });
-        if (latestOtp && (Date.now() - latestOtp.createdAt.getTime()) < 60000) { // 1 minute
-            return res.status(429).json({
-                message: `Please wait ${Math.ceil(Date.now() - latestOtp.createdAt.getTime())} before requesting a new OTP.`
-            });
+        const cooldownMessage = checkOtpCooldown(latestOtp);
+        if (cooldownMessage) {
+            return res.status(429).json({ message: cooldownMessage });
         }
         // make a 6-digit OTP
         const otp = crypto.randomInt(100000, 999999).toString();
