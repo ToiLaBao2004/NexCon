@@ -23,7 +23,7 @@ io.use(socketAuthMiddleware);
 
 const onlineUsers = new Map();
 
-// Track active calls: callerId -> { callerId, receiverId, callId, conversationId, status }
+// Track active calls: callerId -> direct call session (roomName, participants, status, callType)
 const activeCalls = new Map();
 
 function getReceiverSocketId(userId) {

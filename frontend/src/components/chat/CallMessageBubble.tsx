@@ -1,25 +1,31 @@
-import type { CallRecord } from "@/types/call";
+import type { Message } from "@/types/chat";
 import { cn, formatDuration } from "@/lib/utils";
 import { Phone, Video, Ban, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useCallStore } from "@/stores/useCallStore";
+import { useGroupCallStore } from "@/stores/useGroupCallStore";
+import { parseCallSnapshot } from "@/utils/callMessageUtils";
 
 interface CallMessageBubbleProps {
-  call: CallRecord;
+  message: Message;
   currentUserId: string;
   isOwn: boolean;
 }
 
-const CallMessageBubble = ({ call, currentUserId, isOwn }: CallMessageBubbleProps) => {
+const CallMessageBubble = ({ message, currentUserId, isOwn }: CallMessageBubbleProps) => {
   const { startCall, status: callStatus } = useCallStore();
+  const { startGroupCall, status: groupCallStatus } = useGroupCallStore();
+  const snapshot = parseCallSnapshot(message);
 
-  const isInitiator = call.initiatorUser._id === currentUserId;
+  if (!snapshot) return null;
 
-  const myParticipant = call.participants.find(
+  const isInitiator = snapshot.initiatorUser._id === currentUserId;
+
+  const myParticipant = snapshot.participants.find(
     (p) => p.userId._id === currentUserId
   );
 
-  const otherParticipant = call.participants.find(
+  const otherParticipant = snapshot.participants.find(
     (p) => p.userId._id !== currentUserId
   );
 
@@ -28,7 +34,7 @@ const CallMessageBubble = ({ call, currentUserId, isOwn }: CallMessageBubbleProp
     color: string;
     statusType: "rejected" | "missed" | "canceled" | "incoming" | "ended" | "active";
   } => {
-    const { overallStatus } = call;
+    const { overallStatus } = snapshot;
     const myStatus = myParticipant?.status;
 
     if (overallStatus === "missed") {
@@ -48,7 +54,7 @@ const CallMessageBubble = ({ call, currentUserId, isOwn }: CallMessageBubbleProp
         };
       }
       if (isInitiator) {
-        const otherDeclined = call.participants.some(
+        const otherDeclined = snapshot.participants.some(
           (p) => p.userId._id !== currentUserId && p.status === "declined"
         );
         if (otherDeclined) {
@@ -88,21 +94,33 @@ const CallMessageBubble = ({ call, currentUserId, isOwn }: CallMessageBubbleProp
 
   const { label, color, statusType } = getCallInfo();
 
-  const durationText = formatDuration(call.duration);
-  const isVoice = call.type === "voice";
+  const durationText = formatDuration(snapshot.duration);
+  const isVoice = snapshot.callType === "voice";
   const callTypeLabel = isVoice ? "Cuộc gọi thoại" : "Cuộc gọi video";
   const CallTypeIcon = isVoice ? Phone : Video;
 
-  const canCallBack = otherParticipant && callStatus === "idle";
+  const isCallIdle = callStatus === "idle" && groupCallStatus === "idle";
+  const canCallBack = snapshot.mode === "group"
+    ? Boolean(message.conversationId) && isCallIdle
+    : Boolean(otherParticipant) && isCallIdle;
+
   const handleCallBack = () => {
-    if (!canCallBack || !otherParticipant) return;
+    if (!canCallBack) return;
+
+    if (snapshot.mode === "group") {
+      if (!message.conversationId) return;
+      startGroupCall(message.conversationId, snapshot.callType);
+      return;
+    }
+
+    if (!otherParticipant) return;
     startCall(
       {
         _id: otherParticipant.userId._id,
         displayName: otherParticipant.userId.displayName,
         avatarUrl: otherParticipant.userId.avatarUrl ?? null,
       },
-      call.type
+      snapshot.callType
     );
   };
 

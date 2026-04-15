@@ -6,7 +6,6 @@ import { useChatStore } from "./useChatStore";
 import { useFriendStore } from "./useFriendStore";
 import { useNotificationStore } from "./useNotificationStore";
 import { useCallStore } from "./useCallStore";
-import { useCallHistoryStore } from "./useCallHistoryStore";
 import { useGroupCallStore } from "./useGroupCallStore";
 import { toast } from "sonner";
 import { playMessageSound, playNotificationSound } from "@/utils/sound";
@@ -298,11 +297,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       get().setTypingUser(conversationId, userId, false);
     });
 
-    const refreshCallHistory = () => {
-      const activeConvoId = useChatStore.getState().activeConversationId;
-      if (activeConvoId) {
-        useCallHistoryStore.getState().fetchCallsByConversation(activeConvoId, true);
-      }
+    const refreshConversations = () => {
       useChatStore.getState().fetchConversations();
     };
 
@@ -321,17 +316,17 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("call-rejected", () => {
       useCallStore.getState().handleCallRejected();
-      refreshCallHistory();
+      refreshConversations();
     });
 
     socket.on("call-ended", () => {
       useCallStore.getState().handleCallEnded();
-      refreshCallHistory();
+      refreshConversations();
     });
 
     socket.on("call-failed", ({ reason }) => {
       useCallStore.getState().handleCallFailed(reason);
-      refreshCallHistory();
+      refreshConversations();
     });
 
     // Group call events
@@ -361,7 +356,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("group-call:ended", (payload) => {
       useGroupCallStore.getState().handleGroupCallEnded(payload);
-      refreshCallHistory();
+      refreshConversations();
     });
 
     socket.on("group-call:status-response", (payload) => {

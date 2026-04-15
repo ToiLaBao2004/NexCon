@@ -1,12 +1,16 @@
 import { AccessToken } from 'livekit-server-sdk';
-import Call from '../models/callModel.js';
 import Conversation from '../models/conversationModel.js';
+import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
 
-// conversationId → GroupCallInfo
+// conversationId -> GroupCallInfo
 const activeGroupCalls = new Map();
+
+function buildSessionId(prefix = 'group-call') {
+    return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 async function generateToken(roomName, identity, displayName, metadata) {
     const token = new AccessToken(API_KEY, API_SECRET, {
@@ -31,109 +35,97 @@ function participantsArray(groupCall) {
 
 function countJoined(groupCall) {
     let n = 0;
-    for (const p of groupCall.participants.values()) {
-        if (p.status === 'joined') n++;
+    for (const participant of groupCall.participants.values()) {
+        if (participant.status === 'joined') n++;
     }
     return n;
 }
 
+function toFinalParticipantStatus(participant, endedAtIso) {
+    if (participant.status === 'ringing') {
+        return { ...participant, status: 'missed' };
+    }
+    if (participant.status === 'joined') {
+        return {
+            ...participant,
+            status: 'left',
+            leftAt: participant.leftAt || endedAtIso,
+        };
+    }
+    return participant;
+}
+
 async function endGroupCall(conversationId, io) {
-    const gc = activeGroupCalls.get(conversationId);
-    if (!gc) return;
+    const groupCall = activeGroupCalls.get(conversationId);
+    if (!groupCall) return;
 
     const now = new Date();
-    const durationSec = gc.startedAt ? Math.round((now - gc.startedAt) / 1000) : 0;
+    const endedAtIso = now.toISOString();
+    const durationSec = groupCall.startedAt
+        ? Math.max(0, Math.round((now.getTime() - groupCall.startedAt.getTime()) / 1000))
+        : 0;
 
-    // Finalize MongoDB
     try {
-        const call = await Call.findById(gc.callId);
-        if (call) {
-            call.overallStatus = 'ended';
-            call.endedAt = now;
-            call.duration = durationSec;
-            for (const p of call.participants) {
-                if (p.status === 'ringing') p.status = 'missed';
-                else if (p.status === 'accepted') {
-                    p.status = 'left';
-                    p.leftAt = now;
-                }
-            }
-            await call.save();
+        const finalizedParticipants = participantsArray(groupCall)
+            .map((participant) => toFinalParticipantStatus(participant, endedAtIso))
+            .map((participant) => ({
+                userId: {
+                    _id: participant.userId,
+                    displayName: participant.displayName,
+                    avatarUrl: participant.avatarUrl ?? null,
+                },
+                status: participant.status,
+                joinedAt: participant.joinedAt,
+                leftAt: participant.leftAt,
+            }));
 
-            // Update conversation lastMessage
-            await updateConversationLastMessageWithCall(call);
-        }
-    } catch (err) {
-        console.error('[GroupCall] endGroupCall DB error:', err);
+        await persistCallSystemMessage(io, {
+            conversationId,
+            callId: groupCall.callId,
+            mode: 'group',
+            callType: groupCall.callType,
+            overallStatus: 'ended',
+            duration: durationSec,
+            startedAt: groupCall.startedAt,
+            endedAt: now,
+            initiator: groupCall.initiator,
+            participants: finalizedParticipants,
+        });
+    } catch (error) {
+        console.error('[GroupCall] endGroupCall DB error:', error);
     }
 
-    // Notify room
     io.to(conversationId).emit('group-call:ended', {
         conversationId,
-        callId: gc.callId,
+        callId: groupCall.callId,
         duration: durationSec,
-        endedAt: now.toISOString(),
+        endedAt: endedAtIso,
     });
 
-    if (gc.ringTimeout) clearTimeout(gc.ringTimeout);
+    if (groupCall.ringTimeout) clearTimeout(groupCall.ringTimeout);
     activeGroupCalls.delete(conversationId);
 }
 
 async function checkAutoEnd(conversationId, io) {
-    const gc = activeGroupCalls.get(conversationId);
-    if (!gc) return;
-    const joined = countJoined(gc);
-    // No one left in the call
+    const groupCall = activeGroupCalls.get(conversationId);
+    if (!groupCall) return;
+
+    const joined = countJoined(groupCall);
+
+    // Không còn ai trong call
     if (joined === 0) {
         await endGroupCall(conversationId, io);
         return;
     }
-    // Only 1 person left AND no one is still ringing
+
+    // Chỉ còn 1 người joined và không còn ai đang ringing
     let ringing = 0;
-    for (const p of gc.participants.values()) {
-        if (p.status === 'ringing') ringing++;
+    for (const participant of groupCall.participants.values()) {
+        if (participant.status === 'ringing') ringing++;
     }
+
     if (joined < 2 && ringing === 0) {
         await endGroupCall(conversationId, io);
-    }
-}
-
-async function updateConversationLastMessageWithCall(call) {
-    try {
-        const conversation = await Conversation.findById(call.conversationId);
-        if (!conversation) return;
-
-        const content = call.type === 'video' ? 'Cuộc gọi video nhóm' : 'Cuộc gọi thoại nhóm';
-        conversation.lastMessage = {
-            content,
-            senderId: call.initiatorUser,
-            createdAt: new Date(),
-        };
-        conversation.seenBy = [call.initiatorUser];
-
-        call.participants.forEach(p => {
-            const pid = p.userId.toString();
-            if (['accepted', 'declined', 'left'].includes(p.status)) {
-                if (!conversation.seenBy.map(id => id.toString()).includes(pid)) {
-                    conversation.seenBy.push(p.userId);
-                }
-            }
-        });
-
-        // Tăng unread cho missed
-        conversation.participants.forEach(p => {
-            const pid = p.userId.toString();
-            if (pid === call.initiatorUser.toString()) return;
-            const cp = call.participants.find(cp => cp.userId.toString() === pid);
-            if (cp && cp.status === 'missed') {
-                const prev = conversation.unreadCounts.get(pid) || 0;
-                conversation.unreadCounts.set(pid, prev + 1);
-            }
-        });
-
-        await conversation.save();
-    } catch (err) {
-        console.error('[GroupCall] updateConversationLastMessage error:', err);
     }
 }
 
@@ -153,7 +145,7 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
                 return socket.emit('group-call:error', { reason: 'group-disbanded', message: 'Không thể gọi vì nhóm đã bị giải tán' });
             }
             const isMember = conversation.participants.some(
-                p => p.userId._id.toString() === userId
+                (participant) => participant.userId._id.toString() === userId
             );
             if (!isMember) {
                 return socket.emit('group-call:error', { reason: 'not-a-member' });
@@ -164,66 +156,59 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
                 return socket.emit('group-call:error', { reason: 'already-active' });
             }
 
-            // Create Call document
-            const call = await Call.create({
-                conversationId,
-                initiatorUser: user._id,
-                type: callType,
-                participants: conversation.participants.map(p => ({
-                    userId: p.userId._id,
-                    status: p.userId._id.toString() === userId ? 'accepted' : 'ringing',
-                    joinedAt: p.userId._id.toString() === userId ? new Date() : null,
-                })),
-                overallStatus: 'active',
-                startedAt: new Date(),
-            });
+            const startedAt = new Date();
+            const callId = buildSessionId('group-call');
 
             // Build in-memory participants map
             const participantsMap = new Map();
-            for (const p of conversation.participants) {
-                const pid = p.userId._id.toString();
+            for (const participant of conversation.participants) {
+                const pid = participant.userId._id.toString();
                 participantsMap.set(pid, {
                     userId: pid,
-                    displayName: p.userId.displayName,
-                    avatarUrl: p.userId.avatarUrl || null,
+                    displayName: participant.userId.displayName,
+                    avatarUrl: participant.userId.avatarUrl || null,
                     status: pid === userId ? 'joined' : 'ringing',
-                    joinedAt: pid === userId ? new Date().toISOString() : null,
+                    joinedAt: pid === userId ? startedAt.toISOString() : null,
                     leftAt: null,
                 });
             }
 
             // Ring timeout (30s)
             const ringTimeout = setTimeout(async () => {
-                const gc = activeGroupCalls.get(conversationId);
-                if (!gc) return;
+                const session = activeGroupCalls.get(conversationId);
+                if (!session) return;
+
                 let changed = false;
-                for (const [pid, p] of gc.participants) {
-                    if (p.status === 'ringing') {
-                        p.status = 'no-answer';
+                for (const participant of session.participants.values()) {
+                    if (participant.status === 'ringing') {
+                        participant.status = 'no-answer';
                         changed = true;
-                        // Update DB
-                        await Call.updateOne(
-                            { _id: gc.callId, 'participants.userId': pid },
-                            { $set: { 'participants.$.status': 'missed' } }
-                        ).catch(() => { });
                     }
                 }
+
                 if (changed) {
                     io.to(conversationId).emit('group-call:user-declined', {
                         conversationId,
-                        userId: null, // timeout, not a specific user
-                        participants: participantsArray(gc),
+                        userId: null,
+                        participants: participantsArray(session),
                     });
                     await checkAutoEnd(conversationId, io);
                 }
             }, 30_000);
 
+            const initiatorInfo = {
+                _id: userId,
+                displayName: user.displayName,
+                avatarUrl: user.avatarUrl || null,
+            };
+
             const groupCallInfo = {
-                callId: call._id.toString(),
+                callId,
                 conversationId,
                 initiatorId: userId,
+                initiator: initiatorInfo,
                 callType,
-                startedAt: new Date(),
+                startedAt,
                 participants: participantsMap,
                 ringTimeout,
             };
@@ -237,16 +222,11 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
             const token = await generateToken(conversationId, userId, user.displayName, metadata);
 
             const groupName = conversation.group?.name || 'Nhóm';
-            const initiatorInfo = {
-                _id: userId,
-                displayName: user.displayName,
-                avatarUrl: user.avatarUrl || null,
-            };
 
             // Emit to initiator
             socket.emit('group-call:started', {
                 conversationId,
-                callId: call._id.toString(),
+                callId,
                 callType,
                 token,
                 initiator: initiatorInfo,
@@ -257,7 +237,7 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
             // Emit to rest of group
             socket.to(conversationId).emit('group-call:incoming', {
                 conversationId,
-                callId: call._id.toString(),
+                callId,
                 callType,
                 initiator: initiatorInfo,
                 groupName,
@@ -265,8 +245,8 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
             });
 
             console.log(`[GroupCall] ${user.displayName} started group call in ${conversationId}`);
-        } catch (err) {
-            console.error('[GroupCall] start error:', err);
+        } catch (error) {
+            console.error('[GroupCall] start error:', error);
             socket.emit('group-call:error', { reason: 'server-error' });
         }
     });
@@ -274,13 +254,13 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
     // JOIN
     socket.on('group-call:join', async ({ conversationId }) => {
         try {
-            const gc = activeGroupCalls.get(conversationId);
-            if (!gc) {
+            const groupCall = activeGroupCalls.get(conversationId);
+            if (!groupCall) {
                 return socket.emit('group-call:error', { reason: 'call-not-found' });
             }
 
             // Check if user is in the participant map (member of group)
-            if (!gc.participants.has(userId)) {
+            if (!groupCall.participants.has(userId)) {
                 return socket.emit('group-call:error', { reason: 'not-a-member' });
             }
 
@@ -292,16 +272,10 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
             const token = await generateToken(conversationId, userId, user.displayName, metadata);
 
             // Update in-memory
-            const p = gc.participants.get(userId);
-            p.status = 'joined';
-            p.joinedAt = new Date().toISOString();
-            p.leftAt = null;
-
-            // Update DB
-            await Call.updateOne(
-                { _id: gc.callId, 'participants.userId': user._id },
-                { $set: { 'participants.$.status': 'accepted', 'participants.$.joinedAt': new Date() } }
-            ).catch(err => console.error('[GroupCall] join DB update error:', err));
+            const participant = groupCall.participants.get(userId);
+            participant.status = 'joined';
+            participant.joinedAt = new Date().toISOString();
+            participant.leftAt = null;
 
             // Send token to this user
             socket.emit('group-call:token', { conversationId, token });
@@ -314,12 +288,12 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
                     displayName: user.displayName,
                     avatarUrl: user.avatarUrl || null,
                 },
-                participants: participantsArray(gc),
+                participants: participantsArray(groupCall),
             });
 
             console.log(`[GroupCall] ${user.displayName} joined group call in ${conversationId}`);
-        } catch (err) {
-            console.error('[GroupCall] join error:', err);
+        } catch (error) {
+            console.error('[GroupCall] join error:', error);
             socket.emit('group-call:error', { reason: 'server-error' });
         }
     });
@@ -327,76 +301,64 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
     // DECLINE
     socket.on('group-call:decline', async ({ conversationId }) => {
         try {
-            const gc = activeGroupCalls.get(conversationId);
-            if (!gc) return;
+            const groupCall = activeGroupCalls.get(conversationId);
+            if (!groupCall) return;
 
-            const p = gc.participants.get(userId);
-            if (!p) return;
+            const participant = groupCall.participants.get(userId);
+            if (!participant) return;
 
-            p.status = 'declined';
-
-            // Update DB
-            await Call.updateOne(
-                { _id: gc.callId, 'participants.userId': user._id },
-                { $set: { 'participants.$.status': 'declined' } }
-            ).catch(() => { });
+            participant.status = 'declined';
 
             io.to(conversationId).emit('group-call:user-declined', {
                 conversationId,
                 userId,
-                participants: participantsArray(gc),
+                participants: participantsArray(groupCall),
             });
 
             await checkAutoEnd(conversationId, io);
-        } catch (err) {
-            console.error('[GroupCall] decline error:', err);
+        } catch (error) {
+            console.error('[GroupCall] decline error:', error);
         }
     });
 
     // LEAVE
     socket.on('group-call:leave', async ({ conversationId }) => {
         try {
-            const gc = activeGroupCalls.get(conversationId);
-            if (!gc) return;
+            const groupCall = activeGroupCalls.get(conversationId);
+            if (!groupCall) return;
 
-            const p = gc.participants.get(userId);
-            if (!p) return;
+            const participant = groupCall.participants.get(userId);
+            if (!participant) return;
 
-            p.status = 'left';
-            p.leftAt = new Date().toISOString();
-
-            // Update DB
-            await Call.updateOne(
-                { _id: gc.callId, 'participants.userId': user._id },
-                { $set: { 'participants.$.status': 'left', 'participants.$.leftAt': new Date() } }
-            ).catch(() => { });
+            participant.status = 'left';
+            participant.leftAt = new Date().toISOString();
 
             io.to(conversationId).emit('group-call:user-left', {
                 conversationId,
                 userId,
-                participants: participantsArray(gc),
+                participants: participantsArray(groupCall),
             });
 
             await checkAutoEnd(conversationId, io);
 
             console.log(`[GroupCall] ${user.displayName} left group call in ${conversationId}`);
-        } catch (err) {
-            console.error('[GroupCall] leave error:', err);
+        } catch (error) {
+            console.error('[GroupCall] leave error:', error);
         }
     });
 
     // STATUS
     socket.on('group-call:status', ({ conversationId }) => {
-        const gc = activeGroupCalls.get(conversationId);
-        if (gc) {
+        const groupCall = activeGroupCalls.get(conversationId);
+        if (groupCall) {
             socket.emit('group-call:status-response', {
                 conversationId,
                 active: true,
-                callId: gc.callId,
-                callType: gc.callType,
-                initiatorId: gc.initiatorId,
-                participants: participantsArray(gc),
-                startedAt: gc.startedAt?.toISOString() ?? null,
+                callId: groupCall.callId,
+                callType: groupCall.callType,
+                initiatorId: groupCall.initiatorId,
+                participants: participantsArray(groupCall),
+                startedAt: groupCall.startedAt?.toISOString() ?? null,
             });
         } else {
             socket.emit('group-call:status-response', {
@@ -407,24 +369,18 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
     });
 }
 
-// disconnect handler
-
+// Disconnect handler
 async function handleGroupCallDisconnect(userId, io) {
-    for (const [conversationId, gc] of activeGroupCalls) {
-        const p = gc.participants.get(userId);
-        if (p && p.status === 'joined') {
-            p.status = 'left';
-            p.leftAt = new Date().toISOString();
-
-            await Call.updateOne(
-                { _id: gc.callId, 'participants.userId': userId },
-                { $set: { 'participants.$.status': 'left', 'participants.$.leftAt': new Date() } }
-            ).catch(() => { });
+    for (const [conversationId, groupCall] of activeGroupCalls) {
+        const participant = groupCall.participants.get(userId);
+        if (participant && participant.status === 'joined') {
+            participant.status = 'left';
+            participant.leftAt = new Date().toISOString();
 
             io.to(conversationId).emit('group-call:user-left', {
                 conversationId,
                 userId,
-                participants: participantsArray(gc),
+                participants: participantsArray(groupCall),
             });
 
             await checkAutoEnd(conversationId, io);

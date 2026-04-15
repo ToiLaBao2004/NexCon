@@ -2,7 +2,6 @@ import type { Socket } from "socket.io-client";
 import type { Room } from "livekit-client";
 import type { Conversation, Message, MessageType } from "./chat";
 import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
-import type { CallRecord } from "./call";
 import type {
   Reminder,
   GetRemindersParams,
@@ -213,20 +212,6 @@ export interface CallState {
   handleCallEnded: () => void;
   handleCallFailed: (reason: 'offline' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'server-error') => void;
   handleIceCandidate: (_candidate: RTCIceCandidateInit) => Promise<void>;
-}
-
-export interface CallHistoryState {
-  callsByConversation: Record<string, {
-    items: CallRecord[];
-    hasMore: boolean;
-    nextCursor?: string | null;
-  }>;
-  loading: boolean;
-
-  fetchCallsByConversation: (conversationId: string, isRefresh?: boolean) => Promise<void>;
-  addCallRecord: (conversationId: string, call: CallRecord) => void;
-  clearConversationHistory: (keepConversationIds: string[]) => void;
-  reset: () => void;
 }
 
 export interface NotificationState {

@@ -1,6 +1,5 @@
 import { useChatStore } from "@/stores/useChatStore";
 import { useSocketStore } from "@/stores/useSocketStore";
-import { useCallHistoryStore } from "@/stores/useCallHistoryStore";
 import { useGroupCallStore } from "@/stores/useGroupCallStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import ChatWindowSkeleton from "./ChatWindowSkeleton";
@@ -36,27 +35,17 @@ const ChatWindowLayout = () => {
   const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
   const useOverlayInfoSidebar = isMobile || isTabletOrBelow;
 
-  const {
-    loading: callHistoryLoading,
-    callsByConversation,
-    fetchCallsByConversation,
-    clearConversationHistory,
-  } = useCallHistoryStore();
-
   const recentConversationIdsRef = useRef<string[]>([]);
 
   const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
 
   const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
-  const hasLoadedCalls = (callsByConversation[activeConversationId!]?.items?.length ?? 0) > 0;
-
   const { joinConversation } = useSocketStore();
 
   useEffect(() => {
     if (!activeConversationId) {
       recentConversationIdsRef.current = [];
       clearConversationCache([]);
-      clearConversationHistory([]);
       return;
     }
 
@@ -69,8 +58,7 @@ const ChatWindowLayout = () => {
     recentConversationIdsRef.current = keepIds;
 
     clearConversationCache(keepIds);
-    clearConversationHistory(keepIds);
-  }, [activeConversationId, clearConversationCache, clearConversationHistory]);
+  }, [activeConversationId, clearConversationCache]);
 
   useEffect(() => {
     if (activeConversationId) {
@@ -79,12 +67,8 @@ const ChatWindowLayout = () => {
       if (!allMessages[activeConversationId] && !messageLoading) {
         fetchMessages(activeConversationId);
       }
-
-      if (!callsByConversation[activeConversationId] && !callHistoryLoading) {
-        fetchCallsByConversation(activeConversationId);
-      }
     }
-  }, [activeConversationId, joinConversation, fetchMessages, fetchCallsByConversation, messageLoading, callHistoryLoading]);
+  }, [activeConversationId, joinConversation, fetchMessages, messageLoading]);
 
   useEffect(() => {
     if (!selectedConvo || activeConversationId !== focusedConversationId) return;
@@ -119,11 +103,8 @@ const ChatWindowLayout = () => {
   }
 
   const messageData = allMessages[activeConversationId!];
-  const callData = callsByConversation[activeConversationId!];
-
   const isInitialLoading = selectedConvo && (
-    (!hasLoadedMessages && (messageLoading || !messageData)) ||
-    (!hasLoadedCalls && (callHistoryLoading || !callData))
+    !hasLoadedMessages && (messageLoading || !messageData)
   );
 
   if (isInitialLoading) {
