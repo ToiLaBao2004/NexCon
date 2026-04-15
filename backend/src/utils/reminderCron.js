@@ -4,6 +4,8 @@ import User from '../models/userModel.js';
 import { emitToUser } from '../socket/index.js';
 import { sendReminderEmail } from './sendEmail.js';
 import { normalizeReminderSource, resolveReminderContent } from './reminderHelper.js';
+import { createNotification } from '../services/notificationServices.js';
+import { sendPushToUser } from '../services/pushNotificationService.js';
 
 function getNextRemindAt(currentRemindAt, repeatRule) {
     const nextDate = new Date(currentRemindAt);
@@ -87,7 +89,41 @@ async function processReminder(reminder, now) {
     normalizedReminder.content = resolveReminderContent(normalizedReminder);
     normalizedReminder.source = normalizeReminderSource(normalizedReminder.source);
 
-    emitToUser(updated.userId.toString(), 'reminder-triggered', { reminder: normalizedReminder });
+    const delivered = emitToUser(updated.userId.toString(), 'reminder-triggered', { reminder: normalizedReminder });
+
+    if (!delivered) {
+        const offsetMs = 7 * 60 * 60 * 1000;
+        const localDate = new Date(updated.remindAt.getTime() + offsetMs);
+        const HH = String(localDate.getUTCHours()).padStart(2, '0');
+        const mm = String(localDate.getUTCMinutes()).padStart(2, '0');
+        const DD = String(localDate.getUTCDate()).padStart(2, '0');
+        const MM = String(localDate.getUTCMonth() + 1).padStart(2, '0');
+        const YYYY = localDate.getUTCFullYear();
+        const formattedTime = `${HH}:${mm} ${DD}/${MM}/${YYYY}`;
+        const reminderContent = resolveReminderContent(normalizedReminder);
+        const reminderUrl = `/reminders?tab=all&focus=${encodeURIComponent(updated._id.toString())}`;
+
+        try {
+            await createNotification(
+                updated.userId,
+                'Nhắc hẹn',
+                `Bạn có một nhắc hẹn lúc ${formattedTime}: "${reminderContent}"`,
+                reminderUrl
+            );
+        } catch (error) {
+            console.error(`Reminder cron in-app notification failed (${updated._id}):`, error);
+        }
+
+        try {
+            await sendPushToUser(updated.userId.toString(), {
+                title: 'Nhắc hẹn',
+                body: `Lúc ${formattedTime}: "${reminderContent}"`,
+                url: reminderUrl,
+            });
+        } catch (error) {
+            console.error(`Reminder cron push notification failed (${updated._id}):`, error);
+        }
+    }
 
     if (Array.isArray(reminder.notifyChannels) && reminder.notifyChannels.includes('email')) {
         try {

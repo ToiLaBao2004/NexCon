@@ -83,7 +83,7 @@ export async function signIn(req, res) {
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true, // cannot be accessed via JavaScript
             secure: true, // set to true if using HTTPS
-            samesite: 'none', // backend and frontend are on different domains (if same domain, use 'lax' or 'strict')
+            sameSite: 'none', // backend and frontend are on different domains (if same domain, use 'lax' or 'strict')
             maxAge: REFRESH_TOKEN_TTL
         })
         return res.status(200).json({ message: `User ${user.displayName} logged in successfully.`, accessToken: accessToken });
@@ -103,7 +103,7 @@ export async function signOut(req, res) {
         res.clearCookie('refreshToken', {
             httpOnly: true,
             secure: true,
-            samesite: 'none'
+            sameSite: 'none'
         });
         return res.status(200).json({ message: 'User logged out successfully.' });
     } catch (error) {

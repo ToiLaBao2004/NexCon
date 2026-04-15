@@ -113,7 +113,6 @@ const ReminderPage = () => {
     const [searchReminderName, setSearchReminderName] = useState('');
     const [includePersonalReminders, setIncludePersonalReminders] = useState(true);
     const [includeSharedReminders, setIncludeSharedReminders] = useState(true);
-    const [declinedSharedUpcomingReminders, setDeclinedSharedUpcomingReminders] = useState<Reminder[]>([]);
 
     const loadMoreRef = useRef<HTMLDivElement | null>(null);
     const deepLinkRef = useRef('');
@@ -197,48 +196,6 @@ const ReminderPage = () => {
     useEffect(() => {
         void fetchReminders(currentQueryParams);
     }, [fetchReminders, currentQueryParams]);
-
-    useEffect(() => {
-        if (activeTab !== 'upcoming' || !includeSharedReminders) {
-            setDeclinedSharedUpcomingReminders([]);
-            return;
-        }
-
-        let cancelled = false;
-
-        void (async () => {
-            try {
-                const { reminders: dismissedReminders } = await reminderService.getReminders({
-                    status: 'dismissed',
-                    from: fromDate || undefined,
-                    to: toDate || undefined,
-                    sharedKey: focusSharedKey || undefined,
-                    sort: 'remindAt_asc',
-                    limit: 100,
-                });
-
-                if (cancelled) return;
-
-                const nowTs = Date.now();
-                const declinedUpcoming = dismissedReminders.filter((item) =>
-                    item.scope === 'shared'
-                    && item.participationStatus === 'declined'
-                    && new Date(item.remindAt).getTime() >= nowTs
-                );
-
-                setDeclinedSharedUpcomingReminders(declinedUpcoming);
-            } catch (error) {
-                if (!cancelled) {
-                    setDeclinedSharedUpcomingReminders([]);
-                }
-                console.error('Load declined shared upcoming reminders failed:', error);
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [activeTab, fromDate, toDate, focusSharedKey, includeSharedReminders]);
 
     const shouldLoadMore = activeTab === 'past' || activeTab === 'all';
 
@@ -351,19 +308,14 @@ const ReminderPage = () => {
 
             if (!matchedByName) return false;
             if (item.scope === 'personal') return includePersonalReminders;
-            if (item.scope === 'shared') return includeSharedReminders;
+            if (item.scope === 'shared') {
+                // Hide reminders the user has declined; they should reappear only after rejoin.
+                if (item.participationStatus === 'declined') return false;
+                return includeSharedReminders;
+            }
             return true;
         }),
         [normalizedReminders, includePersonalReminders, includeSharedReminders, normalizedSearchReminderName]
-    );
-
-    const filteredDeclinedSharedUpcomingReminders = useMemo(
-        () => (includeSharedReminders ? declinedSharedUpcomingReminders : []).filter((item) => {
-            if (!normalizedSearchReminderName) return true;
-            const normalizedName = removeAccents(getReminderContent(item).toLowerCase());
-            return normalizedName.includes(normalizedSearchReminderName);
-        }),
-        [declinedSharedUpcomingReminders, includeSharedReminders, normalizedSearchReminderName]
     );
 
     const groupedUpcoming = useMemo(() => {
@@ -378,24 +330,12 @@ const ReminderPage = () => {
         return Array.from(groups.entries()).map(([key, items]) => ({ key, label: formatDayLabel(key), items }));
     }, [filteredReminders]);
 
-    const groupedDeclinedSharedUpcoming = useMemo(() => {
-        const groups = new Map<string, Reminder[]>();
-
-        for (const reminder of filteredDeclinedSharedUpcomingReminders) {
-            const key = toDateKey(new Date(reminder.remindAt));
-            if (!groups.has(key)) groups.set(key, []);
-            groups.get(key)?.push(reminder);
-        }
-
-        return Array.from(groups.entries()).map(([key, items]) => ({ key, label: formatDayLabel(key), items }));
-    }, [filteredDeclinedSharedUpcomingReminders]);
-
     const visiblePersonalReminderCount = useMemo(
         () => filteredReminders.filter((item) => item.scope === 'personal').length,
         [filteredReminders]
     );
 
-    const hasUpcomingData = groupedUpcoming.length > 0 || groupedDeclinedSharedUpcoming.length > 0;
+    const hasUpcomingData = groupedUpcoming.length > 0;
     const isAllTabStatusUnselected = activeTab === 'all' && selectedStatuses.length === 0;
 
     const reminderPendingDelete = reminderToConfirmDelete;
@@ -724,6 +664,7 @@ const ReminderPage = () => {
         const isSharedCreator = isShared && reminder.createdBy === currentUserId;
         const isSharedDeclined = reminder.participationStatus === 'declined';
         const shouldShowSharedCancel = !isSharedDeclined;
+        const isPastLikeStatus = reminder.status === 'triggered' || reminder.status === 'dismissed';
         const canEditSharedForOwner = isReminderEditable(reminder) && !isSharedDeclined;
         const canEditSharedAsCreator = Boolean(isSharedCreator) && canEditSharedForOwner;
         const canEditSharedNotifyOnly = !isSharedCreator && canEditSharedForOwner;
@@ -750,6 +691,21 @@ const ReminderPage = () => {
                     cancelLabel: 'Hủy cho tất cả',
                     showReuse: true,
                     showRepeat: true,
+                    highlighted: highlightedReminderId === reminder._id,
+                };
+            }
+
+            if (isPastLikeStatus) {
+                return {
+                    faded: false,
+                    editable: false,
+                    showEdit: isSharedDeclined,
+                    editLabel: 'Tham gia lại',
+                    showCancel: Boolean(isSharedCreator) && shouldShowSharedCancel,
+                    cancelVariant: 'cancel',
+                    cancelLabel: 'Hủy cho tất cả',
+                    showRepeat: !isSharedDeclined,
+                    showReuse: !isSharedDeclined,
                     highlighted: highlightedReminderId === reminder._id,
                 };
             }
@@ -1141,40 +1097,6 @@ const ReminderPage = () => {
                                 ))}
                             </div>
 
-                            {groupedDeclinedSharedUpcoming.length > 0 && (
-                                <div className="pt-1">
-                                    <div className="mb-2 flex items-center border-b border-border/40 pb-2 pt-2">
-                                        <p className="text-[14px] font-normal text-muted-foreground">Đã từ chối (có thể tham gia lại từ thông báo trong chat)</p>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
-                                        {groupedDeclinedSharedUpcoming.flatMap((group) =>
-                                            group.items.map((item) => (
-                                                <ReminderCard
-                                                    key={item._id}
-                                                    reminder={item}
-                                                    activeTab={activeTab}
-                                                    options={{
-                                                        highlighted: highlightedReminderId === item._id,
-                                                        editable: false,
-                                                        showEdit: true,
-                                                        editLabel: 'Tham gia lại',
-                                                        showCancel: false,
-                                                        showRepeat: false,
-                                                        showReuse: false,
-                                                    }}
-                                                    onEdit={handleRejoinSharedReminder}
-                                                    onDelete={handleOpenDeleteConfirm}
-                                                    onReuse={handleReuseReminder}
-                                                    onRepeat={(reminder, minutes) => {
-                                                        void handleRepeatReminder(reminder, minutes);
-                                                    }}
-                                                    onBindRef={bindReminderCardRef}
-                                                />
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     )
                 ) : activeTab === 'past' ? (
