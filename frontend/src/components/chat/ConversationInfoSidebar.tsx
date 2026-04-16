@@ -66,7 +66,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [mutualPopoverOpen, setMutualPopoverOpen] = useState(false);
   const { setNickName, loading: nicknameLoading, friends } = useFriendStore();
   const [newGroupInitialSelected, setNewGroupInitialSelected] = useState<string[] | undefined>(undefined);
-  const { fetchConversations, updateGroupName, updateGroupAvatar } = useChatStore();
+  const { fetchConversations, updateGroupName, updateGroupAvatar, toggleConversationPin } = useChatStore();
 
   /* shared modal state */
   const [openNickname, setOpenNickname] = useState(false);
@@ -80,6 +80,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
+  const [pinLoading, setPinLoading] = useState(false);
 
   // refs for name elements (used for a11y / future enhancements)
   const nameRefDirect = useRef<HTMLSpanElement | null>(null);
@@ -105,6 +106,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   }, [otherParticipant]);
 
   const groupDisplayName = conversation.group?.name || "Nhóm";
+  const isConversationPinned = conversation.isPinned === true;
 
   const currentNickname = useMemo(() => {
     return otherParticipant?.userId?.nickname ?? "";
@@ -197,6 +199,18 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
     }
   };
 
+  const handleToggleConversationPin = async () => {
+    try {
+      setPinLoading(true);
+      await toggleConversationPin(conversation._id);
+      toast.success(isConversationPinned ? "Đã bỏ ghim hội thoại" : "Đã ghim hội thoại");
+    } catch {
+      toast.error("Không thể cập nhật trạng thái ghim hội thoại");
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
   if (!user) return null;
 
   // DIRECT variant
@@ -233,7 +247,12 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
             <div className="flex justify-center gap-4 w-full px-2 mt-2">
               <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled />
-              <ActionBtnLocal icon={Pin} label="Ghim hội thoại" disabled />
+              <ActionBtnLocal
+                icon={Pin}
+                label={isConversationPinned ? "Bỏ ghim" : "Ghim hội thoại"}
+                onClick={handleToggleConversationPin}
+                disabled={pinLoading}
+              />
               <ActionBtnLocal
                 icon={UserPlus}
                 label="Tạo nhóm trò chuyện"
@@ -384,7 +403,12 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
           <div className="flex justify-center gap-4 w-full px-2 mt-2">
             <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled={isDisbanded} />
-            <ActionBtnLocal icon={Pin} label="Ghim hội thoại" disabled={isDisbanded} />
+            <ActionBtnLocal
+              icon={Pin}
+              label={isConversationPinned ? "Bỏ ghim" : "Ghim hội thoại"}
+              onClick={handleToggleConversationPin}
+              disabled={isDisbanded || pinLoading}
+            />
             <ActionBtnLocal
               icon={UserPlus}
               label="Thêm thành viên"

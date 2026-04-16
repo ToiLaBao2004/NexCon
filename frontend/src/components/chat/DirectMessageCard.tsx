@@ -8,7 +8,7 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2 } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin } from "lucide-react";
 import { isUrl } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -33,7 +33,7 @@ import { getSystemMessageText } from '@/utils/chatUtils';
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation } = useChatStore();
+  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation, toggleConversationPin } = useChatStore();
   const { onlineUsers } = useSocketStore();
   const { setNickName, loading } = useFriendStore();
   const active = focusedConversationId === convo._id;
@@ -42,6 +42,9 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const [nickname, setNicknameValue] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [openClearConfirm, setOpenClearConfirm] = useState(false);
+  const [pinning, setPinning] = useState(false);
+
+  const isConversationPinned = convo.isPinned === true;
 
   const currentNickname = useMemo(() => {
     const otherUser = convo.participants.find((p) => p.userId?._id?.toString() !== user?._id?.toString());
@@ -111,67 +114,94 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     }
   };
 
+  const handleToggleConversationPin = async () => {
+    try {
+      setPinning(true);
+      await toggleConversationPin(convo._id);
+      setDropdownOpen(false);
+    } catch (error) {
+      console.error("Cập nhật ghim hội thoại thất bại:", error);
+    } finally {
+      setPinning(false);
+    }
+  };
+
   const menuNode = (
     <>
       <Dialog open={openRename} onOpenChange={setOpenRename}>
-        <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="p-1 rounded hover:bg-muted opacity-100 transition"
-              aria-label="More actions"
+        <div className="flex items-center gap-1">
+          {isConversationPinned && (
+            <Pin className="size-3.5 text-amber-500 fill-current shrink-0" />
+          )}
+          <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="p-1 rounded hover:bg-muted opacity-100 transition"
+                aria-label="More actions"
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="size-4 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent
+              align="end"
+              sideOffset={6}
+              onCloseAutoFocus={(e) => e.preventDefault()}
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              <MoreHorizontal className="size-4 text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-
-          <DropdownMenuContent
-            align="end"
-            sideOffset={6}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-            onClick={(e) => e.stopPropagation()}
-            onPointerDown={(e) => e.stopPropagation()}
-          >
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                onChangeNickname();
-              }}
-            >
-              <PencilLine className="h-4 w-4 mr-2" />
-              Đổi nickname
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onSelect={(e) => {
-                e.preventDefault();
-                setDropdownOpen(false);
-                setOpenClearConfirm(true);
-              }}
-            >
-              <Trash2 className="size-4 mr-2" />
-              Xóa cuộc trò chuyện
-            </DropdownMenuItem>
-            <UserActionDropdown
-              userId={otherUser.userId?._id}
-              displayName={displayName}
-              trigger={(isBlocked) => (
-                <DropdownMenuItem
-                  className={cn(
-                    "gap-2",
-                    isBlocked ? "text-primary focus:text-primary" : "text-destructive focus:text-destructive"
-                  )}
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  <UserX className="h-4 w-4" />
-                  {isBlocked ? "Bỏ chặn" : "Chặn"}
-                </DropdownMenuItem>
-              )}
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  onChangeNickname();
+                }}
+              >
+                <PencilLine className="h-4 w-4 mr-2" />
+                Đổi nickname
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={pinning}
+                onSelect={(e) => {
+                  e.preventDefault();
+                  void handleToggleConversationPin();
+                }}
+              >
+                <Pin className="h-4 w-4 mr-2" />
+                {isConversationPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại"}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setDropdownOpen(false);
+                  setOpenClearConfirm(true);
+                }}
+              >
+                <Trash2 className="size-4 mr-2" />
+                Xóa cuộc trò chuyện
+              </DropdownMenuItem>
+              <UserActionDropdown
+                userId={otherUser.userId?._id}
+                displayName={displayName}
+                trigger={(isBlocked) => (
+                  <DropdownMenuItem
+                    className={cn(
+                      "gap-2",
+                      isBlocked ? "text-primary focus:text-primary" : "text-destructive focus:text-destructive"
+                    )}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    <UserX className="h-4 w-4" />
+                    {isBlocked ? "Bỏ chặn" : "Chặn"}
+                  </DropdownMenuItem>
+                )}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
         <DialogContent
           onClick={(e) => e.stopPropagation()}

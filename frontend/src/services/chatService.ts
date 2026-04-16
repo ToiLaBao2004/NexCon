@@ -92,6 +92,18 @@ export const chatService = {
 		return res.data;
 	},
 
+	async toggleConversationPin(conversationId: string) {
+		const res = await api.patch(`/conversations/${conversationId}/pin`);
+		return res.data as {
+			message: string;
+			conversation: {
+				_id: string;
+				isPinned: boolean;
+				pinnedAt: string | null;
+			};
+		};
+	},
+
 	async updateGroupName(conversationId: string, name: string) {
 		const res = await api.put(`/conversations/${conversationId}/update-group-name`, { name });
 		return res.data;

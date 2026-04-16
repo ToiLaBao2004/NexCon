@@ -16,6 +16,9 @@ const participantSchema = new mongoose.Schema({
     },
     clearedAt: {
         type: Date,
+    },
+    pinnedAt: {
+        type: Date,
     }
 }, { _id: false });
 
