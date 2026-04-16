@@ -7,13 +7,6 @@ import { PinnedMessagesBanner } from "@/components/chat/PinnedMessagesBanner";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSocketStore } from "@/stores/useSocketStore";
-import { useCallHistoryStore } from "@/stores/useCallHistoryStore";
-import type { Message } from "@/types/chat";
-import type { CallRecord } from "@/types/call";
-
-type TimelineItem =
-  | { kind: "message"; data: Message }
-  | { kind: "call"; data: CallRecord };
 
 const ChatWindowBody: React.FC = () => {
   const {
@@ -44,22 +37,7 @@ const ChatWindowBody: React.FC = () => {
   const prevScrollHeightRef = useRef<number>(0);
   const prevMessageCount = useRef(0);
   const isFirstLoad = useRef(true);
-
-  const { callsByConversation, fetchCallsByConversation } = useCallHistoryStore();
-  const calls = useMemo(
-    () => (convoId ? callsByConversation[convoId]?.items ?? [] : []),
-    [callsByConversation, convoId]
-  );
-
-  const timeline: TimelineItem[] = useMemo(() => {
-    const messageItems: TimelineItem[] = messages.map(msg => ({ kind: "message", data: msg }));
-    const callItems: TimelineItem[] = calls.map(call => ({ kind: "call", data: call }));
-    return [...messageItems, ...callItems].sort(
-      (a, b) => new Date(a.data.createdAt).getTime() - new Date(b.data.createdAt).getTime()
-    );
-  }, [messages, calls]);
-
-  const lastItemId = timeline[timeline.length - 1]?.data._id;
+  const lastItemId = messages[messages.length - 1]?._id;
 
   const activeTypingUserIds = convoId
     ? (typingUsers[convoId]?.filter(id => id !== user?._id) || [])
@@ -84,7 +62,7 @@ const ChatWindowBody: React.FC = () => {
     if (loadingOlderRef.current) return;
 
     if (isFirstLoad.current) {
-      if (timeline.length > 0) {
+      if (messages.length > 0) {
         requestAnimationFrame(() => {
           scrollToBottom(true);
           setTimeout(() => scrollToBottom(true), 100);
@@ -92,10 +70,10 @@ const ChatWindowBody: React.FC = () => {
         isFirstLoad.current = false;
       }
     } else if (convoId) {
-      const isStatusUpdate = timeline.length === prevMessageCount.current;
+      const isStatusUpdate = messages.length === prevMessageCount.current;
       scrollToBottom(isStatusUpdate);
     }
-  }, [lastItemId, activeTypingUserIds.length, timeline.length, convoId]);
+  }, [lastItemId, activeTypingUserIds.length, messages.length, convoId]);
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -122,12 +100,8 @@ const ChatWindowBody: React.FC = () => {
   }, [convoId]);
 
   useEffect(() => {
-    prevMessageCount.current = timeline.length;
-  }, [timeline.length]);
-
-  const { loading: callHistoryLoading } = useCallHistoryStore();
-  const callData = convoId ? callsByConversation[convoId] : null;
-  const hasMoreCalls = callData?.hasMore ?? false;
+    prevMessageCount.current = messages.length;
+  }, [messages.length]);
 
   const handleScroll = useCallback(() => {
     const container = scrollRef.current;
@@ -135,25 +109,18 @@ const ChatWindowBody: React.FC = () => {
     if (loadingOlderRef.current) return;
 
     const canFetchMoreMessages = hasMore && !messageLoading;
-    const canFetchMoreCalls = hasMoreCalls && !callHistoryLoading;
 
-    if (container.scrollTop < 100 && (canFetchMoreMessages || canFetchMoreCalls)) {
+    if (container.scrollTop < 100 && canFetchMoreMessages) {
       prevScrollHeightRef.current = container.scrollHeight;
       loadingOlderRef.current = true;
 
-      if (canFetchMoreMessages) {
-        fetchMessages(convoId);
-      }
-
-      if (canFetchMoreCalls) {
-        fetchCallsByConversation(convoId);
-      }
+      fetchMessages(convoId);
     }
-  }, [convoId, hasMore, messageLoading, hasMoreCalls, callHistoryLoading, fetchMessages, fetchCallsByConversation]);
+  }, [convoId, hasMore, messageLoading, fetchMessages]);
 
   useEffect(() => {
     if (!convoId || !loadingOlderRef.current) return;
-    if (messageLoading || callHistoryLoading) return;
+    if (messageLoading) return;
 
     const container = scrollRef.current;
     if (!container) {
@@ -171,17 +138,17 @@ const ChatWindowBody: React.FC = () => {
 
     loadingOlderRef.current = false;
 
-    const stillCanFetch = (hasMore && !messageLoading) || (hasMoreCalls && !callHistoryLoading);
+    const stillCanFetch = hasMore && !messageLoading;
     if (stillCanFetch && container.scrollTop < 24) {
       requestAnimationFrame(() => handleScroll());
     }
-  }, [timeline.length, messageLoading, callHistoryLoading, convoId, hasMore, hasMoreCalls, handleScroll]);
+  }, [messages.length, messageLoading, convoId, hasMore, handleScroll]);
 
   if (!convoId || !selectedConvo) {
     return <ChatWelcomeScreen />;
   }
 
-  if (timeline.length === 0 && activeTypingUserIds.length === 0) {
+  if (messages.length === 0 && activeTypingUserIds.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
         Chưa có tin nhắn nào trong cuộc trò chuyện này!
@@ -204,35 +171,36 @@ const ChatWindowBody: React.FC = () => {
           </div>
         )}
 
-        {timeline.map((item, index) => {
-          if (item.kind === "message") {
-            const msgIdx = messages.indexOf(item.data);
+        {messages.map((message, index) => {
+          const isCallMessage = message.type === "system" && message.systemType === "call";
+
+          if (isCallMessage) {
             return (
-              <div
-                key={`msg-${item.data._id ?? index}`}
-                id={`message-${item.data._id}`}
-              >
-                <MessageItem
-                  message={item.data}
-                  index={msgIdx >= 0 ? msgIdx : index}
-                  messages={messages}
-                  selectedConvo={selectedConvo}
-                  currentUserId={user?._id ?? ""}
-                  isLast={item.data._id === lastItemId}
-                  onReply={setReplyingTo}
-                />
-              </div>
+              <CallMessageItem
+                key={`call-${message._id}`}
+                message={message}
+                currentUserId={user?._id ?? ""}
+                selectedConvo={selectedConvo}
+                isLast={message._id === lastItemId}
+              />
             );
           }
 
           return (
-            <CallMessageItem
-              key={`call-${item.data._id}`}
-              call={item.data as CallRecord}
-              currentUserId={user?._id ?? ""}
-              selectedConvo={selectedConvo}
-              isLast={item.data._id === lastItemId}
-            />
+            <div
+              key={`msg-${message._id ?? index}`}
+              id={`msg-${message._id}`}
+            >
+              <MessageItem
+                message={message}
+                index={index}
+                messages={messages}
+                selectedConvo={selectedConvo}
+                currentUserId={user?._id ?? ""}
+                isLast={message._id === lastItemId}
+                onReply={setReplyingTo}
+              />
+            </div>
           );
         })}
 

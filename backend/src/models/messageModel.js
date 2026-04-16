@@ -32,7 +32,7 @@ const messageSchema = new mongoose.Schema({
         type: String,
         enum: ['member_added', 'member_kicked', 'member_left', 'group_disbanded',
             'call_started', 'call_ended', 'chat_cleared', 'approval_mode_changed',
-            'admin_transferred', 'group_avatar_updated', 'reminder_created_local', 'shared_reminder_created', 'shared_reminder_participation_changed', 'shared_reminder_cancelled', 'shared_reminder_updated'],
+            'call', 'admin_transferred', 'group_avatar_updated', 'reminder_created_local', 'shared_reminder_created', 'shared_reminder_participation_changed', 'shared_reminder_cancelled', 'shared_reminder_updated'],
     },
     metadata: {
         type: Map,

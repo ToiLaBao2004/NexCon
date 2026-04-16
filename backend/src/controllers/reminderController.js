@@ -390,7 +390,7 @@ export async function createSharedReminderFromMessage(req, res) {
 export async function getReminders(req, res) {
     try {
         const userId = req.user._id;
-        const { status, sourceType, from, to, sharedKey, sort = 'remindAt_asc', cursor, limit = 50 } = req.query;
+        const { status, sourceType, from, to, sharedKey, sort = 'remindAt_asc', cursor, limit = 10 } = req.query;
 
         const query = { userId };
 
@@ -447,7 +447,7 @@ export async function getReminders(req, res) {
             query.sharedKey = String(sharedKey).trim();
         }
 
-        const pageSize = Math.min(Math.max(Number(limit) || 50, 1), 100);
+        const pageSize = Math.min(Math.max(Number(limit) || 10, 1), 10);
 
         const sortBy = String(sort || 'remindAt_asc').trim().toLowerCase();
         const sortConfig = REMINDER_SORT_OPTIONS[sortBy] || REMINDER_SORT_OPTIONS.remindat_asc;

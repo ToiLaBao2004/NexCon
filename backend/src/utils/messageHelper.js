@@ -26,6 +26,13 @@ const resolveLastMessagePreview = (message) => {
                     return `Cuộc gọi đã bắt đầu`;
                 case 'call_ended':
                     return `Cuộc gọi đã kết thúc`;
+                case 'call': {
+                    const callTypeLabel = metadata.callType === 'video' ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+                    if (metadata.mode === 'group') {
+                        return `${callTypeLabel} nhóm`;
+                    }
+                    return callTypeLabel;
+                }
                 case 'admin_transferred':
                     return `${metadata.appointedByInfo?.displayName || 'Một quản trị viên'} đã chuyển quyền trưởng nhóm cho ${metadata.appointedUserInfo?.displayName || 'một thành viên'}`;
                 case 'group_avatar_updated':

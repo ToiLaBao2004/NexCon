@@ -168,7 +168,7 @@ const ReminderPage = () => {
                 status: 'pending,snoozed',
                 ...sharedFilters,
                 sort: 'remindAt_asc',
-                limit: 50,
+                limit: 10,
             };
         }
 
@@ -177,7 +177,7 @@ const ReminderPage = () => {
                 status: 'triggered,dismissed',
                 ...sharedFilters,
                 sort: 'remindAt_asc',
-                limit: 50,
+                limit: 10,
             };
         }
 
@@ -189,7 +189,7 @@ const ReminderPage = () => {
             status,
             ...sharedFilters,
             sort: 'remindAt_desc',
-            limit: 100,
+            limit: 10,
         };
     }, [activeTab, selectedStatuses, fromDate, toDate, focusSharedKey]);
 
@@ -197,7 +197,7 @@ const ReminderPage = () => {
         void fetchReminders(currentQueryParams);
     }, [fetchReminders, currentQueryParams]);
 
-    const shouldLoadMore = activeTab === 'past' || activeTab === 'all';
+    const shouldLoadMore = viewMode === 'list';
 
     useEffect(() => {
         if (!shouldLoadMore || !hasMore) return;
@@ -1143,7 +1143,7 @@ const ReminderPage = () => {
                     </div>
                 )}
 
-                {(activeTab === 'past' || activeTab === 'all') && reminders.length > 0 && (
+                {viewMode === 'list' && reminders.length > 0 && (
                     <div ref={loadMoreRef} className="h-8 mt-2 flex items-center justify-center">
                         {isLoadingMore && <Clock3 className="h-4 w-4 animate-spin text-muted-foreground" />}
                     </div>

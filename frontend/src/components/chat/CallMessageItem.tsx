@@ -1,12 +1,12 @@
 import { cn, formatMessageTime } from "@/lib/utils";
-import type { CallRecord } from "@/types/call";
-import type { Conversation, Participant } from "@/types/chat";
+import type { Conversation, Message, Participant } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import CallMessageBubble from "./CallMessageBubble";
 import { useSocketStore } from "@/stores/useSocketStore";
+import { parseCallSnapshot } from "@/utils/callMessageUtils";
 
 interface CallMessageItemProps {
-  call: CallRecord;
+  message: Message;
   currentUserId: string;
   selectedConvo: Conversation;
   isLast?: boolean;
@@ -17,17 +17,18 @@ interface CallMessageItemProps {
  * giống như MessageItem nhưng cho cuộc gọi.
  */
 const CallMessageItem = ({
-  call,
+  message,
   currentUserId,
   selectedConvo,
   isLast,
 }: CallMessageItemProps) => {
-  const isInitiator = call.initiatorUser._id === currentUserId;
+  const snapshot = parseCallSnapshot(message);
+  if (!snapshot) return null;
+
+  const isInitiator = snapshot.initiatorUser._id === currentUserId;
   const { onlineUsers } = useSocketStore();
 
-  // Với item cuộc gọi đến (không phải do mình khởi tạo), người hiển thị avatar luôn là initiatorUser.
-  // Điều này ổn định hơn participants vì participants có thể trả về shape không đồng nhất ở một số record cũ.
-  const otherCallParticipant = call.participants.find(
+  const otherCallParticipant = snapshot.participants.find(
     (p) => (p.userId?._id || p.userId)?.toString?.() !== currentUserId?.toString()
   )?.userId;
   const otherConversationParticipant = selectedConvo.participants.find(
@@ -35,8 +36,8 @@ const CallMessageItem = ({
   )?.userId;
 
   const avatarUser = !isInitiator
-    ? (call.initiatorUser || otherCallParticipant || otherConversationParticipant)
-    : (otherCallParticipant || otherConversationParticipant || call.initiatorUser);
+    ? (snapshot.initiatorUser || otherCallParticipant || otherConversationParticipant)
+    : (otherCallParticipant || otherConversationParticipant || snapshot.initiatorUser);
   const avatarUserId = avatarUser?._id?.toString?.() || "";
   const avatarStatus = avatarUserId && onlineUsers.includes(avatarUserId) ? "online" : "offline";
 
@@ -71,14 +72,14 @@ const CallMessageItem = ({
         )}
       >
         <CallMessageBubble
-          call={call}
+          message={message}
           currentUserId={currentUserId}
           isOwn={isInitiator}
         />
 
         {/* Thời gian */}
         <span className="text-xs text-muted-foreground mt-0.5 px-1.5">
-          {formatMessageTime(new Date(call.createdAt))}
+          {formatMessageTime(new Date(message.createdAt))}
         </span>
 
         {/* Trạng thái đã xem / đã gửi (chỉ hiện cho item cuối cùng của mình) */}

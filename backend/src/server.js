@@ -11,7 +11,6 @@ import friendRouter from './routes/friendRoute.js';
 import messageRouter from './routes/messageRoute.js';
 import conversationRouter from './routes/conversationRoute.js';
 import notificationRouter from './routes/notificationRoute.js';
-import callRouter from './routes/callRoute.js';
 import livekitRouter from './routes/livekitRoute.js';
 import reminderRouter from './routes/reminderRoute.js';
 import pushRouter from './routes/pushRoute.js';
@@ -46,7 +45,6 @@ app.use('/api/friends', friendRouter);
 app.use('/api/messages', messageRouter);
 app.use('/api/conversations', conversationRouter);
 app.use('/api/notifications', notificationRouter);
-app.use('/api/calls', callRouter);
 app.use('/api/livekit', livekitRouter);
 app.use('/api/reminders', reminderRouter);
 

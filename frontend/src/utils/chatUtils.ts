@@ -98,6 +98,20 @@ export const getSystemMessageText = (
             return "Cuộc gọi đã bắt đầu";
         case "call_ended":
             return "Cuộc gọi đã kết thúc";
+        case "call": {
+            const callTypeLabel = meta.callType === "video" ? "Cuộc gọi video" : "Cuộc gọi thoại";
+            const suffix = meta.mode === "group" ? " nhóm" : "";
+
+            if (meta.overallStatus === "missed") {
+                return `${callTypeLabel}${suffix} nhỡ`;
+            }
+
+            if (meta.overallStatus === "canceled") {
+                return `${callTypeLabel}${suffix} đã hủy`;
+            }
+
+            return `${callTypeLabel}${suffix}`;
+        }
 
         case "approval_mode_changed": {
             const changedBy = meta.changedBy;
