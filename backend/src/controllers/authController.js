@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import Otp from '../models/otpModel.js';
 import validator from 'validator';
+import { removeSubscription } from '../services/pushNotificationService.js';
 
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
@@ -99,6 +100,11 @@ export async function signOut(req, res) {
         if (!refreshToken) {
             return res.status(400).json({ message: 'Refresh token not found.' });
         }
+        const pushEndpoint = req.body?.pushEndpoint;
+        if (pushEndpoint) {
+            await removeSubscription(pushEndpoint);
+        }
+
         await Session.deleteOne({ refreshToken: refreshToken });
         res.clearCookie('refreshToken', {
             httpOnly: true,
