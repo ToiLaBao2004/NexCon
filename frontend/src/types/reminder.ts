@@ -63,6 +63,7 @@ export interface GetRemindersParams {
   status?: string;
   sourceType?: ReminderSourceType;
   sharedKey?: string;
+  conversationId?: string;
   sort?: 'remindAt_asc' | 'remindAt_desc' | 'createdAt_desc';
   from?: string;
   to?: string;

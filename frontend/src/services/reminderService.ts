@@ -21,6 +21,7 @@ const toQueryString = (params?: GetRemindersParams): string => {
   if (params.status) query.set('status', params.status);
   if (params.sourceType) query.set('sourceType', params.sourceType);
   if (params.sharedKey) query.set('sharedKey', params.sharedKey);
+  if (params.conversationId) query.set('conversationId', params.conversationId);
   if (params.sort) query.set('sort', params.sort);
   if (params.from) query.set('from', params.from);
   if (params.to) query.set('to', params.to);

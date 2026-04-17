@@ -44,6 +44,7 @@ function ActionBtnLocal({
 import { Bell, Pin, UserPlus, Pencil, Camera, Loader2 } from "lucide-react";
 import { MutualGroupsPanel } from "./MutualGroups";
 import ConversationLists from "./ConversationLists";
+import { ConversationRemindersPanel } from "./ConversationRemindersPanel";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +82,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
   const [pinLoading, setPinLoading] = useState(false);
+  const [remindersOpen, setRemindersOpen] = useState(false);
 
   // refs for name elements (used for a11y / future enhancements)
   const nameRefDirect = useRef<HTMLSpanElement | null>(null);
@@ -273,7 +275,8 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
         </div>
         <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />
         <button
-          className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal"
+          onClick={() => setRemindersOpen(true)}
+          className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal cursor-pointer"
         >
           <Clock className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
           <span className="text-[15px]">Danh sách nhắc hẹn</span>
@@ -287,6 +290,12 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           <span className="text-[15px]">{`${mutualGroupCount} nhóm chung`}</span>
         </div>
         <MutualGroupsPanel open={mutualPopoverOpen} onOpenChange={setMutualPopoverOpen} otherParticipantId={otherParticipant?.userId?._id} />
+        <ConversationRemindersPanel
+          open={remindersOpen}
+          onOpenChange={setRemindersOpen}
+          conversationId={conversation._id}
+          conversationName={directDisplayName}
+        />
         <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />
 
         {/* Media, Files, Links */}

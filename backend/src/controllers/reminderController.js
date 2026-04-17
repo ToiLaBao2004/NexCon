@@ -390,7 +390,7 @@ export async function createSharedReminderFromMessage(req, res) {
 export async function getReminders(req, res) {
     try {
         const userId = req.user._id;
-        const { status, sourceType, from, to, sharedKey, sort = 'remindAt_asc', cursor, limit = 10 } = req.query;
+        const { status, sourceType, from, to, sharedKey, conversationId, sort = 'remindAt_asc', cursor, limit = 10 } = req.query;
 
         const query = { userId };
 
@@ -445,6 +445,14 @@ export async function getReminders(req, res) {
 
         if (sharedKey) {
             query.sharedKey = String(sharedKey).trim();
+        }
+
+        if (conversationId) {
+            if (!mongoose.Types.ObjectId.isValid(String(conversationId).trim())) {
+                return res.status(400).json({ message: 'Invalid conversationId filter.' });
+            }
+            query.conversationId = new mongoose.Types.ObjectId(String(conversationId).trim());
+            query.scope = 'shared';
         }
 
         const pageSize = Math.min(Math.max(Number(limit) || 10, 1), 10);

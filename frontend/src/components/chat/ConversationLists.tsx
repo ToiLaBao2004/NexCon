@@ -5,6 +5,8 @@ import { MutualGroupsPopover } from "./MutualGroups";
 import MembersPanel from "./MembersPanel";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useState } from "react";
+import { ConversationRemindersPanel } from "./ConversationRemindersPanel";
 
 // Local replacements for previously-shared sidebar helpers
 function ThickDividerLocal() {
@@ -33,7 +35,7 @@ export default function ConversationLists({ conversation, mutualGroupCount, memb
   const isGroup = conversation.type === "group";
   const { conversations, setActiveConversation, fetchMessages } = useChatStore();
   const { user } = useAuthStore();
-  // popovers/panels are handled in separate components
+  const [remindersOpen, setRemindersOpen] = useState(false);
 
   const mutualGroups = (() => {
     if (!user) return [] as any[];
@@ -47,10 +49,19 @@ export default function ConversationLists({ conversation, mutualGroupCount, memb
       c.participants?.some((p: any) => p.userId?._id === otherId)
     );
   })();
+
+  const conversationName = isGroup
+    ? (conversation.group?.name || "Nhóm")
+    : undefined;
+
   return (
     <>
       <ThickDividerLocal />
-      <ListRowLocal icon={Clock} label="Danh sách nhắc hẹn" />
+      <ListRowLocal
+        icon={Clock}
+        label="Danh sách nhắc hẹn"
+        onClick={() => setRemindersOpen(true)}
+      />
       {isGroup ? (
         <MembersPanel
           conversationId={conversation._id}
@@ -77,6 +88,14 @@ export default function ConversationLists({ conversation, mutualGroupCount, memb
 
       {/* Media, Files, Links */}
       <SidebarMediaLinks conversation={conversation} />
+
+      {/* Shared reminders panel */}
+      <ConversationRemindersPanel
+        open={remindersOpen}
+        onOpenChange={setRemindersOpen}
+        conversationId={conversation._id}
+        conversationName={conversationName}
+      />
     </>
   );
 }
