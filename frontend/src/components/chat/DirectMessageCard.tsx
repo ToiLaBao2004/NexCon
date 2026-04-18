@@ -225,7 +225,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
                     )}
                     onSelect={(e) => e.preventDefault()}
                   >
-                    <UserX className="h-4 w-4" />
+                    <UserX className="h-4 w-4 mr-2" />
                     {isBlocked ? "Bỏ chặn" : "Chặn"}
                   </DropdownMenuItem>
                 )}

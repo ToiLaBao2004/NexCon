@@ -13,6 +13,9 @@ import { REPEAT_MINUTE_OPTIONS, REPEAT_TEXT, SOURCE_TEXT } from '@/pages/reminde
 import { getReminderContent, getReminderMeetingTitle, getReminderMeetingUrl, formatClock } from '@/pages/reminder/utils';
 import type { ReminderCardOptions, ReminderTab } from '@/pages/reminder/types';
 import { extractFirstHttpUrl, extractMeetingCode, rememberMeetingTitle } from '@/utils/meetingLink';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useChatStore } from '@/stores/useChatStore';
+import UserAvatar from '@/components/chat/UserAvatar';
 
 interface ReminderCardProps {
   reminder: Reminder;
@@ -35,6 +38,9 @@ export default function ReminderCard({
   onRepeat,
   onBindRef,
 }: ReminderCardProps) {
+  const { user } = useAuthStore();
+  const conversation = useChatStore(state => state.conversations.find(c => c._id === reminder.conversationId));
+
   const faded = options?.faded ?? false;
   const editable = options?.editable ?? true;
   const showEdit = options?.showEdit ?? false;
@@ -71,6 +77,20 @@ export default function ReminderCard({
   const calendarWeekday = new Intl.DateTimeFormat('vi-VN', { weekday: 'short' }).format(reminderDate);
   const calendarDay = new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(reminderDate);
   const calendarMonth = new Intl.DateTimeFormat('vi-VN', { month: 'numeric' }).format(reminderDate);
+
+  let chatAvatar = null;
+  let chatName = null;
+
+  if (reminder.scope === 'shared' && conversation) {
+    if (conversation.type === 'group') {
+      chatName = conversation.group?.name || `${conversation.participants.length} Thành Viên`;
+      chatAvatar = <UserAvatar type="seen" name={chatName} avatarUrl={conversation.group?.avatarUrl ?? undefined} />;
+    } else {
+      const otherUser = conversation.participants.find((p: any) => p.userId?._id?.toString() !== user?._id?.toString());
+      chatName = otherUser?.userId?.nickname?.trim() ? otherUser.userId.nickname : (otherUser?.userId?.displayName || 'Unknown');
+      chatAvatar = <UserAvatar type="seen" name={chatName} avatarUrl={otherUser?.userId?.avatarUrl ?? undefined} />;
+    }
+  }
 
   const handleMeetingLinkClick = (event: React.MouseEvent<HTMLAnchorElement>, targetUrl: string) => {
     event.preventDefault();
@@ -158,8 +178,8 @@ export default function ReminderCard({
             )}
             {reminder.scope === 'shared' && (
               <span className={scopeBadgeClass}>
-                <Check className="h-3 w-3" />
-                Nhắc hẹn chung
+                {conversation ? chatAvatar : <Check className="h-3 w-3" />}
+                <span className="truncate max-w-[150px]">{conversation ? chatName : 'Nhắc hẹn chung'}</span>
               </span>
             )}
             {reminder.scope === 'shared' && reminder.participationStatus === 'declined' && (
