@@ -12,8 +12,8 @@ import {
 } from '../middlewares/uploadMiddleware.js';
 import { safeUpload } from '../utils/messageHelper.js';
 import { v2 as cloudinary } from 'cloudinary';
-import { moderateTextMessage } from '../services/moderation/moderationService.js';
-
+import { moderateTextMessage } from '../services/moderation/moderationTextService.js';
+import { moderateLinkMessage } from '../services/moderation/moderationLinkService.js';
 
 export async function sendMessage(req, res) {
     try {
@@ -80,16 +80,30 @@ export async function sendMessage(req, res) {
                 if (!content || !content.trim()) {
                     return res.status(400).json({ message: 'URL is required for link messages.' });
                 }
-                try {
-                    try {
-                        new URL(content.trim());
-                    } catch {
-                        new URL('https://' + content.trim());
-                    }
-                } catch {
-                    return res.status(400).json({ message: 'Invalid URL format.' });
+
+                const trimmedLink = content.trim();
+                const moderationResult = await moderateLinkMessage(trimmedLink);
+
+                if (moderationResult.blocked) {
+                    return res.status(400).json({
+                        message: 'Link vi phạm tiêu chuẩn cộng đồng.',
+                        moderation: {
+                            category: moderationResult.category,
+                            reason: moderationResult.reason,
+                            source: moderationResult.source,
+                            confidence: moderationResult.confidence ?? null,
+                        },
+                    });
                 }
-                messageData.content = content.trim();
+
+                let normalizedUrl = trimmedLink;
+                try {
+                    normalizedUrl = new URL(trimmedLink).toString();
+                } catch {
+                    normalizedUrl = new URL(`https://${trimmedLink}`).toString();
+                }
+
+                messageData.content = normalizedUrl;
                 break;
             }
 
