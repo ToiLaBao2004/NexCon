@@ -550,22 +550,24 @@ export const useChatStore = create<ChatState>()(
                     });
                 }
             },
-            markAsSeen: async () => {
+            markAsSeen: async (conversationId?: string) => {
                 try {
                     const { user } = useAuthStore.getState();
                     const { activeConversationId, conversations } = get();
-                    if (!activeConversationId || !user)
-                        return;
-                    const convo = conversations.find((c) => c._id === activeConversationId);
+                    const targetId = conversationId || activeConversationId;
+                    
+                    if (!targetId || !user) return;
+                    
+                    const convo = conversations.find((c) => c._id === targetId);
                     if (!convo || !convo.lastMessage) return;
 
                     const isUnread = (convo.unreadCounts?.[user._id] ?? 0) > 0;
                     if (!isUnread) return;
 
-                    await chatService.markAsSeen(activeConversationId);
+                    await chatService.markAsSeen(targetId);
                     set((state) => ({
                         conversations: state.conversations.map((c) => (
-                            c._id === activeConversationId && c.lastMessage ? {
+                            c._id === targetId && c.lastMessage ? {
                                 ...c,
                                 unreadCounts: {
                                     ...c.unreadCounts,
@@ -578,6 +580,27 @@ export const useChatStore = create<ChatState>()(
 
                 } catch (error) {
                     console.error("Lỗi khi đánh dấu cuộc trò chuyện đã xem:", error);
+                }
+            },
+            markAsUnread: async (conversationId: string) => {
+                try {
+                    const { user } = useAuthStore.getState();
+                    if (!user) return;
+                    
+                    await chatService.markAsUnread(conversationId);
+                    set((state) => ({
+                        conversations: state.conversations.map((c) => (
+                            c._id === conversationId ? {
+                                ...c,
+                                unreadCounts: {
+                                    ...c.unreadCounts,
+                                    [user._id]: 1
+                                }
+                            } : c
+                        ))
+                    }));
+                } catch (error) {
+                    console.error("Lỗi khi đánh dấu chưa đọc:", error);
                 }
             },
             toggleConversationPin: async (conversationId: string) => {

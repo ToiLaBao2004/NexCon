@@ -92,6 +92,11 @@ export const chatService = {
 		return res.data;
 	},
 
+	async markAsUnread(conversationId: string) {
+		const res = await api.patch(`/conversations/${conversationId}/mark-unread`);
+		return res.data;
+	},
+
 	async toggleConversationPin(conversationId: string) {
 		const res = await api.patch(`/conversations/${conversationId}/pin`);
 		return res.data as {

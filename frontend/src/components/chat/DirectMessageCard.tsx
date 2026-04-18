@@ -8,7 +8,7 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen } from "lucide-react";
 import { isUrl } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -33,7 +33,7 @@ import { getSystemMessageText } from '@/utils/chatUtils';
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation, toggleConversationPin } = useChatStore();
+  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation, toggleConversationPin, markAsUnread, markAsSeen } = useChatStore();
   const { onlineUsers } = useSocketStore();
   const { setNickName, loading } = useFriendStore();
   const active = focusedConversationId === convo._id;
@@ -126,6 +126,19 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     }
   };
 
+  const handleToggleUnread = async () => {
+    try {
+      if (unreadCount > 0) {
+        await markAsSeen(convo._id);
+      } else {
+        await markAsUnread(convo._id);
+      }
+      setDropdownOpen(false);
+    } catch (error) {
+      console.error("Cập nhật trạng thái đọc thất bại:", error);
+    }
+  };
+
   const menuNode = (
     <>
       <Dialog open={openRename} onOpenChange={setOpenRename}>
@@ -173,6 +186,24 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
                 {isConversationPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại"}
               </DropdownMenuItem>
               <DropdownMenuItem
+                onSelect={(e) => {
+                  e.preventDefault();
+                  void handleToggleUnread();
+                }}
+              >
+                {unreadCount > 0 ? (
+                  <>
+                    <MailOpen className="h-4 w-4 mr-2" />
+                    Đánh dấu đã đọc
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Đánh dấu chưa đọc
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onSelect={(e) => {
                   e.preventDefault();
@@ -194,7 +225,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
                     )}
                     onSelect={(e) => e.preventDefault()}
                   >
-                    <UserX className="h-4 w-4" />
+                    <UserX className="h-4 w-4 mr-2" />
                     {isBlocked ? "Bỏ chặn" : "Chặn"}
                   </DropdownMenuItem>
                 )}

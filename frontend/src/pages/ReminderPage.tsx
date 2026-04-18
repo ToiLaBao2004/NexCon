@@ -558,7 +558,7 @@ const ReminderPage = () => {
             });
             setDeleteReminderId(null);
             setReminderToConfirmDelete(null);
-            
+
             void fetchUpcomingCount();
             toast.success(result.message || 'Đã xóa nhắc nhở');
         } catch (error) {
@@ -870,7 +870,7 @@ const ReminderPage = () => {
                         <CalendarDays className="h-5 w-5" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Danh sách nhắc hẹn</h1>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Nhắc hẹn</h1>
                         <p className="text-xs text-muted-foreground">Quản lý các việc cần nhớ của bạn</p>
                     </div>
                 </div>

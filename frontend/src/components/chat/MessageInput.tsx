@@ -365,7 +365,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						value={value}
 						onChange={handleInputChange}
 						onPaste={handlePaste}
-						onFocus={markAsSeen}
+						onFocus={() => markAsSeen()}
 						placeholder={
 							attachment
 								? "Thêm chú thích (tuỳ chọn)…"
