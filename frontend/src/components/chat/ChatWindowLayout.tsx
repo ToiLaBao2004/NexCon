@@ -71,7 +71,7 @@ const ChatWindowLayout = () => {
   }, [activeConversationId, joinConversation, fetchMessages, messageLoading]);
 
   useEffect(() => {
-    if (!selectedConvo || activeConversationId !== focusedConversationId) return;
+    if (!activeConversationId || activeConversationId !== focusedConversationId) return;
     const markSeen = async () => {
       try {
         await markAsSeen();
@@ -81,7 +81,7 @@ const ChatWindowLayout = () => {
     }
 
     markSeen();
-  }, [markAsSeen, selectedConvo, activeConversationId, focusedConversationId]);
+  }, [markAsSeen, activeConversationId, focusedConversationId]);
 
   // Check if there's an active group call when opening a group conversation
   useEffect(() => {

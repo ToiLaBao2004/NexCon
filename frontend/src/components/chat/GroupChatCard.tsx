@@ -4,7 +4,7 @@ import type { Conversation } from "@/types/chat";
 import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
-import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin } from "lucide-react";
+import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, Mail, MailOpen } from "lucide-react";
 import {
 	DropdownMenu,
 	DropdownMenuTrigger,
@@ -37,6 +37,8 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 		updateGroupName,
 		clearConversation,
 		toggleConversationPin,
+		markAsSeen,
+		markAsUnread,
 	} = useChatStore();
 
 	const [openRename, setOpenRename] = useState(false);
@@ -122,6 +124,19 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 		}
 	};
 
+	const handleToggleUnread = async () => {
+		try {
+			if (unreadCount > 0) {
+				await markAsSeen(convo._id);
+			} else {
+				await markAsUnread(convo._id);
+			}
+			setDropdownOpen(false);
+		} catch (error) {
+			console.error("Cập nhật trạng thái đọc thất bại:", error);
+		}
+	};
+
 	const menuNode = (
 		<>
 			<Dialog open={openRename} onOpenChange={setOpenRename}>
@@ -167,6 +182,24 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 							>
 								<Pin className="size-4 mr-2" />
 								{isConversationPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại"}
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								onSelect={(e) => {
+									e.preventDefault();
+									void handleToggleUnread();
+								}}
+							>
+								{unreadCount > 0 ? (
+									<>
+										<MailOpen className="size-4 mr-2" />
+										Đánh dấu đã đọc
+									</>
+								) : (
+									<>
+										<Mail className="size-4 mr-2" />
+										Đánh dấu chưa đọc
+									</>
+								)}
 							</DropdownMenuItem>
 							<DropdownMenuItem
 								className="text-destructive focus:text-destructive"

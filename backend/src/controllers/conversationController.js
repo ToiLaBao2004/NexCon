@@ -209,33 +209,32 @@ export async function getConversations(req, res) {
 				pinnedAt,
 				participants: c.participants
 					.map((p) => {
-					// Fallback to snapshot userInfo if user array is populated as null (user was deleted)
-					let userObj = p.userId;
-					if (!userObj && p.userInfo) {
-						userObj = {
-							_id: null,
-							displayName: p.userInfo.displayName || "Người dùng đã xóa",
-							avatarUrl: p.userInfo.avatarUrl || null
-						};
-					} else if (!userObj) {
-						userObj = {
-							_id: null,
-							displayName: "Người dùng đã xóa",
-							avatarUrl: null
-						};
-					}
+						let userObj = p.userId;
+						if (!userObj && p.userInfo) {
+							userObj = {
+								_id: null,
+								displayName: p.userInfo.displayName || "Người dùng đã xóa",
+								avatarUrl: p.userInfo.avatarUrl || null
+							};
+						} else if (!userObj) {
+							userObj = {
+								_id: null,
+								displayName: "Người dùng đã xóa",
+								avatarUrl: null
+							};
+						}
 
-					const pid = userObj?._id?.toString();
-					const nickname = pid && pid !== myId ? nickMap.get(pid) || null : null;
+						const pid = userObj?._id?.toString();
+						const nickname = pid && pid !== myId ? nickMap.get(pid) || null : null;
 
-					return {
-						...p,
-						userId: {
-							...userObj,
-							nickname,
-						},
-					};
-				}),
+						return {
+							...p,
+							userId: {
+								...userObj,
+								nickname,
+							},
+						};
+					}),
 				unreadCounts: c.unreadCounts || {},
 			};
 		});
@@ -419,6 +418,51 @@ export async function markAsSeen(req, res) {
 
 	} catch (error) {
 		console.error("An error occurred while marking conversation as seen: ", error);
+		return res.status(500).json({ message: "Internal server error" });
+	}
+}
+
+export async function markAsUnread(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const userId = req.user._id.toString();
+
+		const conversation = await Conversation.findById(conversationId).lean();
+		if (!conversation) {
+			return res.status(404).json({ message: "Conversation not found" });
+		}
+
+		const last = conversation.lastMessage;
+		if (last && last.senderId && last.senderId.toString() === userId) {
+			return res.status(200).json({ message: "Cannot mark own message as unread" });
+		}
+
+		const updated = await Conversation.findByIdAndUpdate(conversationId,
+			{
+				$set: { [`unreadCounts.${userId}`]: 1 },
+			}, { new: true }
+		);
+
+		if (!updated) {
+			return res.status(404).json({ message: "Conversation not found" });
+		}
+
+		const receiverSocketId = getReceiverSocketId(userId);
+		if (receiverSocketId) {
+			io.to(receiverSocketId).emit('conversation-updated', {
+				conversationId: updated._id,
+				conversation: { unreadCounts: updated.unreadCounts, seenBy: updated.seenBy }
+			});
+		}
+
+		return res.status(200).json({
+			message: "Conversation marked as unread",
+			seenBy: updated?.seenBy,
+			myunreadCount: 1,
+		});
+
+	} catch (error) {
+		console.error("An error occurred while marking conversation as unread: ", error);
 		return res.status(500).json({ message: "Internal server error" });
 	}
 }
