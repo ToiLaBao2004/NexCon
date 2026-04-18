@@ -79,6 +79,7 @@ export interface ChatState {
   clearConversationCache: (keepConversationIds: string[]) => void;
   fetchConversations: () => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
+  toggleConversationPin: (conversationId: string) => Promise<void>;
   sendMessage: (payload: SendMessagePayload, onProgress?: (pct: number) => void) => Promise<void>;
   addMessage: (message: Message) => Promise<void>;
   createReminderSystemMessage: (conversationId: string, reminder: Reminder) => Promise<void>;

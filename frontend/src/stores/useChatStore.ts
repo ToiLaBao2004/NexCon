@@ -12,6 +12,29 @@ const getReminderContent = (reminder: Reminder): string => {
     return [reminder.title, reminder.note].filter(Boolean).join('\n').trim();
 };
 
+const sortConversations = (conversations: any[]) => {
+    return [...conversations].sort((a, b) => {
+        const aPinned = a.isPinned === true;
+        const bPinned = b.isPinned === true;
+
+        if (aPinned !== bPinned) {
+            return aPinned ? -1 : 1;
+        }
+
+        if (aPinned && bPinned) {
+            const aPinnedAt = new Date(a.pinnedAt || 0).getTime();
+            const bPinnedAt = new Date(b.pinnedAt || 0).getTime();
+            if (aPinnedAt !== bPinnedAt) {
+                return bPinnedAt - aPinnedAt;
+            }
+        }
+
+        const aTime = new Date(a.lastMessage?.createdAt || a.updatedAt || a.createdAt || 0).getTime();
+        const bTime = new Date(b.lastMessage?.createdAt || b.updatedAt || b.createdAt || 0).getTime();
+        return bTime - aTime;
+    });
+};
+
 export const useChatStore = create<ChatState>()(
     persist(
         (set, get) => ({
@@ -121,13 +144,7 @@ export const useChatStore = create<ChatState>()(
                     set({ convoLoading: true });
                     const { conversations } = await chatService.fetchConversations();
 
-                    conversations.sort((a: any, b: any) => {
-                        const dateA = new Date(a.lastMessage?.createdAt || a.createdAt || a.updatedAt || 0).getTime();
-                        const dateB = new Date(b.lastMessage?.createdAt || b.createdAt || b.updatedAt || 0).getTime();
-                        return dateB - dateA;
-                    });
-
-                    set({ conversations, convoLoading: false });
+                    set({ conversations: sortConversations(conversations as any), convoLoading: false });
                 } catch (error) {
                     console.error("Lỗi khi tải danh sách cuộc trò chuyện:", error);
                     set({ convoLoading: false });
@@ -521,17 +538,13 @@ export const useChatStore = create<ChatState>()(
                             c._id === conversation._id ? updatedConv : c
                         );
 
-                        updatedConversations.sort((a, b) => {
-                            const dateA = new Date(a.lastMessage?.createdAt || a.createdAt || 0).getTime();
-                            const dateB = new Date(b.lastMessage?.createdAt || b.createdAt || 0).getTime();
-                            return dateB - dateA;
-                        });
+                        const sortedConversations = sortConversations(updatedConversations as any);
 
                         // Also update selectedConvo if it's the active one
                         const isActive = state.activeConversationId === conversation._id;
 
                         return {
-                            conversations: updatedConversations,
+                            conversations: sortedConversations,
                             ...(isActive ? { selectedConvo: updatedConv } : {})
                         };
                     });
@@ -565,6 +578,32 @@ export const useChatStore = create<ChatState>()(
 
                 } catch (error) {
                     console.error("Lỗi khi đánh dấu cuộc trò chuyện đã xem:", error);
+                }
+            },
+            toggleConversationPin: async (conversationId: string) => {
+                const existing = get().conversations.find((c) => c._id === conversationId);
+                const nextIsPinned = !(existing?.isPinned === true);
+                const optimisticPinnedAt = nextIsPinned ? new Date().toISOString() : null;
+
+                set((state) => ({
+                    conversations: sortConversations(
+                        state.conversations.map((c) =>
+                            c._id === conversationId
+                                ? { ...c, isPinned: nextIsPinned, pinnedAt: optimisticPinnedAt }
+                                : c
+                        ) as any
+                    ),
+                }));
+
+                try {
+                    const response = await chatService.toggleConversationPin(conversationId);
+                    if (response?.conversation) {
+                        get().updateConversation(response.conversation as any);
+                    }
+                } catch (error) {
+                    console.error('Lỗi khi ghim hội thoại:', error);
+                    await get().fetchConversations();
+                    throw error;
                 }
             },
             updateGroupName: async (conversationId: string, name: string) => {

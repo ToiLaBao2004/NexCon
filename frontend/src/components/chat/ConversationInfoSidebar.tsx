@@ -44,6 +44,7 @@ function ActionBtnLocal({
 import { Bell, Pin, UserPlus, Pencil, Camera, Loader2 } from "lucide-react";
 import { MutualGroupsPanel } from "./MutualGroups";
 import ConversationLists from "./ConversationLists";
+import { ConversationRemindersPanel } from "./ConversationRemindersPanel";
 import {
   Dialog,
   DialogContent,
@@ -66,7 +67,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [mutualPopoverOpen, setMutualPopoverOpen] = useState(false);
   const { setNickName, loading: nicknameLoading, friends } = useFriendStore();
   const [newGroupInitialSelected, setNewGroupInitialSelected] = useState<string[] | undefined>(undefined);
-  const { fetchConversations, updateGroupName, updateGroupAvatar } = useChatStore();
+  const { fetchConversations, updateGroupName, updateGroupAvatar, toggleConversationPin } = useChatStore();
 
   /* shared modal state */
   const [openNickname, setOpenNickname] = useState(false);
@@ -80,6 +81,8 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
   const [isLeaveGroupModalOpen, setIsLeaveGroupModalOpen] = useState(false);
+  const [pinLoading, setPinLoading] = useState(false);
+  const [remindersOpen, setRemindersOpen] = useState(false);
 
   // refs for name elements (used for a11y / future enhancements)
   const nameRefDirect = useRef<HTMLSpanElement | null>(null);
@@ -105,6 +108,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   }, [otherParticipant]);
 
   const groupDisplayName = conversation.group?.name || "Nhóm";
+  const isConversationPinned = conversation.isPinned === true;
 
   const currentNickname = useMemo(() => {
     return otherParticipant?.userId?.nickname ?? "";
@@ -197,6 +201,18 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
     }
   };
 
+  const handleToggleConversationPin = async () => {
+    try {
+      setPinLoading(true);
+      await toggleConversationPin(conversation._id);
+      toast.success(isConversationPinned ? "Đã bỏ ghim hội thoại" : "Đã ghim hội thoại");
+    } catch {
+      toast.error("Không thể cập nhật trạng thái ghim hội thoại");
+    } finally {
+      setPinLoading(false);
+    }
+  };
+
   if (!user) return null;
 
   // DIRECT variant
@@ -233,7 +249,12 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
             <div className="flex justify-center gap-4 w-full px-2 mt-2">
               <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled />
-              <ActionBtnLocal icon={Pin} label="Ghim hội thoại" disabled />
+              <ActionBtnLocal
+                icon={Pin}
+                label={isConversationPinned ? "Bỏ ghim" : "Ghim hội thoại"}
+                onClick={handleToggleConversationPin}
+                disabled={pinLoading}
+              />
               <ActionBtnLocal
                 icon={UserPlus}
                 label="Tạo nhóm trò chuyện"
@@ -254,7 +275,8 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
         </div>
         <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />
         <button
-          className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal"
+          onClick={() => setRemindersOpen(true)}
+          className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal cursor-pointer"
         >
           <Clock className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
           <span className="text-[15px]">Danh sách nhắc hẹn</span>
@@ -268,6 +290,12 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           <span className="text-[15px]">{`${mutualGroupCount} nhóm chung`}</span>
         </div>
         <MutualGroupsPanel open={mutualPopoverOpen} onOpenChange={setMutualPopoverOpen} otherParticipantId={otherParticipant?.userId?._id} />
+        <ConversationRemindersPanel
+          open={remindersOpen}
+          onOpenChange={setRemindersOpen}
+          conversationId={conversation._id}
+          conversationName={directDisplayName}
+        />
         <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />
 
         {/* Media, Files, Links */}
@@ -384,7 +412,12 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
           <div className="flex justify-center gap-4 w-full px-2 mt-2">
             <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled={isDisbanded} />
-            <ActionBtnLocal icon={Pin} label="Ghim hội thoại" disabled={isDisbanded} />
+            <ActionBtnLocal
+              icon={Pin}
+              label={isConversationPinned ? "Bỏ ghim" : "Ghim hội thoại"}
+              onClick={handleToggleConversationPin}
+              disabled={isDisbanded || pinLoading}
+            />
             <ActionBtnLocal
               icon={UserPlus}
               label="Thêm thành viên"

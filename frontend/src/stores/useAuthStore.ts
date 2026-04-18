@@ -6,6 +6,7 @@ import { userService } from '@/services/userService';
 import { persist } from 'zustand/middleware';
 import { useChatStore } from './useChatStore';
 import { useNotificationStore } from './useNotificationStore';
+import { unsubscribePushOnLogout } from '@/hooks/usePushNotification';
 
 export const useAuthStore = create<AuthState>()(
   persist((set, get) => ({
@@ -129,8 +130,10 @@ export const useAuthStore = create<AuthState>()(
     signOut: async () => {
       try {
         set({ loading: true });
+        const pushEndpoint = await unsubscribePushOnLogout();
+
         get().clearState();
-        await authService.signOut();
+        await authService.signOut(pushEndpoint);
         toast.success('Đăng xuất thành công!');
       } catch (error: any) {
         console.error('Lỗi khi đăng xuất:', error);

@@ -62,6 +62,8 @@ export interface Conversation {
   type: "direct" | "group";
   group: Group;
   participants: Participant[];
+  isPinned?: boolean;
+  pinnedAt?: string | null;
   lastMessageAt: string;
   seenBy: SeenUser[];
   lastMessage: LastMessage | null;

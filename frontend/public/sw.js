@@ -1,3 +1,11 @@
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(clients.claim());
+});
+
 self.addEventListener('push', (event) => {
   let payload = {};
 
@@ -22,7 +30,23 @@ self.addEventListener('push', (event) => {
     },
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      let isVisible = false;
+      for (const client of windowClients) {
+        if (client.focused || client.visibilityState === 'visible') {
+          isVisible = true;
+          break;
+        }
+      }
+
+      if (isVisible) {
+        return;
+      }
+
+      return self.registration.showNotification(title, options);
+    })
+  );
 });
 
 self.addEventListener('notificationclick', (event) => {

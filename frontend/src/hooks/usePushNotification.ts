@@ -1,6 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/axios';
 
+export async function unsubscribePushOnLogout(): Promise<string | null> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return null;
+  }
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+    if (!subscription) return null;
+
+    const endpoint = subscription.toJSON().endpoint ?? null;
+
+    // Hủy ở phía trình duyệt
+    await subscription.unsubscribe();
+
+    return endpoint;
+  } catch (err) {
+    console.warn('[push] unsubscribePushOnLogout failed silently:', err);
+    return null;
+  }
+}
+
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');

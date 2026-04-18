@@ -4,7 +4,7 @@ import type { Conversation } from "@/types/chat";
 import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
-import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine } from "lucide-react";
+import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin } from "lucide-react";
 import {
 	DropdownMenu,
 	DropdownMenuTrigger,
@@ -36,6 +36,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 		fetchConversations,
 		updateGroupName,
 		clearConversation,
+		toggleConversationPin,
 	} = useChatStore();
 
 	const [openRename, setOpenRename] = useState(false);
@@ -43,6 +44,9 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 	const [loading, setLoading] = useState(false);
 	const [dropdownOpen, setDropdownOpen] = useState(false);
 	const [openClearConfirm, setOpenClearConfirm] = useState(false);
+	const [pinning, setPinning] = useState(false);
+
+	const isConversationPinned = convo.isPinned === true;
 
 	const currentGroupName = useMemo(() => convo.group?.name ?? "", [convo.group?.name]);
 
@@ -106,51 +110,78 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 		}
 	};
 
+	const handleToggleConversationPin = async () => {
+		try {
+			setPinning(true);
+			await toggleConversationPin(convo._id);
+			setDropdownOpen(false);
+		} catch (error) {
+			console.error("Cập nhật ghim hội thoại thất bại:", error);
+		} finally {
+			setPinning(false);
+		}
+	};
+
 	const menuNode = (
 		<>
 			<Dialog open={openRename} onOpenChange={setOpenRename}>
-				<DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-					<DropdownMenuTrigger asChild>
-						<button
-							type="button"
-							className="p-1 rounded hover:bg-muted transition"
-							aria-label="More actions"
+				<div className="flex items-center gap-1">
+					{isConversationPinned && (
+						<Pin className="size-3.5 text-amber-500 fill-current shrink-0" />
+					)}
+					<DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+						<DropdownMenuTrigger asChild>
+							<button
+								type="button"
+								className="p-1 rounded hover:bg-muted transition"
+								aria-label="More actions"
+								onClick={(e) => e.stopPropagation()}
+								onPointerDown={(e) => e.stopPropagation()}
+							>
+								<MoreHorizontal className="size-4 text-muted-foreground" />
+							</button>
+						</DropdownMenuTrigger>
+
+						<DropdownMenuContent
+							align="end"
+							sideOffset={6}
+							onCloseAutoFocus={(e) => e.preventDefault()}
 							onClick={(e) => e.stopPropagation()}
 							onPointerDown={(e) => e.stopPropagation()}
 						>
-							<MoreHorizontal className="size-4 text-muted-foreground" />
-						</button>
-					</DropdownMenuTrigger>
-
-					<DropdownMenuContent
-						align="end"
-						sideOffset={6}
-						onCloseAutoFocus={(e) => e.preventDefault()}
-						onClick={(e) => e.stopPropagation()}
-						onPointerDown={(e) => e.stopPropagation()}
-					>
-						<DropdownMenuItem
-							onSelect={(e) => {
-								e.preventDefault();
-								onOpenRename();
-							}}
-						>
-							<PencilLine className="size-4 mr-2" />
-							Đổi group name
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							className="text-destructive focus:text-destructive"
-							onSelect={(e) => {
-								e.preventDefault();
-								setDropdownOpen(false);
-								setOpenClearConfirm(true);
-							}}
-						>
-							<Trash2 className="size-4 mr-2" />
-							Xóa cuộc trò chuyện
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
+							<DropdownMenuItem
+								onSelect={(e) => {
+									e.preventDefault();
+									onOpenRename();
+								}}
+							>
+								<PencilLine className="size-4 mr-2" />
+								Đổi group name
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								disabled={pinning}
+								onSelect={(e) => {
+									e.preventDefault();
+									void handleToggleConversationPin();
+								}}
+							>
+								<Pin className="size-4 mr-2" />
+								{isConversationPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại"}
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								className="text-destructive focus:text-destructive"
+								onSelect={(e) => {
+									e.preventDefault();
+									setDropdownOpen(false);
+									setOpenClearConfirm(true);
+								}}
+							>
+								<Trash2 className="size-4 mr-2" />
+								Xóa cuộc trò chuyện
+							</DropdownMenuItem>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
 
 				<DialogContent
 					onClick={(e) => e.stopPropagation()}

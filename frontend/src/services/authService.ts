@@ -51,8 +51,12 @@ export const authService = {
     return response.data;
   },
 
-  signOut: async () => {
-    return await api.post('/auth/signout', {}, { withCredentials: true });
+  signOut: async (pushEndpoint?: string | null) => {
+    return await api.post(
+      '/auth/signout',
+      { pushEndpoint: pushEndpoint ?? undefined },
+      { withCredentials: true }
+    );
   },
 
   loginGoogle: () => {

@@ -193,10 +193,22 @@ export async function getConversations(req, res) {
 			}
 		}
 
-		const formatted = conversations.map((c) => ({
-			...c,
-			participants: c.participants
-				.map((p) => {
+		const formatted = conversations.map((c) => {
+			const myParticipant = c.participants?.find((p) => {
+				const participantId = p?.userId?._id?.toString?.() || p?.userId?.toString?.();
+				return participantId === myId;
+			});
+
+			const pinnedAt = myParticipant?.pinnedAt
+				? new Date(myParticipant.pinnedAt).toISOString()
+				: null;
+
+			return {
+				...c,
+				isPinned: !!pinnedAt,
+				pinnedAt,
+				participants: c.participants
+					.map((p) => {
 					// Fallback to snapshot userInfo if user array is populated as null (user was deleted)
 					let userObj = p.userId;
 					if (!userObj && p.userInfo) {
@@ -224,10 +236,23 @@ export async function getConversations(req, res) {
 						},
 					};
 				}),
-			unreadCounts: c.unreadCounts || {},
-		}));
+				unreadCounts: c.unreadCounts || {},
+			};
+		});
 
 		formatted.sort((a, b) => {
+			if (a.isPinned !== b.isPinned) {
+				return a.isPinned ? -1 : 1;
+			}
+
+			if (a.isPinned && b.isPinned) {
+				const pinnedA = new Date(a.pinnedAt || 0).getTime();
+				const pinnedB = new Date(b.pinnedAt || 0).getTime();
+				if (pinnedA !== pinnedB) {
+					return pinnedB - pinnedA;
+				}
+			}
+
 			const dateA = new Date(a.lastMessage?.createdAt || a.updatedAt || 0).getTime();
 			const dateB = new Date(b.lastMessage?.createdAt || b.updatedAt || 0).getTime();
 			return dateB - dateA;
@@ -395,6 +420,50 @@ export async function markAsSeen(req, res) {
 	} catch (error) {
 		console.error("An error occurred while marking conversation as seen: ", error);
 		return res.status(500).json({ message: "Internal server error" });
+	}
+}
+
+export async function toggleConversationPin(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const userId = req.user._id.toString();
+
+		const conversation = await Conversation.findById(conversationId);
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+
+		const participant = conversation.participants.find(
+			(p) => p.userId.toString() === userId
+		);
+
+		if (!participant) {
+			return res.status(403).json({ message: 'You are not a participant in this conversation.' });
+		}
+
+		const wasPinned = !!participant.pinnedAt;
+		participant.pinnedAt = wasPinned ? null : new Date();
+		conversation.markModified('participants');
+		await conversation.save();
+
+		const payload = {
+			_id: conversation._id,
+			isPinned: !wasPinned,
+			pinnedAt: participant.pinnedAt ? participant.pinnedAt.toISOString() : null,
+		};
+
+		const mySocketId = getReceiverSocketId(userId);
+		if (mySocketId) {
+			io.to(mySocketId).emit('conversation-updated', { conversation: payload });
+		}
+
+		return res.status(200).json({
+			message: payload.isPinned ? 'Conversation pinned.' : 'Conversation unpinned.',
+			conversation: payload,
+		});
+	} catch (error) {
+		console.error('Error toggling conversation pin:', error);
+		return res.status(500).json({ message: 'Internal server error' });
 	}
 }
 
