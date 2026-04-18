@@ -1,6 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+import { getGeminiModel } from '../getGeminiModelService.js';
 
 const LOCAL_BLOCKLIST = [
     'địt', 'đụ', 'lồn', 'cặc', 'buồi', 'đéo', 'dm', 'vkl', 'cc', 'cút mẹ',
@@ -96,15 +94,6 @@ function shouldUseAI(text = '') {
 }
 
 let model = null;
-
-function getGeminiModel() {
-    if (!GEMINI_API_KEY) return null;
-    if (!model) {
-        const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-        model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
-    }
-    return model;
-}
 
 async function checkWithGemini(text) {
     const geminiModel = getGeminiModel();
