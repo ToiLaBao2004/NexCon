@@ -48,7 +48,7 @@ export interface LastMessage {
   content: string;
   type?: MessageType;
   systemType?: string | null;
-  metadata?: any;
+  metadata?: MessageMetadata;
   createdAt: string;
   sender: {
     _id: string;
@@ -90,13 +90,28 @@ export interface ReplyToMessage {
   isRecalled?: boolean | null;
 }
 
+export interface LinkPreview {
+  url: string;
+  title?: string;
+  description?: string;
+  image?: string;
+  siteName?: string;
+  hostname?: string;
+}
+
+export interface MessageMetadata {
+  linkPreview?: LinkPreview;
+
+  [key: string]: any;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
   senderId: string;
   type: MessageType;
   systemType?: string | null;
-  metadata?: any;
+  metadata?: MessageMetadata;
   content?: string | null;
   fileUrl?: string | null;
   filePublicId?: string | null;

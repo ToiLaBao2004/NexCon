@@ -120,6 +120,74 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 	}
 
 	if (type === "link" && message.content) {
+		const preview = message.metadata?.linkPreview;
+		const hostname =
+			preview?.hostname ||
+			preview?.siteName ||
+			(() => {
+				try {
+					return new URL(normalizeUrl(message.content!)).hostname;
+				} catch {
+					return "Liên kết";
+				}
+			})();
+
+		if (preview?.title || preview?.image || preview?.description) {
+			return (
+				<a
+					href={normalizeUrl(message.content)}
+					target="_blank"
+					rel="noopener noreferrer"
+					className={cn(
+						"block max-w-[320px] overflow-hidden rounded-2xl border transition hover:opacity-95",
+						isOwn
+							? "border-white/15 bg-white/10 text-white"
+							: "border-border bg-background"
+					)}
+				>
+					{preview.image && (
+						<img
+							src={preview.image}
+							alt={preview.title || "Link preview"}
+							className="h-40 w-full object-cover"
+						/>
+					)}
+
+					<div className="p-3">
+						<div className={cn(
+							"mb-1 flex items-center gap-1.5 text-xs",
+							isOwn ? "text-white/70" : "text-muted-foreground"
+						)}>
+							<Link2 className="size-3.5 shrink-0" />
+							<span className="truncate">{preview.siteName || hostname}</span>
+						</div>
+
+						{preview.title && (
+							<div className="line-clamp-2 text-sm font-semibold">
+								{preview.title}
+							</div>
+						)}
+
+						{preview.description && (
+							<div className={cn(
+								"mt-1 line-clamp-2 text-xs",
+								isOwn ? "text-white/80" : "text-muted-foreground"
+							)}>
+								{preview.description}
+							</div>
+						)}
+
+						<div className={cn(
+							"mt-2 text-[11px] break-all",
+							isOwn ? "text-white/60" : "text-muted-foreground/80"
+						)}>
+							{message.content}
+						</div>
+					</div>
+				</a>
+			);
+		}
+
 		return (
 			<a
 				href={normalizeUrl(message.content)}

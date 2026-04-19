@@ -14,6 +14,7 @@ import { safeUpload } from '../utils/messageHelper.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { moderateTextMessage } from '../services/moderation/moderationTextService.js';
 import { moderateLinkMessage } from '../services/moderation/moderationLinkService.js';
+import { fetchLinkPreview } from '../utils/linkPreview.js';
 
 export async function sendMessage(req, res) {
     try {
@@ -104,6 +105,13 @@ export async function sendMessage(req, res) {
                 }
 
                 messageData.content = normalizedUrl;
+
+                const preview = await fetchLinkPreview(normalizedUrl);
+                messageData.metadata = {
+                    ...(messageData.metadata || {}),
+                    linkPreview: preview,
+                };
+
                 break;
             }
 
