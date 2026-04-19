@@ -88,11 +88,6 @@ export async function persistCallSystemMessage(io, {
     initiator,
     participants,
 }) {
-    const conversation = await Conversation.findById(conversationId);
-    if (!conversation) {
-        return null;
-    }
-
     const sanitizedParticipants = Array.isArray(participants)
         ? participants.map(sanitizeParticipant)
         : [];
@@ -127,9 +122,36 @@ export async function persistCallSystemMessage(io, {
         },
     });
 
-    applyCallConversationState(conversation, message, safeInitiatorId, sanitizedParticipants);
-    await conversation.save();
+    let maxRetries = 3;
+    let saved = false;
+    let updatedConversation = null;
 
-    emitNewMessage(io, conversation, message);
+    while (maxRetries > 0) {
+        try {
+            const conversation = await Conversation.findById(conversationId);
+            if (!conversation) {
+                return message;
+            }
+
+            applyCallConversationState(conversation, message, safeInitiatorId, sanitizedParticipants);
+            await conversation.save();
+            
+            updatedConversation = conversation;
+            saved = true;
+            break;
+        } catch (error) {
+            if (error.name === 'VersionError' && maxRetries > 1) {
+                maxRetries--;
+                await new Promise(resolve => setTimeout(resolve, Math.random() * 50));
+                continue;
+            }
+            console.error('Error saving conversation in persistCallSystemMessage:', error);
+            break;
+        }
+    }
+
+    if (saved && updatedConversation) {
+        emitNewMessage(io, updatedConversation, message);
+    }
     return message;
 }
