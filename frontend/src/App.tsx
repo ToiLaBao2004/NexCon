@@ -59,8 +59,10 @@ function App() {
     };
   }, []);
 
+  const isAuth = !!accessToken;
+
   useEffect(() => {
-    if (accessToken) {
+    if (isAuth) {
       connectSocket();
       useFriendStore.getState().fetchIncomingRequests();
       useFriendStore.getState().fetchFriends();
@@ -68,10 +70,10 @@ function App() {
       useFriendStore.getState().fetchBlockedList();
       useNotificationStore.getState().fetchNotifications();
       useChatStore.getState().fetchConversations();
+    } else {
+      disconnectSocket();
     }
-
-    return () => disconnectSocket();
-  }, [accessToken, connectSocket, disconnectSocket]);
+  }, [isAuth, connectSocket, disconnectSocket]);
 
   useEffect(() => {
     if (!accessToken || !isSupported()) {
