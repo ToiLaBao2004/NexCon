@@ -141,7 +141,7 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 					className={cn(
 						"block max-w-[320px] overflow-hidden rounded-2xl border transition hover:opacity-95",
 						isOwn
-							? "border-white/15 bg-white/10 text-white"
+							? "border-white/20 bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:border-white/10"
 							: "border-border bg-background"
 					)}
 				>
@@ -154,10 +154,7 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 					)}
 
 					<div className="p-3">
-						<div className={cn(
-							"mb-1 flex items-center gap-1.5 text-xs",
-							isOwn ? "text-white/70" : "text-muted-foreground"
-						)}>
+						<div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
 							<Link2 className="size-3.5 shrink-0" />
 							<span className="truncate">{preview.siteName || hostname}</span>
 						</div>
@@ -169,18 +166,12 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 						)}
 
 						{preview.description && (
-							<div className={cn(
-								"mt-1 line-clamp-2 text-xs",
-								isOwn ? "text-white/80" : "text-muted-foreground"
-							)}>
+							<div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
 								{preview.description}
 							</div>
 						)}
 
-						<div className={cn(
-							"mt-2 text-[11px] break-all",
-							isOwn ? "text-white/60" : "text-muted-foreground/80"
-						)}>
+						<div className="mt-2 text-[11px] break-all text-muted-foreground/80">
 							{message.content}
 						</div>
 					</div>
@@ -1292,6 +1283,7 @@ const MessageItem = ({
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
 	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
+	const isLink = message.type === "link" && !isRecalled;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
@@ -1381,7 +1373,7 @@ const MessageItem = ({
 	const handlePointerDownForActions = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (!isCoarsePointer) return;
 		if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-		if (isRecalled || message.status || isDisbanded) return;
+		if (isRecalled || (message.status && message.status !== "sent") || isDisbanded) return;
 
 		clearLongPressTimer();
 		longPressTimeoutRef.current = window.setTimeout(() => {
@@ -1492,13 +1484,15 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								isImage ? "p-0 bg-transparent border-0" : "px-2 py-1.5 text-sm",
-								reactionSummary && !isImage && "min-w-[85px]", // Ensure bubble is wide enough for time + reaction
+								(isImage || isLink) ? "p-0 bg-transparent border-0" : "px-2 py-1.5 text-sm",
+								reactionSummary && !isImage && !isLink && "min-w-[85px]",
 								isRecalled
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
-									: isOwn
-										? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
-										: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
+									: isLink
+										? "bg-transparent border-0"
+										: isOwn
+											? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
+											: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
 							)}
 						>
 							{message.replyTo && !isRecalled && (
@@ -1516,8 +1510,8 @@ const MessageItem = ({
 
 								{!isImage && (
 									<div className={cn(
-										"flex items-center gap-1 select-none self-start -mt-0.5",
-										isOwn ? "text-white/60" : "text-muted-foreground/60"
+										"flex items-center gap-1 select-none self-start -mt-0.5 px-2 pb-1",
+										(isOwn && !isLink) ? "text-white/60" : "text-muted-foreground/60"
 									)}>
 										<span className="text-[10px] sm:text-[10.5px] font-medium leading-none whitespace-nowrap">
 											{formatMessageTime(new Date(message.createdAt))}
@@ -1585,10 +1579,10 @@ const MessageItem = ({
 												<Smile className="h-4 w-4" />
 											</button>
 										</PopoverTrigger>
-										<PopoverContent 
-											className="w-[320px] max-w-[95vw] shadow-2xl rounded-2xl overflow-hidden p-0 border border-border/10 bg-background/95 backdrop-blur-sm relative z-[100] scale-[0.85] sm:scale-100 origin-bottom sm:origin-top" 
-											align={isOwn ? "end" : "start"} 
-											side="top" 
+										<PopoverContent
+											className="w-[320px] max-w-[95vw] shadow-2xl rounded-2xl overflow-hidden p-0 border border-border/10 bg-background/95 backdrop-blur-sm relative z-[100] scale-[0.85] sm:scale-100 origin-bottom sm:origin-top"
+											align={isOwn ? "end" : "start"}
+											side="top"
 											sideOffset={8}
 										>
 											<div className="flex w-full justify-center">
@@ -1723,7 +1717,7 @@ const MessageItem = ({
 															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Trả lời</span>
 														</button>
 													)}
-													
+
 													{message.content && (
 														<button onClick={() => { setShowTouchActions(false); handleCopy(); }} className="flex flex-col items-center gap-2">
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
@@ -1752,11 +1746,11 @@ const MessageItem = ({
 													)}
 
 													{canCreateReminder && (
-														<button 
-															onClick={() => { 
+														<button
+															onClick={() => {
 																setShowTouchActions(false);
 																setReminderTargetMessage({ messageId: message._id, messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn") });
-															}} 
+															}}
 															className="flex flex-col items-center gap-2"
 														>
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
@@ -1765,7 +1759,7 @@ const MessageItem = ({
 															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap overflow-visible">Nhắc hẹn</span>
 														</button>
 													)}
-													
+
 													{isOwn && !isDisbanded && (
 														<button onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }} className="flex flex-col items-center gap-2">
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 shadow-sm hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors">
@@ -1791,7 +1785,7 @@ const MessageItem = ({
 											>
 												<DialogTitle className="sr-only">Chọn cảm xúc</DialogTitle>
 												<div className="flex items-center gap-2 px-4 pt-4 pb-2">
-													<button 
+													<button
 														onClick={() => setTouchActionView("menu")}
 														className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
 													>

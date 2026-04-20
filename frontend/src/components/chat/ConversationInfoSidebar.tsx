@@ -218,9 +218,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   // DIRECT variant
   if (conversation.type === "direct") {
     return (
-      <aside className="flex flex-col h-full min-w-[350px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
+      <aside className="flex h-full w-full min-w-0 flex-col bg-background overflow-y-auto overflow-x-hidden beautiful-scrollbar md:min-w-[350px] md:border-l md:border-border/40">
         <div className="flex flex-col items-center pt-6 pb-4 bg-card">
-          <div className="w-[350px] flex flex-col items-center">
+          <div className="w-full max-w-[350px] px-4 flex flex-col items-center">
             <div className="relative mb-1 h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
               <UserAvatar
                 type="profile"
@@ -247,7 +247,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
               </div>
             </div>
 
-            <div className="flex justify-center gap-4 w-full px-2 mt-2">
+            <div className="flex justify-center gap-3 sm:gap-4 w-full px-2 mt-2">
               <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled />
               <ActionBtnLocal
                 icon={Pin}
@@ -354,9 +354,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   ));
 
   return (
-    <aside className="flex flex-col h-full min-w-[350px] bg-background border-l border-border/40 overflow-y-auto overflow-x-hidden beautiful-scrollbar">
+    <aside className="flex h-full w-full min-w-0 flex-col bg-background overflow-y-auto overflow-x-hidden beautiful-scrollbar md:min-w-[350px] md:border-l md:border-border/40">
       <div className="flex flex-col items-center pt-6 pb-4 bg-card">
-        <div className="w-[350px] flex flex-col items-center">
+        <div className="w-full max-w-[350px] px-4 flex flex-col items-center">
           <div className="relative mb-1">
             <div className="h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
               <GroupChatAvatar
@@ -410,7 +410,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             </div>
           </div>
 
-          <div className="flex justify-center gap-4 w-full px-2 mt-2">
+          <div className="flex justify-center gap-3 sm:gap-4 w-full px-2 mt-2">
             <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled={isDisbanded} />
             <ActionBtnLocal
               icon={Pin}
