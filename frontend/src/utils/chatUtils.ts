@@ -94,6 +94,35 @@ export const getSystemMessageText = (
             return isMe ? "Bạn đã đổi ảnh đại diện nhóm" : `${updatedByName} đã đổi ảnh đại diện nhóm`;
         }
 
+        case "group_name_updated": {
+            const updatedBy = meta.updatedBy;
+            const updatedByName = meta.updatedByName || "Một thành viên";
+            const isMe = updatedBy?.toString() === currentUserId;
+            const targetName = String(meta.newName || "").trim();
+
+            if (!targetName) {
+                return isMe ? "Bạn đã đổi tên nhóm" : `${updatedByName} đã đổi tên nhóm`;
+            }
+
+            return isMe
+                ? `Bạn đã đổi tên nhóm thành ${targetName}`
+                : `${updatedByName} đã đổi tên nhóm thành ${targetName}`;
+        }
+
+        case "message_pinned": {
+            const actionBy = meta.actionBy;
+            const actionByName = meta.actionByName || "Một thành viên";
+            const isMe = actionBy?.toString() === currentUserId;
+            return isMe ? "Bạn đã ghim một tin nhắn" : `${actionByName} đã ghim một tin nhắn`;
+        }
+
+        case "message_unpinned": {
+            const actionBy = meta.actionBy;
+            const actionByName = meta.actionByName || "Một thành viên";
+            const isMe = actionBy?.toString() === currentUserId;
+            return isMe ? "Bạn đã bỏ ghim một tin nhắn" : `${actionByName} đã bỏ ghim một tin nhắn`;
+        }
+
         case "call_started":
             return "Cuộc gọi đã bắt đầu";
         case "call_ended":

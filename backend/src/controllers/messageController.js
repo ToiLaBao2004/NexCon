@@ -359,15 +359,21 @@ export async function pinMessage(req, res) {
     try {
         const { messageId } = req.body;
 
-        const message = await Message.findById(messageId);
+        const message = req.message || await Message.findById(messageId);
         if (!message) {
             return res.status(404).json({ message: 'Không tìm thấy tin nhắn.' });
         }
 
-        const conversation = await Conversation.findById(message.conversationId);
+        const conversation = req.conversation || await Conversation.findById(message.conversationId);
         if (!conversation) {
             return res.status(404).json({ message: 'Không tìm thấy cuộc trò chuyện.' });
         }
+
+        const senderInfo = {
+            displayName: req.user.displayName,
+            avatarUrl: req.user.avatarUrl,
+        };
+        const actionByName = req.user.displayName || 'Một thành viên';
 
         // Nếu đã ghim thì bỏ ghim luôn
         if (message.isPinned) {
@@ -391,6 +397,25 @@ export async function pinMessage(req, res) {
                     io.to(socketId).emit('pin-message', payload);
                 }
             });
+
+            const systemMessage = await Message.create({
+                conversationId: conversation._id,
+                senderId: req.user._id,
+                senderInfo,
+                type: 'system',
+                systemType: 'message_unpinned',
+                content: `${actionByName} đã bỏ ghim một tin nhắn`,
+                metadata: {
+                    actionBy: req.user._id,
+                    actionByName,
+                    targetMessageId: message._id,
+                    targetMessageType: message.type,
+                },
+            });
+
+            updateConversationLastMessage(conversation, systemMessage, req.user._id);
+            await conversation.save();
+            emitNewMessage(io, conversation, systemMessage);
 
             return res.status(200).json({
                 message: 'Bỏ ghim tin nhắn thành công.',
@@ -433,6 +458,25 @@ export async function pinMessage(req, res) {
                 io.to(socketId).emit('pin-message', payload);
             }
         });
+
+        const systemMessage = await Message.create({
+            conversationId: conversation._id,
+            senderId: req.user._id,
+            senderInfo,
+            type: 'system',
+            systemType: 'message_pinned',
+            content: `${actionByName} đã ghim một tin nhắn`,
+            metadata: {
+                actionBy: req.user._id,
+                actionByName,
+                targetMessageId: message._id,
+                targetMessageType: message.type,
+            },
+        });
+
+        updateConversationLastMessage(conversation, systemMessage, req.user._id);
+        await conversation.save();
+        emitNewMessage(io, conversation, systemMessage);
 
         return res.status(200).json({
             message: 'Ghim tin nhắn thành công.',

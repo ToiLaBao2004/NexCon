@@ -614,6 +614,55 @@ function SystemMessageComponent({
 			}
 		}
 
+		if (message.systemType === "group_name_updated") {
+			const updatedByActor = makeActor(
+				metadata.updatedBy || message.senderId,
+				metadata.updatedByName || message.senderInfo?.displayName || "Một thành viên",
+				metadata.updatedByAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			const newName = String(metadata.newName || "").trim();
+
+			if (updatedByActor) {
+				return (
+					<>
+						{actorBadge(updatedByActor)} {textPart(newName ? `đã đổi tên nhóm thành ${newName}` : "đã đổi tên nhóm")}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "message_pinned") {
+			const actor = makeActor(
+				metadata.actionBy || message.senderId,
+				metadata.actionByName || message.senderInfo?.displayName || "Một thành viên",
+				message.senderInfo?.avatarUrl
+			);
+
+			if (actor) {
+				return (
+					<>
+						{actorBadge(actor)} {textPart("đã ghim một tin nhắn")}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "message_unpinned") {
+			const actor = makeActor(
+				metadata.actionBy || message.senderId,
+				metadata.actionByName || message.senderInfo?.displayName || "Một thành viên",
+				message.senderInfo?.avatarUrl
+			);
+
+			if (actor) {
+				return (
+					<>
+						{actorBadge(actor)} {textPart("đã bỏ ghim một tin nhắn")}
+					</>
+				);
+			}
+		}
+
 		if (message.systemType === "member_left") {
 			const leftActor = makeActor(
 				metadata.leftUserId || metadata.userId,

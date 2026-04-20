@@ -565,6 +565,7 @@ export async function updateGroupName(req, res) {
 		if (!name || name.trim() === '') {
 			return res.status(400).json({ message: 'Group name is required.' });
 		}
+		const normalizedName = name.trim();
 		const conversation = await Conversation.findById(conversationId);
 		if (!conversation) {
 			return res.status(404).json({ message: "Conversation not found" });
@@ -578,9 +579,58 @@ export async function updateGroupName(req, res) {
 		if (!conversation.participants.some(p => p.userId.toString() === userId)) {
 			return res.status(403).json({ message: "Only group participants can rename the group" });
 		}
-		conversation.group.name = name;
+
+		const oldName = (conversation.group?.name || '').trim();
+		if (oldName === normalizedName) {
+			return res.status(200).json({
+				success: true,
+				message: 'Group name unchanged.',
+			});
+		}
+
+		conversation.group.name = normalizedName;
+
+		const systemMessage = new Message({
+			conversationId,
+			senderId: req.user._id,
+			senderInfo: {
+				displayName: req.user.displayName,
+				avatarUrl: req.user.avatarUrl,
+			},
+			type: 'system',
+			systemType: 'group_name_updated',
+			metadata: {
+				updatedBy: req.user._id,
+				updatedByName: req.user.displayName,
+				oldName,
+				newName: normalizedName,
+			},
+			content: `${req.user.displayName} đã đổi tên nhóm thành ${normalizedName}`,
+		});
+
+		const savedMsg = await systemMessage.save();
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+
+		updateConversationLastMessage(conversation, finalMsg, req.user._id);
 		await conversation.save();
-		return res.status(200).json({ message: "Group name updated successfully" });
+
+		const updatedConversation = await Conversation.findById(conversationId).populate({
+			path: 'participants.userId',
+			select: 'displayName avatarUrl nickname email bio phone status lastSeen',
+		});
+
+		emitNewMessage(io, updatedConversation, finalMsg);
+
+		io.to(conversationId.toString()).emit('conversation-updated', {
+			conversationId,
+			conversation: updatedConversation,
+		});
+
+		return res.status(200).json({
+			success: true,
+			message: 'Group name updated successfully',
+			conversation: updatedConversation,
+		});
 	} catch (error) {
 		console.error("An error occurred while updating group name: ", error);
 		return res.status(500).json({ message: "Internal server error" });
