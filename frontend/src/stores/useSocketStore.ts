@@ -322,6 +322,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useChatStore.getState().fetchConversations();
     });
 
+    socket.on("accept-call", () => {
+      useCallStore.getState().handleRemoteAccepted();
+    });
+
     socket.on("call-answered", ({ token, roomName }) => {
       useCallStore.getState().handleCallAnswered({ token, roomName });
     });
@@ -336,6 +340,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     socket.on("call-ended", () => {
+      useCallStore.getState().handleCallEnded();
+      refreshConversations();
+    });
+
+    socket.on("call-cancelled", () => {
       useCallStore.getState().handleCallEnded();
       refreshConversations();
     });

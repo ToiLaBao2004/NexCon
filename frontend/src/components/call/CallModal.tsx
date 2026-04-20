@@ -30,6 +30,7 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [hasStarted, setHasStarted] = useState(false);
 
   // Attach local stream (re-run when minimize toggles because DOM elements remount)
   useEffect(() => {
@@ -45,11 +46,20 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
     }
   }, [remoteStream, isMinimized, isRemoteVideoOff]);
 
+  // Bắt đầu đếm khi đã nhận media từ peer (coi như cả hai đã vào cuộc gọi).
+  useEffect(() => {
+    if (remoteStream && !hasStarted) {
+      setHasStarted(true);
+    }
+  }, [remoteStream, hasStarted]);
+
   // Call duration timer
   useEffect(() => {
+    if (!hasStarted) return;
+
     const id = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [hasStarted]);
 
   if (!remoteUser) return null;
 

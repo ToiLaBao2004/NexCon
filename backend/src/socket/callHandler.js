@@ -86,6 +86,10 @@ function buildInitialDirectSession({ conversation, caller, receiverId, callType 
         roomName: sessionId,
         status: 'calling',
         startedAt: null,
+        livekitConnected: {
+            [callerId]: false,
+            [receiverId.toString()]: false,
+        },
         initiator: {
             _id: callerId,
             displayName: caller.displayName,
@@ -123,6 +127,22 @@ function markParticipant(session, userId, patch) {
     if (target) {
         Object.assign(target, patch);
     }
+}
+
+function markLiveKitConnected(session, userId) {
+    const normalizedUserId = userId.toString();
+
+    if (!session.livekitConnected || typeof session.livekitConnected !== 'object') {
+        session.livekitConnected = {
+            [session.callerId]: false,
+            [session.receiverId]: false,
+        };
+    }
+
+    session.livekitConnected[normalizedUserId] = true;
+
+    return Boolean(session.livekitConnected[session.callerId])
+        && Boolean(session.livekitConnected[session.receiverId]);
 }
 
 function finalizeSessionParticipants(participants, endedAtIso) {
@@ -197,6 +217,61 @@ async function generateLiveKitToken(roomName, identity, displayName, metadata) {
 
 // Đăng ký socket events liên quan đến Call
 export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io, getReceiverSocketId) {
+
+    async function finalizeAndNotifyCall({ toUserId, cancelled = false }) {
+        const myId = user._id.toString();
+        const otherIdFromPayload = toUserId ? toUserId.toString() : null;
+
+        let activeCall = null;
+        if (otherIdFromPayload) {
+            activeCall = activeCalls.get(myId) || activeCalls.get(otherIdFromPayload);
+        } else {
+            activeCall = activeCalls.get(myId);
+        }
+
+        if (!activeCall) {
+            activeCall = [...activeCalls.values()].find(
+                (call) => call.callerId === myId || call.receiverId === myId
+            ) || null;
+        }
+
+        const resolvedOtherId = activeCall
+            ? (activeCall.callerId === myId ? activeCall.receiverId : activeCall.callerId)
+            : otherIdFromPayload;
+
+        let notifyEvent = cancelled ? 'call-cancelled' : 'call-ended';
+
+        if (activeCall) {
+            const overallStatus = activeCall.status === 'in-call' ? 'ended' : 'canceled';
+            await persistFinalizedDirectSession(io, activeCall, overallStatus);
+            activeCalls.delete(activeCall.callerId);
+
+            if (overallStatus !== 'ended') {
+                notifyEvent = 'call-cancelled';
+            }
+        }
+
+        const payload = {
+            by: {
+                _id: user._id,
+                displayName: user.displayName,
+            }
+        };
+
+        if (resolvedOtherId) {
+            const otherSocketId = getReceiverSocketId(resolvedOtherId);
+            if (otherSocketId) {
+                io.to(otherSocketId).emit(notifyEvent, payload);
+            }
+        }
+
+        const mySocketId = getReceiverSocketId(myId);
+        if (mySocketId) {
+            io.to(mySocketId).emit(notifyEvent, payload);
+        }
+
+        console.log(`Call ${notifyEvent} between ${myId} and ${resolvedOtherId || 'unknown'}`);
+    }
 
     // A gọi B — tạo call session và báo incoming-call
     socket.on('call-offer', async ({ toUserId, callType }) => {
@@ -298,56 +373,124 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
     });
 
     // B chấp nhận — phát token LiveKit cho cả 2 bên
+    socket.on('accept-call', ({ toUserId }) => {
+        const callerId = toUserId?.toString();
+        const receiverId = user._id.toString();
+
+        if (!callerId) return;
+
+        const activeCall = activeCalls.get(callerId);
+        if (!activeCall) return;
+
+        activeCall.status = 'connecting';
+        markParticipant(activeCall, receiverId, { status: 'accepted', joinedAt: null });
+
+        const callerSocketId = getReceiverSocketId(callerId);
+        if (callerSocketId) {
+            io.to(callerSocketId).emit('accept-call', {
+                by: {
+                    _id: user._id,
+                    displayName: user.displayName,
+                },
+                roomName: activeCall.roomName,
+            });
+        }
+    });
+
     socket.on('call-answer', async ({ toUserId }) => {
-        const callerId = toUserId.toString();
+        const callerId = toUserId?.toString();
         const receiverId = user._id.toString();
 
         try {
+            if (!callerId) return;
+
             const callerSocketId = getReceiverSocketId(callerId);
             if (!callerSocketId) return;
 
             const activeCall = activeCalls.get(callerId);
             if (!activeCall) return;
 
-            const nowIso = new Date().toISOString();
-            activeCall.status = 'in-call';
-            activeCall.startedAt = nowIso;
-            markParticipant(activeCall, callerId, { status: 'accepted', joinedAt: nowIso });
-            markParticipant(activeCall, receiverId, { status: 'accepted', joinedAt: nowIso });
+            activeCall.status = 'connecting';
+            markParticipant(activeCall, receiverId, { status: 'accepted' });
 
-            const callerToken = await generateLiveKitToken(
-                activeCall.roomName,
-                callerId,
-                activeCall.initiator.displayName || callerId,
-                JSON.stringify({
-                    displayName: activeCall.initiator.displayName || callerId,
-                    avatarUrl: activeCall.initiator.avatarUrl || null,
-                })
-            );
+            const [callerToken, receiverToken] = await Promise.all([
+                generateLiveKitToken(
+                    activeCall.roomName,
+                    callerId,
+                    activeCall.initiator.displayName || callerId,
+                    JSON.stringify({
+                        displayName: activeCall.initiator.displayName || callerId,
+                        avatarUrl: activeCall.initiator.avatarUrl || null,
+                    })
+                ),
+                generateLiveKitToken(
+                    activeCall.roomName,
+                    receiverId,
+                    user.displayName,
+                    JSON.stringify({
+                        displayName: user.displayName,
+                        avatarUrl: user.avatarUrl || null,
+                    })
+                )
+            ]);
 
-            const receiverToken = await generateLiveKitToken(
-                activeCall.roomName,
-                receiverId,
-                user.displayName,
-                JSON.stringify({
-                    displayName: user.displayName,
-                    avatarUrl: user.avatarUrl || null,
-                })
-            );
+            const latestCall = activeCalls.get(callerId);
+            if (!latestCall || latestCall.sessionId !== activeCall.sessionId) {
+                return;
+            }
+
+            latestCall.status = 'connecting';
+            markParticipant(latestCall, callerId, { status: 'accepted' });
+            markParticipant(latestCall, receiverId, { status: 'accepted' });
 
             io.to(callerSocketId).emit('call-answered', {
                 token: callerToken,
-                roomName: activeCall.roomName,
+                roomName: latestCall.roomName,
             });
             socket.emit('call-accepted', {
                 token: receiverToken,
-                roomName: activeCall.roomName,
+                roomName: latestCall.roomName,
             });
 
             console.log(`${user.displayName} accepted call from ${callerId}`);
 
         } catch (error) {
             console.error('Error in call-answer:', error);
+            if (callerId) {
+                try {
+                    await finalizeAndNotifyCall({ toUserId: callerId, cancelled: true });
+                } catch (finalizeError) {
+                    console.error('Error cleaning up failed call-answer:', finalizeError);
+                }
+
+                socket.emit('call-failed', { reason: 'server-error' });
+                const callerSocketId = getReceiverSocketId(callerId);
+                if (callerSocketId) {
+                    io.to(callerSocketId).emit('call-failed', { reason: 'server-error' });
+                }
+            }
+        }
+    });
+
+    socket.on('call-connected', ({ toUserId }) => {
+        const myId = user._id.toString();
+        const otherId = toUserId?.toString();
+        if (!otherId) return;
+
+        const activeCall = activeCalls.get(myId) || activeCalls.get(otherId);
+        if (!activeCall) return;
+
+        const isParticipant = activeCall.callerId === myId || activeCall.receiverId === myId;
+        if (!isParticipant) return;
+
+        const connectedAt = new Date().toISOString();
+        markParticipant(activeCall, myId, { status: 'accepted', joinedAt: connectedAt });
+
+        const bothConnected = markLiveKitConnected(activeCall, myId);
+        if (bothConnected && !activeCall.startedAt) {
+            activeCall.status = 'in-call';
+            activeCall.startedAt = connectedAt;
+            console.log(`Call active between ${activeCall.callerId} and ${activeCall.receiverId} at ${connectedAt}`);
         }
     });
 
@@ -392,32 +535,26 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
 
     // Một trong hai bên kết thúc cuộc gọi
     socket.on('call-ended', async ({ toUserId }) => {
-        const myId = user._id.toString();
-        const otherId = toUserId.toString();
-
         try {
-            const activeCall = activeCalls.get(myId) || activeCalls.get(otherId);
-
-            if (activeCall) {
-                const overallStatus = activeCall.status === 'in-call' ? 'ended' : 'canceled';
-                await persistFinalizedDirectSession(io, activeCall, overallStatus);
-                activeCalls.delete(activeCall.callerId);
-            }
-
-            const otherSocketId = getReceiverSocketId(otherId);
-            if (otherSocketId) {
-                io.to(otherSocketId).emit('call-ended');
-            }
-
-            const mySocketId = getReceiverSocketId(myId);
-            if (mySocketId) {
-                io.to(mySocketId).emit('call-ended');
-            }
-
-            console.log(`Call ended between ${myId} and ${otherId}`);
-
+            await finalizeAndNotifyCall({ toUserId, cancelled: false });
         } catch (error) {
             console.error('Error in call-ended:', error);
+        }
+    });
+
+    socket.on('leave-call', async ({ toUserId }) => {
+        try {
+            await finalizeAndNotifyCall({ toUserId, cancelled: false });
+        } catch (error) {
+            console.error('Error in leave-call:', error);
+        }
+    });
+
+    socket.on('call-cancelled', async ({ toUserId }) => {
+        try {
+            await finalizeAndNotifyCall({ toUserId, cancelled: true });
+        } catch (error) {
+            console.error('Error in call-cancelled:', error);
         }
     });
 
