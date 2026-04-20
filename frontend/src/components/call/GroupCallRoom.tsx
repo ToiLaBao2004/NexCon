@@ -31,6 +31,12 @@ interface GroupCallRoomProps {
 }
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
+const LIVEKIT_CONNECT_OPTIONS = {
+  autoSubscribe: true,
+  maxRetries: 5,
+  websocketTimeout: 20_000,
+  peerConnectionTimeout: 20_000,
+};
 
 /* ─── ParticipantCard ─── */
 const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }) => {
@@ -398,6 +404,7 @@ const GroupCallRoom = ({ roomName, roomLabel, token, onLeave, minimized, onMinim
       audio={true}
       token={token}
       serverUrl={LIVEKIT_URL}
+      connectOptions={LIVEKIT_CONNECT_OPTIONS}
       onDisconnected={onLeave}
       className={cn(
         'w-full flex flex-col bg-background',

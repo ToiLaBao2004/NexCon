@@ -1,4 +1,4 @@
-import { PhoneOff, Minimize2, Maximize2 } from "lucide-react";
+import { LoaderCircle, PhoneOff, Minimize2, Maximize2 } from "lucide-react";
 import { useCallStore } from "@/stores/useCallStore";
 import UserAvatar from "@/components/chat/UserAvatar";
 import { useDraggable } from "@/hooks/useDraggable";
@@ -10,8 +10,9 @@ interface OutgoingCallModalProps {
 }
 
 const OutgoingCallModal = ({ isMinimized, onMinimize, onMaximize }: OutgoingCallModalProps) => {
-  const { remoteUser, callType, endCall } = useCallStore();
+  const { remoteUser, callType, endCall, isRemoteConnecting } = useCallStore();
   const { ref: dragRef, style: dragStyle, dragHandlers } = useDraggable({ placement: "top-center" });
+  const statusText = isRemoteConnecting ? "Đang vào phòng chờ..." : "Đang gọi";
 
   if (!remoteUser) return null;
 
@@ -33,8 +34,12 @@ const OutgoingCallModal = ({ isMinimized, onMinimize, onMaximize }: OutgoingCall
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{remoteUser.displayName}</p>
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              {callType === "video" ? "Video" : "Thoại"} · Đang gọi
-              <RingingDots />
+              {callType === "video" ? "Video" : "Thoại"} · {statusText}
+              {isRemoteConnecting ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RingingDots />
+              )}
             </p>
           </div>
           <button
@@ -88,7 +93,13 @@ const OutgoingCallModal = ({ isMinimized, onMinimize, onMaximize }: OutgoingCall
             <p className="text-sm text-muted-foreground mt-1">
               {callType === "video" ? "Cuộc gọi video" : "Cuộc gọi thoại"}
               {" · "}
-              <RingingDots />
+              {statusText}
+              {" "}
+              {isRemoteConnecting ? (
+                <LoaderCircle className="inline-block h-4 w-4 animate-spin" />
+              ) : (
+                <RingingDots />
+              )}
             </p>
           </div>
         </div>

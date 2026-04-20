@@ -6,6 +6,12 @@ import { playRingtone, stopRingtone } from "@/utils/sound";
 import { Room, RoomEvent, Track } from "livekit-client";
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
+const LIVEKIT_CONNECT_OPTIONS = {
+  autoSubscribe: true,
+  maxRetries: 5,
+  websocketTimeout: 20_000,
+  peerConnectionTimeout: 20_000,
+};
 
 function emitCallEvent(event: string, payload?: object) {
   useSocketStore.getState().socket?.emit(event, payload);
@@ -17,9 +23,12 @@ const IDLE_STATE = {
   remoteUser: null,
   localStream: null,
   remoteStream: null,
+  isConnecting: false,
+  isRemoteConnecting: false,
   _livekitRoom: null,
   _roomName: null,
   _token: null,
+  _joinAttemptId: 0,
   _callTimeout: null,
   isMuted: false,
   isVideoOff: false,
@@ -30,9 +39,30 @@ function cleanup(get: () => CallState) {
   const { localStream, _livekitRoom, _callTimeout } = get();
   localStream?.getTracks().forEach((t) => t.stop()); // Stop camera/mic
   if (_livekitRoom) {
+    _livekitRoom.removeAllListeners();
     _livekitRoom.disconnect(true);
   }
   if (_callTimeout) clearTimeout(_callTimeout);
+}
+
+function teardownRoom(room: Room) {
+  room.removeAllListeners();
+  room.disconnect(true);
+}
+
+function resetToIdle(
+  set: (partial: Partial<CallState>) => void,
+  get: () => CallState,
+) {
+  const nextJoinAttemptId = get()._joinAttemptId + 1;
+  cleanup(get);
+  stopRingtone();
+  set({ ...IDLE_STATE, _joinAttemptId: nextJoinAttemptId });
+}
+
+function isJoinAttemptCancelled(get: () => CallState, attemptId: number) {
+  const state = get();
+  return state._joinAttemptId !== attemptId || state.status === "idle";
 }
 
 function buildLocalMediaStream(room: Room) {
@@ -53,13 +83,28 @@ async function connectLiveKitRoom(
   token: string,
   roomName: string,
   callType: CallType,
+  attemptId: number,
   set: (partial: Partial<CallState>) => void,
   get: () => CallState,
 ) {
   const room = new Room();
   const remoteMediaStream = new MediaStream();
+  let hasSignaledConnected = false;
+
+  const isCancelled = () => isJoinAttemptCancelled(get, attemptId);
+  const signalLiveKitConnected = () => {
+    if (hasSignaledConnected || isCancelled()) return;
+
+    const remoteUserId = get().remoteUser?._id;
+    if (!remoteUserId) return;
+
+    emitCallEvent("call-connected", { toUserId: remoteUserId });
+    hasSignaledConnected = true;
+  };
 
   const syncRemoteVideoState = () => {
+    if (isCancelled()) return;
+
     const firstRemote = Array.from(room.remoteParticipants.values())[0];
     if (!firstRemote) {
       set({ remoteStream: null, isRemoteVideoOff: false });
@@ -72,7 +117,10 @@ async function connectLiveKitRoom(
   };
 
   room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+    if (isCancelled()) return;
     if (participant.isLocal) return;
+
+    signalLiveKitConnected();
     if (track.kind !== Track.Kind.Video && track.kind !== Track.Kind.Audio) return;
     remoteMediaStream.addTrack(track.mediaStreamTrack);
     set({ remoteStream: new MediaStream(remoteMediaStream.getTracks()) });
@@ -82,6 +130,7 @@ async function connectLiveKitRoom(
   });
 
   room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+    if (isCancelled()) return;
     if (participant.isLocal) return;
     remoteMediaStream.removeTrack(track.mediaStreamTrack);
     set({ remoteStream: new MediaStream(remoteMediaStream.getTracks()) });
@@ -91,31 +140,59 @@ async function connectLiveKitRoom(
   });
 
   room.on(RoomEvent.TrackMuted, (_publication, participant) => {
+    if (isCancelled()) return;
     if (!participant.isLocal) {
       syncRemoteVideoState();
     }
   });
 
   room.on(RoomEvent.TrackUnmuted, (_publication, participant) => {
+    if (isCancelled()) return;
     if (!participant.isLocal) {
       syncRemoteVideoState();
     }
   });
 
   room.on(RoomEvent.ParticipantDisconnected, () => {
+    if (isCancelled()) return;
+    syncRemoteVideoState();
+  });
+
+  room.on(RoomEvent.ParticipantConnected, () => {
+    if (isCancelled()) return;
+    signalLiveKitConnected();
     syncRemoteVideoState();
   });
 
   room.on(RoomEvent.Disconnected, () => {
-    if (get().status !== "idle") {
-      get().handleCallEnded();
+    const state = get();
+    if (state.status !== "idle" && !isCancelled()) {
+      state.handleCancelCall();
       toast.error("Kết nối bị gián đoạn.");
     }
   });
 
-  await room.connect(LIVEKIT_URL, token);
+  await room.connect(LIVEKIT_URL, token, LIVEKIT_CONNECT_OPTIONS);
+  if (isCancelled()) {
+    teardownRoom(room);
+    return false;
+  }
+
   await room.localParticipant.setMicrophoneEnabled(true);
+  if (isCancelled()) {
+    teardownRoom(room);
+    return false;
+  }
+
   await room.localParticipant.setCameraEnabled(callType === "video");
+  if (isCancelled()) {
+    teardownRoom(room);
+    return false;
+  }
+
+  if (room.remoteParticipants.size > 0) {
+    signalLiveKitConnected();
+  }
 
   const localStream = buildLocalMediaStream(room);
   syncRemoteVideoState();
@@ -129,9 +206,13 @@ async function connectLiveKitRoom(
     remoteStream: remoteMediaStream.getTracks().length
       ? new MediaStream(remoteMediaStream.getTracks())
       : null,
+    isConnecting: false,
+    isRemoteConnecting: false,
     isMuted: false,
     isVideoOff: callType === "voice",
   });
+
+  return true;
 }
 
 export const useCallStore = create<CallState>((set, get) => ({
@@ -148,9 +229,7 @@ export const useCallStore = create<CallState>((set, get) => ({
     try {
       timeout = setTimeout(() => {
         if (get().status === "outgoing") {
-          emitCallEvent("call-ended", { toUserId: toUser._id });
-          cleanup(get);
-          set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+          get().handleCancelCall();
         }
       }, 30_000);
 
@@ -160,6 +239,8 @@ export const useCallStore = create<CallState>((set, get) => ({
         remoteUser: toUser,
         remoteStream: null,
         _callTimeout: timeout,
+        isConnecting: false,
+        isRemoteConnecting: false,
         isMuted: false,
         isVideoOff: callType === "voice",
       });
@@ -179,32 +260,34 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   // Receiver: B accepts the incoming call
   async acceptCall() {
-    const { remoteUser } = get();
-    if (!remoteUser) return;
+    const { remoteUser, isConnecting } = get();
+    if (!remoteUser || isConnecting) return;
 
+    set({ isConnecting: true });
+    emitCallEvent("accept-call", { toUserId: remoteUser._id });
     emitCallEvent("call-answer", { toUserId: remoteUser._id });
     stopRingtone();
   },
 
+  handleCancelCall() {
+    const { remoteUser, status } = get();
+    if (status === "idle") return;
+
+    if (remoteUser?._id) {
+      const eventName = status === "active" ? "leave-call" : "call-cancelled";
+      emitCallEvent(eventName, { toUserId: remoteUser._id });
+    }
+
+    resetToIdle(set, get);
+  },
+
   // Receiver: B rejects the incoming call
   rejectCall() {
-    const { remoteUser } = get();
-    if (remoteUser) {
-      emitCallEvent("call-rejected", { toUserId: remoteUser._id });
-    }
-    cleanup(get);
-    stopRingtone();
-    set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+    get().handleCancelCall();
   },
 
   endCall() {
-    const { remoteUser } = get();
-    if (remoteUser) {
-      emitCallEvent("call-ended", { toUserId: remoteUser._id });
-    }
-    cleanup(get);
-    stopRingtone();
-    set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+    get().handleCancelCall();
   },
 
   // Media controls
@@ -244,7 +327,7 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   handleIncomingCall(from: RemoteUser, callType: CallType, roomName: string) {
     if (get().status !== "idle") {
-      emitCallEvent("call-rejected", { toUserId: from._id });
+      emitCallEvent("call-cancelled", { toUserId: from._id });
       return;
     }
     set({
@@ -252,9 +335,17 @@ export const useCallStore = create<CallState>((set, get) => ({
       callType,
       remoteUser: from,
       _roomName: roomName,
+      isConnecting: false,
+      isRemoteConnecting: false,
     });
     console.log("[CallStore] handleIncomingCall triggered, starting ringtone");
     void playRingtone();
+  },
+
+  handleRemoteAccepted() {
+    if (get().status === "outgoing") {
+      set({ isRemoteConnecting: true });
+    }
   },
 
   async handleCallAnswered({ token, roomName }) {
@@ -266,12 +357,23 @@ export const useCallStore = create<CallState>((set, get) => ({
       set({ _callTimeout: null });
     }
 
+    const attemptId = get()._joinAttemptId + 1;
+    set({ _joinAttemptId: attemptId, isConnecting: true, isRemoteConnecting: true });
+
     try {
-      await connectLiveKitRoom(token, roomName, callType, set, get);
+      const connected = await connectLiveKitRoom(
+        token,
+        roomName,
+        callType,
+        attemptId,
+        set,
+        get,
+      );
+      if (!connected) return;
     } catch (error) {
+      if (isJoinAttemptCancelled(get, attemptId)) return;
       console.error("Join LiveKit as caller failed:", error);
-      cleanup(get);
-      set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+      get().handleCancelCall();
       toast.error("Không thể tham gia cuộc gọi.");
     }
   },
@@ -280,31 +382,36 @@ export const useCallStore = create<CallState>((set, get) => ({
     const { callType } = get();
     if (!callType) return;
 
+    const attemptId = get()._joinAttemptId + 1;
+    set({ _joinAttemptId: attemptId, isConnecting: true });
+
     try {
-      await connectLiveKitRoom(token, roomName, callType, set, get);
+      const connected = await connectLiveKitRoom(
+        token,
+        roomName,
+        callType,
+        attemptId,
+        set,
+        get,
+      );
+      if (!connected) return;
     } catch (error) {
+      if (isJoinAttemptCancelled(get, attemptId)) return;
       console.error("Join LiveKit as callee failed:", error);
-      cleanup(get);
-      set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+      get().handleCancelCall();
       toast.error("Không thể tham gia cuộc gọi.");
     }
   },
 
   handleCallRejected() {
-    cleanup(get);
-    stopRingtone();
-    set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+    resetToIdle(set, get);
   },
 
   handleCallEnded() {
-    cleanup(get);
-    stopRingtone();
-    set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+    resetToIdle(set, get);
   },
 
   handleCallFailed(reason) {
-    cleanup(get);
-    stopRingtone();
     const reasonMap: Record<string, string> = {
       offline: "Người dùng đang offline.",
       busy: "Người dùng đang bận.",
@@ -316,7 +423,7 @@ export const useCallStore = create<CallState>((set, get) => ({
     };
     const msg = reasonMap[reason] ?? "Không thể thực hiện cuộc gọi.";
     toast.error(`Cuộc gọi thất bại: ${msg}`);
-    set({ ...IDLE_STATE, isMuted: false, isVideoOff: false });
+    resetToIdle(set, get);
   },
 
   async handleIceCandidate(_candidate: RTCIceCandidateInit) {
