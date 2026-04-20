@@ -2,15 +2,21 @@ import { useMemo, useState } from "react";
 import {
 	ChevronDown,
 	ChevronUp,
-	MessageCircleMore,
 	MoreHorizontal,
 	Pin,
+	PinOff,
 } from "lucide-react";
 import type { Message } from "@/types/chat";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { cn } from "@/lib/utils";
 import { useShallow } from "zustand/react/shallow";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface PinnedMessagesBannerProps {
 	onPinClick?: (messageId: string) => void;
@@ -29,6 +35,7 @@ export function PinnedMessagesBanner({
 		activeConversationId,
 		pinnedRaw,
 		participants,
+		pinMessage,
 	} = useChatStore(
 		useShallow((s) => {
 			const activeId = s.activeConversationId;
@@ -40,6 +47,7 @@ export function PinnedMessagesBanner({
 					? s.messages[activeId]?.pinnedMessages ?? EMPTY_PINNED_MESSAGES
 					: EMPTY_PINNED_MESSAGES,
 				participants: selectedConvo?.participants ?? EMPTY_PARTICIPANTS,
+				pinMessage: s.pinMessage,
 			};
 		})
 	);
@@ -56,16 +64,31 @@ export function PinnedMessagesBanner({
 
 	if (!activeConversationId || pinned.length === 0 || !latestPinned) return null;
 
+	const handleUnpin = async (e: React.MouseEvent, messageId: string) => {
+		e.stopPropagation();
+		try {
+			await pinMessage(messageId);
+		} catch (error) {
+			console.error(error);
+		}
+	};
+
 	const getSenderName = (msg: Message) => {
-		if (msg.senderId === currentUserId) return "Bạn";
+		const senderIdStr = typeof msg.senderId === "object" 
+			? ((msg.senderId as any)?._id?.toString() || (msg.senderId as any)?.toString())
+			: msg.senderId?.toString();
+			
+		if (senderIdStr === currentUserId) return "Bạn";
 
 		const found = participants.find(
-			(p) => p.userId?._id?.toString() === msg.senderId?.toString()
+			(p) => p.userId?._id?.toString() === senderIdStr
 		);
 
 		return (
 			found?.userId?.nickname?.trim() ||
 			found?.userId?.displayName?.trim() ||
+			msg.senderInfo?.displayName?.trim() ||
+			(typeof msg.senderId === "object" ? (msg.senderId as any)?.displayName?.trim() : null) ||
 			"Người dùng"
 		);
 	};
@@ -152,7 +175,7 @@ export function PinnedMessagesBanner({
 			>
 				<div className="flex items-center gap-2.5 rounded-xl border border-border/60 bg-card/80 px-3 py-2 shadow-sm">
 					<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-500">
-						<MessageCircleMore className="h-4 w-4" />
+						<Pin className="h-4 w-4 fill-sky-500/20" />
 					</div>
 
 					<div className="min-w-0 flex-1">
@@ -160,7 +183,6 @@ export function PinnedMessagesBanner({
 							<span className="text-[13px] font-semibold text-foreground">
 								Tin nhắn ghim
 							</span>
-							<Pin className="h-3.5 w-3.5 text-muted-foreground" />
 						</div>
 
 						<p className="truncate text-[13px] text-foreground/95">
@@ -197,7 +219,7 @@ export function PinnedMessagesBanner({
 					<div className="mx-3 mb-3 rounded-xl border border-border/60 bg-card/95 shadow-sm">
 						<div className="flex items-center justify-between border-b border-border/60 px-3 py-2">
 							<div className="text-sm font-semibold text-foreground">
-								Pinboard ({pinned.length})
+								Danh sách ghim ({pinned.length})
 							</div>
 
 							<button
@@ -212,23 +234,21 @@ export function PinnedMessagesBanner({
 
 						<div className="max-h-[220px] overflow-y-auto">
 							{pinned.map((msg) => (
-								<button
+								<div
 									key={msg._id}
-									type="button"
+									role="button"
+									tabIndex={0}
 									onClick={() => void handleJump(msg)}
 									className={cn(
-										"flex w-full items-start gap-2.5 border-b border-border/50 px-3 py-2 text-left transition-colors",
+										"group flex w-full cursor-pointer items-start gap-2.5 border-b border-border/50 px-3 py-2 text-left transition-colors",
 										"hover:bg-accent/40"
 									)}
 								>
 									<div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-500">
-										<MessageCircleMore className="h-3.5 w-3.5" />
+										<Pin className="h-3.5 w-3.5 fill-sky-500/20" />
 									</div>
 
-									<div className="min-w-0 flex-1">
-										<div className="mb-0.5 text-[13px] font-semibold leading-5 text-foreground">
-											Message
-										</div>
+									<div className="min-w-0 flex-1 flex flex-col justify-center gap-0.5">
 
 										<div className="truncate text-[13px] leading-5 text-foreground/95">
 											<span className="font-semibold">{getSenderName(msg)}:</span>{" "}
@@ -248,21 +268,30 @@ export function PinnedMessagesBanner({
 										</div>
 									</div>
 
-									<div className="mt-0.5 shrink-0 text-muted-foreground">
-										<MoreHorizontal className="h-3.5 w-3.5" />
+									<div className="mt-0.5 flex shrink-0 items-center text-muted-foreground">
+										<DropdownMenu modal={false}>
+											<DropdownMenuTrigger asChild>
+												<button
+													type="button"
+													className="rounded-full p-1 opacity-0 transition-opacity hover:bg-muted/60 focus:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+													onClick={(e) => e.stopPropagation()}
+												>
+													<MoreHorizontal className="h-4 w-4" />
+												</button>
+											</DropdownMenuTrigger>
+											<DropdownMenuContent align="end" className="w-[180px]">
+												<DropdownMenuItem
+													className="cursor-pointer text-destructive focus:text-destructive"
+													onClick={(e) => handleUnpin(e as unknown as React.MouseEvent, msg._id)}
+												>
+													<PinOff className="mr-2 h-4 w-4" />
+													<span>Bỏ ghim tin nhắn</span>
+												</DropdownMenuItem>
+											</DropdownMenuContent>
+										</DropdownMenu>
 									</div>
-								</button>
+								</div>
 							))}
-						</div>
-
-						<div className="flex items-center justify-center px-3 py-2">
-							<button
-								type="button"
-								onClick={() => setExpanded(false)}
-								className="text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
-							>
-								Ẩn danh sách ghim
-							</button>
 						</div>
 					</div>
 				</div>

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   Dialog,
   DialogPortal,
+  DialogOverlay,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Bell,
   Calendar,
   Check,
@@ -665,14 +667,9 @@ export function ConversationRemindersPanel({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         {/* Backdrop — click to close */}
-        <div
-          className="fixed inset-0 z-50 bg-black/10"
-          onClick={() => onOpenChange(false)}
-          aria-hidden
-        />
-        <div
-          className="fixed inset-y-0 right-0 w-full sm:w-[340px] z-[51] flex flex-col rounded-none shadow-2xl bg-card border-l border-border/40"
-          onClick={(e) => e.stopPropagation()}
+        <DialogOverlay className="z-[51] bg-transparent" />
+        <DialogPrimitive.Content
+          className="fixed inset-y-0 right-0 w-[350px] sm:w-[350px] z-[51] flex flex-col rounded-none shadow-2xl bg-card border-l border-border/40 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
         >
           {/*  Header  */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-card shrink-0">
@@ -681,7 +678,7 @@ export function ConversationRemindersPanel({
               className="p-1.5 rounded-md hover:bg-muted/60 transition-colors text-foreground"
               aria-label="Quay lại"
             >
-              <ArrowLeft className="h-[18px] w-[18px]" />
+              <ChevronLeft className="h-[18px] w-[18px]" />
             </button>
             <DialogHeader className="p-0 flex-1 min-w-0">
               <DialogTitle className="text-[15px] font-semibold text-foreground truncate leading-tight">
@@ -751,7 +748,7 @@ export function ConversationRemindersPanel({
               )}
             </div>
           </div>
-        </div>
+        </DialogPrimitive.Content>
 
         {/* Detail popup (rendered inside the same Portal to ensure it overlays the panel) */}
         {selectedReminder && (

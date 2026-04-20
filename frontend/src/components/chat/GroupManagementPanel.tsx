@@ -1,5 +1,5 @@
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, KeyRound } from "lucide-react";
+import { ChevronLeft, KeyRound } from "lucide-react";
 import { useChatStore } from "@/stores/useChatStore";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useState } from "react";
@@ -57,7 +57,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                 onClick={() => onOpenChange(false)}
                 className="p-1 rounded hover:bg-muted/10 transition-colors"
               >
-                <ArrowLeft className="h-5 w-5" strokeWidth={2} />
+                <ChevronLeft className="h-5 w-5" strokeWidth={2} />
               </button>
               <DialogHeader className="p-0">
                 <DialogTitle className="text-[17px] font-semibold">Quản lý nhóm</DialogTitle>

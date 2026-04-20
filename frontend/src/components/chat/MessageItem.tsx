@@ -429,19 +429,19 @@ function SystemMessageComponent({
 	};
 
 	const actorBadge = (actor: Actor, key?: string) => (
-		<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap leading-none">
+		<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap mx-0.5">
 			<UserAvatar
 				type="seen"
 				name={getViewerName(actor)}
 				avatarUrl={actor.avatarUrl ?? undefined}
-				className="size-5 shrink-0 border border-background shadow-sm"
+				className="size-[20px] shrink-0 border border-background shadow-sm"
 			/>
-			<span className="font-semibold leading-none text-slate-700 dark:text-slate-200">{getViewerName(actor)}</span>
+			<span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">{getViewerName(actor)}</span>
 		</span>
 	);
 
 	const textPart = (value: string, key?: string) => (
-		<span key={key || value} className="inline-flex items-center leading-none font-normal text-slate-600 dark:text-slate-300">
+		<span key={key || value} className="inline align-middle font-normal text-[13px] text-slate-600 dark:text-slate-300">
 			{value}
 		</span>
 	);
@@ -475,17 +475,16 @@ function SystemMessageComponent({
 	}, [reminderIdFromMeta, sharedKey]);
 
 	const reminderLinkPart = useCallback((value: string, key?: string) => (
-		<button
-			type="button"
+		<span
 			key={key || value}
 			onClick={(event) => {
 				event.stopPropagation();
 				scrollToReminderCard();
 			}}
-			className="inline-flex items-center leading-none font-medium text-sky-700 underline decoration-sky-500/60 underline-offset-2 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+			className="cursor-pointer inline align-middle font-medium text-[13px] text-sky-700 underline decoration-sky-500/60 underline-offset-2 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
 		>
 			{value}
-		</button>
+		</span>
 	), [scrollToReminderCard]);
 
 	const reminderActionPart = useCallback((actionText: string, reminderContent: string, keyPrefix: string) => {
@@ -513,24 +512,24 @@ function SystemMessageComponent({
 			: visibleNames;
 
 		return (
-			<span className="inline-flex items-center gap-1.5 align-middle leading-none">
-				<span className="inline-flex -space-x-1 shrink-0">
+			<span className="inline-flex items-center gap-1.5 align-middle mx-0.5">
+				<span className="inline-flex -space-x-1.5 shrink-0">
 					{visibleActors.map((actor, idx) => (
 						<UserAvatar
 							key={`added-avatar-${actor.id}-${idx}`}
 							type="seen"
 							name={actor.name}
 							avatarUrl={actor.avatarUrl ?? undefined}
-							className="size-5 border border-background shadow-sm"
+							className="size-[20px] border border-background shadow-sm"
 						/>
 					))}
 					{remainingCount > 0 && (
-						<span className="inline-flex size-5 items-center justify-center rounded-full border border-background bg-slate-500 text-[10px] font-semibold text-white shadow-sm">
+						<span className="inline-flex size-[20px] items-center justify-center rounded-full border border-background bg-slate-500 text-[9px] font-semibold text-white shadow-sm">
 							+{remainingCount}
 						</span>
 					)}
 				</span>
-				<span className="font-semibold leading-none text-slate-700 dark:text-slate-200">
+				<span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">
 					{namesText}
 				</span>
 			</span>
@@ -1237,12 +1236,10 @@ function SystemMessageComponent({
 	}
 
 	return (
-		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
-			<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-				<p className="text-[13px] font-normal tracking-normal break-words">
-					<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
-						{systemContent}
-					</span>
+		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300 px-3">
+			<div className="max-w-[95%] sm:max-w-[85%] text-center rounded-[20px] border border-border/70 bg-card/90 px-4 py-2 shadow-sm backdrop-blur-sm">
+				<p className="text-[13px] font-normal leading-[1.6] break-words text-slate-600 dark:text-slate-300">
+					{systemContent}
 				</p>
 			</div>
 		</div>
@@ -1329,6 +1326,7 @@ const MessageItem = ({
 	const [isReacting, setIsReacting] = useState(false);
 	const [isCoarsePointer, setIsCoarsePointer] = useState(false);
 	const [showTouchActions, setShowTouchActions] = useState(false);
+	const [touchActionView, setTouchActionView] = useState<"menu" | "emoji">("menu");
 	const [reminderTargetMessage, setReminderTargetMessage] = useState<{ messageId: string; messagePreview: string } | null>(null);
 	const messageRootRef = useRef<HTMLDivElement | null>(null);
 	const longPressTimeoutRef = useRef<number | null>(null);
@@ -1356,6 +1354,11 @@ const MessageItem = ({
 
 	useEffect(() => {
 		if (!showTouchActions) return;
+		// On coarse-pointer (touch) devices, the Dialog component handles its own
+		// dismissal via the Radix overlay. Using a global pointerdown listener here
+		// causes a race condition: pointerdown fires before onClick, closing the
+		// dialog before the "emoji" view can be set.
+		if (isCoarsePointer) return;
 
 		const handleOutsidePointerDown = (event: PointerEvent) => {
 			if (!messageRootRef.current) return;
@@ -1367,7 +1370,7 @@ const MessageItem = ({
 		return () => {
 			window.removeEventListener("pointerdown", handleOutsidePointerDown);
 		};
-	}, [showTouchActions]);
+	}, [showTouchActions, isCoarsePointer]);
 
 	useEffect(() => {
 		return () => {
@@ -1566,10 +1569,8 @@ const MessageItem = ({
 						{/* Hover Action Bar - Quick Reaction Button */}
 						{!isRecalled && !message.status && !isDisbanded && (
 							<div className={cn(
-								"absolute top-1/2 -translate-y-1/2 transition-all duration-200 z-30",
-								shouldShowTouchActionControls
-									? "opacity-100 pointer-events-auto"
-									: "opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
+								"hidden sm:flex absolute top-1/2 -translate-y-1/2 transition-all duration-200 z-30",
+								"opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
 								isOwn ? "-left-10" : "-right-10"
 							)}>
 								<div className="flex items-center gap-1 bg-background shadow-md border border-border/40 rounded-full px-0.5 py-0.5">
@@ -1584,19 +1585,26 @@ const MessageItem = ({
 												<Smile className="h-4 w-4" />
 											</button>
 										</PopoverTrigger>
-										<PopoverContent className="w-auto p-0 border-0 shadow-2xl" align={isOwn ? "end" : "start"} side="top" sideOffset={8}>
-											<Picker
-												data={data}
-												onEmojiSelect={(emoji: any) => {
-													handleEmojiSelect(emoji);
-													setShowEmojiPicker(false);
-												}}
-												theme="light"
-												set="native"
-												autoFocus={false}
-												skinTonePosition="none"
-												previewPosition="none"
-											/>
+										<PopoverContent 
+											className="w-[320px] max-w-[95vw] shadow-2xl rounded-2xl overflow-hidden p-0 border border-border/10 bg-background/95 backdrop-blur-sm relative z-[100] scale-[0.85] sm:scale-100 origin-bottom sm:origin-top" 
+											align={isOwn ? "end" : "start"} 
+											side="top" 
+											sideOffset={8}
+										>
+											<div className="flex w-full justify-center">
+												<Picker
+													data={data}
+													onEmojiSelect={(emoji: any) => {
+														handleEmojiSelect(emoji);
+														setShowEmojiPicker(false);
+													}}
+													theme="light"
+													set="native"
+													autoFocus={false}
+													skinTonePosition="none"
+													previewPosition="none"
+												/>
+											</div>
 										</PopoverContent>
 									</Popover>
 								</div>
@@ -1605,89 +1613,214 @@ const MessageItem = ({
 
 
 						{!isRecalled && (!message.status || message.status === "sent") && (
-							<DropdownMenu>
-								<DropdownMenuTrigger asChild>
-									<button
-										className={cn(
-											"absolute top-1/2 -translate-y-1/2",
-											isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19",
-											shouldShowTouchActionControls ? "opacity-100" : "opacity-0 group-hover:opacity-70 hover:opacity-100",
-											"transition-opacity duration-150 ease-in-out",
-											"text-muted-foreground hover:text-foreground",
-											"p-1.5 rounded-full hover:bg-accent/40",
-											"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-										)}
-										aria-label="Message actions"
-										onClick={() => {
-											if (isCoarsePointer) {
-												setShowTouchActions(true);
-											}
-										}}
-									>
-										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-											<circle cx="12" cy="12" r="1" />
-											<circle cx="19" cy="12" r="1" />
-											<circle cx="5" cy="12" r="1" />
-										</svg>
-									</button>
-								</DropdownMenuTrigger>
+							<>
+								{/* Desktop Dropdown */}
+								<div className="hidden sm:block">
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<button
+												className={cn(
+													"absolute top-1/2 -translate-y-1/2",
+													isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19",
+													shouldShowTouchActionControls ? "opacity-100" : "opacity-0 group-hover:opacity-70 hover:opacity-100",
+													"transition-opacity duration-150 ease-in-out",
+													"text-muted-foreground hover:text-foreground",
+													"p-1.5 rounded-full hover:bg-accent/40",
+													"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+												)}
+												aria-label="Message actions"
+											>
+												<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+													<circle cx="12" cy="12" r="1" />
+													<circle cx="19" cy="12" r="1" />
+													<circle cx="5" cy="12" r="1" />
+												</svg>
+											</button>
+										</DropdownMenuTrigger>
 
-								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
-									{!isDisbanded && (
-										<DropdownMenuItem onClick={() => { setShowTouchActions(false); onReply?.(message); }}>
-											<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											Trả lời
-										</DropdownMenuItem>
-									)}
-									{message.content && (
-										<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
-											<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											Sao chép
-										</DropdownMenuItem>
-									)}
-									{(message.fileUrl || message.filePublicId) && (
-										<DropdownMenuItem asChild>
-											<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center" onClick={() => setShowTouchActions(false)}>
-												<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
-												Tải xuống
-											</a>
-										</DropdownMenuItem>
-									)}
-									{!isDisbanded && (
-										<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }}>
-											{isPinned ? (
-												<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											) : (
-												<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+										<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
+											{!isDisbanded && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); onReply?.(message); }}>
+													<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Trả lời
+												</DropdownMenuItem>
 											)}
-											{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-										</DropdownMenuItem>
-									)}
-									{canCreateReminder && (
-										<DropdownMenuItem
-											onClick={() => {
+											{message.content && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
+													<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Sao chép
+												</DropdownMenuItem>
+											)}
+											{(message.fileUrl || message.filePublicId) && (
+												<DropdownMenuItem asChild>
+													<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center" onClick={() => setShowTouchActions(false)}>
+														<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
+														Tải xuống
+													</a>
+												</DropdownMenuItem>
+											)}
+											{!isDisbanded && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }}>
+													{isPinned ? (
+														<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													) : (
+														<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													)}
+													{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+												</DropdownMenuItem>
+											)}
+											{canCreateReminder && (
+												<DropdownMenuItem
+													onClick={() => {
+														setShowTouchActions(false);
+														setReminderTargetMessage({
+															messageId: message._id,
+															messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
+														});
+													}}
+												>
+													<BellPlus className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Tạo nhắc hẹn
+												</DropdownMenuItem>
+											)}
+											{isOwn && !isDisbanded && (
+												<DropdownMenuItem
+													className="text-destructive focus:text-destructive focus:bg-destructive/10"
+													onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }}
+												>
+													<Undo2 className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Thu hồi
+												</DropdownMenuItem>
+											)}
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</div>
+
+								{/* Mobile Touch Action Dialog — Menu */}
+								{isCoarsePointer && (
+									<>
+										<Dialog open={showTouchActions && touchActionView === "menu"} onOpenChange={(open) => {
+											if (!open) setShowTouchActions(false);
+										}}>
+											<DialogContent
+												className="w-[92vw] max-w-[380px] rounded-[24px] shadow-2xl bg-background/95 backdrop-blur-xl border-border/10 p-5 pt-6 gap-5"
+												showCloseButton={false}
+											>
+												<DialogTitle className="sr-only">Thao tác tin nhắn</DialogTitle>
+												<div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-1">
+													<button onClick={() => setTouchActionView("emoji")} className="flex flex-col items-center gap-2">
+														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+															<Smile className="h-5 w-5" strokeWidth={1.5} />
+														</div>
+														<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Cảm xúc</span>
+													</button>
+
+													{!isDisbanded && (
+														<button onClick={() => { setShowTouchActions(false); onReply?.(message); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<Reply className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Trả lời</span>
+														</button>
+													)}
+													
+													{message.content && (
+														<button onClick={() => { setShowTouchActions(false); handleCopy(); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<Copy className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Sao chép</span>
+														</button>
+													)}
+
+													{(message.fileUrl || message.filePublicId) && (
+														<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2" onClick={() => setShowTouchActions(false)}>
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<Download className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Tải xuống</span>
+														</a>
+													)}
+
+													{!isDisbanded && (
+														<button onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																{isPinned ? <PinOff className="h-5 w-5" strokeWidth={1.5} /> : <Pin className="h-5 w-5" strokeWidth={1.5} />}
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">{isPinned ? "Bỏ ghim" : "Ghim"}</span>
+														</button>
+													)}
+
+													{canCreateReminder && (
+														<button 
+															onClick={() => { 
+																setShowTouchActions(false);
+																setReminderTargetMessage({ messageId: message._id, messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn") });
+															}} 
+															className="flex flex-col items-center gap-2"
+														>
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<BellPlus className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap overflow-visible">Nhắc hẹn</span>
+														</button>
+													)}
+													
+													{isOwn && !isDisbanded && (
+														<button onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 shadow-sm hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors">
+																<Undo2 className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Thu hồi</span>
+														</button>
+													)}
+												</div>
+											</DialogContent>
+										</Dialog>
+
+										{/* Emoji Picker — separate Dialog to avoid padding clipping */}
+										<Dialog open={showTouchActions && touchActionView === "emoji"} onOpenChange={(open) => {
+											if (!open) {
+												setTouchActionView("menu");
 												setShowTouchActions(false);
-												setReminderTargetMessage({
-													messageId: message._id,
-													messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
-												});
-											}}
-										>
-											<BellPlus className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											Tạo nhắc hẹn
-										</DropdownMenuItem>
-									)}
-									{isOwn && !isDisbanded && (
-										<DropdownMenuItem
-											className="text-destructive focus:text-destructive focus:bg-destructive/10"
-											onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }}
-										>
-											<Undo2 className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											Thu hồi
-										</DropdownMenuItem>
-									)}
-								</DropdownMenuContent>
-							</DropdownMenu>
+											}
+										}}>
+											<DialogContent
+												className="w-[92vw] max-w-[380px] rounded-[24px] shadow-2xl bg-background overflow-hidden p-0 gap-0 border-border/10"
+												showCloseButton={false}
+											>
+												<DialogTitle className="sr-only">Chọn cảm xúc</DialogTitle>
+												<div className="flex items-center gap-2 px-4 pt-4 pb-2">
+													<button 
+														onClick={() => setTouchActionView("menu")}
+														className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+													>
+														<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+															<path d="M15 18l-6-6 6-6" />
+														</svg>
+													</button>
+													<span className="text-sm font-semibold text-foreground">Chọn cảm xúc</span>
+												</div>
+												<div className="w-full">
+													<Picker
+														data={data}
+														onEmojiSelect={(emoji: any) => {
+															handleEmojiSelect(emoji);
+															setShowTouchActions(false);
+														}}
+														theme="light"
+														set="native"
+														autoFocus={false}
+														skinTonePosition="none"
+														previewPosition="none"
+														style={{ width: "100%" }}
+													/>
+												</div>
+											</DialogContent>
+										</Dialog>
+									</>
+								)}
+							</>
 						)}
 					</div>
 				</div>
