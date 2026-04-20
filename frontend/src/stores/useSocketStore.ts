@@ -69,6 +69,22 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       console.log("Connected to Socket");
     });
 
+    socket.on("connect_error", async (err) => {
+      console.error("Socket connect_error:", err.message);
+      if (err.message.includes("Unauthorized") || err.message.includes("expired token")) {
+        try {
+          await useAuthStore.getState().refreshToken();
+          const newToken = useAuthStore.getState().accessToken;
+          if (newToken) {
+            socket.auth = { token: newToken };
+            socket.connect();
+          }
+        } catch (refreshErr) {
+          console.error("Failed to refresh token for socket", refreshErr);
+        }
+      }
+    });
+
     socket.on("online-users", (userIds) => {
       set({ onlineUsers: userIds });
     });
@@ -377,7 +393,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       }
     });
 
-    socket.on("approval-queue-updated", () => {});
+    socket.on("approval-queue-updated", () => { });
 
     socket.on("group-disbanded", ({ conversationId }) => {
       useChatStore.getState().markGroupAsDisbanded(conversationId);
@@ -386,7 +402,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         toast.warning("Nhóm này đã bị giải tán.");
       }
     });
-    
+
     socket.on("admin-transferred", ({ conversationId, newAdminId }) => {
       useChatStore.getState().updateAdminLocal(conversationId, newAdminId);
     });
