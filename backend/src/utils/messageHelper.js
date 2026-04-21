@@ -135,6 +135,7 @@ export const emitNewMessage = (io, conversation, message, signedUrl = null) => {
             _id: conversation._id,
             lastMessage: lastMsgPayload,
             lastMessageAt: conversation.lastMessageAt,
+            seenBy: conversation.seenBy,
         },
         unreadCounts: conversation.unreadCounts,
     });

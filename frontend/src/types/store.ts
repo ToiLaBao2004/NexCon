@@ -108,6 +108,7 @@ export interface ChatState {
   transferAdminRole: (conversationId: string, memberId: string) => Promise<void>;
   updateAdminLocal: (conversationId: string, newAdminId: string) => void;
   leaveGroup: (conversationId: string, silent?: boolean, newAdminId?: string) => Promise<void>;
+  forwardMessage: (messageId: string, targetConversationIds: string[]) => Promise<{ forwarded: number; errors: { conversationId: string; reason: string }[] }>;
 
 
   // Sidebar

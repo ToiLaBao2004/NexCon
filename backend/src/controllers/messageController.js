@@ -253,6 +253,7 @@ export async function createReminderSystemMessage(req, res) {
                 _id: conversation._id,
                 lastMessage: lastMsgPayload,
                 lastMessageAt: conversation.lastMessage?.createdAt || conversation.updatedAt,
+                seenBy: conversation.seenBy,
             },
             unreadCounts: conversation.unreadCounts,
         };
@@ -618,6 +619,125 @@ export async function getSignedMediaUrl(req, res) {
         return res.status(200).json({ url: signedUrl });
     } catch (error) {
         console.error('Error generating signed URL:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function forwardMessage(req, res) {
+    try {
+        const senderId = req.user._id;
+        const { messageId } = req.params;
+        const { targetConversationIds } = req.body;
+
+        if (!Array.isArray(targetConversationIds) || targetConversationIds.length === 0) {
+            return res.status(400).json({ message: 'targetConversationIds is required and must be a non-empty array.' });
+        }
+
+        if (targetConversationIds.length > 10) {
+            return res.status(400).json({ message: 'Bạn chỉ có thể chuyển tiếp đến tối đa 10 cuộc trò chuyện cùng lúc.' });
+        }
+
+        // Load the source message
+        const source = await Message.findById(messageId);
+        if (!source) {
+            return res.status(404).json({ message: 'Tin nhắn không tồn tại.' });
+        }
+        if (source.isRecalled) {
+            return res.status(400).json({ message: 'Không thể chuyển tiếp tin nhắn đã thu hồi.' });
+        }
+        if (source.type === 'system') {
+            return res.status(400).json({ message: 'Không thể chuyển tiếp tin nhắn hệ thống.' });
+        }
+        const sourceConvo = await Conversation.findById(source.conversationId);
+        if (!sourceConvo) {
+            return res.status(404).json({ message: 'Cuộc trò chuyện gốc không tồn tại.' });
+        }
+        const isMemberOfSource = sourceConvo.participants.some(
+            (p) => p.userId.toString() === senderId.toString()
+        );
+        if (!isMemberOfSource) {
+            return res.status(403).json({ message: 'Bạn không có quyền truy cập tin nhắn này.' });
+        }
+        const sourceMetadata = source.metadata instanceof Map
+            ? Object.fromEntries(source.metadata)
+            : (source.metadata || {});
+        const forwardedFrom = {
+            messageId: source._id.toString(),
+            conversationId: source.conversationId.toString(),
+            senderDisplayName: source.senderInfo?.displayName || null,
+            type: source.type,
+        };
+
+        const results = [];
+        const errors = [];
+
+        for (const targetConvoId of targetConversationIds) {
+            try {
+                const targetConvo = await Conversation.findById(targetConvoId);
+                if (!targetConvo) {
+                    errors.push({ conversationId: targetConvoId, reason: 'Conversation not found.' });
+                    continue;
+                }
+
+                if (targetConvo.disbanded === true) {
+                    errors.push({ conversationId: targetConvoId, reason: 'Nhóm đã bị giải tán.' });
+                    continue;
+                }
+
+                const isMember = targetConvo.participants.some(
+                    (p) => p.userId.toString() === senderId.toString()
+                );
+                if (!isMember) {
+                    errors.push({ conversationId: targetConvoId, reason: 'Bạn không phải thành viên.' });
+                    continue;
+                }
+                const forwardedMetadata = {
+                    ...(sourceMetadata.linkPreview ? { linkPreview: sourceMetadata.linkPreview } : {}),
+                    forwardedFrom,
+                };
+
+                const msgData = {
+                    conversationId: targetConvo._id,
+                    senderId,
+                    senderInfo: {
+                        displayName: req.user.displayName,
+                        avatarUrl: req.user.avatarUrl,
+                    },
+                    type: source.type,
+                    ...(source.content != null ? { content: source.content } : {}),
+                    ...(source.filePublicId ? { filePublicId: source.filePublicId } : {}),
+                    ...(source.fileName ? { fileName: source.fileName } : {}),
+                    ...(source.fileSize ? { fileSize: source.fileSize } : {}),
+                    ...(source.mimeType ? { mimeType: source.mimeType } : {}),
+                    metadata: forwardedMetadata,
+                };
+
+                const newMsg = await Message.create(msgData);
+
+                updateConversationLastMessage(targetConvo, newMsg, senderId);
+                await targetConvo.save();
+
+                const signedUrl = generateSignedUrl(newMsg.filePublicId, newMsg.type);
+                emitNewMessage(io, targetConvo, newMsg, signedUrl);
+
+                results.push({
+                    conversationId: targetConvoId,
+                    message: newMsg,
+                    signedUrl,
+                });
+            } catch (innerErr) {
+                console.error(`Forward error for convo ${targetConvoId}:`, innerErr);
+                errors.push({ conversationId: targetConvoId, reason: 'Internal error.' });
+            }
+        }
+
+        return res.status(200).json({
+            forwarded: results.length,
+            results,
+            errors,
+        });
+    } catch (error) {
+        console.error('Error forwarding message:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }

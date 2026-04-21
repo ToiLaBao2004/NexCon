@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
-import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Picker from '@emoji-mart/react';
@@ -29,6 +29,7 @@ import { useSocketStore } from "@/stores/useSocketStore";
 import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
 import ReminderFormModal from "@/components/reminder/ReminderFormModal";
 import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder";
+import ForwardMessageModal from "./ForwardMessageModal";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -1320,6 +1321,7 @@ const MessageItem = ({
 	const [showTouchActions, setShowTouchActions] = useState(false);
 	const [touchActionView, setTouchActionView] = useState<"menu" | "emoji">("menu");
 	const [reminderTargetMessage, setReminderTargetMessage] = useState<{ messageId: string; messagePreview: string } | null>(null);
+	const [showForwardModal, setShowForwardModal] = useState(false);
 	const messageRootRef = useRef<HTMLDivElement | null>(null);
 	const longPressTimeoutRef = useRef<number | null>(null);
 
@@ -1503,6 +1505,12 @@ const MessageItem = ({
 									currentUserId={currentUserId}
 								/>
 							)}
+							{!isRecalled && message.metadata?.forwardedFrom && (
+								<div className={cn("flex items-center gap-1 px-1 pt-1 pb-0 text-[11px] opacity-70 select-none", isOwn ? "text-blue-100 justify-end" : "text-muted-foreground justify-start")}>
+									<Forward className="h-3 w-3 shrink-0" strokeWidth={2} />
+									<span>Đã chuyển tiếp tin nhắn</span>
+								</div>
+							)}
 							<div className="flex flex-col gap-0.5 w-fit">
 								<div className="w-fit">
 									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} />
@@ -1633,11 +1641,17 @@ const MessageItem = ({
 											</button>
 										</DropdownMenuTrigger>
 
-										<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
+										<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-46">
 											{!isDisbanded && (
 												<DropdownMenuItem onClick={() => { setShowTouchActions(false); onReply?.(message); }}>
 													<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
 													Trả lời
+												</DropdownMenuItem>
+											)}
+											{!isRecalled && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }}>
+													<Forward className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Chuyển tiếp
 												</DropdownMenuItem>
 											)}
 											{message.content && (
@@ -1716,6 +1730,15 @@ const MessageItem = ({
 																<Reply className="h-5 w-5" strokeWidth={1.5} />
 															</div>
 															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Trả lời</span>
+														</button>
+													)}
+
+													{!isRecalled && (
+														<button onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<Forward className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Chuyển tiếp</span>
 														</button>
 													)}
 
@@ -1883,6 +1906,14 @@ const MessageItem = ({
 							toast.error('Không thể đồng bộ tin nhắn nhắc hẹn cá nhân');
 						});
 					}}
+				/>
+			)}
+
+			{showForwardModal && (
+				<ForwardMessageModal
+					open={showForwardModal}
+					onOpenChange={(open) => setShowForwardModal(open)}
+					message={message}
 				/>
 			)}
 		</>
