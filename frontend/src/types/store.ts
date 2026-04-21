@@ -293,9 +293,14 @@ export interface GroupCallState {
     participants: GroupCallParticipant[];
   }) => void;
   handleGroupCallToken: (payload: { conversationId: string; token: string }) => void;
-  handleGroupCallUserJoined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallUserJoined: (payload: {
+    conversationId: string;
+    participants: GroupCallParticipant[];
+    user?: { _id: string; displayName: string; avatarUrl: string | null };
+    userId?: string;
+  }) => void;
   handleGroupCallUserDeclined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
-  handleGroupCallUserLeft: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallUserLeft: (payload: { conversationId: string; userId: string; participants: GroupCallParticipant[] }) => void;
   handleGroupCallEnded: (payload: {
     conversationId: string;
     callId: string;

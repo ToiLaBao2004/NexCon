@@ -25,6 +25,7 @@ const MeetManager = () => {
           minimized={true}
           onMinimize={() => setMinimized(true)}
           onMaximize={() => setMinimized(false)}
+          enablePresenceToasts
         />
       </div>
     );
@@ -41,6 +42,7 @@ const MeetManager = () => {
         minimized={false}
         onMinimize={() => setMinimized(true)}
         onMaximize={() => setMinimized(false)}
+        enablePresenceToasts
       />
     </div>
   );

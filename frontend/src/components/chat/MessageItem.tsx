@@ -1510,7 +1510,8 @@ const MessageItem = ({
 
 								{!isImage && (
 									<div className={cn(
-										"flex items-center gap-1 select-none self-start -mt-0.5 px-2 pb-1",
+										"flex items-center gap-1 select-none -mt-0.5 pb-1",
+										isOwn ? "self-end" : "self-start",
 										(isOwn && !isLink) ? "text-white/60" : "text-muted-foreground/60"
 									)}>
 										<span className="text-[10px] sm:text-[10.5px] font-medium leading-none whitespace-nowrap">
