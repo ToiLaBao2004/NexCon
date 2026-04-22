@@ -171,7 +171,7 @@ const MeetPage = () => {
                             </svg>
                         </div>
                         <div>
-                            <h1 className="text-2xl font-bold tracking-tight text-foreground">Meet</h1>
+                            <h1 className="text-2xl font-bold tracking-tight text-foreground">Cuộc họp</h1>
                             <p className="text-sm text-muted-foreground">Quản lý cuộc họp video của bạn</p>
                         </div>
                     </div>
@@ -220,7 +220,7 @@ const MeetPage = () => {
                         </svg>
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Meet</h1>
+                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Cuộc họp</h1>
                         <p className="text-sm text-muted-foreground">Tạo và tham gia cuộc họp video nhanh chóng</p>
                     </div>
                 </div>

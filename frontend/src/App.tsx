@@ -119,8 +119,11 @@ function App() {
     <>
       <Toaster
         richColors
-        expand={false}
+        expand
+        visibleToasts={6}
         position="top-center"
+        offset={16}
+        mobileOffset={8}
         toastOptions={{
           style: { zIndex: 2147483647 },
         }}

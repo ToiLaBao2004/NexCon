@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
-import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Picker from '@emoji-mart/react';
@@ -29,8 +29,169 @@ import { useSocketStore } from "@/stores/useSocketStore";
 import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
 import ReminderFormModal from "@/components/reminder/ReminderFormModal";
 import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder";
+import ForwardMessageModal from "./ForwardMessageModal";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
+
+/* ── Custom audio player for voice messages ─────────────────────────────────── */
+const AUDIO_BAR_COUNT = 32;
+
+function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [progress, setProgress] = useState(0); // 0-1
+	const [currentTime, setCurrentTime] = useState(0);
+	const [duration, setDuration] = useState(0);
+	const audioRef = useRef<HTMLAudioElement | null>(null);
+
+	// Pseudo-static waveform bars (seeded from src hash for consistency)
+	const bars = useMemo(() => {
+		let seed = 0;
+		for (let i = 0; i < src.length; i++) seed = (seed * 31 + src.charCodeAt(i)) & 0xffffffff;
+		return Array.from({ length: AUDIO_BAR_COUNT }, (_, i) => {
+			seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+			const raw = (Math.abs(seed) / 0x7fffffff);
+			const wave = Math.abs(Math.sin((i / AUDIO_BAR_COUNT) * Math.PI));
+			return 0.15 + raw * 0.55 * wave + 0.1 * wave;
+		});
+	}, [src]);
+
+	useEffect(() => {
+		if (audioRef.current && src && src !== "#") {
+			audioRef.current.load();
+		}
+	}, [src]);
+
+	const togglePlay = () => {
+		const audio = audioRef.current;
+		if (!audio) return;
+		if (src === "#" || !audio.currentSrc) return;
+		
+		if (isPlaying) {
+			audio.pause();
+		} else {
+			// Workaround for Chrome Infinity bug on webm:
+			if (audio.duration === Infinity) {
+				audio.currentTime = 1e101; 
+				setTimeout(() => {
+					audio.currentTime = 0;
+					audio.play().catch(console.error);
+				}, 100);
+			} else {
+				audio.play().catch(console.error);
+			}
+		}
+	};
+
+	const seek = (ratio: number) => {
+		const audio = audioRef.current;
+		if (!audio) return;
+		const targetTime = ratio * (isFinite(duration) && duration > 0 ? duration : audio.duration || 0);
+		if (isFinite(targetTime)) {
+			audio.currentTime = targetTime;
+			setProgress(ratio);
+		}
+	};
+
+	const activeBars = Math.round(progress * AUDIO_BAR_COUNT);
+
+	const fmt = (s: number) => {
+		if (!isFinite(s) || isNaN(s) || s < 0) return "0:00";
+		const m = Math.floor(s / 60);
+		const sec = Math.floor(s % 60);
+		return `${m}:${sec < 10 ? "0" : ""}${sec}`;
+	};
+
+	const activeColor = isOwn ? "rgba(255,255,255,0.9)" : "rgb(99 102 241)";
+	const inactiveColor = isOwn ? "rgba(255,255,255,0.35)" : "rgb(199 210 254 / 0.8)";
+
+	return (
+		<div className="flex items-center gap-2 w-[220px] sm:w-[260px]">
+			{/* Hidden native audio for robust event management */}
+			<audio
+				ref={audioRef}
+				src={src}
+				preload="metadata"
+				onPlay={() => setIsPlaying(true)}
+				onPause={() => setIsPlaying(false)}
+				onEnded={() => {
+					setIsPlaying(false);
+					setProgress(0);
+					setCurrentTime(0);
+					const audio = audioRef.current;
+					if (audio) audio.currentTime = 0;
+				}}
+				onTimeUpdate={(e) => {
+					const audio = e.currentTarget;
+					setCurrentTime(audio.currentTime);
+					// Fallback to 1 if duration is Infinity to avoid NaN
+					const currentDur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : duration;
+					if (isFinite(currentDur) && currentDur > 0) {
+						setProgress(audio.currentTime / currentDur);
+					} else {
+						setProgress(0);
+					}
+				}}
+				onLoadedMetadata={(e) => {
+					const audio = e.currentTarget;
+					if (isFinite(audio.duration)) {
+						setDuration(audio.duration);
+					}
+				}}
+				onDurationChange={(e) => {
+					const audio = e.currentTarget;
+					if (isFinite(audio.duration)) {
+						setDuration(audio.duration);
+					}
+				}}
+			/>
+
+			{/* Play / Pause */}
+			<button
+				type="button"
+				onClick={togglePlay}
+				className={cn(
+					"shrink-0 size-8 rounded-full flex items-center justify-center transition-colors",
+					isOwn
+						? "bg-white/20 hover:bg-white/30 text-white"
+						: "bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/30 text-indigo-600 dark:text-indigo-300"
+				)}
+			>
+				{isPlaying
+					? <Pause className="size-3.5" fill="currentColor" />
+					: <Play className="size-3.5" fill="currentColor" />}
+			</button>
+
+			{/* Waveform + seek */}
+			<div className="flex-1 flex flex-col gap-[3px]">
+				<div
+					className="flex items-center gap-[2px] h-7 cursor-pointer"
+					onClick={(e) => {
+						const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+						seek((e.clientX - rect.left) / rect.width);
+					}}
+					title="Nhấn để tua"
+				>
+					{bars.map((h, i) => (
+						<div
+							key={i}
+							className="rounded-full shrink-0"
+							style={{
+								width: "2px",
+								height: `${Math.max(3, h * 26)}px`,
+								backgroundColor: i < activeBars ? activeColor : inactiveColor,
+								transition: "background-color 0.1s",
+							}}
+						/>
+					))}
+				</div>
+				<span className={cn("text-[10px] tabular-nums font-mono leading-none", isOwn ? "text-white/60" : "text-muted-foreground")}>
+					{(progress > 0 || isPlaying) ? fmt(currentTime) : fmt(duration)}
+				</span>
+			</div>
+		</div>
+	);
+}
+
 
 interface MessageItemProps {
 	message: Message;
@@ -96,6 +257,15 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 		);
 	}
 
+	if (type === "audio" && (message.filePublicId || message.fileUrl)) {
+		return (
+			<div className="flex flex-col gap-1.5">
+				<AudioPlayer src={downloadUrl} isOwn={isOwn} />
+				{message.content && <p className="text-sm px-1">{message.content}</p>}
+			</div>
+		);
+	}
+
 	if (type === "file" && (message.filePublicId || message.fileUrl)) {
 		return (
 			<a
@@ -141,7 +311,7 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 					className={cn(
 						"block max-w-[320px] overflow-hidden rounded-2xl border transition hover:opacity-95",
 						isOwn
-							? "border-white/15 bg-white/10 text-white"
+							? "border-white/20 bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:border-white/10"
 							: "border-border bg-background"
 					)}
 				>
@@ -154,10 +324,7 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 					)}
 
 					<div className="p-3">
-						<div className={cn(
-							"mb-1 flex items-center gap-1.5 text-xs",
-							isOwn ? "text-white/70" : "text-muted-foreground"
-						)}>
+						<div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
 							<Link2 className="size-3.5 shrink-0" />
 							<span className="truncate">{preview.siteName || hostname}</span>
 						</div>
@@ -169,18 +336,12 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 						)}
 
 						{preview.description && (
-							<div className={cn(
-								"mt-1 line-clamp-2 text-xs",
-								isOwn ? "text-white/80" : "text-muted-foreground"
-							)}>
+							<div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
 								{preview.description}
 							</div>
 						)}
 
-						<div className={cn(
-							"mt-2 text-[11px] break-all",
-							isOwn ? "text-white/60" : "text-muted-foreground/80"
-						)}>
+						<div className="mt-2 text-[11px] break-all text-muted-foreground/80">
 							{message.content}
 						</div>
 					</div>
@@ -259,6 +420,12 @@ function ReplyQuoteInline({
 				<span className="flex items-center gap-1">
 					<ImageIcon className="size-3 shrink-0" /> Hình ảnh
 				</span>
+			</span>
+		);
+	} else if (replyTo.type === "audio") {
+		preview = (
+			<span className="flex items-center gap-1">
+				<Mic className="size-3 shrink-0" /> Tin nhắn thoại
 			</span>
 		);
 	} else if (replyTo.type === "file") {
@@ -429,19 +596,19 @@ function SystemMessageComponent({
 	};
 
 	const actorBadge = (actor: Actor, key?: string) => (
-		<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap leading-none">
+		<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap mx-0.5">
 			<UserAvatar
 				type="seen"
 				name={getViewerName(actor)}
 				avatarUrl={actor.avatarUrl ?? undefined}
-				className="size-5 shrink-0 border border-background shadow-sm"
+				className="size-[20px] shrink-0 border border-background shadow-sm"
 			/>
-			<span className="font-semibold leading-none text-slate-700 dark:text-slate-200">{getViewerName(actor)}</span>
+			<span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">{getViewerName(actor)}</span>
 		</span>
 	);
 
 	const textPart = (value: string, key?: string) => (
-		<span key={key || value} className="inline-flex items-center leading-none font-normal text-slate-600 dark:text-slate-300">
+		<span key={key || value} className="inline align-middle font-normal text-[13px] text-slate-600 dark:text-slate-300">
 			{value}
 		</span>
 	);
@@ -475,17 +642,16 @@ function SystemMessageComponent({
 	}, [reminderIdFromMeta, sharedKey]);
 
 	const reminderLinkPart = useCallback((value: string, key?: string) => (
-		<button
-			type="button"
+		<span
 			key={key || value}
 			onClick={(event) => {
 				event.stopPropagation();
 				scrollToReminderCard();
 			}}
-			className="inline-flex items-center leading-none font-medium text-sky-700 underline decoration-sky-500/60 underline-offset-2 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+			className="cursor-pointer inline align-middle font-medium text-[13px] text-sky-700 underline decoration-sky-500/60 underline-offset-2 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
 		>
 			{value}
-		</button>
+		</span>
 	), [scrollToReminderCard]);
 
 	const reminderActionPart = useCallback((actionText: string, reminderContent: string, keyPrefix: string) => {
@@ -513,24 +679,24 @@ function SystemMessageComponent({
 			: visibleNames;
 
 		return (
-			<span className="inline-flex items-center gap-1.5 align-middle leading-none">
-				<span className="inline-flex -space-x-1 shrink-0">
+			<span className="inline-flex items-center gap-1.5 align-middle mx-0.5">
+				<span className="inline-flex -space-x-1.5 shrink-0">
 					{visibleActors.map((actor, idx) => (
 						<UserAvatar
 							key={`added-avatar-${actor.id}-${idx}`}
 							type="seen"
 							name={actor.name}
 							avatarUrl={actor.avatarUrl ?? undefined}
-							className="size-5 border border-background shadow-sm"
+							className="size-[20px] border border-background shadow-sm"
 						/>
 					))}
 					{remainingCount > 0 && (
-						<span className="inline-flex size-5 items-center justify-center rounded-full border border-background bg-slate-500 text-[10px] font-semibold text-white shadow-sm">
+						<span className="inline-flex size-[20px] items-center justify-center rounded-full border border-background bg-slate-500 text-[9px] font-semibold text-white shadow-sm">
 							+{remainingCount}
 						</span>
 					)}
 				</span>
-				<span className="font-semibold leading-none text-slate-700 dark:text-slate-200">
+				<span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">
 					{namesText}
 				</span>
 			</span>
@@ -609,6 +775,55 @@ function SystemMessageComponent({
 				return (
 					<>
 						{actorBadge(updatedByActor)} {textPart("đã đổi ảnh đại diện nhóm")}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "group_name_updated") {
+			const updatedByActor = makeActor(
+				metadata.updatedBy || message.senderId,
+				metadata.updatedByName || message.senderInfo?.displayName || "Một thành viên",
+				metadata.updatedByAvatarUrl || message.senderInfo?.avatarUrl
+			);
+			const newName = String(metadata.newName || "").trim();
+
+			if (updatedByActor) {
+				return (
+					<>
+						{actorBadge(updatedByActor)} {textPart(newName ? `đã đổi tên nhóm thành ${newName}` : "đã đổi tên nhóm")}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "message_pinned") {
+			const actor = makeActor(
+				metadata.actionBy || message.senderId,
+				metadata.actionByName || message.senderInfo?.displayName || "Một thành viên",
+				message.senderInfo?.avatarUrl
+			);
+
+			if (actor) {
+				return (
+					<>
+						{actorBadge(actor)} {textPart("đã ghim một tin nhắn")}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "message_unpinned") {
+			const actor = makeActor(
+				metadata.actionBy || message.senderId,
+				metadata.actionByName || message.senderInfo?.displayName || "Một thành viên",
+				message.senderInfo?.avatarUrl
+			);
+
+			if (actor) {
+				return (
+					<>
+						{actorBadge(actor)} {textPart("đã bỏ ghim một tin nhắn")}
 					</>
 				);
 			}
@@ -1188,12 +1403,10 @@ function SystemMessageComponent({
 	}
 
 	return (
-		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300">
-			<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-				<p className="text-[13px] font-normal tracking-normal break-words">
-					<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
-						{systemContent}
-					</span>
+		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300 px-3">
+			<div className="max-w-[95%] sm:max-w-[85%] text-center rounded-[20px] border border-border/70 bg-card/90 px-4 py-2 shadow-sm backdrop-blur-sm">
+				<p className="text-[13px] font-normal leading-[1.6] break-words text-slate-600 dark:text-slate-300">
+					{systemContent}
 				</p>
 			</div>
 		</div>
@@ -1246,21 +1459,22 @@ const MessageItem = ({
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
 	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
+	const isLink = message.type === "link" && !isRecalled;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
 	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
 	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
 
-	// Automatically fetch signed URL for files if not cached
+	// Automatically fetch signed URL for files and audio if not cached
 	useEffect(() => {
-		if (message.type === "file" && message.filePublicId && !message.fileUrl && !cachedMediaUrl) {
+		if ((message.type === "file" || message.type === "audio") && message.filePublicId && !message.fileUrl && !cachedMediaUrl) {
 			const fetchUrl = async () => {
 				try {
 					const { url } = await chatService.getSignedMediaUrl(message._id);
 					useMediaCacheStore.getState().setUrl(message._id, url);
 				} catch (error) {
-					console.error('Failed to fetch media url for file:', message._id, error);
+					console.error('Failed to fetch media url for file/audio:', message._id, error);
 				}
 			};
 			fetchUrl();
@@ -1280,7 +1494,9 @@ const MessageItem = ({
 	const [isReacting, setIsReacting] = useState(false);
 	const [isCoarsePointer, setIsCoarsePointer] = useState(false);
 	const [showTouchActions, setShowTouchActions] = useState(false);
+	const [touchActionView, setTouchActionView] = useState<"menu" | "emoji">("menu");
 	const [reminderTargetMessage, setReminderTargetMessage] = useState<{ messageId: string; messagePreview: string } | null>(null);
+	const [showForwardModal, setShowForwardModal] = useState(false);
 	const messageRootRef = useRef<HTMLDivElement | null>(null);
 	const longPressTimeoutRef = useRef<number | null>(null);
 
@@ -1307,6 +1523,11 @@ const MessageItem = ({
 
 	useEffect(() => {
 		if (!showTouchActions) return;
+		// On coarse-pointer (touch) devices, the Dialog component handles its own
+		// dismissal via the Radix overlay. Using a global pointerdown listener here
+		// causes a race condition: pointerdown fires before onClick, closing the
+		// dialog before the "emoji" view can be set.
+		if (isCoarsePointer) return;
 
 		const handleOutsidePointerDown = (event: PointerEvent) => {
 			if (!messageRootRef.current) return;
@@ -1318,7 +1539,7 @@ const MessageItem = ({
 		return () => {
 			window.removeEventListener("pointerdown", handleOutsidePointerDown);
 		};
-	}, [showTouchActions]);
+	}, [showTouchActions, isCoarsePointer]);
 
 	useEffect(() => {
 		return () => {
@@ -1329,7 +1550,7 @@ const MessageItem = ({
 	const handlePointerDownForActions = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (!isCoarsePointer) return;
 		if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-		if (isRecalled || message.status || isDisbanded) return;
+		if (isRecalled || (message.status && message.status !== "sent") || isDisbanded) return;
 
 		clearLongPressTimer();
 		longPressTimeoutRef.current = window.setTimeout(() => {
@@ -1440,13 +1661,15 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								isImage ? "p-0 bg-transparent border-0" : "px-2 py-1.5 text-sm",
-								reactionSummary && !isImage && "min-w-[85px]", // Ensure bubble is wide enough for time + reaction
+								(isImage || isLink) ? "p-0 bg-transparent border-0" : "px-2 py-1.5 text-sm",
+								reactionSummary && !isImage && !isLink && "min-w-[85px]",
 								isRecalled
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
-									: isOwn
-										? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
-										: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
+									: isLink
+										? "bg-transparent border-0"
+										: isOwn
+											? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
+											: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
 							)}
 						>
 							{message.replyTo && !isRecalled && (
@@ -1457,6 +1680,12 @@ const MessageItem = ({
 									currentUserId={currentUserId}
 								/>
 							)}
+							{!isRecalled && message.metadata?.forwardedFrom && (
+								<div className={cn("flex items-center gap-1 px-1 pt-1 pb-0 text-[11px] opacity-70 select-none", isOwn ? "text-blue-100 justify-end" : "text-muted-foreground justify-start")}>
+									<Forward className="h-3 w-3 shrink-0" strokeWidth={2} />
+									<span>Đã chuyển tiếp tin nhắn</span>
+								</div>
+							)}
 							<div className="flex flex-col gap-0.5 w-fit">
 								<div className="w-fit">
 									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} />
@@ -1464,8 +1693,9 @@ const MessageItem = ({
 
 								{!isImage && (
 									<div className={cn(
-										"flex items-center gap-1 select-none self-start -mt-0.5",
-										isOwn ? "text-white/60" : "text-muted-foreground/60"
+										"flex items-center gap-1 select-none -mt-0.5 pb-1",
+										isOwn ? "self-end" : "self-start",
+										(isOwn && !isLink) ? "text-white/60" : "text-muted-foreground/60"
 									)}>
 										<span className="text-[10px] sm:text-[10.5px] font-medium leading-none whitespace-nowrap">
 											{formatMessageTime(new Date(message.createdAt))}
@@ -1517,10 +1747,8 @@ const MessageItem = ({
 						{/* Hover Action Bar - Quick Reaction Button */}
 						{!isRecalled && !message.status && !isDisbanded && (
 							<div className={cn(
-								"absolute top-1/2 -translate-y-1/2 transition-all duration-200 z-30",
-								shouldShowTouchActionControls
-									? "opacity-100 pointer-events-auto"
-									: "opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
+								"hidden sm:flex absolute top-1/2 -translate-y-1/2 transition-all duration-200 z-30",
+								"opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
 								isOwn ? "-left-10" : "-right-10"
 							)}>
 								<div className="flex items-center gap-1 bg-background shadow-md border border-border/40 rounded-full px-0.5 py-0.5">
@@ -1535,19 +1763,26 @@ const MessageItem = ({
 												<Smile className="h-4 w-4" />
 											</button>
 										</PopoverTrigger>
-										<PopoverContent className="w-auto p-0 border-0 shadow-2xl" align={isOwn ? "end" : "start"} side="top" sideOffset={8}>
-											<Picker
-												data={data}
-												onEmojiSelect={(emoji: any) => {
-													handleEmojiSelect(emoji);
-													setShowEmojiPicker(false);
-												}}
-												theme="light"
-												set="native"
-												autoFocus={false}
-												skinTonePosition="none"
-												previewPosition="none"
-											/>
+										<PopoverContent
+											className="w-[320px] max-w-[95vw] shadow-2xl rounded-2xl overflow-hidden p-0 border border-border/10 bg-background/95 backdrop-blur-sm relative z-[100] scale-[0.85] sm:scale-100 origin-bottom sm:origin-top"
+											align={isOwn ? "end" : "start"}
+											side="top"
+											sideOffset={8}
+										>
+											<div className="flex w-full justify-center">
+												<Picker
+													data={data}
+													onEmojiSelect={(emoji: any) => {
+														handleEmojiSelect(emoji);
+														setShowEmojiPicker(false);
+													}}
+													theme="light"
+													set="native"
+													autoFocus={false}
+													skinTonePosition="none"
+													previewPosition="none"
+												/>
+											</div>
 										</PopoverContent>
 									</Popover>
 								</div>
@@ -1556,89 +1791,229 @@ const MessageItem = ({
 
 
 						{!isRecalled && (!message.status || message.status === "sent") && (
-							<DropdownMenu>
-								<DropdownMenuTrigger asChild>
-									<button
-										className={cn(
-											"absolute top-1/2 -translate-y-1/2",
-											isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19",
-											shouldShowTouchActionControls ? "opacity-100" : "opacity-0 group-hover:opacity-70 hover:opacity-100",
-											"transition-opacity duration-150 ease-in-out",
-											"text-muted-foreground hover:text-foreground",
-											"p-1.5 rounded-full hover:bg-accent/40",
-											"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-										)}
-										aria-label="Message actions"
-										onClick={() => {
-											if (isCoarsePointer) {
-												setShowTouchActions(true);
-											}
-										}}
-									>
-										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-											<circle cx="12" cy="12" r="1" />
-											<circle cx="19" cy="12" r="1" />
-											<circle cx="5" cy="12" r="1" />
-										</svg>
-									</button>
-								</DropdownMenuTrigger>
+							<>
+								{/* Desktop Dropdown */}
+								<div className="hidden sm:block">
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<button
+												className={cn(
+													"absolute top-1/2 -translate-y-1/2",
+													isOwn ? "-left-18 sm:-left-19" : "-right-18 sm:-right-19",
+													shouldShowTouchActionControls ? "opacity-100" : "opacity-0 group-hover:opacity-70 hover:opacity-100",
+													"transition-opacity duration-150 ease-in-out",
+													"text-muted-foreground hover:text-foreground",
+													"p-1.5 rounded-full hover:bg-accent/40",
+													"focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+												)}
+												aria-label="Message actions"
+											>
+												<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+													<circle cx="12" cy="12" r="1" />
+													<circle cx="19" cy="12" r="1" />
+													<circle cx="5" cy="12" r="1" />
+												</svg>
+											</button>
+										</DropdownMenuTrigger>
 
-								<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-44">
-									{!isDisbanded && (
-										<DropdownMenuItem onClick={() => { setShowTouchActions(false); onReply?.(message); }}>
-											<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											Trả lời
-										</DropdownMenuItem>
-									)}
-									{message.content && (
-										<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
-											<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											Sao chép
-										</DropdownMenuItem>
-									)}
-									{(message.fileUrl || message.filePublicId) && (
-										<DropdownMenuItem asChild>
-											<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center" onClick={() => setShowTouchActions(false)}>
-												<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
-												Tải xuống
-											</a>
-										</DropdownMenuItem>
-									)}
-									{!isDisbanded && (
-										<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }}>
-											{isPinned ? (
-												<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											) : (
-												<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+										<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-46">
+											{!isDisbanded && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); onReply?.(message); }}>
+													<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Trả lời
+												</DropdownMenuItem>
 											)}
-											{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-										</DropdownMenuItem>
-									)}
-									{canCreateReminder && (
-										<DropdownMenuItem
-											onClick={() => {
+											{!isRecalled && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }}>
+													<Forward className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Chuyển tiếp
+												</DropdownMenuItem>
+											)}
+											{message.content && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
+													<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Sao chép
+												</DropdownMenuItem>
+											)}
+											{(message.fileUrl || message.filePublicId) && (
+												<DropdownMenuItem asChild>
+													<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center" onClick={() => setShowTouchActions(false)}>
+														<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
+														Tải xuống
+													</a>
+												</DropdownMenuItem>
+											)}
+											{!isDisbanded && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }}>
+													{isPinned ? (
+														<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													) : (
+														<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													)}
+													{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+												</DropdownMenuItem>
+											)}
+											{canCreateReminder && (
+												<DropdownMenuItem
+													onClick={() => {
+														setShowTouchActions(false);
+														setReminderTargetMessage({
+															messageId: message._id,
+															messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
+														});
+													}}
+												>
+													<BellPlus className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Tạo nhắc hẹn
+												</DropdownMenuItem>
+											)}
+											{isOwn && !isDisbanded && (
+												<DropdownMenuItem
+													className="text-destructive focus:text-destructive focus:bg-destructive/10"
+													onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }}
+												>
+													<Undo2 className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Thu hồi
+												</DropdownMenuItem>
+											)}
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</div>
+
+								{/* Mobile Touch Action Dialog — Menu */}
+								{isCoarsePointer && (
+									<>
+										<Dialog open={showTouchActions && touchActionView === "menu"} onOpenChange={(open) => {
+											if (!open) setShowTouchActions(false);
+										}}>
+											<DialogContent
+												className="w-[92vw] max-w-[380px] rounded-[24px] shadow-2xl bg-background/95 backdrop-blur-xl border-border/10 p-5 pt-6 gap-5"
+												showCloseButton={false}
+											>
+												<DialogTitle className="sr-only">Thao tác tin nhắn</DialogTitle>
+												<div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-1">
+													<button onClick={() => setTouchActionView("emoji")} className="flex flex-col items-center gap-2">
+														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+															<Smile className="h-5 w-5" strokeWidth={1.5} />
+														</div>
+														<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Cảm xúc</span>
+													</button>
+
+													{!isDisbanded && (
+														<button onClick={() => { setShowTouchActions(false); onReply?.(message); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<Reply className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Trả lời</span>
+														</button>
+													)}
+
+													{!isRecalled && (
+														<button onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<Forward className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Chuyển tiếp</span>
+														</button>
+													)}
+
+													{message.content && (
+														<button onClick={() => { setShowTouchActions(false); handleCopy(); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<Copy className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Sao chép</span>
+														</button>
+													)}
+
+													{(message.fileUrl || message.filePublicId) && (
+														<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2" onClick={() => setShowTouchActions(false)}>
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<Download className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Tải xuống</span>
+														</a>
+													)}
+
+													{!isDisbanded && (
+														<button onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																{isPinned ? <PinOff className="h-5 w-5" strokeWidth={1.5} /> : <Pin className="h-5 w-5" strokeWidth={1.5} />}
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">{isPinned ? "Bỏ ghim" : "Ghim"}</span>
+														</button>
+													)}
+
+													{canCreateReminder && (
+														<button
+															onClick={() => {
+																setShowTouchActions(false);
+																setReminderTargetMessage({ messageId: message._id, messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn") });
+															}}
+															className="flex flex-col items-center gap-2"
+														>
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																<BellPlus className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap overflow-visible">Nhắc hẹn</span>
+														</button>
+													)}
+
+													{isOwn && !isDisbanded && (
+														<button onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 shadow-sm hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors">
+																<Undo2 className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Thu hồi</span>
+														</button>
+													)}
+												</div>
+											</DialogContent>
+										</Dialog>
+
+										{/* Emoji Picker — separate Dialog to avoid padding clipping */}
+										<Dialog open={showTouchActions && touchActionView === "emoji"} onOpenChange={(open) => {
+											if (!open) {
+												setTouchActionView("menu");
 												setShowTouchActions(false);
-												setReminderTargetMessage({
-													messageId: message._id,
-													messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
-												});
-											}}
-										>
-											<BellPlus className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											Tạo nhắc hẹn
-										</DropdownMenuItem>
-									)}
-									{isOwn && !isDisbanded && (
-										<DropdownMenuItem
-											className="text-destructive focus:text-destructive focus:bg-destructive/10"
-											onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }}
-										>
-											<Undo2 className="w-4 h-4 mr-2" strokeWidth={1.6} />
-											Thu hồi
-										</DropdownMenuItem>
-									)}
-								</DropdownMenuContent>
-							</DropdownMenu>
+											}
+										}}>
+											<DialogContent
+												className="w-[92vw] max-w-[380px] rounded-[24px] shadow-2xl bg-background overflow-hidden p-0 gap-0 border-border/10"
+												showCloseButton={false}
+											>
+												<DialogTitle className="sr-only">Chọn cảm xúc</DialogTitle>
+												<div className="flex items-center gap-2 px-4 pt-4 pb-2">
+													<button
+														onClick={() => setTouchActionView("menu")}
+														className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+													>
+														<svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+															<path d="M15 18l-6-6 6-6" />
+														</svg>
+													</button>
+													<span className="text-sm font-semibold text-foreground">Chọn cảm xúc</span>
+												</div>
+												<div className="w-full">
+													<Picker
+														data={data}
+														onEmojiSelect={(emoji: any) => {
+															handleEmojiSelect(emoji);
+															setShowTouchActions(false);
+														}}
+														theme="light"
+														set="native"
+														autoFocus={false}
+														skinTonePosition="none"
+														previewPosition="none"
+														style={{ width: "100%" }}
+													/>
+												</div>
+											</DialogContent>
+										</Dialog>
+									</>
+								)}
+							</>
 						)}
 					</div>
 				</div>
@@ -1706,6 +2081,14 @@ const MessageItem = ({
 							toast.error('Không thể đồng bộ tin nhắn nhắc hẹn cá nhân');
 						});
 					}}
+				/>
+			)}
+
+			{showForwardModal && (
+				<ForwardMessageModal
+					open={showForwardModal}
+					onOpenChange={(open) => setShowForwardModal(open)}
+					message={message}
 				/>
 			)}
 		</>

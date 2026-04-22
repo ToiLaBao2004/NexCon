@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { io, type Socket } from "socket.io-client";
 import { useAuthStore } from "./useAuthStore";
-import type { SocketState } from "@/types/store";
+import type { GroupCallParticipant, SocketState } from "@/types/store";
 import { useChatStore } from "./useChatStore";
 import { useFriendStore } from "./useFriendStore";
 import { useNotificationStore } from "./useNotificationStore";
@@ -317,6 +317,18 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useChatStore.getState().fetchConversations();
     };
 
+    const isRelevantGroupCallEvent = (conversationId: string) => {
+      const groupCallState = useGroupCallStore.getState();
+      const activeConversationId = useChatStore.getState().activeConversationId;
+      return (
+        groupCallState.conversationId === conversationId ||
+        activeConversationId === conversationId
+      );
+    };
+
+    const getCurrentUserId = () =>
+      useAuthStore.getState().user?._id?.toString() ?? "";
+
     socket.on("incoming-call", ({ from, callType, roomName }) => {
       useCallStore.getState().handleIncomingCall(from, callType, roomName);
       useChatStore.getState().fetchConversations();
@@ -339,7 +351,17 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       refreshConversations();
     });
 
-    socket.on("call-ended", () => {
+    socket.on("call-ended", (payload?: { by?: { _id?: string; displayName?: string } }) => {
+      const currentUserId = getCurrentUserId();
+      const endedById = payload?.by?._id?.toString() || "";
+      const endedByName = payload?.by?.displayName || "Đối phương";
+
+      if (!endedById || endedById !== currentUserId) {
+        toast.info(`${endedByName} đã kết thúc cuộc gọi.`, {
+          duration: 3500,
+        });
+      }
+
       useCallStore.getState().handleCallEnded();
       refreshConversations();
     });
@@ -367,16 +389,57 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useGroupCallStore.getState().handleGroupCallToken(payload);
     });
 
-    socket.on("group-call:user-joined", (payload) => {
+    socket.on("group-call:user-joined", (payload: {
+      conversationId: string;
+      participants: GroupCallParticipant[];
+      user?: { _id: string; displayName: string; avatarUrl: string | null };
+      userId?: string;
+    }) => {
       useGroupCallStore.getState().handleGroupCallUserJoined(payload);
+
+      if (!isRelevantGroupCallEvent(payload.conversationId)) return;
+
+      const currentUserId = getCurrentUserId();
+      const joinedUserId =
+        payload.user?._id?.toString() || payload.userId?.toString() || "";
+
+      if (joinedUserId && joinedUserId === currentUserId) return;
+
+      const joinedDisplayName =
+        payload.user?.displayName ||
+        payload.participants.find((participant) => participant.userId === joinedUserId)
+          ?.displayName ||
+        "Một người";
+
+      toast.success(`${joinedDisplayName} đã tham gia cuộc họp.`, {
+        duration: 3500,
+      });
     });
 
     socket.on("group-call:user-declined", (payload) => {
       useGroupCallStore.getState().handleGroupCallUserDeclined(payload);
     });
 
-    socket.on("group-call:user-left", (payload) => {
+    socket.on("group-call:user-left", (payload: {
+      conversationId: string;
+      userId: string;
+      participants: GroupCallParticipant[];
+    }) => {
       useGroupCallStore.getState().handleGroupCallUserLeft(payload);
+
+      if (!isRelevantGroupCallEvent(payload.conversationId)) return;
+
+      const currentUserId = getCurrentUserId();
+      const leftUserId = payload.userId?.toString() || "";
+      if (leftUserId && leftUserId === currentUserId) return;
+
+      const leftDisplayName =
+        payload.participants.find((participant) => participant.userId === leftUserId)
+          ?.displayName || "Một người";
+
+      toast.info(`${leftDisplayName} đã rời cuộc họp.`, {
+        duration: 3500,
+      });
     });
 
     socket.on("group-call:ended", (payload) => {

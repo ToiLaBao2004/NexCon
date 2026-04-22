@@ -1317,6 +1317,15 @@ export const useChatStore = create<ChatState>()(
                     throw error;
                 }
             },
+            forwardMessage: async (messageId: string, targetConversationIds: string[]) => {
+                try {
+                    const result = await chatService.forwardMessage(messageId, targetConversationIds);
+                    return { forwarded: result.forwarded, errors: result.errors };
+                } catch (error) {
+                    console.error("Lỗi khi chuyển tiếp tin nhắn:", error);
+                    throw error;
+                }
+            },
         }),
 
         {

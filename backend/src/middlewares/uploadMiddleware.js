@@ -65,6 +65,22 @@ export const uploadRawFileFromBuffer = (buffer, originalName, folder = 'NexCon/m
     });
 };
 
+export const uploadAudioFromBuffer = (buffer, originalName, folder = 'NexCon/messages/audio') => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: 'raw', // Use raw instead of video to prevent 404 extension issues with authenticated blobs
+                type: 'authenticated',
+                public_id: `${Date.now()}_${originalName}`,
+                use_filename: false,
+            },
+            (error, result) => (error ? reject(error) : resolve(result))
+        );
+        stream.end(buffer);
+    });
+};
+
 export const deleteCloudinaryResource = (publicId, resourceType = 'image', deliveryType = 'upload') => {
     return new Promise((resolve, reject) => {
         cloudinary.uploader.destroy(

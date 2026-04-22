@@ -1,5 +1,5 @@
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, KeyRound } from "lucide-react";
+import { ChevronLeft, KeyRound } from "lucide-react";
 import { useChatStore } from "@/stores/useChatStore";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useState } from "react";
@@ -50,14 +50,14 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
         <DialogPortal>
           <DialogOverlay className="bg-transparent" />
           <DialogPrimitive.Content
-            className="fixed inset-y-0 right-0 w-[350px] p-0 m-0 rounded-none shadow-2xl bg-card border-l border-border/40 z-50 flex flex-col focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
+            className="fixed inset-y-0 right-0 w-screen md:w-[350px] p-0 m-0 rounded-none shadow-2xl bg-card border-l border-border/40 z-[60] flex flex-col focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
           >
             <div className="flex items-center gap-3 px-4 py-4 border-b border-border/40 bg-card shrink-0">
               <button
                 onClick={() => onOpenChange(false)}
                 className="p-1 rounded hover:bg-muted/10 transition-colors"
               >
-                <ArrowLeft className="h-5 w-5" strokeWidth={2} />
+                <ChevronLeft className="h-5 w-5" strokeWidth={2} />
               </button>
               <DialogHeader className="p-0">
                 <DialogTitle className="text-[17px] font-semibold">Quản lý nhóm</DialogTitle>

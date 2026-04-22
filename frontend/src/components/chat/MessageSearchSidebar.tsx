@@ -427,6 +427,9 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
                       {msg.type === 'link' && (
                         <span className="text-muted-foreground/50 mr-1 text-[11px]">[Link]</span>
                       )}
+                      {msg.type === 'audio' && (
+                        <span className="text-muted-foreground/50 mr-1 text-[11px]">[Tin nhắn thoại]</span>
+                      )}
                       {highlightKeyword(contentText, debouncedKeyword)}
                     </p>
                   </div>

@@ -6,6 +6,7 @@ import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
     uploadChatImageFromBuffer,
     uploadRawFileFromBuffer,
+    uploadAudioFromBuffer,
     deleteCloudinaryResource,
     MAX_FILE_SIZE,
     MAX_IMAGE_SIZE,
@@ -160,6 +161,29 @@ export async function sendMessage(req, res) {
                 break;
             }
 
+            case 'audio': {
+                if (!uploadedFile) {
+                    return res.status(400).json({ message: 'Audio file is required.' });
+                }
+                if (uploadedFile.size > MAX_FILE_SIZE) {
+                    return res.status(413).json({
+                        message: `File quá lớn. Kích thước tối đa là ${MAX_FILE_SIZE / 1024 / 1024}MB.`,
+                    });
+                }
+
+                const result = await safeUpload(
+                    uploadAudioFromBuffer,
+                    uploadedFile.buffer,
+                    uploadedFile.originalname || 'voice_message.webm'
+                );
+                messageData.filePublicId = result.public_id;
+                messageData.fileName = uploadedFile.originalname || 'voice_message.webm';
+                messageData.fileSize = uploadedFile.size;
+                messageData.mimeType = uploadedFile.mimetype;
+                if (content?.trim()) messageData.content = content.trim();
+                break;
+            }
+
             default:
                 return res.status(400).json({ message: `Unsupported message type: ${type}` });
         }
@@ -253,6 +277,7 @@ export async function createReminderSystemMessage(req, res) {
                 _id: conversation._id,
                 lastMessage: lastMsgPayload,
                 lastMessageAt: conversation.lastMessage?.createdAt || conversation.updatedAt,
+                seenBy: conversation.seenBy,
             },
             unreadCounts: conversation.unreadCounts,
         };
@@ -303,7 +328,7 @@ export async function recallMessage(req, res) {
 
         if (message.filePublicId) {
             try {
-                const resourceType = message.type === 'file' ? 'raw' : 'image';
+                const resourceType = message.type === 'audio' ? 'raw' : (message.type === 'file' ? 'raw' : 'image');
                 await deleteCloudinaryResource(message.filePublicId, resourceType, 'authenticated');
             } catch (cloudErr) {
                 console.warn('Cloudinary delete warning:', cloudErr?.message);
@@ -359,15 +384,21 @@ export async function pinMessage(req, res) {
     try {
         const { messageId } = req.body;
 
-        const message = await Message.findById(messageId);
+        const message = req.message || await Message.findById(messageId);
         if (!message) {
             return res.status(404).json({ message: 'Không tìm thấy tin nhắn.' });
         }
 
-        const conversation = await Conversation.findById(message.conversationId);
+        const conversation = req.conversation || await Conversation.findById(message.conversationId);
         if (!conversation) {
             return res.status(404).json({ message: 'Không tìm thấy cuộc trò chuyện.' });
         }
+
+        const senderInfo = {
+            displayName: req.user.displayName,
+            avatarUrl: req.user.avatarUrl,
+        };
+        const actionByName = req.user.displayName || 'Một thành viên';
 
         // Nếu đã ghim thì bỏ ghim luôn
         if (message.isPinned) {
@@ -391,6 +422,25 @@ export async function pinMessage(req, res) {
                     io.to(socketId).emit('pin-message', payload);
                 }
             });
+
+            const systemMessage = await Message.create({
+                conversationId: conversation._id,
+                senderId: req.user._id,
+                senderInfo,
+                type: 'system',
+                systemType: 'message_unpinned',
+                content: `${actionByName} đã bỏ ghim một tin nhắn`,
+                metadata: {
+                    actionBy: req.user._id,
+                    actionByName,
+                    targetMessageId: message._id,
+                    targetMessageType: message.type,
+                },
+            });
+
+            updateConversationLastMessage(conversation, systemMessage, req.user._id);
+            await conversation.save();
+            emitNewMessage(io, conversation, systemMessage);
 
             return res.status(200).json({
                 message: 'Bỏ ghim tin nhắn thành công.',
@@ -433,6 +483,25 @@ export async function pinMessage(req, res) {
                 io.to(socketId).emit('pin-message', payload);
             }
         });
+
+        const systemMessage = await Message.create({
+            conversationId: conversation._id,
+            senderId: req.user._id,
+            senderInfo,
+            type: 'system',
+            systemType: 'message_pinned',
+            content: `${actionByName} đã ghim một tin nhắn`,
+            metadata: {
+                actionBy: req.user._id,
+                actionByName,
+                targetMessageId: message._id,
+                targetMessageType: message.type,
+            },
+        });
+
+        updateConversationLastMessage(conversation, systemMessage, req.user._id);
+        await conversation.save();
+        emitNewMessage(io, conversation, systemMessage);
 
         return res.status(200).json({
             message: 'Ghim tin nhắn thành công.',
@@ -574,6 +643,125 @@ export async function getSignedMediaUrl(req, res) {
         return res.status(200).json({ url: signedUrl });
     } catch (error) {
         console.error('Error generating signed URL:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function forwardMessage(req, res) {
+    try {
+        const senderId = req.user._id;
+        const { messageId } = req.params;
+        const { targetConversationIds } = req.body;
+
+        if (!Array.isArray(targetConversationIds) || targetConversationIds.length === 0) {
+            return res.status(400).json({ message: 'targetConversationIds is required and must be a non-empty array.' });
+        }
+
+        if (targetConversationIds.length > 10) {
+            return res.status(400).json({ message: 'Bạn chỉ có thể chuyển tiếp đến tối đa 10 cuộc trò chuyện cùng lúc.' });
+        }
+
+        // Load the source message
+        const source = await Message.findById(messageId);
+        if (!source) {
+            return res.status(404).json({ message: 'Tin nhắn không tồn tại.' });
+        }
+        if (source.isRecalled) {
+            return res.status(400).json({ message: 'Không thể chuyển tiếp tin nhắn đã thu hồi.' });
+        }
+        if (source.type === 'system') {
+            return res.status(400).json({ message: 'Không thể chuyển tiếp tin nhắn hệ thống.' });
+        }
+        const sourceConvo = await Conversation.findById(source.conversationId);
+        if (!sourceConvo) {
+            return res.status(404).json({ message: 'Cuộc trò chuyện gốc không tồn tại.' });
+        }
+        const isMemberOfSource = sourceConvo.participants.some(
+            (p) => p.userId.toString() === senderId.toString()
+        );
+        if (!isMemberOfSource) {
+            return res.status(403).json({ message: 'Bạn không có quyền truy cập tin nhắn này.' });
+        }
+        const sourceMetadata = source.metadata instanceof Map
+            ? Object.fromEntries(source.metadata)
+            : (source.metadata || {});
+        const forwardedFrom = {
+            messageId: source._id.toString(),
+            conversationId: source.conversationId.toString(),
+            senderDisplayName: source.senderInfo?.displayName || null,
+            type: source.type,
+        };
+
+        const results = [];
+        const errors = [];
+
+        for (const targetConvoId of targetConversationIds) {
+            try {
+                const targetConvo = await Conversation.findById(targetConvoId);
+                if (!targetConvo) {
+                    errors.push({ conversationId: targetConvoId, reason: 'Conversation not found.' });
+                    continue;
+                }
+
+                if (targetConvo.disbanded === true) {
+                    errors.push({ conversationId: targetConvoId, reason: 'Nhóm đã bị giải tán.' });
+                    continue;
+                }
+
+                const isMember = targetConvo.participants.some(
+                    (p) => p.userId.toString() === senderId.toString()
+                );
+                if (!isMember) {
+                    errors.push({ conversationId: targetConvoId, reason: 'Bạn không phải thành viên.' });
+                    continue;
+                }
+                const forwardedMetadata = {
+                    ...(sourceMetadata.linkPreview ? { linkPreview: sourceMetadata.linkPreview } : {}),
+                    forwardedFrom,
+                };
+
+                const msgData = {
+                    conversationId: targetConvo._id,
+                    senderId,
+                    senderInfo: {
+                        displayName: req.user.displayName,
+                        avatarUrl: req.user.avatarUrl,
+                    },
+                    type: source.type,
+                    ...(source.content != null ? { content: source.content } : {}),
+                    ...(source.filePublicId ? { filePublicId: source.filePublicId } : {}),
+                    ...(source.fileName ? { fileName: source.fileName } : {}),
+                    ...(source.fileSize ? { fileSize: source.fileSize } : {}),
+                    ...(source.mimeType ? { mimeType: source.mimeType } : {}),
+                    metadata: forwardedMetadata,
+                };
+
+                const newMsg = await Message.create(msgData);
+
+                updateConversationLastMessage(targetConvo, newMsg, senderId);
+                await targetConvo.save();
+
+                const signedUrl = generateSignedUrl(newMsg.filePublicId, newMsg.type);
+                emitNewMessage(io, targetConvo, newMsg, signedUrl);
+
+                results.push({
+                    conversationId: targetConvoId,
+                    message: newMsg,
+                    signedUrl,
+                });
+            } catch (innerErr) {
+                console.error(`Forward error for convo ${targetConvoId}:`, innerErr);
+                errors.push({ conversationId: targetConvoId, reason: 'Internal error.' });
+            }
+        }
+
+        return res.status(200).json({
+            forwarded: results.length,
+            results,
+            errors,
+        });
+    } catch (error) {
+        console.error('Error forwarding message:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }

@@ -108,6 +108,7 @@ export interface ChatState {
   transferAdminRole: (conversationId: string, memberId: string) => Promise<void>;
   updateAdminLocal: (conversationId: string, newAdminId: string) => void;
   leaveGroup: (conversationId: string, silent?: boolean, newAdminId?: string) => Promise<void>;
+  forwardMessage: (messageId: string, targetConversationIds: string[]) => Promise<{ forwarded: number; errors: { conversationId: string; reason: string }[] }>;
 
 
   // Sidebar
@@ -293,9 +294,14 @@ export interface GroupCallState {
     participants: GroupCallParticipant[];
   }) => void;
   handleGroupCallToken: (payload: { conversationId: string; token: string }) => void;
-  handleGroupCallUserJoined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallUserJoined: (payload: {
+    conversationId: string;
+    participants: GroupCallParticipant[];
+    user?: { _id: string; displayName: string; avatarUrl: string | null };
+    userId?: string;
+  }) => void;
   handleGroupCallUserDeclined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
-  handleGroupCallUserLeft: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallUserLeft: (payload: { conversationId: string; userId: string; participants: GroupCallParticipant[] }) => void;
   handleGroupCallEnded: (payload: {
     conversationId: string;
     callId: string;

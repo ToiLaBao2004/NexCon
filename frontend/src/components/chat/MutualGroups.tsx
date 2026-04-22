@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Popover, PopoverTrigger, PopoverContent, PopoverHeader, PopoverTitle, PopoverDescription } from "@/components/ui/popover";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import GroupChatAvatar from "./GroupChatAvatar";
-import { ArrowLeft, Users } from "lucide-react";
+import { ChevronLeft, Users } from "lucide-react";
 import type { Conversation } from "@/types/chat";
 
 function useComputedMutualGroups(otherParticipantId?: string | null) {
@@ -63,14 +64,14 @@ export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: Pa
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        <DialogOverlay />
-        <div className="fixed inset-y-0 right-0 w-[340px] p-0 m-0 rounded-none shadow-2xl bg-card border-l border-border/40 z-50">
+        <DialogOverlay className="bg-transparent" />
+        <DialogPrimitive.Content className="fixed inset-y-0 right-0 w-screen md:w-[350px] p-0 m-0 rounded-none shadow-2xl bg-card border-l border-border/40 z-[60] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card">
             <button
               onClick={() => onOpenChange(false)}
               className="p-1 rounded hover:bg-muted/10"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ChevronLeft className="h-5 w-5" />
             </button>
             <DialogHeader className="p-0">
               <DialogTitle className="text-base font-medium">Nhóm chung</DialogTitle>
@@ -96,7 +97,7 @@ export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: Pa
               </div>
             )}
           </div>
-        </div>
+        </DialogPrimitive.Content>
       </DialogPortal>
     </Dialog>
   );

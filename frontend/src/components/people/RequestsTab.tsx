@@ -1,6 +1,6 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, Send, UserPlus } from "lucide-react";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { useState } from "react";
 
@@ -33,7 +33,15 @@ export default function RequestsTab({ sentRequests, incomingRequests, processing
                         ))}
                     </div>
                 ) : (
-                    <div className="h-40 flex items-center justify-center text-muted-foreground">Chưa gửi lời mời nào</div>
+                    <div className="flex-1 h-48 flex flex-col items-center justify-center py-6 bg-card/10 rounded-3xl border border-dashed border-border/60 mt-1">
+                        <div className="h-14 w-14 rounded-3xl bg-muted/30 flex items-center justify-center mb-4 ring-8 ring-muted/10">
+                            <Send className="h-6 w-6 text-muted-foreground/40 -ml-1" />
+                        </div>
+                        <h3 className="text-base font-bold text-foreground/80 mb-1.5">Chưa gửi lời mời nào</h3>
+                        <p className="text-sm text-muted-foreground/60 text-center max-w-[250px] px-4">
+                            Những lời mời bạn đã gửi sẽ hiển thị tại đây.
+                        </p>
+                    </div>
                 )}
             </div>
 
@@ -59,7 +67,15 @@ export default function RequestsTab({ sentRequests, incomingRequests, processing
                         })}
                     </div>
                 ) : (
-                    <div className="h-40 flex items-center justify-center text-muted-foreground">Không có lời mời đến</div>
+                    <div className="flex-1 h-48 flex flex-col items-center justify-center py-6 bg-card/10 rounded-3xl border border-dashed border-border/60 mt-1">
+                        <div className="h-14 w-14 rounded-3xl bg-muted/30 flex items-center justify-center mb-4 ring-8 ring-muted/10">
+                            <UserPlus className="h-6 w-6 text-muted-foreground/40" />
+                        </div>
+                        <h3 className="text-base font-bold text-foreground/80 mb-1.5">Chưa có lời mời đến</h3>
+                        <p className="text-sm text-muted-foreground/60 text-center max-w-[250px] px-4">
+                            Các yêu cầu kết bạn gửi đến bạn sẽ xuất hiện ở đây.
+                        </p>
+                    </div>
                 )}
             </div>
 

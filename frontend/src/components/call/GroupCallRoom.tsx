@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import '@livekit/components-styles';
 import {
   LiveKitRoom,
@@ -19,6 +19,7 @@ import {
 import { Track } from 'livekit-client';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor, MonitorUp, MonitorOff, Minimize2, Maximize2 } from 'lucide-react';
 import { cn, nameToColor } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface GroupCallRoomProps {
   roomName: string;
@@ -28,6 +29,7 @@ interface GroupCallRoomProps {
   minimized?: boolean;
   onMinimize?: () => void;
   onMaximize?: () => void;
+  enablePresenceToasts?: boolean;
 }
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
@@ -396,8 +398,134 @@ const ScreenShareCleanup = () => {
   return null;
 };
 
+const PresenceToasts = ({ enabled }: { enabled: boolean }) => {
+  const participants = useParticipants();
+  const previousParticipantsRef = useRef<Map<string, string>>(new Map());
+  const initializedRef = useRef(false);
+  const enabledAtRef = useRef<number | null>(null);
+
+  const INITIAL_SYNC_WINDOW_MS = 3500;
+
+  useEffect(() => {
+    if (!enabled) {
+      previousParticipantsRef.current.clear();
+      initializedRef.current = false;
+      enabledAtRef.current = null;
+      return;
+    }
+
+    if (enabledAtRef.current === null) {
+      enabledAtRef.current = Date.now();
+    }
+
+    const currentParticipants = new Map<string, string>();
+    for (const participant of participants) {
+      if (participant.isLocal) continue;
+      const identity = String(participant.identity || '').trim();
+      if (!identity) continue;
+
+      const displayName = String(participant.name || '').trim() || identity;
+      currentParticipants.set(identity, displayName);
+    }
+
+    if (!initializedRef.current) {
+      previousParticipantsRef.current = currentParticipants;
+      initializedRef.current = true;
+      return;
+    }
+
+    const previousParticipants = previousParticipantsRef.current;
+    const shouldSuppressInitialJoinToasts =
+      enabledAtRef.current !== null
+      && Date.now() - enabledAtRef.current < INITIAL_SYNC_WINDOW_MS;
+
+    for (const [identity, name] of currentParticipants) {
+      if (!previousParticipants.has(identity)) {
+        if (!shouldSuppressInitialJoinToasts) {
+          toast.success(`${name} đã tham gia cuộc họp.`, {
+            duration: 3000,
+          });
+        }
+      }
+    }
+
+    for (const [identity, name] of previousParticipants) {
+      if (!currentParticipants.has(identity)) {
+        toast.info(`${name} đã rời cuộc họp.`, {
+          duration: 3000,
+        });
+      }
+    }
+
+    previousParticipantsRef.current = currentParticipants;
+  }, [enabled, participants]);
+
+  return null;
+};
+
+const ScreenShareToasts = () => {
+  const participants = useParticipants();
+  const previousShareStateRef = useRef<Map<string, { name: string; sharing: boolean }>>(new Map());
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    const currentShareState = new Map<string, { name: string; sharing: boolean }>();
+
+    for (const participant of participants) {
+      if (participant.isLocal) continue;
+
+      const identity = String(participant.identity || '').trim();
+      if (!identity) continue;
+
+      const name = String(participant.name || '').trim() || identity;
+      currentShareState.set(identity, {
+        name,
+        sharing: Boolean(participant.isScreenShareEnabled),
+      });
+    }
+
+    if (!initializedRef.current) {
+      previousShareStateRef.current = currentShareState;
+      initializedRef.current = true;
+      return;
+    }
+
+    const previousShareState = previousShareStateRef.current;
+
+    for (const [identity, current] of currentShareState) {
+      const previous = previousShareState.get(identity);
+      if (!previous) continue;
+
+      if (!previous.sharing && current.sharing) {
+        toast.info(`${current.name} đang chia sẻ màn hình.`, {
+          duration: 3000,
+        });
+      }
+
+      if (previous.sharing && !current.sharing) {
+        toast.info(`${current.name} đã dừng chia sẻ màn hình.`, {
+          duration: 3000,
+        });
+      }
+    }
+
+    previousShareStateRef.current = currentShareState;
+  }, [participants]);
+
+  return null;
+};
+
 /* ─── Main Component ─── */
-const GroupCallRoom = ({ roomName, roomLabel, token, onLeave, minimized, onMinimize, onMaximize }: GroupCallRoomProps) => {
+const GroupCallRoom = ({
+  roomName,
+  roomLabel,
+  token,
+  onLeave,
+  minimized,
+  onMinimize,
+  onMaximize,
+  enablePresenceToasts = false,
+}: GroupCallRoomProps) => {
   return (
     <LiveKitRoom
       video={true}
@@ -412,6 +540,8 @@ const GroupCallRoom = ({ roomName, roomLabel, token, onLeave, minimized, onMinim
       )}
     >
       <ScreenShareCleanup />
+      <PresenceToasts enabled={enablePresenceToasts} />
+      <ScreenShareToasts />
       <RoomAudioRenderer />
       {minimized ? (
         <MiniControls onMaximize={onMaximize} onLeave={onLeave} roomLabel={roomLabel} />

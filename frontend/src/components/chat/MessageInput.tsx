@@ -1,14 +1,15 @@
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { Conversation, MessageType } from "@/types/chat";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import EmojiPicker from "./EmojiPicker";
+import VoiceRecorder from "./VoiceRecorder";
 import { useChatStore } from "@/stores/useChatStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
-import { Paperclip, ImagePlus, Send, X, FileText, Reply } from "lucide-react";
+import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
 import { isUrl, formatBytes } from "@/lib/utils";
 
 
@@ -18,7 +19,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 
 interface Attachment {
-	type: "image" | "file";
+	type: "image" | "file" | "audio";
 	file: File;
 	preview?: string;
 }
@@ -50,6 +51,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const [attachment, setAttachment] = useState<Attachment | null>(null);
 	const [sending, setSending] = useState(false);
 	const [loadingLocal, setLoadingLocal] = useState(false);
+	const [isRecording, setIsRecording] = useState(false);
 
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const imageInputRef = useRef<HTMLInputElement>(null);
@@ -76,12 +78,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const type = resolveType(trimmed);
 
 		if (type === "text" && !trimmed && !attachment) return;
-		if ((type === "image" || type === "file") && !attachment?.file) return;
+		if ((type === "image" || type === "file" || type === "audio") && !attachment?.file) return;
 
 		const currValue = trimmed;
 		const prevAttachment = attachment;
 		setValue("");
 		setAttachment(null);
+		setIsRecording(false);
 		emitStopTyping(selectedConvo._id);
 		if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
@@ -227,6 +230,29 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}, 400);
 	};
 
+	/** Gửi trực tiếp một audio file (từ VoiceRecorder) */
+	const sendAudio = useCallback(async (file: File) => {
+		setIsRecording(false);
+
+		const payload: Parameters<typeof sendMessage>[0] = { type: "audio", file };
+
+		if (selectedConvo.type === "direct") {
+			payload.recipientId = otherUserId as string;
+		} else {
+			payload.conversationId = selectedConvo._id;
+		}
+
+		setSending(true);
+		try {
+			await sendMessage(payload);
+		} catch {
+			toast.error("Gửi tin nhắn thoại thất bại. Vui lòng thử lại!");
+		} finally {
+			setSending(false);
+			setTimeout(() => textInputRef.current?.focus(), 0);
+		}
+	}, [selectedConvo, otherUserId, sendMessage]);
+
 	const removeAttachment = () => {
 		if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
 		setAttachment(null);
@@ -275,11 +301,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									? "Tin nhắn đã thu hồi"
 									: replyingTo.type === "image"
 										? "Hình ảnh"
-										: replyingTo.type === "file"
-											? (replyingTo.fileName ?? "Tệp đính kèm")
-											: (replyingTo.content && replyingTo.content.length > 50
-												? replyingTo.content.slice(0, 50) + "…"
-												: replyingTo.content ?? "")}
+										: replyingTo.type === "audio"
+											? "🎙️ Tin nhắn thoại"
+											: replyingTo.type === "file"
+												? (replyingTo.fileName ?? "Tệp đính kèm")
+												: (replyingTo.content && replyingTo.content.length > 50
+													? replyingTo.content.slice(0, 50) + "…"
+													: replyingTo.content ?? "")}
 							</span>
 						</div>
 					</div>
@@ -305,6 +333,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 								className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 hover:bg-black/80 transition-colors"
 							>
 								<X className="size-3 text-white" />
+							</button>
+						</div>
+					) : attachment.type === "audio" && attachment.preview ? (
+						<div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 text-sm max-w-xs w-full">
+							<audio controls src={attachment.preview} className="h-8 w-48" />
+							<button onClick={removeAttachment} className="ml-1 hover:text-destructive transition-colors shrink-0">
+								<X className="size-4" />
 							</button>
 						</div>
 					) : (
@@ -358,39 +393,62 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					<Paperclip className="size-4" />
 				</Button>
 
-				<div className="flex-1 relative">
-					<Input
-						ref={textInputRef}
-						onKeyDown={handleKeyDown}
-						value={value}
-						onChange={handleInputChange}
-						onPaste={handlePaste}
-						onFocus={() => markAsSeen()}
-						placeholder={
-							attachment
-								? "Thêm chú thích (tuỳ chọn)…"
-								: "Soạn tin nhắn"
-						}
-						className="pr-12 h-9 bg-white dark:bg-muted border-border/50 focus:border-primary/50 transition-colors"
+				{!isRecording && (
+					<Button
+						type="button"
+						variant="ghost" size="icon"
+						className="size-9 shrink-0 hover:bg-primary/10 hover:text-primary transition-colors"
+						title="Ghi âm"
+						onClick={() => setIsRecording(true)}
 						disabled={sending}
-					/>
-					<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-						<Button asChild variant="ghost" size="icon" className="size-8 hover:bg-primary/10">
-							<div>
-								<EmojiPicker onChange={(emoji: string) => setValue(`${value}${emoji}`)} />
-							</div>
-						</Button>
-					</div>
-				</div>
+					>
+						<Mic className="size-4" />
+					</Button>
+				)}
 
-				<Button
-					onClick={handleSend}
-					className="bg-gradient-chat hover:shadow-glow transition-all hover:scale-105 shrink-0"
-					disabled={!canSend}
-					size="icon"
-				>
-					<Send className="size-4 text-white" />
-				</Button>
+				{isRecording ? (
+					<VoiceRecorder
+						onSend={sendAudio}
+						onCancel={() => setIsRecording(false)}
+					/>
+				) : (
+					<div className="flex-1 relative">
+						<Input
+							ref={textInputRef}
+							onKeyDown={handleKeyDown}
+							value={value}
+							onChange={handleInputChange}
+							onPaste={handlePaste}
+							onFocus={() => markAsSeen()}
+							placeholder={
+								attachment
+									? "Thêm chú thích (tuỳ chọn)…"
+									: "Soạn tin nhắn"
+							}
+							className="pr-12 h-9 bg-white dark:bg-muted border-border/50 focus:border-primary/50 transition-colors"
+							disabled={sending}
+						/>
+						<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+							<Button asChild variant="ghost" size="icon" className="size-8 hover:bg-primary/10">
+								<div>
+									<EmojiPicker onChange={(emoji: string) => setValue(`${value}${emoji}`)} />
+								</div>
+							</Button>
+						</div>
+					</div>
+				)}
+
+				{!isRecording && (
+					<Button
+						onClick={handleSend}
+						className="bg-gradient-chat hover:shadow-glow transition-all hover:scale-105 shrink-0"
+						disabled={!canSend}
+						size="icon"
+						title="Gửi"
+					>
+						<Send className="size-4 text-white" />
+					</Button>
+				)}
 			</div>
 		</div>
 	);

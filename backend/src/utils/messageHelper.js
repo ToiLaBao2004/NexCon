@@ -37,6 +37,12 @@ const resolveLastMessagePreview = (message) => {
                     return `${metadata.appointedByInfo?.displayName || 'Một quản trị viên'} đã chuyển quyền trưởng nhóm cho ${metadata.appointedUserInfo?.displayName || 'một thành viên'}`;
                 case 'group_avatar_updated':
                     return `${metadata.updatedByName || 'Một thành viên'} đã đổi ảnh đại diện nhóm`;
+                case 'group_name_updated':
+                    return `${metadata.updatedByName || 'Một thành viên'} đã đổi tên nhóm${metadata.newName ? ` thành ${metadata.newName}` : ''}`;
+                case 'message_pinned':
+                    return `${metadata.actionByName || 'Một thành viên'} đã ghim một tin nhắn`;
+                case 'message_unpinned':
+                    return `${metadata.actionByName || 'Một thành viên'} đã bỏ ghim một tin nhắn`;
                 case 'reminder_created_local':
                     return metadata.reminderContent
                         ? `Bạn đã tạo nhắc hẹn mới: ${metadata.reminderContent}`
@@ -129,6 +135,7 @@ export const emitNewMessage = (io, conversation, message, signedUrl = null) => {
             _id: conversation._id,
             lastMessage: lastMsgPayload,
             lastMessageAt: conversation.lastMessageAt,
+            seenBy: conversation.seenBy,
         },
         unreadCounts: conversation.unreadCounts,
     });
@@ -150,7 +157,9 @@ export async function safeUpload(uploadFn, ...args) {
 
 export function generateSignedUrl(filePublicId, type = 'image') {
     if (!filePublicId) return null;
-    const resource_type = type === 'image' ? 'image' : 'raw';
+    let resource_type = 'raw';
+    if (type === 'image') resource_type = 'image';
+    if (type === 'audio') resource_type = 'raw';
 
     return cloudinary.url(filePublicId, {
         resource_type,

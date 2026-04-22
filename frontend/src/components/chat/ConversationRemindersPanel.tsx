@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
   Dialog,
   DialogPortal,
+  DialogOverlay,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import {
-  ArrowLeft,
+  ChevronLeft,
   Bell,
   Calendar,
   Check,
@@ -18,6 +20,7 @@ import {
 } from "lucide-react";
 import { reminderService } from "@/services/reminderService";
 import type { Reminder } from "@/types/reminder";
+import { useAuthStore } from "@/stores/useAuthStore";
 import {
   getReminderContent,
   formatClock,
@@ -157,9 +160,11 @@ interface DetailDialogProps {
   reminder: Reminder | null;
   onClose: () => void;
   onUpdate: (updated: Reminder) => void;
+  currentUserId?: string;
+  onCancelSharedForAll: (sharedKey: string) => void;
 }
 
-function DetailDialog({ reminder, onClose, onUpdate }: DetailDialogProps) {
+function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelSharedForAll }: DetailDialogProps) {
   const [isActing, setIsActing] = useState(false);
 
   if (!reminder) return null;
@@ -170,6 +175,7 @@ function DetailDialog({ reminder, onClose, onUpdate }: DetailDialogProps) {
   const isJoined  = reminder.participationStatus === "joined";
   const isDeclined = reminder.participationStatus === "declined";
   const sharedKey = reminder.sharedKey;
+  const isCreator = String(reminder.createdBy || "") === String(currentUserId || "");
 
   const handleParticipation = async (participate: boolean) => {
     if (!sharedKey || isActing) return;
@@ -183,6 +189,21 @@ function DetailDialog({ reminder, onClose, onUpdate }: DetailDialogProps) {
       toast.success(participate ? "Đã tham gia nhắc hẹn" : "Đã từ chối không tham gia");
     } catch {
       toast.error("Không thể cập nhật, thử lại sau");
+    } finally {
+      setIsActing(false);
+    }
+  };
+
+  const handleCancelForAll = async () => {
+    if (!sharedKey || isActing) return;
+    setIsActing(true);
+    try {
+      await reminderService.deleteReminder(reminder._id);
+      onCancelSharedForAll(sharedKey);
+      toast.success("Đã hủy nhắc hẹn chung cho tất cả thành viên");
+      onClose();
+    } catch {
+      toast.error("Không thể hủy nhắc hẹn lúc này");
     } finally {
       setIsActing(false);
     }
@@ -262,52 +283,98 @@ function DetailDialog({ reminder, onClose, onUpdate }: DetailDialogProps) {
 
             {/* Action buttons */}
             <div className="flex gap-2.5 pt-1">
-              {/* Join / Re-join */}
-              {(!isJoined || isDeclined) && (
-                <button
-                  onClick={() => handleParticipation(true)}
-                  disabled={isActing}
-                  className={cn(
-                    "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
-                    "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm active:scale-[0.98]",
-                    "disabled:opacity-60 disabled:cursor-not-allowed"
+              {isCreator ? (
+                <>
+                  {(!isJoined || isDeclined) && (
+                    <button
+                      onClick={() => handleParticipation(true)}
+                      disabled={isActing}
+                      className={cn(
+                        "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
+                        "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm active:scale-[0.98]",
+                        "disabled:opacity-60 disabled:cursor-not-allowed"
+                      )}
+                    >
+                      {isActing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-4 w-4" />
+                      )}
+                      {isDeclined ? "Tham gia lại" : "Tham gia"}
+                    </button>
                   )}
-                >
-                  {isActing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <UserPlus className="h-4 w-4" />
-                  )}
-                  {isDeclined ? "Tham gia lại" : "Tham gia"}
-                </button>
-              )}
 
-              {/* Decline */}
-              {!isDeclined && (
-                <button
-                  onClick={() => handleParticipation(false)}
-                  disabled={isActing}
-                  className={cn(
-                    "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
-                    "border border-rose-500/60 text-rose-500 hover:bg-rose-500/8 active:scale-[0.98]",
-                    "disabled:opacity-60 disabled:cursor-not-allowed"
+                  {isJoined && !isDeclined && (
+                    <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <Check className="h-4 w-4" />
+                      Đang tham gia
+                    </span>
                   )}
-                >
-                  {isActing ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <UserMinus className="h-4 w-4" />
-                  )}
-                  Không tham gia
-                </button>
-              )}
 
-              {/* Already both states — just allow switching */}
-              {isJoined && !isDeclined && (
-                <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                  <Check className="h-4 w-4" />
-                  Đang tham gia
-                </span>
+                  <button
+                    onClick={handleCancelForAll}
+                    disabled={isActing}
+                    className={cn(
+                      "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
+                      "border border-rose-500/60 text-rose-500 hover:bg-rose-500/8 active:scale-[0.98]",
+                      "disabled:opacity-60 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {isActing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                    Hủy cho tất cả
+                  </button>
+                </>
+              ) : (
+                <>
+                  {(!isJoined || isDeclined) && (
+                    <button
+                      onClick={() => handleParticipation(true)}
+                      disabled={isActing}
+                      className={cn(
+                        "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
+                        "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm active:scale-[0.98]",
+                        "disabled:opacity-60 disabled:cursor-not-allowed"
+                      )}
+                    >
+                      {isActing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-4 w-4" />
+                      )}
+                      {isDeclined ? "Tham gia lại" : "Tham gia"}
+                    </button>
+                  )}
+
+                  {!isDeclined && (
+                    <button
+                      onClick={() => handleParticipation(false)}
+                      disabled={isActing}
+                      className={cn(
+                        "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
+                        "border border-rose-500/60 text-rose-500 hover:bg-rose-500/8 active:scale-[0.98]",
+                        "disabled:opacity-60 disabled:cursor-not-allowed"
+                      )}
+                    >
+                      {isActing ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserMinus className="h-4 w-4" />
+                      )}
+                      Không tham gia
+                    </button>
+                  )}
+
+                  {isJoined && !isDeclined && (
+                    <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <Check className="h-4 w-4" />
+                      Đang tham gia
+                    </span>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -448,6 +515,7 @@ export function ConversationRemindersPanel({
   conversationId,
   conversationName,
 }: ConversationRemindersPanelProps) {
+  const currentUserId = useAuthStore((state) => state.user?._id);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -559,8 +627,6 @@ export function ConversationRemindersPanel({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-    // Re-run when hasMore changes so the observer re-attaches as new items load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, fetchMore]);
 
   //  Derived state 
@@ -588,20 +654,20 @@ export function ConversationRemindersPanel({
     setSelectedReminder(updated);
   }, []);
 
+  const handleCancelSharedForAll = useCallback((sharedKey: string) => {
+    setReminders((prev) => prev.filter((item) => item.sharedKey !== sharedKey));
+    setSelectedReminder(null);
+  }, []);
+
   //  Render 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         {/* Backdrop — click to close */}
-        <div
-          className="fixed inset-0 z-50 bg-black/10"
-          onClick={() => onOpenChange(false)}
-          aria-hidden
-        />
-        <div
-          className="fixed inset-y-0 right-0 w-full sm:w-[340px] z-[51] flex flex-col rounded-none shadow-2xl bg-card border-l border-border/40"
-          onClick={(e) => e.stopPropagation()}
+        <DialogOverlay className="z-[51] bg-transparent" />
+        <DialogPrimitive.Content
+          className="fixed inset-y-0 right-0 w-screen md:w-[350px] z-[51] flex flex-col rounded-none shadow-2xl bg-card border-l border-border/40 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
         >
           {/*  Header  */}
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-card shrink-0">
@@ -610,7 +676,7 @@ export function ConversationRemindersPanel({
               className="p-1.5 rounded-md hover:bg-muted/60 transition-colors text-foreground"
               aria-label="Quay lại"
             >
-              <ArrowLeft className="h-[18px] w-[18px]" />
+              <ChevronLeft className="h-[18px] w-[18px]" />
             </button>
             <DialogHeader className="p-0 flex-1 min-w-0">
               <DialogTitle className="text-[15px] font-semibold text-foreground truncate leading-tight">
@@ -680,7 +746,7 @@ export function ConversationRemindersPanel({
               )}
             </div>
           </div>
-        </div>
+        </DialogPrimitive.Content>
 
         {/* Detail popup (rendered inside the same Portal to ensure it overlays the panel) */}
         {selectedReminder && (
@@ -688,6 +754,8 @@ export function ConversationRemindersPanel({
             reminder={selectedReminder}
             onClose={() => setSelectedReminder(null)}
             onUpdate={handleReminderUpdate}
+            currentUserId={currentUserId}
+            onCancelSharedForAll={handleCancelSharedForAll}
           />
         )}
       </DialogPortal>

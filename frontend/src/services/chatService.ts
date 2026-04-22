@@ -258,4 +258,16 @@ export const chatService = {
 			throw new Error(resolveErrorMessage(error));
 		}
 	},
+
+	async forwardMessage(
+		messageId: string,
+		targetConversationIds: string[]
+	): Promise<{ forwarded: number; results: any[]; errors: { conversationId: string; reason: string }[] }> {
+		try {
+			const res = await api.post(`/messages/${messageId}/forward`, { targetConversationIds });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
 };

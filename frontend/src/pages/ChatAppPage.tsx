@@ -82,8 +82,8 @@ const ChatAppPageContent = ({
         <div
           className={
             isMobile
-              ? "fixed inset-0 z-50 bg-background overflow-y-auto"
-              : "fixed top-2 right-2 bottom-2 z-50 bg-background overflow-y-auto rounded-2xl border border-border/40 shadow-soft"
+              ? "fixed inset-0 z-50 flex flex-col bg-background overflow-hidden"
+              : "fixed top-2 right-2 bottom-2 z-50 flex flex-col bg-background overflow-hidden rounded-2xl border border-border/40 shadow-soft"
           }
           style={isMobile ? undefined : tabletOverlayStyle}
         >
@@ -96,7 +96,9 @@ const ChatAppPageContent = ({
             </button>
             <span className="font-semibold text-foreground">Thông tin hội thoại</span>
           </div>
-          <ConversationInfoSidebar conversation={selectedConvo} />
+          <div className="flex-1 min-h-0">
+            <ConversationInfoSidebar conversation={selectedConvo} />
+          </div>
         </div>
       )}
     </>

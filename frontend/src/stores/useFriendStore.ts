@@ -102,7 +102,6 @@ export const useFriendStore = create<FriendState>((set) => ({
 				incomingRequests: state.incomingRequests.filter((r) => r._id !== requestId),
 				friends: data.newFriend ? [data.newFriend, ...state.friends] : state.friends
 			}));
-			toast.success(data.message || 'Đã chấp nhận lời mời kết bạn!');
 		} catch (error: any) {
 			console.error('Lỗi khi chấp nhận kết bạn:', error);
 			toast.error(

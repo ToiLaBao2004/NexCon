@@ -77,7 +77,7 @@ export interface ConversationResponse {
   conversations: Conversation[];
 }
 
-export type MessageType = 'text' | 'image' | 'file' | 'link' | 'system';
+export type MessageType = 'text' | 'image' | 'audio' | 'file' | 'link' | 'system';
 
 export interface ReplyToMessage {
   _id: string;
@@ -99,8 +99,16 @@ export interface LinkPreview {
   hostname?: string;
 }
 
+export interface ForwardedFrom {
+  messageId: string;
+  conversationId: string;
+  senderDisplayName: string | null;
+  type: MessageType;
+}
+
 export interface MessageMetadata {
   linkPreview?: LinkPreview;
+  forwardedFrom?: ForwardedFrom;
 
   [key: string]: any;
 }
