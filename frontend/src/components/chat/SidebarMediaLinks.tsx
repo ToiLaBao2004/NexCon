@@ -325,7 +325,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         </div>
         <button
           onClick={() => openViewer("image")}
-          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors"
+          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
         >
           Xem tất cả
         </button>
@@ -341,7 +341,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         </div>
         <button
           onClick={() => openViewer("file")}
-          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors"
+          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
         >
           Xem tất cả
         </button>
@@ -355,7 +355,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         </div>
         <button
           onClick={() => openViewer("link")}
-          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors"
+          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
         >
           Xem tất cả
         </button>

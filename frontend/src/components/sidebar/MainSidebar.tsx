@@ -165,7 +165,7 @@ const MainSidebar = () => {
                                 variant="outline"
                                 onClick={() => navigate("/chat")}
                                 className={cn(
-                                    "h-12 w-12 rounded-full transition-all duration-300 border-primary/30 shadow-sm group relative",
+                                    "h-12 w-12 rounded-full transition-all duration-300 border-primary/30 shadow-sm group relative cursor-pointer",
                                     isPathActive("/chat") ? "bg-primary text-primary-foreground border-primary" : "bg-primary/10 hover:bg-primary/20 hover:text-primary"
                                 )}
                             >
@@ -195,7 +195,7 @@ const MainSidebar = () => {
                                         size="icon"
                                         onClick={() => navigate(item.path)}
                                         className={cn(
-                                            "h-12 w-12 rounded-2xl transition-all duration-300 border-primary/30 shadow-sm group relative",
+                                            "h-12 w-12 rounded-2xl transition-all duration-300 border-primary/30 shadow-sm group relative cursor-pointer",
                                             active ? "bg-primary text-primary-foreground border-primary" : "bg-primary/10 hover:bg-primary/20 hover:text-primary"
                                         )}
                                     >
