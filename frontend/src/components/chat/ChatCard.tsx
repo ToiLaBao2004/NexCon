@@ -41,11 +41,12 @@ const ChatCard = (
 							>
 								{name}
 							</h3>
-							{titleAccessory}
 						</div>
+						{titleAccessory && <div className="flex-shrink-0 ml-1">{titleAccessory}</div>}
+
 
 						<span
-							className="text-xs text-muted-foreground"
+							className="text-xs text-muted-foreground ml-auto pl-2"
 						>{timestamp ? formatOnlineTime(timestamp) : ""}</span>
 					</div>
 
