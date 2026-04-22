@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 
-const MESSAGE_TYPES = ['text', 'image', 'file', 'link', 'system'];
+const MESSAGE_TYPES = ['text', 'image', 'audio', 'file', 'link', 'system'];
 
 const messageSchema = new mongoose.Schema({
     conversationId: {

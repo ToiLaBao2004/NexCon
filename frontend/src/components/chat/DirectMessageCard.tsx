@@ -8,7 +8,7 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen, Mic } from "lucide-react";
 import { isUrl } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -346,7 +346,11 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
             else if (cleanMsg.startsWith("🔗 ")) cleanMsg = cleanMsg.replace("🔗 ", "");
 
             let Icon = null;
-            if (type === "image" || content.includes("Đã gửi một ảnh")) Icon = ImageIcon;
+            if (type === "audio") {
+              Icon = Mic;
+              cleanMsg = "Tin nhắn thoại";
+            }
+            else if (type === "image" || content.includes("Đã gửi một ảnh")) Icon = ImageIcon;
             else if (type === "file" || content.startsWith("📎 ")) Icon = Paperclip;
             else if (type === "link" || content.includes("Đã gửi một liên kết") || isUrl(cleanMsg)) Icon = Link2;
 

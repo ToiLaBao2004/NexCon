@@ -77,7 +77,7 @@ export interface ConversationResponse {
   conversations: Conversation[];
 }
 
-export type MessageType = 'text' | 'image' | 'file' | 'link' | 'system';
+export type MessageType = 'text' | 'image' | 'audio' | 'file' | 'link' | 'system';
 
 export interface ReplyToMessage {
   _id: string;

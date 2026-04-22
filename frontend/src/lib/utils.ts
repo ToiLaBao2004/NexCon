@@ -93,7 +93,7 @@ export const isUrl = (text: string) => URL_REGEX.test(text.trim());
 export const normalizeUrl = (raw: string) => {
   if (!raw) return raw;
   const t = raw.trim();
-  if (/^https?:\/\//i.test(t)) return t;
+  if (/^(https?|blob|data):/i.test(t)) return t;
   return `https://${t}`;
 };
 

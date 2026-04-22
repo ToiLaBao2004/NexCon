@@ -157,7 +157,9 @@ export async function safeUpload(uploadFn, ...args) {
 
 export function generateSignedUrl(filePublicId, type = 'image') {
     if (!filePublicId) return null;
-    const resource_type = type === 'image' ? 'image' : 'raw';
+    let resource_type = 'raw';
+    if (type === 'image') resource_type = 'image';
+    if (type === 'audio') resource_type = 'raw';
 
     return cloudinary.url(filePublicId, {
         resource_type,

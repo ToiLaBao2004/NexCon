@@ -627,8 +627,6 @@ export function ConversationRemindersPanel({
 
     observer.observe(sentinel);
     return () => observer.disconnect();
-    // Re-run when hasMore changes so the observer re-attaches as new items load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, fetchMore]);
 
   //  Derived state 

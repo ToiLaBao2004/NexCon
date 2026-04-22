@@ -6,6 +6,7 @@ import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
     uploadChatImageFromBuffer,
     uploadRawFileFromBuffer,
+    uploadAudioFromBuffer,
     deleteCloudinaryResource,
     MAX_FILE_SIZE,
     MAX_IMAGE_SIZE,
@@ -160,6 +161,29 @@ export async function sendMessage(req, res) {
                 break;
             }
 
+            case 'audio': {
+                if (!uploadedFile) {
+                    return res.status(400).json({ message: 'Audio file is required.' });
+                }
+                if (uploadedFile.size > MAX_FILE_SIZE) {
+                    return res.status(413).json({
+                        message: `File quá lớn. Kích thước tối đa là ${MAX_FILE_SIZE / 1024 / 1024}MB.`,
+                    });
+                }
+
+                const result = await safeUpload(
+                    uploadAudioFromBuffer,
+                    uploadedFile.buffer,
+                    uploadedFile.originalname || 'voice_message.webm'
+                );
+                messageData.filePublicId = result.public_id;
+                messageData.fileName = uploadedFile.originalname || 'voice_message.webm';
+                messageData.fileSize = uploadedFile.size;
+                messageData.mimeType = uploadedFile.mimetype;
+                if (content?.trim()) messageData.content = content.trim();
+                break;
+            }
+
             default:
                 return res.status(400).json({ message: `Unsupported message type: ${type}` });
         }
@@ -304,7 +328,7 @@ export async function recallMessage(req, res) {
 
         if (message.filePublicId) {
             try {
-                const resourceType = message.type === 'file' ? 'raw' : 'image';
+                const resourceType = message.type === 'audio' ? 'raw' : (message.type === 'file' ? 'raw' : 'image');
                 await deleteCloudinaryResource(message.filePublicId, resourceType, 'authenticated');
             } catch (cloudErr) {
                 console.warn('Cloudinary delete warning:', cloudErr?.message);

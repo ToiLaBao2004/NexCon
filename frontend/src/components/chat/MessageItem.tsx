@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
-import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Picker from '@emoji-mart/react';
@@ -32,6 +32,166 @@ import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder"
 import ForwardMessageModal from "./ForwardMessageModal";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
+
+/* ── Custom audio player for voice messages ─────────────────────────────────── */
+const AUDIO_BAR_COUNT = 32;
+
+function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [progress, setProgress] = useState(0); // 0-1
+	const [currentTime, setCurrentTime] = useState(0);
+	const [duration, setDuration] = useState(0);
+	const audioRef = useRef<HTMLAudioElement | null>(null);
+
+	// Pseudo-static waveform bars (seeded from src hash for consistency)
+	const bars = useMemo(() => {
+		let seed = 0;
+		for (let i = 0; i < src.length; i++) seed = (seed * 31 + src.charCodeAt(i)) & 0xffffffff;
+		return Array.from({ length: AUDIO_BAR_COUNT }, (_, i) => {
+			seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+			const raw = (Math.abs(seed) / 0x7fffffff);
+			const wave = Math.abs(Math.sin((i / AUDIO_BAR_COUNT) * Math.PI));
+			return 0.15 + raw * 0.55 * wave + 0.1 * wave;
+		});
+	}, [src]);
+
+	useEffect(() => {
+		if (audioRef.current && src && src !== "#") {
+			audioRef.current.load();
+		}
+	}, [src]);
+
+	const togglePlay = () => {
+		const audio = audioRef.current;
+		if (!audio) return;
+		if (src === "#" || !audio.currentSrc) return;
+		
+		if (isPlaying) {
+			audio.pause();
+		} else {
+			// Workaround for Chrome Infinity bug on webm:
+			if (audio.duration === Infinity) {
+				audio.currentTime = 1e101; 
+				setTimeout(() => {
+					audio.currentTime = 0;
+					audio.play().catch(console.error);
+				}, 100);
+			} else {
+				audio.play().catch(console.error);
+			}
+		}
+	};
+
+	const seek = (ratio: number) => {
+		const audio = audioRef.current;
+		if (!audio) return;
+		const targetTime = ratio * (isFinite(duration) && duration > 0 ? duration : audio.duration || 0);
+		if (isFinite(targetTime)) {
+			audio.currentTime = targetTime;
+			setProgress(ratio);
+		}
+	};
+
+	const activeBars = Math.round(progress * AUDIO_BAR_COUNT);
+
+	const fmt = (s: number) => {
+		if (!isFinite(s) || isNaN(s) || s < 0) return "0:00";
+		const m = Math.floor(s / 60);
+		const sec = Math.floor(s % 60);
+		return `${m}:${sec < 10 ? "0" : ""}${sec}`;
+	};
+
+	const activeColor = isOwn ? "rgba(255,255,255,0.9)" : "rgb(99 102 241)";
+	const inactiveColor = isOwn ? "rgba(255,255,255,0.35)" : "rgb(199 210 254 / 0.8)";
+
+	return (
+		<div className="flex items-center gap-2 w-[220px] sm:w-[260px]">
+			{/* Hidden native audio for robust event management */}
+			<audio
+				ref={audioRef}
+				src={src}
+				preload="metadata"
+				onPlay={() => setIsPlaying(true)}
+				onPause={() => setIsPlaying(false)}
+				onEnded={() => {
+					setIsPlaying(false);
+					setProgress(0);
+					setCurrentTime(0);
+					const audio = audioRef.current;
+					if (audio) audio.currentTime = 0;
+				}}
+				onTimeUpdate={(e) => {
+					const audio = e.currentTarget;
+					setCurrentTime(audio.currentTime);
+					// Fallback to 1 if duration is Infinity to avoid NaN
+					const currentDur = isFinite(audio.duration) && audio.duration > 0 ? audio.duration : duration;
+					if (isFinite(currentDur) && currentDur > 0) {
+						setProgress(audio.currentTime / currentDur);
+					} else {
+						setProgress(0);
+					}
+				}}
+				onLoadedMetadata={(e) => {
+					const audio = e.currentTarget;
+					if (isFinite(audio.duration)) {
+						setDuration(audio.duration);
+					}
+				}}
+				onDurationChange={(e) => {
+					const audio = e.currentTarget;
+					if (isFinite(audio.duration)) {
+						setDuration(audio.duration);
+					}
+				}}
+			/>
+
+			{/* Play / Pause */}
+			<button
+				type="button"
+				onClick={togglePlay}
+				className={cn(
+					"shrink-0 size-8 rounded-full flex items-center justify-center transition-colors",
+					isOwn
+						? "bg-white/20 hover:bg-white/30 text-white"
+						: "bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/30 text-indigo-600 dark:text-indigo-300"
+				)}
+			>
+				{isPlaying
+					? <Pause className="size-3.5" fill="currentColor" />
+					: <Play className="size-3.5" fill="currentColor" />}
+			</button>
+
+			{/* Waveform + seek */}
+			<div className="flex-1 flex flex-col gap-[3px]">
+				<div
+					className="flex items-center gap-[2px] h-7 cursor-pointer"
+					onClick={(e) => {
+						const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+						seek((e.clientX - rect.left) / rect.width);
+					}}
+					title="Nhấn để tua"
+				>
+					{bars.map((h, i) => (
+						<div
+							key={i}
+							className="rounded-full shrink-0"
+							style={{
+								width: "2px",
+								height: `${Math.max(3, h * 26)}px`,
+								backgroundColor: i < activeBars ? activeColor : inactiveColor,
+								transition: "background-color 0.1s",
+							}}
+						/>
+					))}
+				</div>
+				<span className={cn("text-[10px] tabular-nums font-mono leading-none", isOwn ? "text-white/60" : "text-muted-foreground")}>
+					{(progress > 0 || isPlaying) ? fmt(currentTime) : fmt(duration)}
+				</span>
+			</div>
+		</div>
+	);
+}
+
 
 interface MessageItemProps {
 	message: Message;
@@ -92,6 +252,15 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 						/>
 					</button>
 				)}
+				{message.content && <p className="text-sm px-1">{message.content}</p>}
+			</div>
+		);
+	}
+
+	if (type === "audio" && (message.filePublicId || message.fileUrl)) {
+		return (
+			<div className="flex flex-col gap-1.5">
+				<AudioPlayer src={downloadUrl} isOwn={isOwn} />
 				{message.content && <p className="text-sm px-1">{message.content}</p>}
 			</div>
 		);
@@ -251,6 +420,12 @@ function ReplyQuoteInline({
 				<span className="flex items-center gap-1">
 					<ImageIcon className="size-3 shrink-0" /> Hình ảnh
 				</span>
+			</span>
+		);
+	} else if (replyTo.type === "audio") {
+		preview = (
+			<span className="flex items-center gap-1">
+				<Mic className="size-3 shrink-0" /> Tin nhắn thoại
 			</span>
 		);
 	} else if (replyTo.type === "file") {
@@ -1291,15 +1466,15 @@ const MessageItem = ({
 	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
 	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
 
-	// Automatically fetch signed URL for files if not cached
+	// Automatically fetch signed URL for files and audio if not cached
 	useEffect(() => {
-		if (message.type === "file" && message.filePublicId && !message.fileUrl && !cachedMediaUrl) {
+		if ((message.type === "file" || message.type === "audio") && message.filePublicId && !message.fileUrl && !cachedMediaUrl) {
 			const fetchUrl = async () => {
 				try {
 					const { url } = await chatService.getSignedMediaUrl(message._id);
 					useMediaCacheStore.getState().setUrl(message._id, url);
 				} catch (error) {
-					console.error('Failed to fetch media url for file:', message._id, error);
+					console.error('Failed to fetch media url for file/audio:', message._id, error);
 				}
 			};
 			fetchUrl();

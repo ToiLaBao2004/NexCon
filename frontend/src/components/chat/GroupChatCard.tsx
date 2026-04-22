@@ -4,7 +4,7 @@ import type { Conversation } from "@/types/chat";
 import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
-import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, Mail, MailOpen } from "lucide-react";
+import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, Mail, MailOpen, Mic } from "lucide-react";
 import {
 	DropdownMenu,
 	DropdownMenuTrigger,
@@ -330,7 +330,11 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 						let cleanMsg = content;
 
 						let Icon = null;
-						if (type === "image") Icon = ImageIcon;
+						if (type === "audio") {
+							Icon = Mic;
+							cleanMsg = "Tin nhắn thoại";
+						}
+						else if (type === "image") Icon = ImageIcon;
 						else if (type === "file") Icon = Paperclip;
 						else if (type === "link") Icon = Link2;
 
