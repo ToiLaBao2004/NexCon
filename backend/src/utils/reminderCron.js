@@ -1,11 +1,13 @@
 import cron from 'node-cron';
 import Reminder from '../models/reminderModel.js';
+import Conversation from '../models/conversationModel.js';
 import User from '../models/userModel.js';
 import { emitToUser } from '../socket/index.js';
 import { sendReminderEmail } from './sendEmail.js';
 import { normalizeReminderSource, resolveReminderContent } from './reminderHelper.js';
 import { createNotification } from '../services/notificationServices.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
+import { isMuted } from './isMuted.js';
 
 function getNextRemindAt(currentRemindAt, repeatRule) {
     const nextDate = new Date(currentRemindAt);
@@ -101,8 +103,28 @@ async function processReminder(reminder, now) {
     const formattedTime = `${HH}:${mm} ${DD}/${MM}/${YYYY}`;
     const reminderContent = resolveReminderContent(normalizedReminder);
     const reminderUrl = `/reminders?tab=all&focus=${encodeURIComponent(updated._id.toString())}`;
+    let mutedForReminderNotification = false;
 
-    if (!delivered) {
+    if (updated.conversationId) {
+        try {
+            const conversation = await Conversation.findOne(
+                { _id: updated.conversationId, 'participants.userId': updated.userId },
+                { 'participants.$': 1 }
+            ).lean();
+
+            const participant = conversation?.participants?.[0];
+            const isMeetingReminder = Boolean(updated.meetingLink)
+                || updated.type === 'meeting'
+                || updated.source?.type === 'meeting';
+            const muteType = isMeetingReminder ? 'meetings' : 'messages';
+
+            mutedForReminderNotification = isMuted(participant?.mute, muteType);
+        } catch (error) {
+            console.error(`Reminder cron mute lookup failed (${updated._id}):`, error);
+        }
+    }
+
+    if (!delivered && !mutedForReminderNotification) {
         try {
             await createNotification(
                 updated.userId,
@@ -115,14 +137,16 @@ async function processReminder(reminder, now) {
         }
     }
 
-    try {
-        await sendPushToUser(updated.userId.toString(), {
-            title: 'Nhắc hẹn',
-            body: `Lúc ${formattedTime}: "${reminderContent}"`,
-            url: reminderUrl,
-        });
-    } catch (error) {
-        console.error(`Reminder cron push notification failed (${updated._id}):`, error);
+    if (!mutedForReminderNotification) {
+        try {
+            await sendPushToUser(updated.userId.toString(), {
+                title: 'Nhắc hẹn',
+                body: `Lúc ${formattedTime}: "${reminderContent}"`,
+                url: reminderUrl,
+            });
+        } catch (error) {
+            console.error(`Reminder cron push notification failed (${updated._id}):`, error);
+        }
     }
 
     if (Array.isArray(reminder.notifyChannels) && reminder.notifyChannels.includes('email')) {

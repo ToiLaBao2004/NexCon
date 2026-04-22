@@ -270,4 +270,17 @@ export const chatService = {
 			throw new Error(resolveErrorMessage(error));
 		}
 	},
+
+	async updateConversationMute(
+		conversationId: string,
+		target: 'messages' | 'meetings' | 'both',
+		duration: '1h' | '8h' | '24h' | 'forever' | 'off'
+	) {
+		try {
+			const res = await api.patch(`/conversations/${conversationId}/mute`, { target, duration });
+			return res.data;
+		} catch (error: any) {
+			throw new Error(resolveErrorMessage(error));
+		}
+	},
 };

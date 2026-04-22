@@ -10,6 +10,12 @@ import {
 } from '../middlewares/uploadMiddleware.js';
 import { io, getReceiverSocketId } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
+
+const MUTE_DURATION_MS = {
+	'1h': 60 * 60 * 1000,
+	'8h': 8 * 60 * 60 * 1000,
+	'24h': 24 * 60 * 60 * 1000,
+};
 export async function createConversation(req, res) {
 	try {
 		const { type, name, memberIds } = req.body;
@@ -507,6 +513,64 @@ export async function toggleConversationPin(req, res) {
 		});
 	} catch (error) {
 		console.error('Error toggling conversation pin:', error);
+		return res.status(500).json({ message: 'Internal server error' });
+	}
+}
+
+export async function updateConversationMute(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const { target, duration } = req.body;
+		const userId = req.user._id;
+
+		const validTargets = ['messages', 'meetings', 'both'];
+		const validDurations = ['1h', '8h', '24h', 'forever', 'off'];
+
+		if (!validTargets.includes(target) || !validDurations.includes(duration)) {
+			return res.status(400).json({
+				message: 'Invalid target or duration. target: messages|meetings|both, duration: 1h|8h|24h|forever|off',
+			});
+		}
+
+		let until = null;
+		if (duration === 'forever') {
+			until = new Date('9999-12-31');
+		} else if (duration !== 'off') {
+			until = new Date(Date.now() + MUTE_DURATION_MS[duration]);
+		}
+
+		const updatePayload = {};
+		if (target === 'messages' || target === 'both') {
+			updatePayload['participants.$.mute.messages'] = until;
+		}
+		if (target === 'meetings' || target === 'both') {
+			updatePayload['participants.$.mute.meetings'] = until;
+		}
+
+		const query = {
+			_id: conversationId,
+			'participants.userId': userId,
+		};
+
+		const result = await Conversation.updateOne(query, {
+			$set: updatePayload,
+		});
+
+		if (!result.matchedCount) {
+			return res.status(404).json({ message: 'Conversation not found or you are not a participant.' });
+		}
+
+		const updatedConversation = await Conversation.findOne(query, { 'participants.$': 1 }).lean();
+		const mute = updatedConversation?.participants?.[0]?.mute || {};
+
+		return res.status(200).json({
+			mute: {
+				messages: mute.messages || null,
+				meetings: mute.meetings || null,
+			},
+		});
+	} catch (error) {
+		console.error('Error updating conversation mute:', error);
 		return res.status(500).json({ message: 'Internal server error' });
 	}
 }

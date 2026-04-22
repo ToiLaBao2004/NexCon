@@ -101,12 +101,14 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
     });
   },
 
-  handleGroupCallIncoming(payload) {
+  handleGroupCallIncoming(payload, isMutedCall: boolean = false) {
     const current = get().status;
     const p2pStatus = useCallStore.getState().status;
     if (current !== "idle" || p2pStatus !== "idle") return;
 
-    playRingtone();
+    if (!isMutedCall) {
+      playRingtone();
+    }
     set({
       status: "incoming",
       conversationId: payload.conversationId,
@@ -115,6 +117,7 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
       initiator: payload.initiator,
       groupName: payload.groupName,
       participants: payload.participants,
+      isMutedCall,
     });
   },
 

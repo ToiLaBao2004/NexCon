@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, forwardRef } from "react";
 import type { Conversation } from "@/types/chat";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useFriendStore } from "@/stores/useFriendStore";
@@ -14,25 +14,22 @@ import { AddMemberModal } from "./AddMemberModal";
 import { LeaveGroupModal } from "./LeaveGroupModal";
 import { toast } from "sonner";
 
-function ActionBtnLocal({
-  icon: Icon,
-  label,
-  onClick,
-  disabled,
-}: {
+const ActionBtnLocal = forwardRef<HTMLButtonElement, {
   icon: React.ElementType;
   label: string;
   onClick?: () => void;
   disabled?: boolean;
-}) {
+}>(({ icon: Icon, label, onClick, disabled, ...props }, ref) => {
   return (
     <button
+      ref={ref}
       onClick={onClick}
       disabled={disabled}
       className={cn(
         "flex flex-col items-center gap-[6px] rounded-lg py-1 px-1 transition-colors min-w-0 bg-transparent",
         disabled ? "opacity-100 cursor-default" : "hover:bg-muted/60 cursor-pointer"
       )}
+      {...props}
     >
       <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-muted/10 text-foreground">
         <Icon className="h-5 w-5" strokeWidth={1.2} />
@@ -40,8 +37,11 @@ function ActionBtnLocal({
       <span className="text-[12px] text-center text-muted-foreground/90 font-normal leading-[16px] w-[65px]">{label}</span>
     </button>
   );
-}
-import { Bell, Pin, UserPlus, Pencil, Camera, Loader2 } from "lucide-react";
+});
+ActionBtnLocal.displayName = "ActionBtnLocal";
+import { Bell, BellOff, Pin, UserPlus, Pencil, Camera, Loader2 } from "lucide-react";
+import { isMuted } from "@/utils/isMuted";
+import { MuteDropdown } from "./MuteDropdown";
 import { MutualGroupsPanel } from "./MutualGroups";
 import ConversationLists from "./ConversationLists";
 import { ConversationRemindersPanel } from "./ConversationRemindersPanel";
@@ -248,7 +248,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             </div>
 
             <div className="flex justify-center gap-3 sm:gap-4 w-full px-2 mt-2">
-              <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled />
+              <MuteDropdown conversationId={conversation._id}>
+                <ActionBtnLocal icon={isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "messages") || isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "meetings") ? BellOff : Bell} label="Thông báo" />
+              </MuteDropdown>
               <ActionBtnLocal
                 icon={Pin}
                 label={isConversationPinned ? "Bỏ ghim" : "Ghim hội thoại"}
@@ -411,7 +413,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           </div>
 
           <div className="flex justify-center gap-3 sm:gap-4 w-full px-2 mt-2">
-            <ActionBtnLocal icon={Bell} label="Tắt thông báo" disabled={isDisbanded} />
+            <MuteDropdown conversationId={conversation._id} disabled={isDisbanded}>
+              <ActionBtnLocal icon={isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "messages") || isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "meetings") ? BellOff : Bell} label="Thông báo" disabled={isDisbanded} />
+            </MuteDropdown>
             <ActionBtnLocal
               icon={Pin}
               label={isConversationPinned ? "Bỏ ghim" : "Ghim hội thoại"}

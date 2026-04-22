@@ -19,6 +19,10 @@ const participantSchema = new mongoose.Schema({
     },
     pinnedAt: {
         type: Date,
+    },
+    mute: {
+        messages: { type: Date, default: null },
+        meetings: { type: Date, default: null },
     }
 }, { _id: false });
 

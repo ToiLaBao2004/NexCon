@@ -1,4 +1,5 @@
 import { chatService } from '@/services/chatService';
+import { toast } from 'sonner';
 import type { ChatState, SendMessagePayload } from '@/types/store';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -1323,6 +1324,41 @@ export const useChatStore = create<ChatState>()(
                     return { forwarded: result.forwarded, errors: result.errors };
                 } catch (error) {
                     console.error("Lỗi khi chuyển tiếp tin nhắn:", error);
+                    throw error;
+                }
+            },
+            muteConversation: async (conversationId: string, target: 'messages' | 'meetings' | 'both', duration: '1h' | '8h' | '24h' | 'forever' | 'off') => {
+                try {
+                    const response = await chatService.updateConversationMute(conversationId, target, duration);
+                    const { user } = useAuthStore.getState();
+                    if (!user) return;
+
+                    set((state) => {
+                        const updatedConversations = state.conversations.map((c) => {
+                            if (c._id === conversationId) {
+                                const newParticipants = c.participants.map((p) => {
+                                    if ((p.userId?._id || p.userId)?.toString() === user._id.toString()) {
+                                        return { ...p, mute: response.mute };
+                                    }
+                                    return p;
+                                });
+                                return { ...c, participants: newParticipants };
+                            }
+                            return c;
+                        });
+                        return { conversations: updatedConversations };
+                    });
+
+                    // Thêm Toast thông báo
+                    if (duration === 'off') {
+                        toast.success("Đã bật lại thông báo");
+                    } else {
+                        const targetText = target === 'both' ? 'tin nhắn và cuộc gọi' : (target === 'messages' ? 'tin nhắn' : 'cuộc gọi');
+                        const durationText = duration === 'forever' ? 'cho đến khi bạn bật lại' : `trong ${duration.replace('h', ' giờ')}`;
+                        toast.success(`Đã tắt thông báo ${targetText} ${durationText}`);
+                    }
+                } catch (error) {
+                    console.error('Lỗi khi tắt thông báo hội thoại:', error);
                     throw error;
                 }
             },

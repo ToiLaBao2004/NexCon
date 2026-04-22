@@ -9,6 +9,7 @@ import ChatWindowBody from "./ChatWindowBody";
 import MessageInput from "./MessageInput";
 import OngoingCallBanner from "@/components/call/OngoingCallBanner";
 import MessageSearchSidebar from "./MessageSearchSidebar";
+import { MutedBanner } from "./MutedBanner";
 import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMaxWidth } from "@/hooks/use-max-width";
@@ -129,6 +130,7 @@ const ChatWindowLayout = () => {
         {selectedConvo.type === "group" && activeConversationId && (
           <OngoingCallBanner conversationId={activeConversationId} />
         )}
+        <MutedBanner />
 
         <div className="flex-1 min-h-0 bg-primary-foreground">
           <ChatWindowBody />
