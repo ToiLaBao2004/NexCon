@@ -9,6 +9,7 @@ import { useCallStore } from "./useCallStore";
 import { useGroupCallStore } from "./useGroupCallStore";
 import { toast } from "sonner";
 import { playMessageSound, playNotificationSound } from "@/utils/sound";
+import { isMuted } from "@/utils/isMuted";
 import useMediaCacheStore from "./useMediaCacheStore";
 import { useReminderStore } from "./useReminderStore";
 import { showReminderToast } from "@/components/reminder/showReminderToast";
@@ -108,6 +109,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         chatState.focusedConversationId === message.conversationId;
       const senderId = message.senderId || message.sender?._id;
       const isMine = String(senderId) === String(currentUserId);
+      const currentConversation = chatState.conversations.find(
+        (item) => String(item._id) === String(message.conversationId)
+      );
+      const myParticipant = currentConversation?.participants?.find(
+        (participant) => String(participant.userId?._id || participant.userId) === String(currentUserId)
+      );
+      const mutedMessages = isMuted(myParticipant?.mute, "messages");
 
       chatState.updateConversation(updatedConversation);
 
@@ -115,7 +123,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         chatState.markAsSeen();
       }
 
-      if (!isMine) {
+      if (!isMine && !mutedMessages) {
         void playMessageSound();
       }
     });
@@ -317,20 +325,23 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useChatStore.getState().fetchConversations();
     };
 
-    const isRelevantGroupCallEvent = (conversationId: string) => {
-      const groupCallState = useGroupCallStore.getState();
-      const activeConversationId = useChatStore.getState().activeConversationId;
-      return (
-        groupCallState.conversationId === conversationId ||
-        activeConversationId === conversationId
-      );
-    };
+
 
     const getCurrentUserId = () =>
       useAuthStore.getState().user?._id?.toString() ?? "";
 
-    socket.on("incoming-call", ({ from, callType, roomName }) => {
-      useCallStore.getState().handleIncomingCall(from, callType, roomName);
+    socket.on("incoming-call", ({ from, callType, roomName, conversationId }) => {
+      const currentUserId = getCurrentUserId();
+      const currentConversation = useChatStore.getState().conversations.find(
+        (item) => String(item._id) === String(conversationId)
+      );
+      const myParticipant = currentConversation?.participants?.find(
+        (p) => String(p.userId?._id || p.userId) === String(currentUserId)
+      );
+
+      const isMutedCall = isMuted(myParticipant?.mute, "meetings");
+
+      useCallStore.getState().handleIncomingCall(from, callType, roomName, isMutedCall);
       useChatStore.getState().fetchConversations();
     });
 
@@ -382,7 +393,17 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     socket.on("group-call:incoming", (payload) => {
-      useGroupCallStore.getState().handleGroupCallIncoming(payload);
+      const currentUserId = getCurrentUserId();
+      const currentConversation = useChatStore.getState().conversations.find(
+        (item) => String(item._id) === String(payload.conversationId)
+      );
+      const myParticipant = currentConversation?.participants?.find(
+        (p) => String(p.userId?._id || p.userId) === String(currentUserId)
+      );
+
+      const isMutedCall = isMuted(myParticipant?.mute, "meetings");
+
+      useGroupCallStore.getState().handleGroupCallIncoming(payload, isMutedCall);
     });
 
     socket.on("group-call:token", (payload) => {
@@ -397,7 +418,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     }) => {
       useGroupCallStore.getState().handleGroupCallUserJoined(payload);
 
-      if (!isRelevantGroupCallEvent(payload.conversationId)) return;
+      if (useGroupCallStore.getState().status !== "active") return;
 
       const currentUserId = getCurrentUserId();
       const joinedUserId =
@@ -427,7 +448,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     }) => {
       useGroupCallStore.getState().handleGroupCallUserLeft(payload);
 
-      if (!isRelevantGroupCallEvent(payload.conversationId)) return;
+      if (useGroupCallStore.getState().status !== "active") return;
 
       const currentUserId = getCurrentUserId();
       const leftUserId = payload.userId?.toString() || "";

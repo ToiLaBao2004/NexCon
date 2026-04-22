@@ -12,11 +12,12 @@ interface CharCardProps {
 	subtitle: React.ReactNode;
 	rightSection?: React.ReactNode;
 	statusIcon?: React.ReactNode;
+	titleAccessory?: React.ReactNode;
 }
 
 const ChatCard = (
 	{
-		convoId, name, timestamp, isActive, onSelect, unreadCount, leftSection, subtitle, rightSection, statusIcon
+		convoId, name, timestamp, isActive, onSelect, unreadCount, leftSection, subtitle, rightSection, statusIcon, titleAccessory
 	}: CharCardProps) => {
 
 	return (
@@ -33,12 +34,15 @@ const ChatCard = (
 
 				<div className="flex-1 min-w-0">
 					<div className="flex items-center justify-between mb-1">
-						<h3 className={cn("text-sm truncate",
-							unreadCount && unreadCount > 0 ? "font-bold text-foreground" : "font-semibold text-slate-800 dark:text-zinc-200"
-						)}
-						>
-							{name}
-						</h3>
+						<div className="flex items-center gap-1 min-w-0 overflow-hidden">
+							<h3 className={cn("text-sm truncate",
+								unreadCount && unreadCount > 0 ? "font-bold text-foreground" : "font-semibold text-slate-800 dark:text-zinc-200"
+							)}
+							>
+								{name}
+							</h3>
+							{titleAccessory}
+						</div>
 
 						<span
 							className="text-xs text-muted-foreground"

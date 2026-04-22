@@ -4,7 +4,9 @@ import type { Conversation } from "@/types/chat";
 import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
-import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, Mail, MailOpen, Mic } from "lucide-react";
+import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, Mail, MailOpen, Mic, BellOff } from "lucide-react";
+import { isMuted } from '@/utils/isMuted';
+import { MuteSubMenu } from './MuteSubMenu';
 import {
 	DropdownMenu,
 	DropdownMenuTrigger,
@@ -57,6 +59,9 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 			setGroupNameDraft(currentGroupName);
 		}
 	}, [openRename, currentGroupName]);
+
+	const myParticipant = convo.participants.find((p) => (p.userId?._id || p.userId)?.toString() === user?._id?.toString());
+	const isPartiallyMuted = isMuted(myParticipant?.mute, "messages") || isMuted(myParticipant?.mute, "meetings");
 
 	if (!user) return null;
 
@@ -173,6 +178,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 								<PencilLine className="size-4 mr-2" />
 								Đổi group name
 							</DropdownMenuItem>
+							<MuteSubMenu conversationId={convo._id} />
 							<DropdownMenuItem
 								disabled={pinning}
 								onSelect={(e) => {
@@ -306,6 +312,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 			isActive={focusedConversationId === convo._id}
 			onSelect={handleSelectConversation}
 			unreadCount={unreadCount}
+			titleAccessory={isPartiallyMuted && <span title="Đã tắt thông báo" className="flex items-center"><BellOff className="size-3.5 text-muted-foreground shrink-0" /></span>}
 			rightSection={menuNode}
 			statusIcon={statusIcon}
 			leftSection={

@@ -8,8 +8,10 @@ import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen, Mic } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen, Mic, BellOff } from "lucide-react";
 import { isUrl } from '@/lib/utils';
+import { isMuted } from '@/utils/isMuted';
+import { MuteSubMenu } from './MuteSubMenu';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -56,6 +58,9 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
       setNicknameValue(currentNickname);
     }
   }, [openRename, currentNickname]);
+
+  const myParticipant = convo.participants.find((p) => (p.userId?._id || p.userId)?.toString() === user?._id?.toString());
+  const isPartiallyMuted = isMuted(myParticipant?.mute, "messages") || isMuted(myParticipant?.mute, "meetings");
 
   if (!user) return null;
 
@@ -175,6 +180,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
                 <PencilLine className="h-4 w-4 mr-2" />
                 Đổi nickname
               </DropdownMenuItem>
+              <MuteSubMenu conversationId={convo._id} />
               <DropdownMenuItem
                 disabled={pinning}
                 onSelect={(e) => {
@@ -310,6 +316,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
       isActive={active}
       onSelect={handleSelectConversation}
       unreadCount={unreadCount}
+      titleAccessory={isPartiallyMuted && <span title="Đã tắt thông báo" className="flex items-center"><BellOff className="size-3.5 text-muted-foreground shrink-0" /></span>}
       rightSection={menuNode}
       statusIcon={statusIcon}
       leftSection={

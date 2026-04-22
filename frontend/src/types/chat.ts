@@ -9,6 +9,10 @@ export interface Participant {
     phone?: string;
   };
   joinedAt: string;
+  mute?: {
+    messages?: string | null;
+    meetings?: string | null;
+  };
 }
 
 export interface SeenUser {

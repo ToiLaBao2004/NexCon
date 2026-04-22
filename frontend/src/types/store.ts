@@ -109,6 +109,7 @@ export interface ChatState {
   updateAdminLocal: (conversationId: string, newAdminId: string) => void;
   leaveGroup: (conversationId: string, silent?: boolean, newAdminId?: string) => Promise<void>;
   forwardMessage: (messageId: string, targetConversationIds: string[]) => Promise<{ forwarded: number; errors: { conversationId: string; reason: string }[] }>;
+  muteConversation: (conversationId: string, target: 'messages' | 'meetings' | 'both', duration: '1h' | '8h' | '24h' | 'forever' | 'off') => Promise<void>;
 
 
   // Sidebar
@@ -199,6 +200,7 @@ export interface CallState {
   isMuted: boolean;
   isVideoOff: boolean;
   isRemoteVideoOff: boolean;
+  isMutedCall?: boolean;
   _livekitRoom: Room | null;
   _roomName: string | null;
   _token: string | null;
@@ -212,7 +214,7 @@ export interface CallState {
   toggleMute: () => void;
   toggleVideo: () => void;
   handleVideoToggle: (isVideoOff: boolean) => void;
-  handleIncomingCall: (from: RemoteUser, callType: CallType, roomName: string) => void;
+  handleIncomingCall: (from: RemoteUser, callType: CallType, roomName: string, isMutedCall?: boolean) => void;
   handleRemoteAccepted: () => void;
   handleCallAnswered: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallAccepted: (payload: { token: string; roomName: string }) => Promise<void>;
@@ -260,6 +262,7 @@ export interface GroupCallState {
   callId: string | null;
   callType: "voice" | "video" | null;
   token: string | null;
+  isMutedCall?: boolean;
   initiator: {
     _id: string;
     displayName: string;
@@ -292,7 +295,7 @@ export interface GroupCallState {
     initiator: { _id: string; displayName: string; avatarUrl: string | null };
     groupName: string;
     participants: GroupCallParticipant[];
-  }) => void;
+  }, isMutedCall?: boolean) => void;
   handleGroupCallToken: (payload: { conversationId: string; token: string }) => void;
   handleGroupCallUserJoined: (payload: {
     conversationId: string;

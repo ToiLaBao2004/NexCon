@@ -325,7 +325,7 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   // Socket event handlers (called from useSocketStore)
 
-  handleIncomingCall(from: RemoteUser, callType: CallType, roomName: string) {
+  handleIncomingCall(from: RemoteUser, callType: CallType, roomName: string, isMutedCall: boolean = false) {
     if (get().status !== "idle") {
       emitCallEvent("call-cancelled", { toUserId: from._id });
       return;
@@ -337,9 +337,13 @@ export const useCallStore = create<CallState>((set, get) => ({
       _roomName: roomName,
       isConnecting: false,
       isRemoteConnecting: false,
+      isMutedCall,
     });
-    console.log("[CallStore] handleIncomingCall triggered, starting ringtone");
-    void playRingtone();
+    
+    if (!isMutedCall) {
+      console.log("[CallStore] handleIncomingCall triggered, starting ringtone");
+      void playRingtone();
+    }
   },
 
   handleRemoteAccepted() {
