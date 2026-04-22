@@ -258,7 +258,7 @@ const MeetPage = () => {
                         <div className="mt-5 md:mt-6 flex flex-col gap-3">
                             <button
                                 onClick={handleOpenCreate}
-                                className="flex h-12 md:h-14 items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-white/95 text-[15px] md:text-base font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
+                                className="flex h-12 md:h-14 items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-white/95 text-[15px] md:text-base font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90 cursor-pointer"
                             >
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
@@ -267,7 +267,7 @@ const MeetPage = () => {
                             </button>
                             <button
                                 onClick={() => setMode('join')}
-                                className="flex h-12 md:h-14 items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-white/95 text-[15px] md:text-base font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
+                                className="flex h-12 md:h-14 items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-white/95 text-[15px] md:text-base font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90 cursor-pointer"
                             >
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14" />

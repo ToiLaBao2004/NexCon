@@ -50,7 +50,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <button
                   type="button"
                   onClick={() => setIsGroupModalOpen(true)}
-                  className="normal-case text-xs font-medium px-2 py-1 rounded-md border border-border/60 bg-background hover:bg-muted/20 text-foreground transition-colors"
+                  className="normal-case text-xs font-medium px-2 py-1 rounded-md border border-border/60 bg-background hover:bg-muted/20 text-foreground transition-colors cursor-pointer"
                 >
                   Tạo nhóm
                 </button>

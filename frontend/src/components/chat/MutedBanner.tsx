@@ -70,7 +70,7 @@ export function MutedBanner() {
       </div>
       <button
         onClick={handleUnmute}
-        className="text-[13px] font-medium text-primary hover:underline transition-all"
+        className="text-[13px] font-medium text-primary hover:underline transition-all cursor-pointer"
       >
         Bật lại
       </button>
