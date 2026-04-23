@@ -97,7 +97,7 @@ const MainSidebar = () => {
                             <Button variant="outline" className="relative h-12 w-12 rounded-full p-0 hover:bg-primary/20 transition-all group border-primary/30 bg-primary/10 shadow-sm overflow-visible">
                                 <Avatar className="h-9 w-9 transition-all rounded-full">
                                     <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
-                                    <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                                    <AvatarFallback className="bg-primary/10 text-primary font-bold cursor-pointer">
                                         {user?.displayName?.charAt(0)}
                                     </AvatarFallback>
                                 </Avatar>
@@ -145,7 +145,7 @@ const MainSidebar = () => {
                                 >
                                     {isDark ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
                                     <div className="flex-1 capitalize">{isDark ? "Tối" : "Sáng"}</div>
-                                    <Switch checked={isDark} className="ml-2" />
+                                    <Switch checked={isDark} className="ml-2 cursor-pointer" />
                                 </DropdownMenuItem>
                             </DropdownMenuGroup>
                             <DropdownMenuSeparator />
