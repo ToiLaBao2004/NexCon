@@ -9,7 +9,11 @@ import {
   DropdownMenuPortal,
   DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
+import { BellOff, Bell, MessageSquare, Phone, BellRing } from "lucide-react";
 import { useChatStore } from "@/stores/useChatStore";
+import { useAuthStore } from '@/stores/useAuthStore';
+import { isMuted } from '@/utils/isMuted';
+import { useMemo } from 'react';
 
 interface MuteDropdownProps {
   conversationId: string;
@@ -18,7 +22,25 @@ interface MuteDropdownProps {
 }
 
 export function MuteDropdown({ conversationId, disabled, children }: MuteDropdownProps) {
-  const { muteConversation } = useChatStore();
+  const { muteConversation, conversations } = useChatStore();
+  const currentUserId = useAuthStore((s) => s.user?._id);
+
+  const selectedConvo = useMemo(() => 
+    conversations.find((c) => c._id === conversationId),
+    [conversations, conversationId]
+  );
+
+  const myParticipant = useMemo(() => 
+    selectedConvo?.participants?.find(
+      (p) => (p.userId?._id || p.userId)?.toString() === currentUserId?.toString()
+    ),
+    [selectedConvo, currentUserId]
+  );
+
+  const isCurrentlyMuted = useMemo(() => {
+    if (!myParticipant?.mute) return false;
+    return isMuted(myParticipant.mute, "messages") || isMuted(myParticipant.mute, "meetings");
+  }, [myParticipant]);
 
   const handleMute = async (target: 'messages' | 'meetings' | 'both', duration: '1h' | '8h' | '24h' | 'forever' | 'off') => {
     try {
@@ -35,11 +57,17 @@ export function MuteDropdown({ conversationId, disabled, children }: MuteDropdow
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
         <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Tắt thông báo</DropdownMenuSubTrigger>
+          <DropdownMenuSubTrigger>
+            <BellOff className="h-4 w-4 mr-2" />
+            Tắt thông báo
+          </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Tin nhắn</DropdownMenuSubTrigger>
+                <DropdownMenuSubTrigger>
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Tin nhắn
+                </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
                   <DropdownMenuSubContent>
                     <DropdownMenuItem onSelect={() => handleMute('messages', '1h')}>Trong 1 giờ</DropdownMenuItem>
@@ -50,7 +78,10 @@ export function MuteDropdown({ conversationId, disabled, children }: MuteDropdow
                 </DropdownMenuPortal>
               </DropdownMenuSub>
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Cuộc gọi</DropdownMenuSubTrigger>
+                <DropdownMenuSubTrigger>
+                  <Phone className="h-4 w-4 mr-2" />
+                  Cuộc gọi
+                </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
                   <DropdownMenuSubContent>
                     <DropdownMenuItem onSelect={() => handleMute('meetings', '1h')}>Trong 1 giờ</DropdownMenuItem>
@@ -61,7 +92,10 @@ export function MuteDropdown({ conversationId, disabled, children }: MuteDropdow
                 </DropdownMenuPortal>
               </DropdownMenuSub>
               <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Tin nhắn và cuộc gọi</DropdownMenuSubTrigger>
+                <DropdownMenuSubTrigger>
+                  <BellRing className="h-4 w-4 mr-2" />
+                  Tin nhắn và cuộc gọi
+                </DropdownMenuSubTrigger>
                 <DropdownMenuPortal>
                   <DropdownMenuSubContent>
                     <DropdownMenuItem onSelect={() => handleMute('both', '1h')}>Trong 1 giờ</DropdownMenuItem>
@@ -74,9 +108,12 @@ export function MuteDropdown({ conversationId, disabled, children }: MuteDropdow
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
         </DropdownMenuSub>
-        <DropdownMenuItem onSelect={() => handleMute('both', 'off')} className="text-primary focus:text-primary">
-          Mở lại thông báo
-        </DropdownMenuItem>
+        {isCurrentlyMuted && (
+          <DropdownMenuItem onSelect={() => handleMute('both', 'off')} className="text-primary focus:text-primary">
+            <Bell className="h-4 w-4 mr-2" />
+            Mở lại thông báo
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

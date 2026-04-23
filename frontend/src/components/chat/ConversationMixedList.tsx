@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import DirectMessageCard from "./DirectMessageCard";
@@ -10,6 +10,18 @@ const ConversationMixedList = () => {
   const { conversations, fetchConversations } = useChatStore();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "k" && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     fetchConversations();
@@ -41,9 +53,10 @@ const ConversationMixedList = () => {
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
           <Input
+            ref={searchInputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm cuộc trò chuyện..."
+            placeholder="Tìm cuộc trò chuyện (Ctrl+K)..."
             className="pl-8 pr-8 h-8 text-[13px] rounded-xl border-border/50 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/40"
           />
           {searchQuery && (
