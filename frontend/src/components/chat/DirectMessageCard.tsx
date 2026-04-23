@@ -246,7 +246,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
         >
           <DialogHeader>
             <DialogTitle>Đổi nickname</DialogTitle>
-            <DialogDescription>Nickname chỉ áp dụng trong cuộc chat này.</DialogDescription>
+            <DialogDescription>Nickname sẽ áp dụng trong mọi cuộc trò chuyện.</DialogDescription>
           </DialogHeader>
 
           <Input
