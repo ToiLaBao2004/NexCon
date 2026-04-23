@@ -145,7 +145,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
             {chat.type === "direct" ? (
               <>
                 <UserAvatar
-                  type={"sidebar"}
+                  type={"card"}
                   name={displayName}
                   avatarUrl={otherUser?.userId?.avatarUrl || undefined}
                 />
@@ -156,7 +156,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
             ) : (
               <GroupChatAvatar
                 participants={chat.participants}
-                type="sidebar"
+                type="card"
                 groupAvatarUrl={chat.group?.avatarUrl}
               />
             )}

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 interface GroupChatAvatarProps {
     participants: Participant[];
-    type: "chat" | "sidebar";
+    type: "chat" | "sidebar" | "card";
     groupAvatarUrl?: string | null;
 }
 
@@ -18,13 +18,16 @@ const GroupChatAvatar = ({ participants, type, groupAvatarUrl }: GroupChatAvatar
     let childSizeClass = "";
 
     const isSidebar = type === "sidebar";
+    const isCard = type === "card";
+    const isLarge = isSidebar;
+    const isMedium = isCard;
 
     if (groupAvatarUrl) {
         return (
             <div
                 className={cn(
                     "relative shrink-0",
-                    isSidebar ? "w-16 h-16" : "w-8 h-8"
+                    isLarge ? "w-16 h-16" : isMedium ? "w-12 h-12" : "w-8 h-8"
                 )}
             >
                 <UserAvatar
@@ -33,9 +36,11 @@ const GroupChatAvatar = ({ participants, type, groupAvatarUrl }: GroupChatAvatar
                     avatarUrl={groupAvatarUrl}
                     className={cn(
                         "border border-background",
-                        isSidebar
+                        isLarge
                             ? "!size-16 !text-base border-2"
-                            : "!size-8 !text-sm border-[1.5px]"
+                            : isMedium
+                                ? "!size-12 !text-base border-2"
+                                : "!size-8 !text-sm border-[1.5px]"
                     )}
                 />
             </div>
@@ -44,20 +49,20 @@ const GroupChatAvatar = ({ participants, type, groupAvatarUrl }: GroupChatAvatar
 
     if (limit === 1) {
         positions = ["top-0 left-0 w-full h-full"];
-        childSizeClass = isSidebar ? "!size-16 !text-base" : "!size-8 !text-sm";
+        childSizeClass = isLarge ? "!size-16 !text-base" : isMedium ? "!size-12 !text-base" : "!size-8 !text-sm";
     } else if (limit === 2) {
         positions = [
             "top-0 right-0 z-0",
             "bottom-0 left-0 z-10"
         ];
-        childSizeClass = isSidebar ? "!size-[42px] !text-sm" : "!size-[22px] !text-[10px]";
+        childSizeClass = isLarge ? "!size-[42px] !text-sm" : isMedium ? "!size-[32px] !text-sm" : "!size-[22px] !text-[10px]";
     } else if (limit === 3) {
         positions = [
             "top-0 left-1/2 -translate-x-1/2 z-10",
             "bottom-0 left-0 z-20",
             "bottom-0 right-0 z-0",
         ];
-        childSizeClass = isSidebar ? "!size-[38px] !text-xs" : "!size-[18px] !text-[9px]";
+        childSizeClass = isLarge ? "!size-[38px] !text-xs" : isMedium ? "!size-[28px] !text-xs" : "!size-[18px] !text-[9px]";
     } else {
         // limit >= 4
         positions = [
@@ -66,7 +71,7 @@ const GroupChatAvatar = ({ participants, type, groupAvatarUrl }: GroupChatAvatar
             "bottom-0 left-0 z-20",
             "bottom-0 right-0 z-30"
         ];
-        childSizeClass = isSidebar ? "!size-[34px] !text-xs" : "!size-[17px] !text-[8px]";
+        childSizeClass = isLarge ? "!size-[34px] !text-xs" : isMedium ? "!size-[26px] !text-xs" : "!size-[17px] !text-[8px]";
     }
 
     const avatars = [];
@@ -82,7 +87,7 @@ const GroupChatAvatar = ({ participants, type, groupAvatarUrl }: GroupChatAvatar
                     className={cn(
                         childSizeClass,
                         "border border-background",
-                        isSidebar ? "border-2" : "border-[1.5px]"
+                        isLarge ? "border-2" : "border-[1.5px]"
                     )}
                 />
             </div>
@@ -92,7 +97,7 @@ const GroupChatAvatar = ({ participants, type, groupAvatarUrl }: GroupChatAvatar
     return (
         <div className={cn(
             "relative shrink-0",
-            isSidebar ? "w-16 h-16" : "w-8 h-8"
+            isLarge ? "w-16 h-16" : isMedium ? "w-12 h-12" : "w-8 h-8"
         )}>
             {avatars}
         </div>

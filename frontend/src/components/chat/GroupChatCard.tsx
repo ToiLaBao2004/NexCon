@@ -318,7 +318,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 			leftSection={
 				<>
 					{unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
-					<GroupChatAvatar participants={convo.participants} type="sidebar" groupAvatarUrl={convo.group?.avatarUrl} />
+					<GroupChatAvatar participants={convo.participants} type="card" groupAvatarUrl={convo.group?.avatarUrl} />
 				</>
 			}
 			subtitle={

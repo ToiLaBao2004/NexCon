@@ -430,7 +430,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									? "Thêm chú thích (tuỳ chọn)…"
 									: "Soạn tin nhắn"
 							}
-							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/50 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
+							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/50 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
 							disabled={sending}
 						/>
 						<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
