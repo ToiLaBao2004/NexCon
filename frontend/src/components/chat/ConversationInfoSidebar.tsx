@@ -309,7 +309,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             <DialogHeader>
               <DialogTitle>Đổi nickname</DialogTitle>
               <DialogDescription>
-                Nickname chỉ áp dụng trong cuộc chat này.
+                Nickname sẽ áp dụng trong mọi cuộc trò chuyện.
               </DialogDescription>
             </DialogHeader>
             <Input
