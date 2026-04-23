@@ -2,7 +2,6 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import type { Conversation, MessageType } from "@/types/chat";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import EmojiPicker from "./EmojiPicker";
 import VoiceRecorder from "./VoiceRecorder";
 import { useChatStore } from "@/stores/useChatStore";
@@ -56,7 +55,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const imageInputRef = useRef<HTMLInputElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
-	const textInputRef = useRef<HTMLInputElement>(null);
+	const textInputRef = useRef<HTMLTextAreaElement>(null);
 
 	if (!user) return null;
 
@@ -83,6 +82,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const currValue = trimmed;
 		const prevAttachment = attachment;
 		setValue("");
+		if (textInputRef.current) {
+			textInputRef.current.style.height = "auto";
+		}
 		setAttachment(null);
 		setIsRecording(false);
 		emitStopTyping(selectedConvo._id);
@@ -134,15 +136,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 	};
 
-	const handleKeyDown = (e: React.KeyboardEvent) => {
+	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
 			handleSend();
 		}
 	};
 
-	const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setValue(e.target.value);
+		e.target.style.height = "auto";
+		e.target.style.height = `${e.target.scrollHeight}px`;
 		if (e.target.value.trim()) {
 			emitTyping(selectedConvo._id);
 			if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -161,7 +165,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		};
 	}, [attachment]);
 
-	const handlePaste = async (e: React.ClipboardEvent<HTMLInputElement>) => {
+	const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
 		const items = Array.from(e.clipboardData?.items || []);
 
 		const imageItem = items.find((item) => item.type.startsWith("image/"));
@@ -412,20 +416,21 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						onCancel={() => setIsRecording(false)}
 					/>
 				) : (
-					<div className="flex-1 relative">
-						<Input
+					<div className="flex-1 relative flex items-center">
+						<textarea
 							ref={textInputRef}
 							onKeyDown={handleKeyDown}
 							value={value}
 							onChange={handleInputChange}
 							onPaste={handlePaste}
 							onFocus={() => markAsSeen()}
+							rows={1}
 							placeholder={
 								attachment
 									? "Thêm chú thích (tuỳ chọn)…"
 									: "Soạn tin nhắn"
 							}
-							className="pr-12 h-9 bg-white dark:bg-muted border-border/50 focus:border-primary/50 transition-colors"
+							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/50 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
 							disabled={sending}
 						/>
 						<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
