@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import StatusBadge from "./StatusBadge";
 
 interface IUserAvatarProps {
-    type: "sidebar" | "chat" | "profile" | "seen";
+    type: "sidebar" | "chat" | "profile" | "seen" | "card";
     name: string;
     avatarUrl?: string;
     className?: string;
@@ -21,7 +21,7 @@ const UserAvatar = ({ type, name, avatarUrl, className, status }: IUserAvatarPro
         <span className="relative inline-flex">
             <Avatar
                 className={cn(className ?? "",
-                    type === "sidebar" && "size-12 text-base",
+                    (type === "sidebar" || type === "card") && "size-12 text-base",
                     type === "chat" && "size-8 text-sm",
                     type === "profile" && "size-24 text-3xl shadow-md",
                     type === "seen" && "size-4 text-[8px]"
