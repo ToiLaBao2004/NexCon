@@ -6,6 +6,7 @@ import {
   Search, Send, X, Check, Forward,
   FileText, Link2, ImageIcon, MessageSquare, AlertCircle,
 } from "lucide-react";
+import { StickerIcon } from "@/components/shared/StickerIcon";
 import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -30,6 +31,8 @@ function getMessagePreview(message: Message): { text: string; Icon: React.Elemen
       return { text: message.fileName ?? "Tệp đính kèm", Icon: FileText };
     case "link":
       return { text: message.content ?? "Liên kết", Icon: Link2 };
+    case "sticker":
+      return { text: "Nhãn dán", Icon: StickerIcon };
     default:
       return { text: message.content ?? "(tin nhắn trống)", Icon: MessageSquare };
   }
@@ -211,9 +214,19 @@ const ForwardMessageModal = ({ open, onOpenChange, message }: ForwardMessageModa
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-medium text-muted-foreground mb-0.5">Tin nhắn gốc</p>
-            <p className="text-[13px] text-foreground/85 line-clamp-2 leading-relaxed truncate">
-              {previewText}
-            </p>
+            {message.type === 'sticker' && message.content ? (
+              <div className="mt-1">
+                <img 
+                  src={message.content} 
+                  alt="sticker-preview" 
+                  className="size-16 object-contain rounded-lg bg-background/50 p-1 border border-border/40" 
+                />
+              </div>
+            ) : (
+              <p className="text-[13px] text-foreground/85 line-clamp-2 leading-relaxed truncate">
+                {previewText}
+              </p>
+            )}
           </div>
         </div>
 

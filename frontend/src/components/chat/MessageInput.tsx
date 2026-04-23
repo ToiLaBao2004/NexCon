@@ -9,6 +9,7 @@ import { useFriendStore } from "@/stores/useFriendStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
+import StickerPickerPopover from "./StickerPickerPopover";
 import { isUrl, formatBytes } from "@/lib/utils";
 
 
@@ -257,6 +258,29 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 	}, [selectedConvo, otherUserId, sendMessage]);
 
+	const handleStickerSelect = async (url: string) => {
+		const payload: Parameters<typeof sendMessage>[0] = {
+			type: "sticker",
+			content: url
+		};
+
+		if (selectedConvo.type === "direct") {
+			payload.recipientId = otherUserId as string;
+		} else {
+			payload.conversationId = selectedConvo._id;
+		}
+
+		setSending(true);
+		try {
+			await sendMessage(payload);
+		} catch {
+			toast.error("Gửi sticker thất bại. Vui lòng thử lại!");
+		} finally {
+			setSending(false);
+			setTimeout(() => textInputRef.current?.focus(), 0);
+		}
+	};
+
 	const removeAttachment = () => {
 		if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
 		setAttachment(null);
@@ -408,6 +432,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					>
 						<Mic className="size-4" />
 					</Button>
+				)}
+
+				{!isRecording && (
+					<StickerPickerPopover onSelect={handleStickerSelect} />
 				)}
 
 				{isRecording ? (

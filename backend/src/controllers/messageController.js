@@ -184,6 +184,14 @@ export async function sendMessage(req, res) {
                 break;
             }
 
+            case 'sticker': {
+                if (!content || !content.trim()) {
+                    return res.status(400).json({ message: 'Sticker URL is required.' });
+                }
+                messageData.content = content.trim();
+                break;
+            }
+
             default:
                 return res.status(400).json({ message: `Unsupported message type: ${type}` });
         }

@@ -5,6 +5,7 @@ import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, Mail, MailOpen, Mic, BellOff } from "lucide-react";
+import { StickerIcon as Sticker } from "@/components/shared/StickerIcon";
 import { isMuted } from '@/utils/isMuted';
 import { MuteSubMenu } from './MuteSubMenu';
 import {
@@ -340,6 +341,10 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 						if (type === "audio") {
 							Icon = Mic;
 							cleanMsg = "Tin nhắn thoại";
+						}
+						else if (type === "sticker") {
+							Icon = Sticker;
+							cleanMsg = "Đã gửi một nhãn dán";
 						}
 						else if (type === "image") Icon = ImageIcon;
 						else if (type === "file") Icon = Paperclip;
