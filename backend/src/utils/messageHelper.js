@@ -161,11 +161,12 @@ export function generateSignedUrl(filePublicId, type = 'image') {
     if (type === 'image') resource_type = 'image';
     if (type === 'audio') resource_type = 'raw';
 
-    return cloudinary.url(filePublicId, {
+    const timestamp = Math.round(Date.now() / 1000) + 3600;
+
+    return cloudinary.utils.private_download_url(filePublicId, '', {
         resource_type,
         type: 'authenticated',
-        sign_url: true,
-        secure: true,
-        expires_at: Math.floor(Date.now() / 1000) + 3600, // 1h
+        expires_at: timestamp,
+        secure: true
     });
 }
