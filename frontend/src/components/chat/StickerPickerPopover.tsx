@@ -8,65 +8,65 @@ const STICKER_SETS = [
   {
     id: "bu-mat-ngao",
     name: "Bư Mặt Ngáo",
-    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1776983986/icon_jwksup.jpg",
+    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1777003934/icon_e56jol.png",
     stickers: [
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982987/z7757266604812_294db4dc5474ed8012fd8c1aae2af9a6_rmriv9.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982985/z7757266602382_7cd74791eb0ec6b6a41573a9a414511b_xbdfj7.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982984/z7757266599492_1e30411fc780877b83d70e0365a05a26_ulgaij.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982983/z7757266596374_f1f34e99376d3309e719da2b0c99cbb5_my3mz0.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982981/z7757266594245_1968707e6da7bbc9c6f0235222f01ed1_vsoqhf.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982980/z7757266591197_789c0fbaf1d051525e2d90ef12ec418f_bgtgsb.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982978/z7757266587323_1c066bfd1dd51f4dc87cca445c981539_hdoyrq.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982977/z7757266587321_deff8b9196bee431ce31b569668be944_teph0j.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776982977/z7757266586886_2a2e6e818a3acfd6578fdf5380b7f84a_qckn7l.jpg"
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003897/bu1_lz84qm.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003901/bu2_xnypab.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003905/bu3_l80qom.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003909/bu4_fipqmi.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003913/bu5_fgfnzc.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003917/bu6_mrjnsf.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003922/bu7_lcdgpz.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003926/bu8_rmabg2.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003930/bu9_sr0gjp.png"
     ]
   },
   {
     id: "zapy-do-tri",
     name: "Zapy Dô Tri",
-    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1776984599/icon_e309lo.jpg",
+    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1777003621/icon_oniljk.png",
     stickers: [
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984618/z7757277714623_8befe9f116c4e9ce647a1362657e58fa_fpudkk.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984616/z7757277707352_ed2243729b19fc434447cd44aa6a42e5_bhdjw3.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984614/z7757277706055_79cbefea515802d3d49a0e3fba4ce805_l357gg.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984611/z7757277701628_5e244174fba349129381f4b4b4500508_wafl01.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984609/z7757277696630_887aa861d14ef6265f85d45f12819151_skmyrw.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984607/z7757277688766_50c47a2c605c66146372712b18e0157e_v47uje.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984605/z7757277683558_6527c6f04218efba79746c10c7d0770c_b2vqbw.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984603/z7757277675228_e647fa69ef1c4670ab707decc0118503_up8nsc.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776984600/z7757277673950_93ad2d4ce033c82e5db754b36a363a8d_gdo5zb.jpg"
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003624/zapy1_yxn521.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003628/zapy2_zfqkef.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003632/zapy3_jofbj0.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003636/zapy4_ppyyul.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003640/zapy5_iizy7r.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003644/zapy6_aznnup.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003648/zapy7_ezygkx.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003652/zapy8_a1sjej.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003656/zapy9_ydgstc.png"
     ]
   },
   {
     id: "tonton",
     name: "Tonton",
-    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1776992013/icon_iqmeug.jpg",
+    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1777001926/icon_smyotr.png",
     stickers: [
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992032/z7757396056214_5a9c147f9232ad3707e7f76370cc00f4_sp9lo8.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992034/z7757396069903_bafb1eedeb3b2c1d326bed232035d617_ueqfdj.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992037/z7757396100380_3faa42b6150ef74f776e3e15e4ea0593_t10pw1.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992039/z7757396115581_19e3b69817835db711a636fea864698f_pjdszv.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992041/z7757396124842_d067ee96db9b1549b3c3081da104a17d_nyqpsg.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992043/z7757396152787_3f9c1bf1cc2045f3a5398e86aebb5ee8_agwzxw.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992045/z7757396175806_39d1675bcccbce401bdfdeb55c3bbeb9_iik0lp.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992047/z7757396190366_5514664dbb548530dd7004bb2eb9dd97_amfwce.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992049/z7757396216724_03a50047885233f070047858dc25342d_nmoyqr.jpg"
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001929/tonton1_v74rei.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001936/tonton2_xgt3en.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001940/tonton3_xwn8t1.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001945/tonton4_qfbpbx.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001949/tonton5_uc4jmy.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001956/tonton6_mjhslb.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001958/tonton7_t3jngs.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001961/tonton8_s0y3bj.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001965/tonton9_vlvuvf.png"
     ]
   },
   {
     id: "meo-meo",
-    name: "Meo Meo",
-    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1776994607/icon_xm9p8g.jpg",
+    name: "Mèo Mèo",
+    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1777004779/icon_bbemow.png",
     stickers: [
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994634/z7757577798878_bb56e7895bceda5e32074d2694c52a8e_vofqr0.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994636/z7757577819996_2c07dd213c98c72e64869e85bb8398ad_pk9ibb.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994639/z7757577882672_8b6e18dd5185d3caabbbcc50b0a6e67c_l36ro9.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994645/z7757577923624_c0e45b2b0565bd4a1394ef8ec7bdc578_haglll.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994647/z7757577962917_509e3689b14873b2bf3e39cd2b60a495_syqk9z.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994650/z7757577963083_2ac4ce1a50339bc43d488605a5354c3f_aulqwl.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994652/z7757578028769_804480e21f945f0a5c97d18b967716f8_telhd2.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994655/z7757578028959_99f330e94c5e9fc293fb1c31cc6acf5a_wzwmt6.jpg",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994657/z7757578098301_5bde539d3d1833e2147ab6d19e331168_qoiyzf.jpg"
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004782/meomeo1_im6ntl.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004786/meomeo2_pk6mty.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004791/meomeo3_agzobv.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004795/meomeo4_vx3znt.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004799/meomeo5_fp3bgg.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004803/meomeo6_sigx00.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004808/meomeo7_f7ewje.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004813/meomeo8_opgue5.png",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004816/meomeo9_rsrubu.png"
     ]
   }
 ];

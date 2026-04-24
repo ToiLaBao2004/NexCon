@@ -66,13 +66,13 @@ function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 		const audio = audioRef.current;
 		if (!audio) return;
 		if (src === "#" || !audio.currentSrc) return;
-		
+
 		if (isPlaying) {
 			audio.pause();
 		} else {
 			// Workaround for Chrome Infinity bug on webm:
 			if (audio.duration === Infinity) {
-				audio.currentTime = 1e101; 
+				audio.currentTime = 1e101;
 				setTimeout(() => {
 					audio.currentTime = 0;
 					audio.play().catch(console.error);
@@ -260,13 +260,15 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 
 	if (type === "sticker" && message.content) {
 		return (
-			<div className="p-0 bg-transparent">
-				<img
-					src={message.content}
-					alt="sticker"
-					className="w-32 h-32 sm:w-40 sm:h-40 object-contain animate-in zoom-in-50 duration-300"
-					loading="lazy"
-				/>
+			<div className="group/sticker relative">
+				<div className="relative transition-all duration-300 group-hover/sticker:scale-110 drop-shadow-sm group-hover/sticker:drop-shadow-md">
+					<img
+						src={message.content}
+						alt="sticker"
+						className="w-32 h-32 sm:w-40 sm:h-40 object-contain animate-in zoom-in-50 duration-300"
+						loading="lazy"
+					/>
+				</div>
 			</div>
 		);
 	}
