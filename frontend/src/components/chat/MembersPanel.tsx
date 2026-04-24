@@ -210,13 +210,13 @@ export default function MembersPanel({ conversationId, participants, memberCount
                         </div>
                       </div>
 
-                      <DropdownMenu modal={false}>
+                      <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="p-1.5 rounded-full hover:bg-muted/20 opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100">
+                          <button className="p-1.5 rounded-full hover:bg-muted/20 opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100 outline-none">
                             <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuContent align="end" className="w-48 z-[70]">
                           <DropdownMenuItem onClick={() => handleShowProfile(u)}>
                             <UserCircle className="mr-2 h-4 w-4" />
                             <span>Xem thông tin</span>
