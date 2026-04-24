@@ -324,19 +324,30 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							<span className="text-[12px] font-bold text-blue-600 dark:text-blue-400 truncate">
 								Đang trả lời
 							</span>
-							<span className="text-[11px] text-muted-foreground truncate leading-snug mt-px">
-								{replyingTo.isRecalled
-									? "Tin nhắn đã thu hồi"
-									: replyingTo.type === "image"
-										? "Hình ảnh"
-										: replyingTo.type === "audio"
-											? "🎙️ Tin nhắn thoại"
-											: replyingTo.type === "file"
-												? (replyingTo.fileName ?? "Tệp đính kèm")
-												: (replyingTo.content && replyingTo.content.length > 50
-													? replyingTo.content.slice(0, 50) + "…"
-													: replyingTo.content ?? "")}
-							</span>
+							<div className="flex items-center gap-2">
+								{replyingTo.type === "sticker" && replyingTo.content && (
+									<img
+										src={replyingTo.content}
+										alt="sticker-reply"
+										className="size-8 rounded-md object-contain bg-white/10"
+									/>
+								)}
+								<span className="text-[11px] text-muted-foreground truncate leading-snug mt-px">
+									{replyingTo.isRecalled
+										? "Tin nhắn đã thu hồi"
+										: replyingTo.type === "image"
+											? "Hình ảnh"
+										: replyingTo.type === "sticker"
+											? "Nhãn dán"
+											: replyingTo.type === "audio"
+												? "🎙️ Tin nhắn thoại"
+												: replyingTo.type === "file"
+													? (replyingTo.fileName ?? "Tệp đính kèm")
+													: (replyingTo.content && replyingTo.content.length > 50
+														? replyingTo.content.slice(0, 50) + "…"
+														: replyingTo.content ?? "")}
+								</span>
+							</div>
 						</div>
 					</div>
 					<button
