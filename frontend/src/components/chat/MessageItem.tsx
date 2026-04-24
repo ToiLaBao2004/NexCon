@@ -19,6 +19,7 @@ import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
 import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause } from "lucide-react";
+import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Picker from '@emoji-mart/react';
@@ -65,13 +66,13 @@ function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 		const audio = audioRef.current;
 		if (!audio) return;
 		if (src === "#" || !audio.currentSrc) return;
-		
+
 		if (isPlaying) {
 			audio.pause();
 		} else {
 			// Workaround for Chrome Infinity bug on webm:
 			if (audio.duration === Infinity) {
-				audio.currentTime = 1e101; 
+				audio.currentTime = 1e101;
 				setTimeout(() => {
 					audio.currentTime = 0;
 					audio.play().catch(console.error);
@@ -257,6 +258,21 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 		);
 	}
 
+	if (type === "sticker" && message.content) {
+		return (
+			<div className="group/sticker relative">
+				<div className="relative transition-all duration-300 group-hover/sticker:scale-110 drop-shadow-sm group-hover/sticker:drop-shadow-md">
+					<img
+						src={message.content}
+						alt="sticker"
+						className="w-32 h-32 sm:w-40 sm:h-40 object-contain animate-in zoom-in-50 duration-300"
+						loading="lazy"
+					/>
+				</div>
+			</div>
+		);
+	}
+
 	if (type === "audio" && (message.filePublicId || message.fileUrl)) {
 		return (
 			<div className="flex flex-col gap-1.5">
@@ -419,6 +435,21 @@ function ReplyQuoteInline({
 				) : null}
 				<span className="flex items-center gap-1">
 					<ImageIcon className="size-3 shrink-0" /> Hình ảnh
+				</span>
+			</span>
+		);
+	} else if (replyTo.type === "sticker") {
+		preview = (
+			<span className="flex items-center gap-2">
+				{replyTo.content && (
+					<img
+						src={replyTo.content}
+						alt="reply-sticker-thumbnail"
+						className="w-8 h-8 rounded-md object-contain bg-white/10 border border-blue-200 dark:border-blue-400"
+					/>
+				)}
+				<span className="flex items-center gap-1">
+					<StickerIcon className="size-3 shrink-0" /> Nhãn dán
 				</span>
 			</span>
 		);
@@ -1460,6 +1491,7 @@ const MessageItem = ({
 	const isPinned = message.isPinned === true;
 	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
 	const isLink = message.type === "link" && !isRecalled;
+	const isSticker = message.type === "sticker" && !isRecalled;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
@@ -1661,12 +1693,12 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								(isImage || isLink) ? "p-0 bg-transparent border-0" : "px-2 py-1.5 text-sm",
-								reactionSummary && !isImage && !isLink && "min-w-[85px]",
+								(isImage || isLink || isSticker) ? "p-0 bg-transparent border-0 shadow-none" : "px-2 py-1.5 text-sm",
+								reactionSummary && !isImage && !isLink && !isSticker && "min-w-[85px]",
 								isRecalled
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
-									: isLink
-										? "bg-transparent border-0"
+									: isLink || isSticker
+										? "bg-transparent border-0 shadow-none"
 										: isOwn
 											? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
 											: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
@@ -1691,7 +1723,7 @@ const MessageItem = ({
 									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} />
 								</div>
 
-								{!isImage && (
+								{!isImage && !isSticker && (
 									<div className={cn(
 										"flex items-center gap-1 select-none -mt-0.5 pb-1",
 										isOwn ? "self-end" : "self-start",
@@ -1829,7 +1861,7 @@ const MessageItem = ({
 													Chuyển tiếp
 												</DropdownMenuItem>
 											)}
-											{message.content && (
+											{message.content && message.type !== 'sticker' && (
 												<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
 													<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
 													Sao chép
@@ -1917,7 +1949,7 @@ const MessageItem = ({
 														</button>
 													)}
 
-													{message.content && (
+													{message.content && message.type !== 'sticker' && (
 														<button onClick={() => { setShowTouchActions(false); handleCopy(); }} className="flex flex-col items-center gap-2">
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
 																<Copy className="h-5 w-5" strokeWidth={1.5} />

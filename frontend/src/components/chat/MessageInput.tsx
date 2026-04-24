@@ -9,6 +9,7 @@ import { useFriendStore } from "@/stores/useFriendStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
+import StickerPickerPopover from "./StickerPickerPopover";
 import { isUrl, formatBytes } from "@/lib/utils";
 
 
@@ -257,6 +258,29 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 	}, [selectedConvo, otherUserId, sendMessage]);
 
+	const handleStickerSelect = async (url: string) => {
+		const payload: Parameters<typeof sendMessage>[0] = {
+			type: "sticker",
+			content: url
+		};
+
+		if (selectedConvo.type === "direct") {
+			payload.recipientId = otherUserId as string;
+		} else {
+			payload.conversationId = selectedConvo._id;
+		}
+
+		setSending(true);
+		try {
+			await sendMessage(payload);
+		} catch {
+			toast.error("Gửi sticker thất bại. Vui lòng thử lại!");
+		} finally {
+			setSending(false);
+			setTimeout(() => textInputRef.current?.focus(), 0);
+		}
+	};
+
 	const removeAttachment = () => {
 		if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
 		setAttachment(null);
@@ -300,19 +324,30 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							<span className="text-[12px] font-bold text-blue-600 dark:text-blue-400 truncate">
 								Đang trả lời
 							</span>
-							<span className="text-[11px] text-muted-foreground truncate leading-snug mt-px">
-								{replyingTo.isRecalled
-									? "Tin nhắn đã thu hồi"
-									: replyingTo.type === "image"
-										? "Hình ảnh"
-										: replyingTo.type === "audio"
-											? "🎙️ Tin nhắn thoại"
-											: replyingTo.type === "file"
-												? (replyingTo.fileName ?? "Tệp đính kèm")
-												: (replyingTo.content && replyingTo.content.length > 50
-													? replyingTo.content.slice(0, 50) + "…"
-													: replyingTo.content ?? "")}
-							</span>
+							<div className="flex items-center gap-2">
+								{replyingTo.type === "sticker" && replyingTo.content && (
+									<img
+										src={replyingTo.content}
+										alt="sticker-reply"
+										className="size-8 rounded-md object-contain bg-white/10"
+									/>
+								)}
+								<span className="text-[11px] text-muted-foreground truncate leading-snug mt-px">
+									{replyingTo.isRecalled
+										? "Tin nhắn đã thu hồi"
+										: replyingTo.type === "image"
+											? "Hình ảnh"
+										: replyingTo.type === "sticker"
+											? "Nhãn dán"
+											: replyingTo.type === "audio"
+												? "🎙️ Tin nhắn thoại"
+												: replyingTo.type === "file"
+													? (replyingTo.fileName ?? "Tệp đính kèm")
+													: (replyingTo.content && replyingTo.content.length > 50
+														? replyingTo.content.slice(0, 50) + "…"
+														: replyingTo.content ?? "")}
+								</span>
+							</div>
 						</div>
 					</div>
 					<button
@@ -408,6 +443,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					>
 						<Mic className="size-4" />
 					</Button>
+				)}
+
+				{!isRecording && (
+					<StickerPickerPopover onSelect={handleStickerSelect} />
 				)}
 
 				{isRecording ? (

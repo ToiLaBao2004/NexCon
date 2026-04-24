@@ -9,6 +9,7 @@ import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
 import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen, Mic, BellOff } from "lucide-react";
+import { StickerIcon as Sticker } from "@/components/shared/StickerIcon";
 import { isUrl } from '@/lib/utils';
 import { isMuted } from '@/utils/isMuted';
 import { MuteSubMenu } from './MuteSubMenu';
@@ -356,6 +357,10 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
             if (type === "audio") {
               Icon = Mic;
               cleanMsg = "Tin nhắn thoại";
+            }
+            else if (type === "sticker") {
+              Icon = Sticker;
+              cleanMsg = "Đã gửi một nhãn dán";
             }
             else if (type === "image" || content.includes("Đã gửi một ảnh")) Icon = ImageIcon;
             else if (type === "file" || content.startsWith("📎 ")) Icon = Paperclip;

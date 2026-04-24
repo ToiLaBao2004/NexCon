@@ -1,11 +1,13 @@
 import { v2 as cloudinary } from 'cloudinary';
 
 const resolveLastMessagePreview = (message) => {
-    if (message.type !== 'system' && message.content?.trim()) return message.content.trim();
+    if (message.isRecalled) return 'Tin nhắn đã được thu hồi';
 
     switch (message.type) {
         case 'image': return 'Đã gửi một ảnh';
+        case 'sticker': return 'Đã gửi một nhãn dán';
         case 'file': return message.fileName || 'Tệp đính kèm';
+        case 'audio': return 'Tin nhắn thoại';
         case 'link': return 'Đã gửi một liên kết';
         case 'system': {
             const systemType = message.systemType;
@@ -19,13 +21,13 @@ const resolveLastMessagePreview = (message) => {
                 case 'member_kicked':
                     return `Đã xóa ${metadata.kickedUserName || 'một thành viên'} khỏi nhóm`;
                 case 'group_disbanded':
-                    return `Nhóm đã bị giải tán`;
+                    return 'Nhóm đã bị giải tán';
                 case 'member_left':
                     return `${metadata.userName || 'Một thành viên'} đã rời khỏi nhóm`;
                 case 'call_started':
-                    return `Cuộc gọi đã bắt đầu`;
+                    return 'Cuộc gọi đã bắt đầu';
                 case 'call_ended':
-                    return `Cuộc gọi đã kết thúc`;
+                    return 'Cuộc gọi đã kết thúc';
                 case 'call': {
                     const callTypeLabel = metadata.callType === 'video' ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
                     if (metadata.mode === 'group') {
@@ -78,7 +80,8 @@ const resolveLastMessagePreview = (message) => {
                     return message.content || 'Thông báo hệ thống';
             }
         }
-        default: return message.content?.trim() || '';
+        default:
+            return message.content?.trim() || '';
     }
 };
 
