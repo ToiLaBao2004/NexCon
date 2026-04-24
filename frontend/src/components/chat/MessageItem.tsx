@@ -440,8 +440,17 @@ function ReplyQuoteInline({
 		);
 	} else if (replyTo.type === "sticker") {
 		preview = (
-			<span className="flex items-center gap-1">
-				<StickerIcon className="size-3 shrink-0" /> Nhãn dán
+			<span className="flex items-center gap-2">
+				{replyTo.content && (
+					<img
+						src={replyTo.content}
+						alt="reply-sticker-thumbnail"
+						className="w-8 h-8 rounded-md object-contain bg-white/10 border border-blue-200 dark:border-blue-400"
+					/>
+				)}
+				<span className="flex items-center gap-1">
+					<StickerIcon className="size-3 shrink-0" /> Nhãn dán
+				</span>
 			</span>
 		);
 	} else if (replyTo.type === "audio") {
