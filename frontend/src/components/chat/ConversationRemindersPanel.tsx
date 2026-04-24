@@ -178,7 +178,12 @@ function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelShar
   const isCreator = String(reminder.createdBy || "") === String(currentUserId || "");
 
   const handleParticipation = async (participate: boolean) => {
-    if (!sharedKey || isActing) return;
+    if (!sharedKey) {
+      toast.error("Thiếu thông tin nhắc hẹn chung");
+      return;
+    }
+    if (isActing) return;
+
     setIsActing(true);
     try {
       const { reminder: updated } = await reminderService.updateSharedReminderParticipation(
@@ -195,7 +200,12 @@ function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelShar
   };
 
   const handleCancelForAll = async () => {
-    if (!sharedKey || isActing) return;
+    if (!sharedKey) {
+      toast.error("Thiếu thông tin nhắc hẹn chung");
+      return;
+    }
+    if (isActing) return;
+
     setIsActing(true);
     try {
       await reminderService.deleteReminder(reminder._id);
@@ -217,141 +227,106 @@ function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelShar
   }).format(date);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-[60] bg-black/30"
-        onClick={onClose}
-        aria-hidden
-      />
+    <Dialog open={!!reminder} onOpenChange={(open) => !open && onClose()}>
+      <DialogPortal>
+        {/* Backdrop */}
+        <DialogOverlay className="z-[60] bg-black/40" />
 
-      {/* Dialog */}
-      <div className="fixed z-[61] inset-0 flex items-end sm:items-center justify-center pointer-events-none px-4 pb-6 sm:pb-0">
-        <div
-          className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border/60 bg-card shadow-2xl overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
+        {/* Dialog Content Wrapper */}
+        <DialogPrimitive.Content
+          onPointerDownOutside={onClose}
+          onEscapeKeyDown={onClose}
+          className="fixed z-[61] inset-0 flex items-end sm:items-center justify-center pointer-events-none px-4 pb-6 sm:pb-0 outline-none"
         >
-          {/* Header bar */}
-          <div className={cn("h-1 w-full", cfg.bar)} />
+          <div
+            className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border/60 bg-card shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header bar */}
+            <div className={cn("h-1 w-full", cfg.bar)} />
 
-          <div className="p-5 flex flex-col gap-4">
-            {/* Close button + title row */}
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-[15px] font-bold text-foreground leading-snug flex-1 min-w-0">
-                {content}
-              </h3>
-              <button
-                onClick={onClose}
-                className="p-1 rounded-full hover:bg-muted/60 text-muted-foreground transition-colors shrink-0"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Info rows */}
-            <div className="flex flex-col gap-2 rounded-xl bg-muted/30 px-4 py-3 border border-border/40">
-              {/* Date */}
-              <div className="flex items-center gap-2.5 text-[13px] text-foreground">
-                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="capitalize">{fullDate}</span>
-              </div>
-              {/* Time */}
-              <div className="flex items-center gap-2.5 text-[13px] text-foreground">
-                <Clock3 className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span>{formatClock(reminder.remindAt)}</span>
-                {/* Status */}
-                <span
-                  className={cn(
-                    "ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
-                    cfg.labelClass
-                  )}
+            <div className="p-5 flex flex-col gap-4">
+              {/* Close button + title row */}
+              <div className="flex items-start justify-between gap-3">
+                <h3 className="text-[15px] font-bold text-foreground leading-snug flex-1 min-w-0">
+                  {content}
+                </h3>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-1 rounded-full hover:bg-muted/60 text-muted-foreground transition-colors shrink-0"
                 >
-                  <span className={cn("h-1.5 w-1.5 rounded-full", cfg.dot)} />
-                  {cfg.label}
-                </span>
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-            </div>
 
-            {/* Participation status */}
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] text-muted-foreground">Trạng thái của bạn:</span>
-              <ParticipationBadge status={reminder.participationStatus} />
-              {!reminder.participationStatus && (
-                <span className="text-[12px] text-muted-foreground italic">Chưa phản hồi</span>
-              )}
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex gap-2.5 pt-1">
-              {isCreator ? (
-                <>
-                  {(!isJoined || isDeclined) && (
-                    <button
-                      onClick={() => handleParticipation(true)}
-                      disabled={isActing}
-                      className={cn(
-                        "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
-                        "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm active:scale-[0.98]",
-                        "disabled:opacity-60 disabled:cursor-not-allowed"
-                      )}
-                    >
-                      {isActing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <UserPlus className="h-4 w-4" />
-                      )}
-                      {isDeclined ? "Tham gia lại" : "Tham gia"}
-                    </button>
-                  )}
-
-                  {isJoined && !isDeclined && (
-                    <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                      <Check className="h-4 w-4" />
-                      Đang tham gia
-                    </span>
-                  )}
-
-                  <button
-                    onClick={handleCancelForAll}
-                    disabled={isActing}
+              {/* Info rows */}
+              <div className="flex flex-col gap-2 rounded-xl bg-muted/30 px-4 py-3 border border-border/40">
+                {/* Date */}
+                <div className="flex items-center gap-2.5 text-[13px] text-foreground">
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="capitalize">{fullDate}</span>
+                </div>
+                {/* Time */}
+                <div className="flex items-center gap-2.5 text-[13px] text-foreground">
+                  <Clock3 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span>{formatClock(reminder.remindAt)}</span>
+                  {/* Status */}
+                  <span
                     className={cn(
-                      "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
-                      "border border-rose-500/60 text-rose-500 hover:bg-rose-500/8 active:scale-[0.98]",
-                      "disabled:opacity-60 disabled:cursor-not-allowed"
+                      "ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium",
+                      cfg.labelClass
                     )}
                   >
-                    {isActing ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <X className="h-4 w-4" />
-                    )}
-                    Hủy cho tất cả
-                  </button>
-                </>
-              ) : (
-                <>
-                  {(!isJoined || isDeclined) && (
-                    <button
-                      onClick={() => handleParticipation(true)}
-                      disabled={isActing}
-                      className={cn(
-                        "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
-                        "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm active:scale-[0.98]",
-                        "disabled:opacity-60 disabled:cursor-not-allowed"
-                      )}
-                    >
-                      {isActing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <UserPlus className="h-4 w-4" />
-                      )}
-                      {isDeclined ? "Tham gia lại" : "Tham gia"}
-                    </button>
-                  )}
+                    <span className={cn("h-1.5 w-1.5 rounded-full", cfg.dot)} />
+                    {cfg.label}
+                  </span>
+                </div>
+              </div>
 
-                  {!isDeclined && (
+              {/* Participation status */}
+              <div className="flex items-center gap-2">
+                <span className="text-[12px] text-muted-foreground">Trạng thái của bạn:</span>
+                <ParticipationBadge status={reminder.participationStatus} />
+                {!reminder.participationStatus && (
+                  <span className="text-[12px] text-muted-foreground italic">Chưa phản hồi</span>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-2.5 pt-1">
+                {isCreator ? (
+                  <>
+                    {(!isJoined || isDeclined) && (
+                      <button
+                        type="button"
+                        onClick={() => handleParticipation(true)}
+                        disabled={isActing}
+                        className={cn(
+                          "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
+                          "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm active:scale-[0.98]",
+                          "disabled:opacity-60 disabled:cursor-not-allowed"
+                        )}
+                      >
+                        {isActing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserPlus className="h-4 w-4" />
+                        )}
+                        {isDeclined ? "Tham gia lại" : "Tham gia"}
+                      </button>
+                    )}
+
+                    {isJoined && !isDeclined && (
+                      <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <Check className="h-4 w-4" />
+                        Đang tham gia
+                      </span>
+                    )}
+
                     <button
-                      onClick={() => handleParticipation(false)}
+                      type="button"
+                      onClick={handleCancelForAll}
                       disabled={isActing}
                       className={cn(
                         "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
@@ -362,25 +337,67 @@ function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelShar
                       {isActing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <UserMinus className="h-4 w-4" />
+                        <X className="h-4 w-4" />
                       )}
-                      Không tham gia
+                      Hủy cho tất cả
                     </button>
-                  )}
+                  </>
+                ) : (
+                  <>
+                    {(!isJoined || isDeclined) && (
+                      <button
+                        type="button"
+                        onClick={() => handleParticipation(true)}
+                        disabled={isActing}
+                        className={cn(
+                          "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
+                          "bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm active:scale-[0.98]",
+                          "disabled:opacity-60 disabled:cursor-not-allowed"
+                        )}
+                      >
+                        {isActing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserPlus className="h-4 w-4" />
+                        )}
+                        {isDeclined ? "Tham gia lại" : "Tham gia"}
+                      </button>
+                    )}
 
-                  {isJoined && !isDeclined && (
-                    <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                      <Check className="h-4 w-4" />
-                      Đang tham gia
-                    </span>
-                  )}
-                </>
-              )}
+                    {!isDeclined && (
+                      <button
+                        type="button"
+                        onClick={() => handleParticipation(false)}
+                        disabled={isActing}
+                        className={cn(
+                          "flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold transition-all",
+                          "border border-rose-500/60 text-rose-500 hover:bg-rose-500/8 active:scale-[0.98]",
+                          "disabled:opacity-60 disabled:cursor-not-allowed"
+                        )}
+                      >
+                        {isActing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <UserMinus className="h-4 w-4" />
+                        )}
+                        Không tham gia
+                      </button>
+                    )}
+
+                    {isJoined && !isDeclined && (
+                      <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                        <Check className="h-4 w-4" />
+                        Đang tham gia
+                      </span>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    </>
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </Dialog>
   );
 }
 
