@@ -36,6 +36,38 @@ const STICKER_SETS = [
       "https://res.cloudinary.com/df1iezypb/image/upload/v1776984603/z7757277675228_e647fa69ef1c4670ab707decc0118503_up8nsc.jpg",
       "https://res.cloudinary.com/df1iezypb/image/upload/v1776984600/z7757277673950_93ad2d4ce033c82e5db754b36a363a8d_gdo5zb.jpg"
     ]
+  },
+  {
+    id: "tonton",
+    name: "Tonton",
+    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1776992013/icon_iqmeug.jpg",
+    stickers: [
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992032/z7757396056214_5a9c147f9232ad3707e7f76370cc00f4_sp9lo8.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992034/z7757396069903_bafb1eedeb3b2c1d326bed232035d617_ueqfdj.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992037/z7757396100380_3faa42b6150ef74f776e3e15e4ea0593_t10pw1.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992039/z7757396115581_19e3b69817835db711a636fea864698f_pjdszv.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992041/z7757396124842_d067ee96db9b1549b3c3081da104a17d_nyqpsg.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992043/z7757396152787_3f9c1bf1cc2045f3a5398e86aebb5ee8_agwzxw.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992045/z7757396175806_39d1675bcccbce401bdfdeb55c3bbeb9_iik0lp.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992047/z7757396190366_5514664dbb548530dd7004bb2eb9dd97_amfwce.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776992049/z7757396216724_03a50047885233f070047858dc25342d_nmoyqr.jpg"
+    ]
+  },
+  {
+    id: "meo-meo",
+    name: "Meo Meo",
+    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1776994607/icon_xm9p8g.jpg",
+    stickers: [
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994634/z7757577798878_bb56e7895bceda5e32074d2694c52a8e_vofqr0.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994636/z7757577819996_2c07dd213c98c72e64869e85bb8398ad_pk9ibb.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994639/z7757577882672_8b6e18dd5185d3caabbbcc50b0a6e67c_l36ro9.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994645/z7757577923624_c0e45b2b0565bd4a1394ef8ec7bdc578_haglll.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994647/z7757577962917_509e3689b14873b2bf3e39cd2b60a495_syqk9z.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994650/z7757577963083_2ac4ce1a50339bc43d488605a5354c3f_aulqwl.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994652/z7757578028769_804480e21f945f0a5c97d18b967716f8_telhd2.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994655/z7757578028959_99f330e94c5e9fc293fb1c31cc6acf5a_wzwmt6.jpg",
+      "https://res.cloudinary.com/df1iezypb/image/upload/v1776994657/z7757578098301_5bde539d3d1833e2147ab6d19e331168_qoiyzf.jpg"
+    ]
   }
 ];
 
