@@ -207,8 +207,6 @@ export async function moderateTextMessage(text) {
     }
 
     if (shouldUseAI(cleaned)) {
-        console.log(`[Moderation] Calling Gemini for: ${cleaned.substring(0, 90)}...`);
-
         const aiResult = await checkWithGemini(cleaned);
 
         if (aiResult.blocked && aiResult.confidence >= 0.5) {

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
-import { emitNewMessage, updateConversationLastMessage, generateSignedUrl } from '../utils/messageHelper.js';
+import { emitNewMessage, updateConversationLastMessage, generateSignedUrl, replaceMentionTags } from '../utils/messageHelper.js';
 import { io, getReceiverSocketId, emitToUser } from '../socket/index.js';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
@@ -310,7 +310,8 @@ export async function sendMessage(req, res) {
         emitNewMessage(io, conversation, message, signedUrl);
 
         if (Array.isArray(message.mentions) && message.mentions.length > 0) {
-            const preview = message.content?.substring(0, 100) ?? '';
+            const cleanContent = replaceMentionTags(message.content, message.mentions);
+            const preview = cleanContent?.substring(0, 100) ?? '';
             const conversationUrl = `${process.env.FRONTEND_URL}/chat?conversationId=${conversation._id}&messageId=${message._id}`;
             const mentionTargets = new Set();
 
@@ -792,7 +793,7 @@ export async function getMentionMessages(req, res) {
         return res.status(200).json({
             data: items.map((message) => ({
                 _id: message._id,
-                content: message.content || '',
+                content: replaceMentionTags(message.content, message.mentions) || '',
                 createdAt: message.createdAt,
                 conversation: {
                     _id: message.conversationId?._id,
