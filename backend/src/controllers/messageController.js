@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
 import { emitNewMessage, updateConversationLastMessage, generateSignedUrl } from '../utils/messageHelper.js';
@@ -16,12 +17,79 @@ import { v2 as cloudinary } from 'cloudinary';
 import { moderateTextMessage } from '../services/moderation/moderationTextService.js';
 import { moderateLinkMessage } from '../services/moderation/moderationLinkService.js';
 import { fetchLinkPreview } from '../utils/linkPreview.js';
+import { createNotification } from '../services/notificationServices.js';
+import { sendPushToUser } from '../services/pushNotificationService.js';
+
+const parseMentionPayload = (rawMentions) => {
+    if (Array.isArray(rawMentions)) {
+        return rawMentions;
+    }
+
+    if (rawMentions == null || rawMentions === '') {
+        return [];
+    }
+
+    if (typeof rawMentions === 'string') {
+        try {
+            const parsed = JSON.parse(rawMentions);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            const error = new Error('mentions must be a JSON array.');
+            error.statusCode = 400;
+            throw error;
+        }
+    }
+
+    return [];
+};
+
+const normalizeMentionEntry = (mention) => {
+    const userId = String(mention?.userId || '').trim();
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        return null;
+    }
+
+    return {
+        userId,
+        displayName: typeof mention?.displayName === 'string' ? mention.displayName.trim().slice(0, 120) : '',
+        offset: Number.isFinite(Number(mention?.offset)) ? Math.max(0, Math.trunc(Number(mention.offset))) : 0,
+        length: Number.isFinite(Number(mention?.length)) ? Math.max(0, Math.trunc(Number(mention.length))) : 0,
+    };
+};
+
+const buildValidMentions = (conversation, rawMentions) => {
+    const participants = new Set(
+        (conversation?.participants || []).map((participant) => participant.userId.toString())
+    );
+    const seen = new Set();
+    const mentions = [];
+
+    for (const mention of rawMentions) {
+        const normalized = normalizeMentionEntry(mention);
+        if (!normalized) {
+            continue;
+        }
+
+        if (!participants.has(normalized.userId) || seen.has(normalized.userId)) {
+            continue;
+        }
+
+        seen.add(normalized.userId);
+        mentions.push({
+            ...normalized,
+            userId: new mongoose.Types.ObjectId(normalized.userId),
+        });
+    }
+
+    return mentions;
+};
 
 export async function sendMessage(req, res) {
     try {
         const senderId = req.user._id;
         const { type = 'text', recipientId, content, replyTo } = req.body;
         const uploadedFile = req.file;
+        const rawMentions = parseMentionPayload(req.body.mentions);
 
         let conversation = req.conversation;
 
@@ -42,6 +110,8 @@ export async function sendMessage(req, res) {
             return res.status(404).json({ message: 'Conversation not found.' });
         }
 
+        const mentions = buildValidMentions(conversation, rawMentions);
+
         const messageData = {
             conversationId: conversation._id,
             senderId,
@@ -50,6 +120,7 @@ export async function sendMessage(req, res) {
                 avatarUrl: req.user.avatarUrl
             },
             type,
+            mentions,
         };
 
         switch (type) {
@@ -214,11 +285,85 @@ export async function sendMessage(req, res) {
             });
         }
 
+        if (Array.isArray(mentions) && mentions.length > 0) {
+            const mentionedUserIds = new Set(
+                mentions
+                    .map((mention) => mention.userId.toString())
+                    .filter((mentionUserId) => mentionUserId !== senderId.toString())
+            );
+
+            if (mentionedUserIds.size > 0) {
+                conversation.participants.forEach((participant) => {
+                    const participantId = participant.userId.toString();
+                    if (mentionedUserIds.has(participantId)) {
+                        participant.unreadMentionCount = (participant.unreadMentionCount || 0) + 1;
+                    }
+                });
+                conversation.markModified('participants');
+            }
+        }
+
         updateConversationLastMessage(conversation, message, senderId);
         await conversation.save();
 
         const signedUrl = generateSignedUrl(message.filePublicId, message.type);
         emitNewMessage(io, conversation, message, signedUrl);
+
+        if (Array.isArray(message.mentions) && message.mentions.length > 0) {
+            const preview = message.content?.substring(0, 100) ?? '';
+            const conversationUrl = `${process.env.FRONTEND_URL}/chat?conversationId=${conversation._id}&messageId=${message._id}`;
+            const mentionTargets = new Set();
+
+            for (const mention of message.mentions) {
+                const mentionUserId = mention.userId.toString();
+                if (mentionUserId === senderId.toString() || mentionTargets.has(mentionUserId)) {
+                    continue;
+                }
+
+                mentionTargets.add(mentionUserId);
+
+                const delivered = emitToUser(mentionUserId, 'user_mentioned', {
+                    messageId: message._id,
+                    conversationId: message.conversationId,
+                    mentionedBy: {
+                        userId: senderId,
+                        displayName: req.user.displayName,
+                        avatarUrl: req.user.avatarUrl,
+                    },
+                    preview,
+                    createdAt: message.createdAt,
+                });
+
+                if (!delivered) {
+                    await createNotification(
+                        mention.userId,
+                        'Bạn được nhắc đến',
+                        `${req.user.displayName}${preview ? `: "${preview}"` : ''}`,
+                        conversationUrl,
+                        {
+                            type: 'mention',
+                            targetId: message._id,
+                            actorId: senderId,
+                            recipientId: mention.userId,
+                            metadata: {
+                                conversationId: conversation._id.toString(),
+                                preview,
+                            },
+                        }
+                    );
+
+                    try {
+                        await sendPushToUser(mentionUserId, {
+                            title: 'Bạn được nhắc đến',
+                            body: `${req.user.displayName}${preview ? `: ${preview}` : ''}`,
+                            url: conversationUrl,
+                        });
+                    } catch (pushError) {
+                        console.error('Error sending mention push notification:', pushError);
+                    }
+                }
+            }
+        }
 
         return res.status(201).json({ message, signedUrl });
     } catch (error) {
@@ -578,6 +723,101 @@ export async function searchMessages(req, res) {
     } catch (error) {
         console.error('Error searching messages:', error);
         return res.status(500).json({ message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™.' });
+    }
+}
+
+export async function getMentionMessages(req, res) {
+    try {
+        const userId = req.user._id.toString();
+        const { before, limit = 20 } = req.query;
+        const limitNumber = Math.max(1, Math.min(100, Number(limit) || 20));
+
+        const accessibleConversations = await Conversation.find({ 'participants.userId': userId })
+            .select('_id')
+            .lean();
+
+        const conversationIds = accessibleConversations.map((conversation) => conversation._id);
+
+        if (!conversationIds.length) {
+            return res.status(200).json({ data: [], nextCursor: null });
+        }
+
+        const query = {
+            conversationId: { $in: conversationIds },
+            'mentions.userId': userId,
+        };
+
+        if (before) {
+            let beforeDate = null;
+            let beforeId = null;
+
+            if (mongoose.Types.ObjectId.isValid(before)) {
+                const cursorMessage = await Message.findById(before).select('_id createdAt').lean();
+                if (cursorMessage?.createdAt) {
+                    beforeDate = cursorMessage.createdAt;
+                    beforeId = cursorMessage._id;
+                }
+            }
+
+            if (!beforeDate) {
+                const parsedDate = new Date(before);
+                if (!Number.isNaN(parsedDate.getTime())) {
+                    beforeDate = parsedDate;
+                }
+            }
+
+            if (beforeDate) {
+                if (beforeId) {
+                    query.$or = [
+                        { createdAt: { $lt: beforeDate } },
+                        { createdAt: beforeDate, _id: { $lt: beforeId } },
+                    ];
+                } else {
+                    query.createdAt = { $lt: beforeDate };
+                }
+            }
+        }
+
+        const messages = await Message.find(query)
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(limitNumber + 1)
+            .populate('conversationId', 'type group.name group.avatarUrl')
+            .populate('senderId', 'displayName avatarUrl')
+            .lean();
+
+        const hasMore = messages.length > limitNumber;
+        const items = hasMore ? messages.slice(0, limitNumber) : messages;
+        const nextCursor = hasMore ? items[items.length - 1]?._id?.toString() || null : null;
+
+        return res.status(200).json({
+            data: items.map((message) => ({
+                _id: message._id,
+                content: message.content || '',
+                createdAt: message.createdAt,
+                conversation: {
+                    _id: message.conversationId?._id,
+                    name: message.conversationId?.group?.name || null,
+                    type: message.conversationId?.type || null,
+                    avatarUrl: message.conversationId?.group?.avatarUrl || null,
+                },
+                sender: message.senderId
+                    ? {
+                        _id: message.senderId._id,
+                        displayName: message.senderId.displayName || message.senderInfo?.displayName || 'Người dùng đã xóa',
+                        avatarUrl: message.senderId.avatarUrl || message.senderInfo?.avatarUrl || null,
+                    }
+                    : {
+                        _id: null,
+                        displayName: message.senderInfo?.displayName || 'Người dùng đã xóa',
+                        avatarUrl: message.senderInfo?.avatarUrl || null,
+                    },
+                mentions: message.mentions || [],
+            })),
+            nextCursor,
+        });
+    } catch (error) {
+        console.error('Error fetching mention messages:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
     }
 }
 export async function reactToMessage(req, res) {

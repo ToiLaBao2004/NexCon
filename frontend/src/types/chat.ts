@@ -9,6 +9,7 @@ export interface Participant {
     phone?: string;
   };
   joinedAt: string;
+  unreadMentionCount?: number;
   mute?: {
     messages?: string | null;
     meetings?: string | null;
@@ -117,6 +118,13 @@ export interface MessageMetadata {
   [key: string]: any;
 }
 
+export interface Mention {
+  userId: string;
+  displayName: string;
+  offset: number;
+  length: number;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -146,5 +154,24 @@ export interface Message {
   progress?: number;
   replyTo?: ReplyToMessage | null;
   reactions?: { userId: string; emoji: string }[];
+  mentions?: Mention[];
+}
+
+export interface MentionMessage {
+  _id: string;
+  content: string;
+  createdAt: string;
+  conversation: {
+    _id: string;
+    name: string | null;
+    type: 'direct' | 'group' | null;
+    avatarUrl?: string | null;
+  };
+  sender: {
+    _id: string | null;
+    displayName: string;
+    avatarUrl?: string | null;
+  };
+  mentions: Mention[];
 }
 

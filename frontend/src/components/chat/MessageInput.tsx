@@ -1,6 +1,6 @@
 import { useAuthStore } from "@/stores/useAuthStore";
-import type { Conversation, MessageType } from "@/types/chat";
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import type { Conversation, Mention, MessageType } from "@/types/chat";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Button } from "../ui/button";
 import EmojiPicker from "./EmojiPicker";
 import VoiceRecorder from "./VoiceRecorder";
@@ -24,6 +24,102 @@ interface Attachment {
 	preview?: string;
 }
 
+interface MentionCandidate {
+	userId: string;
+	displayName: string;
+	canonicalDisplayName: string;
+	avatarUrl?: string | null;
+}
+
+interface MentionTokenRange {
+	start: number;
+	end: number;
+}
+
+const getActiveMentionToken = (text: string, cursor: number) => {
+	const beforeCursor = text.slice(0, cursor);
+	const match = beforeCursor.match(/(^|\s)@([^\s@]*)$/);
+
+	if (!match) {
+		return null;
+	}
+
+	const query = match[2] || "";
+	const start = beforeCursor.length - query.length - 1;
+	const end = cursor;
+
+	if (start < 0 || beforeCursor[start] !== "@") {
+		return null;
+	}
+
+	return {
+		query,
+		start,
+		end,
+	};
+};
+
+const buildMentionsFromText = (text: string, mentions: MentionCandidate[]): { content: string; mentions: Mention[] } => {
+	const remainingMentions = [...mentions].sort((a, b) => b.displayName.length - a.displayName.length);
+	const usedRanges: Array<{ start: number; end: number }> = [];
+	const matchedRanges: Array<{ start: number; end: number; mention: MentionCandidate }> = [];
+
+	for (const mention of remainingMentions) {
+		const token = `@${mention.displayName}`;
+		let searchIndex = text.indexOf(token);
+
+		while (searchIndex !== -1) {
+			const tokenEnd = searchIndex + token.length;
+			const overlaps = usedRanges.some((range) => !(tokenEnd <= range.start || searchIndex >= range.end));
+
+			if (!overlaps) {
+				usedRanges.push({ start: searchIndex, end: tokenEnd });
+				matchedRanges.push({ start: searchIndex, end: tokenEnd, mention });
+				break;
+			}
+
+			searchIndex = text.indexOf(token, searchIndex + 1);
+		}
+	}
+
+	if (!matchedRanges.length) {
+		return { content: text, mentions: [] };
+	}
+
+	matchedRanges.sort((a, b) => a.start - b.start);
+
+	let cursor = 0;
+	let tokenizedContent = "";
+	const result: Mention[] = [];
+
+	for (const range of matchedRanges) {
+		if (range.start < cursor) {
+			continue;
+		}
+
+		tokenizedContent += text.slice(cursor, range.start);
+		const mentionToken = `@[USER:${range.mention.userId}]`;
+		const offset = tokenizedContent.length;
+		tokenizedContent += mentionToken;
+
+		result.push({
+			userId: range.mention.userId,
+			displayName: range.mention.canonicalDisplayName || range.mention.displayName,
+			offset,
+			length: mentionToken.length,
+		});
+
+		cursor = range.end;
+	}
+
+	tokenizedContent += text.slice(cursor);
+
+	return {
+		content: tokenizedContent,
+		mentions: result,
+	};
+};
+
 function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: number, label?: string }) {
 	return (
 		<div className="px-3 pb-2">
@@ -46,22 +142,45 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const { emitTyping, emitStopTyping } = useSocketStore();
 	const { sendMessage, markAsSeen, replyingTo, setReplyingTo } = useChatStore();
 	const { blockedUsers, blockedBy } = useFriendStore();
+	const currentUserId = user?._id ?? "";
 
 	const [value, setValue] = useState("");
 	const [attachment, setAttachment] = useState<Attachment | null>(null);
 	const [sending, setSending] = useState(false);
 	const [loadingLocal, setLoadingLocal] = useState(false);
 	const [isRecording, setIsRecording] = useState(false);
+	const [mentionQuery, setMentionQuery] = useState("");
+	const [mentionRange, setMentionRange] = useState<MentionTokenRange | null>(null);
+	const [mentionOpen, setMentionOpen] = useState(false);
+	const [activeMentionIndex, setActiveMentionIndex] = useState(0);
+	const [selectedMentions, setSelectedMentions] = useState<MentionCandidate[]>([]);
 
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const imageInputRef = useRef<HTMLInputElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const textInputRef = useRef<HTMLTextAreaElement>(null);
 
+	const participants = selectedConvo.participants;
+	const mentionCandidates = useMemo(() => {
+		const keyword = mentionQuery.trim().toLowerCase();
+
+		return participants
+			.filter((participant) => participant.userId?._id?.toString() !== currentUserId)
+			.map((participant) => ({
+				userId: participant.userId._id,
+				displayName: participant.userId.nickname?.trim() || participant.userId.displayName,
+				canonicalDisplayName: participant.userId.displayName,
+				avatarUrl: participant.userId.avatarUrl,
+			}))
+			.filter((participant) => {
+				if (!keyword) return true;
+				return participant.displayName.toLowerCase().includes(keyword);
+			});
+	}, [currentUserId, mentionQuery, participants]);
+
 	if (!user) return null;
 
-	const participants = selectedConvo.participants;
-	const otherUser = participants.find((p) => p.userId?._id?.toString() !== user._id.toString());
+	const otherUser = participants.find((p) => p.userId?._id?.toString() !== currentUserId);
 	const otherUserId = otherUser?.userId?._id;
 
 	const isBlockedByMe = blockedUsers.some((u) => u._id === otherUserId);
@@ -82,12 +201,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		const currValue = trimmed;
 		const prevAttachment = attachment;
+		const prevMentions = selectedMentions;
 		setValue("");
 		if (textInputRef.current) {
 			textInputRef.current.style.height = "auto";
 		}
 		setAttachment(null);
 		setIsRecording(false);
+		setSelectedMentions([]);
+		setMentionOpen(false);
+		setMentionQuery("");
+		setMentionRange(null);
 		emitStopTyping(selectedConvo._id);
 		if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
@@ -99,8 +223,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			payload.conversationId = selectedConvo._id;
 		}
 
-		if (currValue) payload.content = currValue;
+		const tokenized = buildMentionsFromText(currValue, prevMentions);
+		if (tokenized.content) payload.content = tokenized.content;
 		if (attachment?.file) payload.file = attachment.file;
+		if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
 
 		setSending(true);
 
@@ -126,6 +252,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				// ✅ lỗi bình thường → restore lại để user không bị mất text
 				setValue(currValue);
 				setAttachment(prevAttachment);
+				setSelectedMentions(prevMentions);
 
 				toast.error(
 					error?.message ?? "Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại!"
@@ -138,17 +265,89 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+		if (mentionOpen && mentionCandidates.length > 0) {
+			if (e.key === "ArrowDown") {
+				e.preventDefault();
+				setActiveMentionIndex((current) => (current + 1) % mentionCandidates.length);
+				return;
+			}
+			if (e.key === "ArrowUp") {
+				e.preventDefault();
+				setActiveMentionIndex((current) => (current - 1 + mentionCandidates.length) % mentionCandidates.length);
+				return;
+			}
+			if (e.key === "Enter" || e.key === "Tab") {
+				e.preventDefault();
+				const selectedCandidate = mentionCandidates[activeMentionIndex] ?? mentionCandidates[0];
+				if (selectedCandidate) {
+					insertMention(selectedCandidate);
+				}
+				return;
+			}
+			if (e.key === "Escape") {
+				e.preventDefault();
+				setMentionOpen(false);
+				setMentionQuery("");
+				setMentionRange(null);
+				return;
+			}
+		}
+
 		if (e.key === "Enter" && !e.shiftKey) {
 			e.preventDefault();
 			handleSend();
 		}
 	};
 
+	const insertMention = useCallback((candidate: MentionCandidate) => {
+		const range = mentionRange ?? { start: value.length, end: value.length };
+		const mentionText = `@${candidate.displayName}`;
+		const nextValue = `${value.slice(0, range.start)}${mentionText} ${value.slice(range.end)}`;
+		const nextCursor = range.start + mentionText.length + 1;
+
+		setValue(nextValue);
+		setSelectedMentions((current) => {
+			const filtered = current.filter((item) => item.userId !== candidate.userId);
+			return [...filtered, candidate];
+		});
+		setMentionOpen(false);
+		setMentionQuery("");
+		setMentionRange(null);
+		setActiveMentionIndex(0);
+
+		requestAnimationFrame(() => {
+			const textarea = textInputRef.current;
+			if (!textarea) return;
+			textarea.focus();
+			textarea.setSelectionRange(nextCursor, nextCursor);
+		});
+	}, [mentionRange, value]);
+
+	const handleMentionSelect = (candidate: MentionCandidate) => {
+		insertMention(candidate);
+	};
+
 	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-		setValue(e.target.value);
+		const nextValue = e.target.value;
+		setValue(nextValue);
 		e.target.style.height = "auto";
 		e.target.style.height = `${e.target.scrollHeight}px`;
-		if (e.target.value.trim()) {
+
+		const cursor = e.target.selectionStart ?? nextValue.length;
+		const activeToken = getActiveMentionToken(nextValue, cursor);
+		if (activeToken) {
+			setMentionOpen(true);
+			setMentionQuery(activeToken.query);
+			setMentionRange({ start: activeToken.start, end: activeToken.end });
+			setActiveMentionIndex(0);
+		} else {
+			setMentionOpen(false);
+			setMentionQuery("");
+			setMentionRange(null);
+			setActiveMentionIndex(0);
+		}
+
+		if (nextValue.trim()) {
 			emitTyping(selectedConvo._id);
 			if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 			typingTimeoutRef.current = setTimeout(() => emitStopTyping(selectedConvo._id), 2000);
@@ -165,6 +364,15 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			}
 		};
 	}, [attachment]);
+
+	useEffect(() => {
+		setValue("");
+		setAttachment(null);
+		setSelectedMentions([]);
+		setMentionOpen(false);
+		setMentionQuery("");
+		setMentionRange(null);
+	}, [selectedConvo._id]);
 
 	const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
 		const items = Array.from(e.clipboardData?.items || []);
@@ -472,6 +680,42 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/50 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
 							disabled={sending}
 						/>
+
+						{mentionOpen && (
+							<div className="absolute left-0 bottom-full mb-2 z-40 w-60 max-w-full border border-border/60 bg-popover shadow-lg overflow-hidden rounded-sm">
+								{mentionCandidates.length > 0 ? (
+									<ul className="max-h-56 overflow-y-auto py-1">
+										{mentionCandidates.map((candidate, index) => {
+											const isActive = index === activeMentionIndex;
+											return (
+												<li key={candidate.userId}>
+													<button
+														type="button"
+														onMouseDown={(event) => event.preventDefault()}
+														onClick={() => handleMentionSelect(candidate)}
+														className={`w-full px-3 py-2 text-left flex items-center gap-2.5 transition-colors rounded-sm ${isActive ? "bg-primary/10" : "hover:bg-muted/70"}`}
+													>
+														<span className="size-6 rounded-sm overflow-hidden shrink-0 bg-muted flex items-center justify-center text-[11px] font-semibold text-muted-foreground">
+															{candidate.avatarUrl ? (
+																<img src={candidate.avatarUrl} alt={candidate.displayName} className="w-full h-full object-cover" />
+															) : (
+																candidate.displayName.charAt(0).toUpperCase()
+															)}
+														</span>
+														<div className="min-w-0">
+															<span className="text-sm font-medium text-foreground truncate">{candidate.displayName}</span>
+														</div>
+													</button>
+												</li>
+											);
+										})}
+									</ul>
+								) : (
+									<div className="px-3 py-2.5 text-sm text-muted-foreground">Không tìm thấy thành viên phù hợp</div>
+								)}
+							</div>
+						)}
+
 						<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
 							<Button asChild variant="ghost" size="icon" className="size-8 hover:bg-primary/10">
 								<div>

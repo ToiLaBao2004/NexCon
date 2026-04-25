@@ -18,6 +18,12 @@ const messageSchema = new mongoose.Schema({
         displayName: { type: String },
         avatarUrl: { type: String }
     },
+    mentions: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        displayName: { type: String },
+        offset: { type: Number },
+        length: { type: Number },
+    }],
     type: {
         type: String,
         enum: MESSAGE_TYPES,

@@ -18,6 +18,25 @@ const notificationSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    type: {
+        type: String,
+        default: 'generic',
+    },
+    targetId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Message',
+    },
+    actorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    },
+    recipientId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    },
+    metadata: {
+        type: mongoose.Schema.Types.Mixed,
+    },
     isRead: {
         type: Boolean,
         default: false

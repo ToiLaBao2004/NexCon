@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io-client";
 import type { Room } from "livekit-client";
-import type { Conversation, Message, MessageType } from "./chat";
+import type { Conversation, Mention, Message, MessageType } from "./chat";
 import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
 import type {
   Reminder,
@@ -19,6 +19,7 @@ export interface SendMessagePayload {
   content?: string;
   file?: File;
   replyToMessageId?: string;
+  mentions?: Mention[];
 }
 
 export interface ThemeState {
@@ -175,6 +176,15 @@ export interface Notification {
   title: string;
   content: string;
   linkUrl: string;
+  type?: string;
+  targetId?: string;
+  actorId?: string;
+  recipientId?: string;
+  metadata?: {
+    conversationId?: string;
+    preview?: string;
+    [key: string]: unknown;
+  };
   isRead: boolean;
   createdAt: string;
   updatedAt: string;

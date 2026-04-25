@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import UserAvatar from './UserAvatar';
 import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
+import MentionCountBadge from './MentionCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
 import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen, Mic, BellOff } from "lucide-react";
 import { StickerIcon as Sticker } from "@/components/shared/StickerIcon";
@@ -33,6 +34,26 @@ import { UserActionDropdown } from "../shared/UserActionDropdown";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmationModal } from "../shared/ConfirmationModal";
 import { getSystemMessageText } from '@/utils/chatUtils';
+
+const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
+
+const decodeMentionTokens = (text: string, convo: Conversation) => {
+  if (!text) return text;
+
+  return text.replace(MENTION_TOKEN_REGEX, (_raw, userId) => {
+    const mentionUserId = String(userId || "").trim();
+    if (!mentionUserId) return "@Người dùng";
+
+    const participant = convo.participants.find(
+      (item) => String(item.userId?._id || item.userId) === mentionUserId
+    );
+
+    const displayName =
+      participant?.userId?.nickname?.trim() || participant?.userId?.displayName || "Người dùng";
+
+    return `@${displayName}`;
+  });
+};
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
@@ -73,6 +94,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
     : otherUser?.userId?.displayName ?? "";
 
   const unreadCount = convo.unreadCounts[user._id];
+  const unreadMentionCount = myParticipant?.unreadMentionCount ?? 0;
 
   const handleSelectConversation = async (id: string) => {
     setActiveConversation(id);
@@ -329,6 +351,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
           />
           {onlineUsers.includes(otherUser?.userId?._id ?? "") && <StatusBadge status="online" />}
           {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
+          {unreadMentionCount > 0 && <MentionCountBadge count={unreadMentionCount} />}
         </>
       }
       subtitle={
@@ -352,6 +375,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
             if (cleanMsg.startsWith("📎 ")) cleanMsg = cleanMsg.replace("📎 ", "");
             else if (cleanMsg.startsWith("📷 ")) cleanMsg = cleanMsg.replace("📷 ", "");
             else if (cleanMsg.startsWith("🔗 ")) cleanMsg = cleanMsg.replace("🔗 ", "");
+            cleanMsg = decodeMentionTokens(cleanMsg, convo);
 
             let Icon = null;
             if (type === "audio") {

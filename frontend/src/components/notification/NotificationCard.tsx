@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router';
 import { useNotificationStore } from '@/stores/useNotificationStore';
+import { useChatStore } from '@/stores/useChatStore';
 import type { Notification } from '@/types/store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -70,10 +71,84 @@ const getFriendlyNotificationContent = (content?: string) => {
     return safeContent.replace(/Bạn có một nhắc hẹn bị bỏ lỡ lúc/gi, 'Bạn có một nhắc hẹn lúc');
 };
 
+const getMentionActorAndPreview = (content?: string) => {
+    const safeContent = typeof content === 'string' ? content.trim() : '';
+    if (!safeContent) {
+        return { actorName: 'Ai đó', preview: '' };
+    }
+
+    const colonIndex = safeContent.indexOf(':');
+    if (colonIndex > 0) {
+        const actorName = safeContent.slice(0, colonIndex).trim();
+        const preview = safeContent.slice(colonIndex + 1).trim();
+        return {
+            actorName: actorName || 'Ai đó',
+            preview,
+        };
+    }
+
+    return {
+        actorName: 'Ai đó',
+        preview: safeContent,
+    };
+};
+
+const isMentionNotification = (notification: Notification) => {
+    if ((notification.type || '').toLowerCase() === 'mention') {
+        return true;
+    }
+
+    const normalizedTitle = normalizeNotificationTitle(notification.title || '');
+    return normalizedTitle.includes('nhắc đến') || normalizedTitle.includes('được nhắc đến');
+};
+
+const toInternalAppPath = (rawUrl?: string) => {
+    const safeUrl = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+    if (!safeUrl) {
+        return null;
+    }
+
+    if (safeUrl.startsWith('/')) {
+        return safeUrl;
+    }
+
+    try {
+        const parsed = new URL(safeUrl);
+        if (parsed.pathname.startsWith('/')) {
+            return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
+};
+
+const getConversationIdFromNotification = (notification: Notification) => {
+    const metaConversationId = notification.metadata?.conversationId;
+    if (typeof metaConversationId === 'string' && metaConversationId.trim()) {
+        return metaConversationId.trim();
+    }
+
+    const internalPath = toInternalAppPath(notification.linkUrl);
+    if (!internalPath) {
+        return null;
+    }
+
+    const queryString = internalPath.includes('?') ? internalPath.split('?')[1] : '';
+    if (!queryString) {
+        return null;
+    }
+
+    const params = new URLSearchParams(queryString);
+    const conversationId = params.get('conversationId');
+    return conversationId && conversationId.trim() ? conversationId.trim() : null;
+};
+
 const resolveNotificationPath = (notification: Notification) => {
-    const linkUrl = typeof notification.linkUrl === 'string' ? notification.linkUrl.trim() : '';
-    if (linkUrl.startsWith('/')) {
-        return linkUrl;
+    const internalPath = toInternalAppPath(notification.linkUrl);
+    if (internalPath) {
+        return internalPath;
     }
 
     const normalizedTitle = normalizeNotificationTitle(notification.title || '');
@@ -95,12 +170,47 @@ const resolveNotificationPath = (notification: Notification) => {
 
 const NotificationCard: React.FC<NotificationCardProps> = ({ notification }) => {
     const navigate = useNavigate();
+    const conversations = useChatStore((state) => state.conversations);
     const markAsRead = useNotificationStore((state) => state.markAsRead);
     const pendingReadIds = useNotificationStore((state) => state.pendingReadIds);
     const markAllPending = useNotificationStore((state) => state.markAllPending);
     const isPendingRead = pendingReadIds.includes(notification._id);
     const isUnread = !notification.isRead;
     const isReadOnlyAction = !isUnread || isPendingRead || markAllPending;
+    const mentionNotification = isMentionNotification(notification);
+
+    const mentionGroupName = (() => {
+        if (!mentionNotification) {
+            return null;
+        }
+
+        const conversationId = getConversationIdFromNotification(notification);
+        if (!conversationId) {
+            return null;
+        }
+
+        const conversation = conversations.find((item) => String(item._id) === String(conversationId));
+        if (!conversation || conversation.type !== 'group') {
+            return null;
+        }
+
+        const groupName = conversation.group?.name?.trim();
+        return groupName || null;
+    })();
+
+    const mentionText = (() => {
+        if (!mentionNotification) {
+            return getFriendlyNotificationContent(notification.content);
+        }
+
+        const { actorName, preview } = getMentionActorAndPreview(notification.content);
+        const groupContext = mentionGroupName ? ` trong nhóm "${mentionGroupName}"` : '';
+        return `${actorName} đã nhắc đến bạn${groupContext}${preview ? `: ${preview}` : ''}`;
+    })();
+
+    const secondaryLabel = mentionNotification
+        ? (mentionGroupName ? `Nhắc đến bạn - ${mentionGroupName}` : 'Nhắc đến bạn')
+        : getFriendlyNotificationTitle(notification.title);
 
     const handleClick = async () => {
         if (!notification.isRead && !isPendingRead && !markAllPending) {
@@ -143,7 +253,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({ notification }) => 
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                         <p className={cn('text-sm break-words', notification.isRead ? 'text-foreground/80' : 'font-semibold text-foreground')}>
-                            {getFriendlyNotificationContent(notification.content)}
+                            {mentionText}
                         </p>
                         {isUnread && (
                             <Badge
@@ -158,7 +268,7 @@ const NotificationCard: React.FC<NotificationCardProps> = ({ notification }) => 
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                         <div className="min-w-0">
                             <p className="truncate text-[11px] tracking-wide text-muted-foreground/80">
-                                {getFriendlyNotificationTitle(notification.title)}
+                                {secondaryLabel}
                             </p>
                             <span className="text-[11px] text-muted-foreground">{formatTime(notification.createdAt)}</span>
                         </div>
