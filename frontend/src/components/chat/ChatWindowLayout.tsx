@@ -36,7 +36,8 @@ const ChatWindowLayout = () => {
   const isMobile = useIsMobile();
   const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
   const useOverlayInfoSidebar = isMobile || isTabletOrBelow;
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+
 
   const recentConversationIdsRef = useRef<string[]>([]);
   const deepLinkMessageIdRef = useRef<string | null>(null);
@@ -81,7 +82,12 @@ const ChatWindowLayout = () => {
     if (activeConversationId !== conversationIdParam) {
       useChatStore.getState().setActiveConversation(conversationIdParam);
     }
-  }, [activeConversationId, conversationIdParam]);
+
+    if (!messageIdParam) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [activeConversationId, conversationIdParam, messageIdParam, setSearchParams]);
+
 
   useEffect(() => {
     if (!messageIdParam || !activeConversationId) return;
@@ -100,6 +106,8 @@ const ChatWindowLayout = () => {
       target.classList.add('animate-highlight-flash');
       setTimeout(() => target.classList.remove('animate-highlight-flash'), 2000);
       deepLinkMessageIdRef.current = messageIdParam;
+
+      setSearchParams({}, { replace: true });
       return true;
     };
 
@@ -112,7 +120,8 @@ const ChatWindowLayout = () => {
     }, 150);
 
     return () => window.clearTimeout(timer);
-  }, [activeConversationId, messageIdParam, allMessages]);
+  }, [activeConversationId, messageIdParam, allMessages, setSearchParams]);
+
 
   useEffect(() => {
     if (!activeConversationId || activeConversationId !== focusedConversationId) return;
