@@ -1,5 +1,5 @@
 import { cn, formatMessageTime, formatBytes, normalizeUrl } from "@/lib/utils";
-import type { Conversation, Message, MessageType, Participant, ReplyToMessage } from "@/types/chat";
+import type { Conversation, Mention, Message, MessageType, Participant, ReplyToMessage } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import { Card } from "../ui/card";
 import {
@@ -36,6 +36,122 @@ const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewRespon
 
 /* ── Custom audio player for voice messages ─────────────────────────────────── */
 const AUDIO_BAR_COUNT = 32;
+
+function MentionChip({ children, isOwn }: { children: React.ReactNode; isOwn: boolean }) {
+	return (
+		<span
+			className={cn(
+				"inline-flex items-center rounded-md px-1.5 py-0.5 font-semibold align-baseline",
+				isOwn
+					? "bg-white/15 text-white"
+					: "bg-blue-500/10 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300"
+			)}
+		>
+			{children}
+		</span>
+	);
+}
+
+const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
+
+const resolveMentionDisplayName = (
+	userId: string,
+	participants: Participant[],
+	mentions: Mention[] | undefined,
+) => {
+	const participant = participants.find(
+		(item) => String(item.userId?._id || item.userId) === String(userId)
+	);
+
+	if (participant) {
+		return participant.userId?.nickname?.trim() || participant.userId?.displayName || "Người dùng";
+	}
+
+	const mentionMeta = (mentions ?? []).find((item) => String(item.userId) === String(userId));
+	if (mentionMeta?.displayName?.trim()) {
+		return mentionMeta.displayName.trim();
+	}
+
+	return "Người dùng";
+};
+
+function renderMentionedText(
+	text: string,
+	mentions: Mention[] | undefined,
+	isOwn: boolean,
+	participants: Participant[],
+) {
+	const safeText = text ?? "";
+
+	const tokenParts: React.ReactNode[] = [];
+	let tokenCursor = 0;
+	let tokenMatched = false;
+	let tokenMatch: RegExpExecArray | null = null;
+
+	MENTION_TOKEN_REGEX.lastIndex = 0;
+	while ((tokenMatch = MENTION_TOKEN_REGEX.exec(safeText)) !== null) {
+		tokenMatched = true;
+		const tokenStart = tokenMatch.index;
+		const tokenRaw = tokenMatch[0] || "";
+		const tokenUserId = (tokenMatch[1] || "").trim();
+
+		if (tokenStart > tokenCursor) {
+			tokenParts.push(<span key={`token-text-${tokenCursor}`}>{safeText.slice(tokenCursor, tokenStart)}</span>);
+		}
+
+		const mentionLabel = resolveMentionDisplayName(tokenUserId, participants, mentions);
+		tokenParts.push(
+			<MentionChip key={`token-mention-${tokenStart}-${tokenUserId}`} isOwn={isOwn}>
+				{`@${mentionLabel}`}
+			</MentionChip>
+		);
+
+		tokenCursor = tokenStart + tokenRaw.length;
+	}
+
+	if (tokenMatched) {
+		if (tokenCursor < safeText.length) {
+			tokenParts.push(<span key={`token-tail-${tokenCursor}`}>{safeText.slice(tokenCursor)}</span>);
+		}
+
+		return <span className="text-sm whitespace-pre-wrap break-words">{tokenParts}</span>;
+	}
+
+	const validMentions = (mentions ?? [])
+		.filter((mention) => Number.isFinite(mention.offset) && Number.isFinite(mention.length) && mention.length > 0)
+		.sort((a, b) => a.offset - b.offset);
+
+	if (!validMentions.length) {
+		return <span className="text-sm whitespace-pre-wrap break-words">{safeText}</span>;
+	}
+
+	const parts: React.ReactNode[] = [];
+	let cursor = 0;
+
+	for (const mention of validMentions) {
+		const mentionStart = Math.max(0, mention.offset);
+		const mentionEnd = Math.max(mentionStart, mentionStart + mention.length);
+
+		if (mentionStart > cursor) {
+			parts.push(<span key={`text-${cursor}`}>{safeText.slice(cursor, mentionStart)}</span>);
+		}
+
+		if (mentionStart < safeText.length && mentionEnd <= safeText.length) {
+			parts.push(
+				<MentionChip key={`mention-${mentionStart}-${mentionEnd}`} isOwn={isOwn}>
+					{safeText.slice(mentionStart, mentionEnd)}
+				</MentionChip>
+			);
+			cursor = mentionEnd;
+		}
+	}
+
+	if (cursor < safeText.length) {
+		parts.push(<span key={`text-tail-${cursor}`}>{safeText.slice(cursor)}</span>);
+	}
+
+	return <span className="text-sm whitespace-pre-wrap break-words">{parts}</span>;
+}
 
 function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -204,7 +320,7 @@ interface MessageItemProps {
 	onReply?: (message: Message) => void;
 }
 
-function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isOwn: boolean; downloadUrl: string }) {
+function MessageContent({ message, isOwn, downloadUrl, participants }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[] }) {
 	const type: MessageType = message.type ?? "text";
 
 	if (message.isRecalled) {
@@ -253,7 +369,7 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 						/>
 					</button>
 				)}
-				{message.content && <p className="text-sm px-1">{message.content}</p>}
+				{message.content && <p className="text-sm px-1">{renderMentionedText(message.content, message.mentions, isOwn, participants)}</p>}
 			</div>
 		);
 	}
@@ -277,7 +393,9 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 		return (
 			<div className="flex flex-col gap-1.5">
 				<AudioPlayer src={downloadUrl} isOwn={isOwn} />
-				{message.content && <p className="text-sm px-1">{message.content}</p>}
+				{message.content && (
+					<p className="text-sm px-1">{renderMentionedText(message.content, message.mentions, isOwn, participants)}</p>
+				)}
 			</div>
 		);
 	}
@@ -381,7 +499,7 @@ function MessageContent({ message, isOwn, downloadUrl }: { message: Message; isO
 		);
 	}
 
-	return <span className="text-sm whitespace-pre-wrap break-words">{message.content}</span>;
+	return renderMentionedText(message.content ?? "", message.mentions, isOwn, participants);
 }
 
 // Reply quote (rendered inside the Card bubble) 
@@ -1720,7 +1838,7 @@ const MessageItem = ({
 							)}
 							<div className="flex flex-col gap-0.5 w-fit">
 								<div className="w-fit">
-									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} />
+									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} participants={selectedConvo.participants} />
 								</div>
 
 								{!isImage && !isSticker && (

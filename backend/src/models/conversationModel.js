@@ -23,6 +23,10 @@ const participantSchema = new mongoose.Schema({
     mute: {
         messages: { type: Date, default: null },
         meetings: { type: Date, default: null },
+    },
+    unreadMentionCount: {
+        type: Number,
+        default: 0,
     }
 }, { _id: false });
 

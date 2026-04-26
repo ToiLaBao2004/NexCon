@@ -14,6 +14,7 @@ import { useEffect, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMaxWidth } from "@/hooks/use-max-width";
 import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
+import { useSearchParams } from "react-router";
 
 const MAX_CACHED_CONVERSATIONS = 1;
 
@@ -35,10 +36,14 @@ const ChatWindowLayout = () => {
   const isMobile = useIsMobile();
   const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
   const useOverlayInfoSidebar = isMobile || isTabletOrBelow;
+  const [searchParams] = useSearchParams();
 
   const recentConversationIdsRef = useRef<string[]>([]);
+  const deepLinkMessageIdRef = useRef<string | null>(null);
 
   const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
+  const conversationIdParam = searchParams.get('conversationId')?.trim() || '';
+  const messageIdParam = searchParams.get('messageId')?.trim() || '';
 
   const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
   const { joinConversation } = useSocketStore();
@@ -70,6 +75,44 @@ const ChatWindowLayout = () => {
       }
     }
   }, [activeConversationId, joinConversation, fetchMessages, messageLoading]);
+
+  useEffect(() => {
+    if (!conversationIdParam) return;
+    if (activeConversationId !== conversationIdParam) {
+      useChatStore.getState().setActiveConversation(conversationIdParam);
+    }
+  }, [activeConversationId, conversationIdParam]);
+
+  useEffect(() => {
+    if (!messageIdParam || !activeConversationId) return;
+    if (deepLinkMessageIdRef.current === messageIdParam) return;
+
+    const tryScroll = () => {
+      const targets = [
+        document.getElementById(`msg-${messageIdParam}`),
+        document.getElementById(`message-${messageIdParam}`),
+      ].filter(Boolean) as HTMLElement[];
+
+      const target = targets[0];
+      if (!target) return false;
+
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.add('animate-highlight-flash');
+      setTimeout(() => target.classList.remove('animate-highlight-flash'), 2000);
+      deepLinkMessageIdRef.current = messageIdParam;
+      return true;
+    };
+
+    if (tryScroll()) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      tryScroll();
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [activeConversationId, messageIdParam, allMessages]);
 
   useEffect(() => {
     if (!activeConversationId || activeConversationId !== focusedConversationId) return;

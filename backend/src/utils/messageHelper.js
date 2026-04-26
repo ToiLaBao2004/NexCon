@@ -80,8 +80,10 @@ const resolveLastMessagePreview = (message) => {
                     return message.content || 'Thông báo hệ thống';
             }
         }
-        default:
-            return message.content?.trim() || '';
+        default: {
+            const rawContent = message.content?.trim() || '';
+            return replaceMentionTags(rawContent, message.mentions);
+        }
     }
 };
 
@@ -173,3 +175,14 @@ export function generateSignedUrl(filePublicId, type = 'image') {
         secure: true
     });
 }
+
+export const replaceMentionTags = (content, mentions = []) => {
+    if (!content || !mentions || mentions.length === 0) return content;
+    let result = content;
+    mentions.forEach((mention) => {
+        const userId = mention.userId?.toString() || String(mention.userId);
+        const tag = `@[USER:${userId}]`;
+        result = result.split(tag).join(`@${mention.displayName || 'Người dùng'}`);
+    });
+    return result;
+};

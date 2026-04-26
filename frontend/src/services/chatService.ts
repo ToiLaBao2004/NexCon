@@ -37,7 +37,7 @@ export const chatService = {
 		payload: SendMessagePayload,
 		onProgress?: (percent: number) => void,
 	): Promise<{ message: Message; signedUrl?: string }> {
-		const { type, recipientId, conversationId, content, file, replyToMessageId } = payload;
+		const { type, recipientId, conversationId, content, file, replyToMessageId, mentions } = payload;
 
 		const formData = new FormData();
 		formData.append('type', type);
@@ -46,6 +46,9 @@ export const chatService = {
 		if (content) formData.append('content', content);
 		if (file) formData.append('file', file);
 		if (replyToMessageId) formData.append('replyTo', replyToMessageId);
+		if (Array.isArray(mentions) && mentions.length > 0) {
+			formData.append('mentions', JSON.stringify(mentions));
+		}
 
 		try {
 			const res = await api.post('/messages/send', formData, {

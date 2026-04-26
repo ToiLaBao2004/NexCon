@@ -3,6 +3,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import type { Conversation } from "@/types/chat";
 import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
+import MentionCountBadge from "./MentionCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, Mail, MailOpen, Mic, BellOff } from "lucide-react";
 import { StickerIcon as Sticker } from "@/components/shared/StickerIcon";
@@ -28,6 +29,26 @@ import { Button } from "@/components/ui/button";
 import UserAvatar from "./UserAvatar";
 import { ConfirmationModal } from "../shared/ConfirmationModal";
 import { getSystemMessageText } from "@/utils/chatUtils";
+
+const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
+
+const decodeMentionTokens = (text: string, convo: Conversation) => {
+	if (!text) return text;
+
+	return text.replace(MENTION_TOKEN_REGEX, (_raw, userId) => {
+		const mentionUserId = String(userId || "").trim();
+		if (!mentionUserId) return "@Người dùng";
+
+		const participant = convo.participants.find(
+			(item) => String(item.userId?._id || item.userId) === mentionUserId
+		);
+
+		const displayName =
+			participant?.userId?.nickname?.trim() || participant?.userId?.displayName || "Người dùng";
+
+		return `@${displayName}`;
+	});
+};
 
 const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideStatusIcon?: boolean }) => {
 	const { user } = useAuthStore();
@@ -67,6 +88,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 	if (!user) return null;
 
 	const unreadCount = convo.unreadCounts?.[user._id] ?? 0;
+	const unreadMentionCount = myParticipant?.unreadMentionCount ?? 0;
 
 	const handleSelectConversation = async (id: string) => {
 		setActiveConversation(id);
@@ -319,6 +341,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 			leftSection={
 				<>
 					{unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
+					{unreadMentionCount > 0 && <MentionCountBadge count={unreadMentionCount} />}
 					<GroupChatAvatar participants={convo.participants} type="card" groupAvatarUrl={convo.group?.avatarUrl} />
 				</>
 			}
@@ -336,6 +359,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 
 						const prefix = isMyLastMessage ? "Bạn: " : `${senderName}: `;
 						let cleanMsg = content;
+						cleanMsg = decodeMentionTokens(cleanMsg, convo);
 
 						let Icon = null;
 						if (type === "audio") {

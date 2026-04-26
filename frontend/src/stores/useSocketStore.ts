@@ -16,6 +16,87 @@ import { showReminderToast } from "@/components/reminder/showReminderToast";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
+const canShowBrowserNotification = () => {
+  return typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
+};
+
+const isAppVisible = () => {
+  return typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
+};
+
+const showBrowserNotification = (payload: {
+  title: string;
+  body: string;
+  url: string;
+}) => {
+  if (!canShowBrowserNotification() || isAppVisible()) {
+    return;
+  }
+
+  const notification = new Notification(payload.title, {
+    body: payload.body,
+    icon: "/logo.svg",
+    badge: "/logo.svg",
+    requireInteraction: true,
+    data: {
+      url: payload.url,
+    },
+  });
+
+  notification.onclick = () => {
+    notification.close();
+    const targetUrl = payload.url || "/notification";
+    window.focus();
+    window.location.href = targetUrl;
+  };
+};
+
+const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
+
+const decodeMentionPreview = (
+  preview: string,
+  conversation: any,
+) => {
+  if (!preview || typeof preview !== "string") {
+    return "Bạn được nhắc đến";
+  }
+
+  return preview.replace(MENTION_TOKEN_REGEX, (_full, rawUserId) => {
+    const mentionUserId = String(rawUserId || "").trim();
+    if (!mentionUserId) {
+      return "@Người dùng";
+    }
+
+    const participant = conversation?.participants?.find(
+      (item: any) => String(item.userId?._id || item.userId) === mentionUserId
+    );
+
+    const displayName =
+      participant?.userId?.nickname?.trim() || participant?.userId?.displayName || "Người dùng";
+
+    return `@${displayName}`;
+  });
+};
+
+const localizeNotificationTitle = (title?: string) => {
+  const safeTitle = typeof title === "string" ? title.trim() : "";
+  const normalized = safeTitle.toLowerCase();
+
+  if (normalized === "new friend request") {
+    return "Lời mời kết bạn mới";
+  }
+
+  if (normalized === "friend request accepted") {
+    return "Lời mời kết bạn đã được chấp nhận";
+  }
+
+  if (normalized === "friend request resent") {
+    return "Lời mời kết bạn được gửi lại";
+  }
+
+  return safeTitle || "NexCon";
+};
+
 export const useSocketStore = create<SocketState>((set, get) => ({
   socket: null,
   onlineUsers: [],
@@ -177,7 +258,85 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("new-notification", ({ notification }) => {
       useNotificationStore.getState().addNotification(notification);
+
+      showBrowserNotification({
+        title: localizeNotificationTitle(notification.title),
+        body: notification.content || "Bạn có một thông báo mới",
+        url: notification.linkUrl || "/notification",
+      });
+
       void playNotificationSound();
+    });
+
+    socket.on("user_mentioned", ({ messageId, conversationId, mentionedBy, preview }) => {
+      const chatState = useChatStore.getState();
+      const currentUserId = useAuthStore.getState().user?._id?.toString() ?? "";
+      const targetConversationId = conversationId?.toString?.() || conversationId;
+      const isFocused = chatState.focusedConversationId === targetConversationId;
+      const senderName = mentionedBy?.displayName || "Ai đó";
+      const targetConversation = chatState.conversations.find(
+        (item) => String(item._id) === String(targetConversationId)
+      );
+      const previewText = decodeMentionPreview(
+        typeof preview === "string" ? preview.trim() : "",
+        targetConversation
+      );
+      const groupName =
+        targetConversation?.type === "group"
+          ? targetConversation.group?.name?.trim() || ""
+          : "";
+      const mentionTitle = groupName
+        ? `${senderName} đã nhắc đến bạn trong nhóm ${groupName}`
+        : `${senderName} đã nhắc đến bạn`;
+      const mentionDescription = previewText;
+      const targetUrl = `/chat?conversationId=${encodeURIComponent(String(targetConversationId || ''))}&messageId=${encodeURIComponent(String(messageId || ''))}`;
+
+      if (targetConversationId && !isFocused) {
+        useChatStore.setState((state) => ({
+          conversations: state.conversations.map((conversation) => {
+            if (String(conversation._id) !== String(targetConversationId)) {
+              return conversation;
+            }
+
+            const participants = (conversation.participants || []).map((participant) => {
+              const participantId = String(participant.userId?._id || participant.userId);
+              if (participantId !== currentUserId) {
+                return participant;
+              }
+
+              return {
+                ...participant,
+                unreadMentionCount: (participant.unreadMentionCount || 0) + 1,
+              };
+            });
+
+            return { ...conversation, participants };
+          }),
+        }));
+      }
+
+      toast.info(mentionTitle, {
+        duration: 7000,
+        className: "border border-primary/25 bg-gradient-to-br from-background to-primary/5 shadow-lg",
+        descriptionClassName: "text-[12px] text-muted-foreground",
+        action: {
+          label: 'Mở chat',
+          onClick: () => {
+            window.location.href = targetUrl;
+          },
+        },
+        description: mentionDescription,
+      });
+
+      showBrowserNotification({
+        title: mentionTitle,
+        body: mentionDescription,
+        url: targetUrl,
+      });
+
+      if (!isFocused) {
+        void playMessageSound();
+      }
     });
 
     socket.on("reminder-triggered", ({ reminder }) => {

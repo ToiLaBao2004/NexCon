@@ -394,13 +394,18 @@ export async function markAsSeen(req, res) {
 			return res.status(200).json({ message: "Cannot mark own message as seen" });
 		}
 
-		const updated = await Conversation.findByIdAndUpdate(conversationId,
+		const updated = await Conversation.findOneAndUpdate(
+			{ _id: conversationId, 'participants.userId': userId },
 			{
 				$addToSet: { seenBy: userId },
-				$set: { [`unreadCounts.${userId}`]: 0 },
-
-			}, { new: true }
+				$set: { [`unreadCounts.${userId}`]: 0, 'participants.$.unreadMentionCount': 0 },
+			},
+			{ new: true }
 		);
+
+		if (!updated) {
+			return res.status(404).json({ message: "Conversation not found" });
+		}
 
 		io.to(conversationId).emit("read-message", {
 			conversationId: conversationId,

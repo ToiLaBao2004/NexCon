@@ -573,7 +573,18 @@ export const useChatStore = create<ChatState>()(
                                 unreadCounts: {
                                     ...c.unreadCounts,
                                     [user._id]: 0
-                                }
+                                },
+                                participants: c.participants.map((participant) => {
+                                    const participantId = (participant.userId?._id || participant.userId)?.toString();
+                                    if (participantId !== user._id.toString()) {
+                                        return participant;
+                                    }
+
+                                    return {
+                                        ...participant,
+                                        unreadMentionCount: 0,
+                                    };
+                                })
                             }
                                 : c
                         ))
