@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
-import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions } from "lucide-react";
 import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -309,6 +309,79 @@ function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 	);
 }
 
+function AudioMessageBubble({
+	message,
+	isOwn,
+	downloadUrl,
+	participants,
+}: {
+	message: Message;
+	isOwn: boolean;
+	downloadUrl: string;
+	participants: Participant[];
+}) {
+	const [showTranscript, setShowTranscript] = useState(false);
+	const hasTranscript = Boolean(message.content?.trim());
+
+	useEffect(() => {
+		setShowTranscript(false);
+	}, [message._id]);
+
+	return (
+		<div className="flex flex-col gap-2">
+			<div className="flex items-center gap-2">
+				<AudioPlayer src={downloadUrl} isOwn={isOwn} />
+
+				{hasTranscript && (
+					<button
+						type="button"
+						onClick={() => setShowTranscript((current) => !current)}
+						className={cn(
+							"shrink-0 size-7 rounded-full border text-[11px] font-bold",
+							"flex items-center justify-center transition-all",
+							showTranscript && "scale-105",
+							isOwn
+								? cn(
+									"border-white/25 text-white",
+									showTranscript
+										? "bg-white/30 shadow-sm"
+										: "bg-white/15 hover:bg-white/25"
+								)
+								: cn(
+									"border-border text-foreground",
+									showTranscript
+										? "bg-primary text-primary-foreground shadow-sm"
+										: "bg-background hover:bg-muted"
+								)
+						)}
+						title={showTranscript ? "Ẩn nội dung thoại" : "Hiện nội dung thoại"}
+					>
+						<Captions className="size-3.5" />
+					</button>
+				)}
+			</div>
+
+			{hasTranscript && showTranscript && (
+				<div
+					className={cn(
+						"max-w-[260px] rounded-xl px-3 py-2 text-sm leading-relaxed",
+						"whitespace-pre-wrap break-words animate-in fade-in slide-in-from-top-1 duration-150",
+						isOwn
+							? "bg-white/12 text-white border border-white/10"
+							: "bg-muted/70 text-foreground border border-border/60"
+					)}
+				>
+					{renderMentionedText(
+						message.content ?? "",
+						message.mentions,
+						isOwn,
+						participants
+					)}
+				</div>
+			)}
+		</div>
+	);
+}
 
 interface MessageItemProps {
 	message: Message;
@@ -395,43 +468,13 @@ function MessageContent({ message, isOwn, downloadUrl, participants }: { message
 	}
 
 	if (type === "audio" && (message.filePublicId || message.fileUrl)) {
-		const hasAudioText = Boolean(message.content?.trim());
-
 		return (
-			<div className="flex flex-col gap-1.5">
-				<div className="flex items-center gap-2">
-					<AudioPlayer src={downloadUrl} isOwn={isOwn} />
-
-					{hasAudioText && (
-						<button
-							type="button"
-							onClick={() => setShowAudioText((current) => !current)}
-							className={cn(
-								"shrink-0 h-7 min-w-7 px-2 rounded-full text-[11px] font-bold transition-colors border cursor-pointer",
-								isOwn
-									? "bg-white/15 hover:bg-white/25 border-white/20 text-white"
-									: "bg-muted hover:bg-muted/80 border-border text-foreground"
-							)}
-							title={showAudioText ? "Ẩn nội dung thoại" : "Hiện nội dung thoại"}
-						>
-							[A]
-						</button>
-					)}
-				</div>
-
-				{hasAudioText && showAudioText && (
-					<p
-						className={cn(
-							"text-sm px-2 py-1.5 rounded-lg max-w-[260px] whitespace-pre-wrap break-words",
-							isOwn
-								? "bg-white/10 text-white"
-								: "bg-muted/70 text-foreground"
-						)}
-					>
-						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
-					</p>
-				)}
-			</div>
+			<AudioMessageBubble
+				message={message}
+				isOwn={isOwn}
+				downloadUrl={downloadUrl}
+				participants={participants}
+			/>
 		);
 	}
 
