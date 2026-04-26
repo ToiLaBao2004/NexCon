@@ -21,15 +21,31 @@ function safeHostname(url) {
 }
 
 async function fetchYouTubePreview(url) {
-    const { data } = await axios.get(
-        `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
-        { timeout: 5000 }
-    );
+    const [oembedRes, pageRes] = await Promise.allSettled([
+        axios.get(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, { timeout: 5000 }),
+        axios.get(url, {
+            timeout: 8000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept-Language': 'en-US,en;q=0.5',
+            },
+        }),
+    ]);
+
+    const oembedData = oembedRes.status === 'fulfilled' ? oembedRes.value.data : {};
+
+    let description = '';
+    if (pageRes.status === 'fulfilled') {
+        const $ = cheerio.load(pageRes.value.data);
+        description = getMeta($, 'og:description') || '';
+    }
+
     const videoId = url.match(/(?:watch\?v=|embed\/|shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1];
+
     return {
         url,
-        title: data.title || '',
-        description: '',
+        title: oembedData.title || '',
+        description,
         image: videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '',
         siteName: 'YouTube',
         hostname: 'www.youtube.com',
