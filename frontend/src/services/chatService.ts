@@ -2,10 +2,20 @@ import api from '@/lib/axios';
 import type { ConversationResponse, Message } from '@/types/chat';
 import type { SendMessagePayload } from '@/types/store';
 
+interface FetchMessagesParams {
+	conversationId: string;
+	cursor?: string;
+	before?: string;
+	after?: string;
+	aroundId?: string;
+	limit?: number;
+}
+
 interface FetchMessageProps {
 	messages: Message[];
 	cursor?: string;
 	pinnedMessages: Message[];
+	hasMore?: boolean;
 }
 
 const pageLimit = 20;
@@ -28,10 +38,27 @@ export const chatService = {
 		return res.data;
 	},
 
-	async fetchMessages(id: string, cursor?: string): Promise<FetchMessageProps> {
-		const res = await api.get(`/conversations/${id}/messages?limit=${pageLimit}&cursor=${cursor}`);
-		return { messages: res.data.messages, cursor: res.data.nextCursor, pinnedMessages: res.data.pinnedMessages };
+	async fetchMessages(params: FetchMessagesParams): Promise<FetchMessageProps & { anchorId?: string, hasMoreOlder?: boolean, hasMoreNewer?: boolean }> {
+		const { conversationId, cursor, before, after, aroundId, limit = pageLimit } = params;
+		const query = new URLSearchParams();
+		query.append('limit', String(limit));
+		if (cursor) query.append('cursor', cursor);
+		if (before) query.append('before', before);
+		if (after) query.append('after', after);
+		if (aroundId) query.append('aroundId', aroundId);
+
+		const res = await api.get(`/conversations/${conversationId}/messages?${query.toString()}`);
+		return {
+			messages: res.data.messages,
+			cursor: res.data.nextCursor,
+			pinnedMessages: res.data.pinnedMessages,
+			anchorId: res.data.anchorId,
+			hasMoreOlder: res.data.hasMoreOlder,
+			hasMoreNewer: res.data.hasMoreNewer,
+			hasMore: res.data.hasMore
+		} as any;
 	},
+
 
 	async sendMessage(
 		payload: SendMessagePayload,

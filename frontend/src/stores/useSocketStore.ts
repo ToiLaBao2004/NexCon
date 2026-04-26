@@ -179,7 +179,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useMediaCacheStore.getState().setUrl(message._id, message.signedUrl);
       }
 
-      useChatStore.getState().addMessage(message);
+      const jumpContext = chatState.jumpContexts[message.conversationId];
+      if (!jumpContext?.isJumpMode) {
+        useChatStore.getState().addMessage(message);
+      }
 
       const updatedConversation = {
         ...conversation,

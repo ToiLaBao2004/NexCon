@@ -221,14 +221,24 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
     setDisplayCount(PAGE_SIZE);
   };
 
-  const handleJumpToMessage = (messageId: string) => {
+  const handleJumpToMessage = async (messageId: string) => {
     const el = document.getElementById(`message-${messageId}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('animate-highlight-flash');
-      setTimeout(() => el.classList.remove('animate-highlight-flash'), 2000);
+      el.classList.remove('animate-jump-highlight');
+      void (el as HTMLElement).offsetWidth;
+      el.classList.add('animate-jump-highlight');
+      setTimeout(() => el.classList.remove('animate-jump-highlight'), 3000);
+      if (isMobile) onClose();
+      return;
+    }
+
+    if (activeConversationId) {
+      await useChatStore.getState().jumpToMessage(activeConversationId, messageId);
+      if (isMobile) onClose();
     }
   };
+
 
   // Derived label for sender dropdown
   const senderLabel = selectedSenderId

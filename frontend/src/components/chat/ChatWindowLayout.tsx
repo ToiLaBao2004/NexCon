@@ -94,33 +94,35 @@ const ChatWindowLayout = () => {
     if (deepLinkMessageIdRef.current === messageIdParam) return;
 
     const tryScroll = () => {
-      const targets = [
-        document.getElementById(`msg-${messageIdParam}`),
-        document.getElementById(`message-${messageIdParam}`),
-      ].filter(Boolean) as HTMLElement[];
-
-      const target = targets[0];
+      const target = document.getElementById(`message-${messageIdParam}`);
       if (!target) return false;
 
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      target.classList.add('animate-highlight-flash');
-      setTimeout(() => target.classList.remove('animate-highlight-flash'), 2000);
+      target.classList.remove('animate-jump-highlight');
+      void target.offsetWidth;
+      target.classList.add('animate-jump-highlight');
+      setTimeout(() => target.classList.remove('animate-jump-highlight'), 3000);
+      
       deepLinkMessageIdRef.current = messageIdParam;
-
       setSearchParams({}, { replace: true });
       return true;
     };
 
-    if (tryScroll()) {
-      return;
-    }
+    if (tryScroll()) return;
 
-    const timer = window.setTimeout(() => {
-      tryScroll();
-    }, 150);
+    const performJump = async () => {
+      try {
+        await useChatStore.getState().jumpToMessage(activeConversationId, messageIdParam);
+        deepLinkMessageIdRef.current = messageIdParam;
+        setSearchParams({}, { replace: true });
+      } catch (err) {
+        console.error("Deep link jump failed", err);
+      }
+    };
 
-    return () => window.clearTimeout(timer);
-  }, [activeConversationId, messageIdParam, allMessages, setSearchParams]);
+    performJump();
+  }, [activeConversationId, messageIdParam, setSearchParams]);
+
 
 
   useEffect(() => {
