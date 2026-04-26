@@ -20,6 +20,7 @@ import { fetchLinkPreview } from '../utils/linkPreview.js';
 import { createNotification } from '../services/notificationServices.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { transcribeAudioFromBuffer } from '../services/audio/transcribeAudio.js';
+import { moderateImageMessage } from '../services/moderation/imageModerationService.js';
 
 const parseMentionPayload = (rawMentions) => {
     if (Array.isArray(rawMentions)) {
@@ -198,6 +199,23 @@ export async function sendMessage(req, res) {
                 if (uploadedFile.size > MAX_IMAGE_SIZE) {
                     return res.status(413).json({
                         message: `Ảnh quá lớn. Kích thước tối đa là ${MAX_IMAGE_SIZE / 1024 / 1024}MB.`,
+                    });
+                }
+
+                const imageBuffer = uploadedFile.buffer;
+                const mimeType = uploadedFile.mimetype;
+
+                const moderationResult = await moderateImageMessage(imageBuffer, mimeType);
+
+                if (moderationResult.blocked) {
+                    return res.status(400).json({
+                        message: 'Ảnh vi phạm tiêu chuẩn cộng đồng.',
+                        moderation: {
+                            category: moderationResult.category,
+                            reason: moderationResult.reason,
+                            source: moderationResult.source,
+                            confidence: moderationResult.confidence ?? null,
+                        },
                     });
                 }
 
