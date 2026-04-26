@@ -395,11 +395,6 @@ interface MessageItemProps {
 
 function MessageContent({ message, isOwn, downloadUrl, participants }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[] }) {
 	const type: MessageType = message.type ?? "text";
-	const [showAudioText, setShowAudioText] = useState(false);
-
-	useEffect(() => {
-		setShowAudioText(false);
-	}, [message._id]);
 
 	if (message.isRecalled) {
 		return (
