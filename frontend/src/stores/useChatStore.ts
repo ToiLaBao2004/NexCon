@@ -47,7 +47,9 @@ export const useChatStore = create<ChatState>()(
             focusedConversationId: null,
             convoLoading: false,
             messageLoading: false,
+            jumpContexts: {},
             replyingTo: null,
+
             activeSidebar: null,
             searchResults: {
                 items: [] as import('@/types/chat').Message[],
@@ -55,10 +57,25 @@ export const useChatStore = create<ChatState>()(
                 query: '',
             },
 
-            setActiveConversation: (id) => set({ activeConversationId: id, focusedConversationId: id }),
-            setFocusedConversation: (id) => set({ focusedConversationId: id }),
-            setReplyingTo: (message) => set({ replyingTo: message }),
-            clearConversationCache: (keepConversationIds) => {
+            setActiveConversation: (id: string | null) => {
+
+                const prevId = get().activeConversationId;
+                set((state) => {
+                    const nextJumpContexts = { ...state.jumpContexts };
+                    if (prevId) nextJumpContexts[prevId] = null;
+                    if (id) nextJumpContexts[id] = null;
+
+                    return {
+                        activeConversationId: id,
+                        focusedConversationId: id,
+                        jumpContexts: nextJumpContexts,
+                    };
+                });
+            },
+
+            setFocusedConversation: (id: string | null) => set({ focusedConversationId: id }),
+            setReplyingTo: (message: any) => set({ replyingTo: message }),
+            clearConversationCache: (keepConversationIds: string[]) => {
                 const keep = new Set(keepConversationIds.filter(Boolean));
 
                 set((state) => {
@@ -151,7 +168,7 @@ export const useChatStore = create<ChatState>()(
                     set({ convoLoading: false });
                 }
             },
-            fetchMessages: async (conversationId) => {
+            fetchMessages: async (conversationId?: string) => {
                 const { activeConversationId, messages } = get();
                 const { user } = useAuthStore.getState();
 
@@ -166,10 +183,15 @@ export const useChatStore = create<ChatState>()(
                 set({ messageLoading: true });
 
                 try {
-                    const { messages: fetched, cursor, pinnedMessages } = await chatService.fetchMessages(convoId, nextCursor);
+                    const response = await chatService.fetchMessages({
+                        conversationId: convoId,
+                        cursor: nextCursor ?? undefined
+                    });
+                    const { messages: fetched, cursor, pinnedMessages, hasMore: backendHasMore } = response;
+
                     const processed = fetched.map((m) => ({
                         ...m,
-                        isOwn: m.senderId === user?._id,
+                        isOwn: m.senderId === user?._id || (m.senderId as any)?._id === user?._id,
                     }));
 
                     set((state) => {
@@ -183,21 +205,27 @@ export const useChatStore = create<ChatState>()(
                         const prevItems = prevState.items ?? [];
                         const merged = prevItems.length > 0 ? [...processed, ...prevItems] : processed;
 
-                        merged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                        // Use a Map to deduplicate by _id
+                        const dedupMap = new Map();
+                        merged.forEach(m => dedupMap.set(m._id, m));
+                        const uniqueMerged = Array.from(dedupMap.values());
+
+                        uniqueMerged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
                         return {
                             messages: {
                                 ...state.messages,
                                 [convoId]: {
                                     ...prevState,
-                                    items: merged,
-                                    hasMore: !!cursor,
+                                    items: uniqueMerged,
+                                    hasMore: fetched.length > 0 ? (backendHasMore ?? !!cursor) : false,
                                     nextCursor: cursor ?? null,
                                     pinnedMessages: pinnedMessages ?? prevState.pinnedMessages ?? [],
                                 },
                             },
                         };
                     });
+
 
                 } catch (error) {
                     console.error("Lỗi khi tải tin nhắn:", error);
@@ -206,6 +234,224 @@ export const useChatStore = create<ChatState>()(
                 }
 
             },
+
+            jumpToMessage: async (conversationId: string, messageId: string) => {
+                const { user } = useAuthStore.getState();
+                set({ messageLoading: true });
+                try {
+                    const response = await chatService.fetchMessages({
+                        conversationId,
+                        aroundId: messageId,
+                        limit: 40
+                    });
+
+                    const processed = response.messages.map((m) => ({
+                        ...m,
+                        isOwn: m.senderId === user?._id || (m.senderId as any)?._id === user?._id,
+                    }));
+
+                    set((state) => ({
+                        messages: {
+                            ...state.messages,
+                            [conversationId]: {
+                                items: processed,
+                                hasMore: response.hasMoreOlder ?? false,
+                                nextCursor: null,
+                                pinnedMessages: state.messages[conversationId]?.pinnedMessages ?? [],
+                            }
+
+                        },
+                        jumpContexts: {
+                            ...state.jumpContexts,
+                            [conversationId]: {
+                                anchorId: response.anchorId ?? messageId,
+                                hasMoreOlder: response.hasMoreOlder ?? false,
+                                hasMoreNewer: response.hasMoreNewer ?? false,
+                                isJumpMode: true
+                            }
+                        }
+                    }));
+
+
+                    return response.anchorId;
+                } catch (error) {
+                    console.error("Lỗi khi jump tới tin nhắn:", error);
+                    toast.error("Không thể đi tới tin nhắn này");
+                } finally {
+                    set({ messageLoading: false });
+                }
+            },
+
+            loadOlderInJumpMode: async (conversationId: string) => {
+                const context = get().jumpContexts[conversationId];
+                if (!context || !context.isJumpMode || !context.hasMoreOlder) return;
+
+                set({ messageLoading: true });
+
+
+                const { user } = useAuthStore.getState();
+                const messages = get().messages[conversationId]?.items ?? [];
+                if (messages.length === 0) return;
+
+                const firstMessage = messages[0];
+
+                try {
+                    const response = await chatService.fetchMessages({
+                        conversationId,
+                        before: firstMessage.createdAt,
+                        limit: 20
+                    });
+
+                    const processed = response.messages.map((m) => ({
+                        ...m,
+                        isOwn: m.senderId === user?._id || (m.senderId as any)?._id === user?._id,
+                    }));
+
+                    set((state) => {
+                        const prevState = state.messages[conversationId];
+                        const merged = [...processed, ...prevState.items];
+
+                        const dedupMap = new Map();
+                        merged.forEach(m => dedupMap.set(m._id, m));
+                        const uniqueMerged = Array.from(dedupMap.values());
+                        uniqueMerged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+                        return {
+                            messages: {
+                                ...state.messages,
+                                [conversationId]: {
+                                    ...prevState,
+                                    items: uniqueMerged,
+                                },
+                            },
+                            jumpContexts: {
+                                ...state.jumpContexts,
+                                [conversationId]: {
+                                    ...context,
+                                    hasMoreOlder: processed.length > 0 ? (response.hasMore ?? false) : false
+                                }
+                            }
+                        };
+                    });
+                } catch (error) {
+                    console.error("Lỗi khi tải thêm tin nhắn cũ (Jump Mode):", error);
+                } finally {
+                    set({ messageLoading: false });
+                }
+            },
+
+
+
+            loadNewerInJumpMode: async (conversationId: string) => {
+                const context = get().jumpContexts[conversationId];
+                if (!context || !context.isJumpMode || !context.hasMoreNewer) return;
+
+                set({ messageLoading: true });
+
+
+                const { user } = useAuthStore.getState();
+                const messages = get().messages[conversationId]?.items ?? [];
+                if (messages.length === 0) return;
+
+                const lastMessage = messages[messages.length - 1];
+
+                try {
+                    const response = await chatService.fetchMessages({
+                        conversationId,
+                        after: lastMessage.createdAt,
+                        limit: 20
+                    });
+
+                    const processed = response.messages.map((m) => ({
+                        ...m,
+                        isOwn: m.senderId === user?._id || (m.senderId as any)?._id === user?._id,
+                    }));
+
+                    const hasMoreNewer = response.hasMore ?? false;
+
+                    set((state) => {
+                        const prevState = state.messages[conversationId];
+                        const merged = [...prevState.items, ...processed];
+
+                        const dedupMap = new Map();
+                        merged.forEach(m => dedupMap.set(m._id, m));
+                        const uniqueMerged = Array.from(dedupMap.values());
+                        uniqueMerged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+                        const isTransitioning = !hasMoreNewer;
+                        const oldestMessage = uniqueMerged[0];
+
+                        return {
+                            messages: {
+                                ...state.messages,
+                                [conversationId]: {
+                                    ...prevState,
+                                    items: uniqueMerged,
+                                    // If transitioning to normal mode, update nextCursor to support upward scrolling
+                                    ...(isTransitioning ? {
+                                        nextCursor: oldestMessage ? oldestMessage._id : prevState.nextCursor,
+                                        hasMore: true
+                                    } : {})
+                                },
+                            },
+                            jumpContexts: {
+                                ...state.jumpContexts,
+                                [conversationId]: isTransitioning ? null : {
+                                    ...context,
+                                    hasMoreNewer: processed.length > 0 ? (response.hasMore ?? false) : false
+                                }
+                            }
+                        };
+                    });
+                } catch (error) {
+                    console.error("Lỗi khi tải thêm tin nhắn mới (Jump Mode):", error);
+                } finally {
+                    set({ messageLoading: false });
+                }
+            },
+
+
+
+
+            exitJumpMode: async (conversationId: string) => {
+                const { user } = useAuthStore.getState();
+                const currentMessages = get().messages[conversationId];
+                
+                set({ messageLoading: true });
+
+                try {
+                    const response = await chatService.fetchMessages({
+                        conversationId,
+                        cursor: "" // Fetch latest
+                    });
+
+                    const processed = response.messages.map((m) => ({
+                        ...m,
+                        isOwn: m.senderId === user?._id || (m.senderId as any)?._id === user?._id,
+                    }));
+
+                    set((state) => ({
+                        messages: {
+                            ...state.messages,
+                            [conversationId]: {
+                                items: processed,
+                                hasMore: !!response.cursor,
+                                nextCursor: response.cursor ?? null,
+                                pinnedMessages: response.pinnedMessages ?? currentMessages?.pinnedMessages ?? [],
+                            }
+                        },
+                        jumpContexts: {
+                            ...state.jumpContexts,
+                            [conversationId]: null
+                        }
+                    }));
+                } catch (error) {
+                    console.error("Lỗi khi thoát Jump Mode:", error);
+                } finally {
+                    set({ messageLoading: false });
+                }
+            },
+
+
             sendMessage: async (payload: SendMessagePayload, onProgress?: (pct: number) => void) => {
                 const { activeConversationId, replyingTo } = get();
                 const { user } = useAuthStore.getState();
@@ -384,7 +630,7 @@ export const useChatStore = create<ChatState>()(
 
 
 
-            addMessage: async (message) => {
+            addMessage: async (message: any) => {
                 try {
                     const { user } = useAuthStore.getState();
                     const { fetchMessages } = get();
@@ -490,7 +736,7 @@ export const useChatStore = create<ChatState>()(
                     console.error(error, "Lỗi khi thêm tin nhắn");
                 }
             },
-            createReminderSystemMessage: async (conversationId, reminder) => {
+            createReminderSystemMessage: async (conversationId: string, reminder: any) => {
                 try {
                     const reminderContent = getReminderContent(reminder);
                     const response = await chatService.createReminderSystemMessage({

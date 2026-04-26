@@ -57,7 +57,15 @@ export interface MediaPaginationState {
   link: MediaPageState;
 }
 
+export interface JumpContext {
+  anchorId: string;
+  hasMoreOlder: boolean;
+  hasMoreNewer: boolean;
+  isJumpMode: boolean;
+}
+
 export interface ChatState {
+
   conversations: Conversation[];
   messages: Record<string, {
     items: Message[],
@@ -71,7 +79,9 @@ export interface ChatState {
   focusedConversationId: string | null;
   convoLoading: boolean;
   messageLoading: boolean;
+  jumpContexts: Record<string, JumpContext | null>;
   replyingTo: Message | null;
+
   reset: () => void;
 
   setActiveConversation: (id: string | null) => void;
@@ -126,7 +136,14 @@ export interface ChatState {
     query: string,
     filters?: { senderId?: string; fromDate?: string; toDate?: string }
   ) => Promise<void>;
+
+  // Jump Mode Actions
+  jumpToMessage: (conversationId: string, messageId: string) => Promise<string | void>;
+  loadOlderInJumpMode: (conversationId: string) => Promise<void>;
+  loadNewerInJumpMode: (conversationId: string) => Promise<void>;
+  exitJumpMode: (conversationId: string) => Promise<void>;
 }
+
 
 export interface SocketState {
   socket: Socket | null;

@@ -273,66 +273,30 @@ export async function getConversations(req, res) {
 export async function getMessages(req, res) {
 	try {
 		const { conversationId } = req.params;
-		const { limit = 50, cursor } = req.query;
+		const { limit = 50, cursor, before, after, aroundId } = req.query;
 		const userId = req.user._id.toString();
 
 		const conversation = await Conversation.findById(conversationId).select('participants').lean();
-		const me = conversation?.participants?.find(p => p.userId.toString() === userId);
+		if (!conversation) {
+			return res.status(404).json({ message: "Conversation not found" });
+		}
+
+		const me = conversation.participants?.find(p => p.userId.toString() === userId);
 		const clearedAt = me?.clearedAt ? new Date(me.clearedAt) : null;
 
-		const query = { conversationId };
-		query.$or = [
-			{ 'metadata.visibleToUserIds': { $exists: false } },
-			{ 'metadata.visibleToUserIds': { $size: 0 } },
-			{ 'metadata.visibleToUserIds': userId },
-		];
-		if (cursor) {
-			query.createdAt = { $lt: new Date(cursor) };
-		}
-		if (clearedAt) {
-			query.createdAt = { ...query.createdAt, $gt: clearedAt };
-		}
-
-		const pinnedQuery = {
-			conversationId: query.conversationId,
-			isPinned: true,
-			$or: query.$or,
+		const baseFilter = {
+			conversationId,
+			$or: [
+				{ 'metadata.visibleToUserIds': { $exists: false } },
+				{ 'metadata.visibleToUserIds': { $size: 0 } },
+				{ 'metadata.visibleToUserIds': userId },
+			],
 		};
+
 		if (clearedAt) {
-			pinnedQuery.createdAt = { $gt: clearedAt };
+			baseFilter.createdAt = { $gt: clearedAt };
 		}
 
-		const pinnedMessages = await Message.find(pinnedQuery)
-			.sort({ pinnedAt: -1, createdAt: -1 })
-			.populate('senderId', 'displayName avatarUrl')
-			.populate({
-				path: 'replyTo',
-				select: '_id senderId type content fileName isRecalled',
-				populate: { path: 'senderId', select: 'displayName' },
-			})
-			.lean();
-
-		let messages = await Message.find(query)
-			.sort({ createdAt: -1 })
-			.limit(Number(limit) + 1)
-			.populate('senderId', 'displayName avatarUrl')
-			.populate({
-				path: 'replyTo',
-				select: '_id senderId type content fileName isRecalled',
-				populate: { path: 'senderId', select: 'displayName' },
-			});
-
-		let nextCursor = null;
-
-		if (messages.length > Number(limit)) {
-			const nextMessage = messages[messages.length - 1];
-			nextCursor = nextMessage.createdAt.toISOString();
-			messages.pop();
-		}
-
-		messages = messages.reverse();
-
-		// Fallback for hard-deleted users
 		const fallbackSender = (msg) => {
 			if (msg && !msg.senderId) {
 				msg.senderId = {
@@ -350,12 +314,123 @@ export async function getMessages(req, res) {
 			return msg;
 		};
 
+		if (aroundId) {
+			const mongoose = await import('mongoose');
+			if (!mongoose.default.Types.ObjectId.isValid(aroundId)) {
+				return res.status(400).json({ message: "Invalid aroundId" });
+			}
+
+			const anchor = await Message.findById(aroundId).lean();
+			if (!anchor) {
+				return res.status(404).json({ message: "Anchor message not found" });
+			}
+			if (anchor.conversationId.toString() !== conversationId) {
+				return res.status(403).json({ message: "Message does not belong to this conversation" });
+			}
+
+			const limitNumber = Math.min(Number(limit), 100);
+			const half = Math.floor(limitNumber / 2);
+
+			const [olderMessages, newerMessages] = await Promise.all([
+				Message.find({ ...baseFilter, createdAt: { $lt: anchor.createdAt } })
+					.sort({ createdAt: -1 })
+					.limit(half)
+					.populate('senderId', 'displayName avatarUrl')
+					.populate({
+						path: 'replyTo',
+						select: '_id senderId type content fileName isRecalled',
+						populate: { path: 'senderId', select: 'displayName' },
+					})
+					.lean(),
+				Message.find({ ...baseFilter, createdAt: { $gt: anchor.createdAt } })
+					.sort({ createdAt: 1 })
+					.limit(half)
+					.populate('senderId', 'displayName avatarUrl')
+					.populate({
+						path: 'replyTo',
+						select: '_id senderId type content fileName isRecalled',
+						populate: { path: 'senderId', select: 'displayName' },
+					})
+					.lean(),
+			]);
+
+			const combined = [
+				...olderMessages.reverse(),
+				anchor,
+				...newerMessages
+			].map(fallbackSender);
+
+			return res.status(200).json({
+				messages: combined,
+				anchorId: aroundId,
+				hasMoreOlder: olderMessages.length === half,
+				hasMoreNewer: newerMessages.length === half,
+			});
+		}
+		const limitNumber = Number(limit);
+		let query = { ...baseFilter };
+		let sortDirection = -1; // Default: newest first
+
+		const activeCursor = before || cursor; // 'cursor' is legacy for 'before'
+
+		if (activeCursor) {
+			query.createdAt = { ...query.createdAt, $lt: new Date(activeCursor) };
+		} else if (after) {
+			query.createdAt = { ...query.createdAt, $gt: new Date(after) };
+			sortDirection = 1; // forward: oldest to newest
+		}
+
+		let messages = await Message.find(query)
+			.sort({ createdAt: sortDirection })
+			.limit(limitNumber + 1)
+			.populate('senderId', 'displayName avatarUrl')
+			.populate({
+				path: 'replyTo',
+				select: '_id senderId type content fileName isRecalled',
+				populate: { path: 'senderId', select: 'displayName' },
+			})
+			.lean();
+
+		let hasMore = false;
+		if (messages.length > limitNumber) {
+			hasMore = true;
+			messages.pop();
+		}
+
+		if (sortDirection === -1) {
+			messages = messages.reverse();
+		}
+
 		messages = messages.map(fallbackSender);
-		const safePinnedMessages = pinnedMessages.map(fallbackSender);
+
+		// Handle pinned messages (only for initial load or backward pagination)
+		let safePinnedMessages = [];
+		if (!after) {
+			const pinnedQuery = {
+				conversationId: baseFilter.conversationId,
+				isPinned: true,
+				$or: baseFilter.$or,
+			};
+			if (clearedAt) {
+				pinnedQuery.createdAt = { $gt: clearedAt };
+			}
+
+			const pinnedMessages = await Message.find(pinnedQuery)
+				.sort({ pinnedAt: -1, createdAt: -1 })
+				.populate('senderId', 'displayName avatarUrl')
+				.populate({
+					path: 'replyTo',
+					select: '_id senderId type content fileName isRecalled',
+					populate: { path: 'senderId', select: 'displayName' },
+				})
+				.lean();
+			safePinnedMessages = pinnedMessages.map(fallbackSender);
+		}
 
 		return res.status(200).json({
 			messages,
-			nextCursor,
+			hasMore,
+			nextCursor: (sortDirection === -1 && hasMore && messages.length > 0) ? messages[0].createdAt : null,
 			pinnedMessages: safePinnedMessages,
 		});
 
@@ -364,6 +439,7 @@ export async function getMessages(req, res) {
 		return res.status(500).json({ message: "Internal server error" });
 	}
 }
+
 
 export async function getUserConversationsForSocketIO(userId) {
 	try {

@@ -103,50 +103,21 @@ export function PinnedMessagesBanner({
 	};
 
 	const highlightMessage = (messageId: string) => {
-		const el = document.getElementById(`msg-${messageId}`);
+		const el = document.getElementById(`message-${messageId}`);
 		if (!el) return false;
 
 		el.scrollIntoView({ behavior: "smooth", block: "center" });
 
 		// restart animation nếu click nhiều lần
-		el.classList.remove("pin-message-flash");
+		el.classList.remove("animate-jump-highlight");
 		void el.offsetWidth;
-		el.classList.add("pin-message-flash");
+		el.classList.add("animate-jump-highlight");
 
 		setTimeout(() => {
-			el.classList.remove("pin-message-flash");
-		}, 1800);
+			el.classList.remove("animate-jump-highlight");
+		}, 3000);
 
 		return true;
-	};
-
-	const ensureMessageLoaded = async (messageId: string) => {
-		const store = useChatStore.getState();
-		const convoId = store.activeConversationId;
-		if (!convoId) return false;
-
-		for (let i = 0; i < 10; i++) {
-			const state = useChatStore.getState();
-			const convo = state.messages[convoId];
-			const items = convo?.items ?? [];
-
-			if (items.some((m) => m._id === messageId)) return true;
-			if (!convo?.hasMore || convo?.nextCursor === null) return false;
-
-			await state.fetchMessages(convoId);
-		}
-
-		return false;
-	};
-
-	const waitForDomThenHighlight = async (messageId: string) => {
-		for (let i = 0; i < 24; i++) {
-			if (highlightMessage(messageId)) return true;
-			await new Promise((resolve) =>
-				requestAnimationFrame(() => resolve(true))
-			);
-		}
-		return false;
 	};
 
 	const handleJump = async (msg: Message) => {
@@ -155,13 +126,18 @@ export function PinnedMessagesBanner({
 			return;
 		}
 
-		if (highlightMessage(msg._id)) return;
+		if (highlightMessage(msg._id)) {
+			setExpanded(false);
+			return;
+		}
 
-		const loaded = await ensureMessageLoaded(msg._id);
-		if (!loaded) return;
-
-		await waitForDomThenHighlight(msg._id);
+		const store = useChatStore.getState();
+		if (activeConversationId) {
+			await store.jumpToMessage(activeConversationId, msg._id);
+			setExpanded(false);
+		}
 	};
+
 
 	return (
 		<div className="sticky top-0 z-20 border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">

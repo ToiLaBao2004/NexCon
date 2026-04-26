@@ -4,9 +4,11 @@ import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import MessageItem from "./MessageItem";
 import CallMessageItem from "./CallMessageItem";
 import { PinnedMessagesBanner } from "@/components/chat/PinnedMessagesBanner";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSocketStore } from "@/stores/useSocketStore";
+
 
 const ChatWindowBody: React.FC = () => {
   const {
@@ -16,9 +18,15 @@ const ChatWindowBody: React.FC = () => {
     fetchMessages,
     messageLoading,
     setReplyingTo,
+    jumpContexts,
+    loadOlderInJumpMode,
+    loadNewerInJumpMode,
+    exitJumpMode,
   } = useChatStore();
 
   const convoId = activeConversationId ?? null;
+  const jumpContext = useMemo(() => convoId ? jumpContexts[convoId] : null, [jumpContexts, convoId]);
+  const isJumpMode = jumpContext?.isJumpMode ?? false;
 
   const messages = useMemo(
     () => (convoId ? allMessages[convoId]?.items ?? [] : []),
@@ -26,11 +34,15 @@ const ChatWindowBody: React.FC = () => {
   );
 
   const messageData = convoId ? allMessages[convoId] : null;
-  const hasMore = messageData?.hasMore ?? false;
+  const hasMoreOlder = isJumpMode ? (jumpContext?.hasMoreOlder ?? false) : (messageData?.hasMore ?? false);
+  const hasMoreNewer = isJumpMode ? (jumpContext?.hasMoreNewer ?? false) : false;
 
   const selectedConvo = conversations.find((c) => c._id === convoId);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
+
   const { user } = useAuthStore();
   const { typingUsers } = useSocketStore();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -43,14 +55,99 @@ const ChatWindowBody: React.FC = () => {
     ? (typingUsers[convoId]?.filter(id => id !== user?._id) || [])
     : [];
 
-  const activeTypingParticipants = activeTypingUserIds.map(id =>
+  const activeTypingParticipants = activeTypingUserIds.map((id: string) =>
     selectedConvo?.participants.find(p => p.userId?._id?.toString() === id)
   );
 
-  const loadingOlderRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
+  // Track scroll position to show "Back to latest" button in normal mode
   useEffect(() => {
-    const scrollToBottom = (instant = false) => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      // Show button if we are more than 800px away from bottom
+      const isFarFromBottom = scrollHeight - scrollTop - clientHeight > 800;
+      setShowScrollToBottom(isFarFromBottom);
+    };
+
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll(); // Check initial state
+
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [convoId]);
+
+
+  // IntersectionObserver for top sentinel (load older)
+  useEffect(() => {
+    if (!topSentinelRef.current || !convoId) return;
+    if (!hasMoreOlder || messageLoading) return;
+
+    const observer = new IntersectionObserver((entries: any) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && !loadingMoreRef.current) {
+        loadingMoreRef.current = true;
+        prevScrollHeightRef.current = scrollRef.current?.scrollHeight ?? 0;
+
+        if (isJumpMode) {
+          loadOlderInJumpMode(convoId);
+        } else {
+          fetchMessages(convoId);
+        }
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(topSentinelRef.current);
+    return () => observer.disconnect();
+  }, [convoId, hasMoreOlder, messageLoading, isJumpMode, fetchMessages, loadOlderInJumpMode]);
+
+  // IntersectionObserver for bottom sentinel (load newer)
+  useEffect(() => {
+    if (!bottomSentinelRef.current || !convoId) return;
+    if (!isJumpMode || !hasMoreNewer || messageLoading) return;
+
+    const observer = new IntersectionObserver((entries: any) => {
+      const [entry] = entries;
+      if (entry.isIntersecting && !loadingMoreRef.current) {
+        loadingMoreRef.current = true;
+        loadNewerInJumpMode(convoId);
+      }
+    }, { threshold: 0.1 });
+
+    observer.observe(bottomSentinelRef.current);
+    return () => observer.disconnect();
+  }, [convoId, isJumpMode, hasMoreNewer, messageLoading, loadNewerInJumpMode]);
+
+  // Restore scroll position after loading older messages
+  useEffect(() => {
+    if (!convoId || !loadingMoreRef.current) return;
+    if (messageLoading) return;
+
+    const container = scrollRef.current;
+    if (container && prevScrollHeightRef.current > 0) {
+      const newHeight = container.scrollHeight;
+      const delta = newHeight - prevScrollHeightRef.current;
+      if (delta > 0) {
+        container.scrollTop += delta;
+      }
+      prevScrollHeightRef.current = 0;
+    }
+
+    // Delay resetting loading flag to ensure ResizeObserver sees it as true during layout
+    requestAnimationFrame(() => {
+      loadingMoreRef.current = false;
+    });
+  }, [messages.length, messageLoading, convoId]);
+
+
+  const prevLastItemIdRef = useRef<string | undefined>(undefined);
+
+  // Handle auto-scroll to bottom on first load or new messages
+  useEffect(() => {
+    const scrollToBottom = (instant: boolean = false) => {
       if (scrollRef.current) {
         scrollRef.current.scrollTo({
           top: scrollRef.current.scrollHeight,
@@ -58,8 +155,11 @@ const ChatWindowBody: React.FC = () => {
         });
       }
     };
-    // if we're currently loading older messages, skip auto-scrolling to bottom
-    if (loadingOlderRef.current) return;
+
+    const isNewMessageAtBottom = lastItemId !== prevLastItemIdRef.current;
+    prevLastItemIdRef.current = lastItemId;
+
+    if (loadingMoreRef.current || isJumpMode || showScrollToBottom) return;
 
     if (isFirstLoad.current) {
       if (messages.length > 0) {
@@ -69,86 +169,70 @@ const ChatWindowBody: React.FC = () => {
         });
         isFirstLoad.current = false;
       }
-    } else if (convoId) {
-      const isStatusUpdate = messages.length === prevMessageCount.current;
-      scrollToBottom(isStatusUpdate);
+    } else if (convoId && isNewMessageAtBottom) {
+      scrollToBottom();
     }
-  }, [lastItemId, activeTypingUserIds.length, messages.length, convoId]);
+  }, [lastItemId, messages.length, convoId, isJumpMode]);
+
+
+  // Handle jump scroll to anchor
+  const anchorId = jumpContext?.anchorId;
+  useEffect(() => {
+    if (!anchorId || !isJumpMode) return;
+
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`message-${anchorId}`);
+      if (!el) return;
+
+      el.scrollIntoView({ behavior: 'instant', block: 'center' });
+      el.classList.add('animate-jump-highlight');
+      setTimeout(() => el.classList.remove('animate-jump-highlight'), 3000);
+    });
+  }, [anchorId, isJumpMode]);
 
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
 
     const resizeObserver = new ResizeObserver(() => {
-        const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 500;
-        if (isNearBottom && !isFirstLoad.current) {
-            container.scrollTop = container.scrollHeight;
-        }
+      // Don't auto-scroll to bottom if we are loading older/newer messages
+      if (loadingMoreRef.current) return;
+
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      // Only auto-scroll if near bottom and NOT near the top
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
+      const isNearTop = scrollTop < 100;
+
+      if (isNearBottom && !isNearTop && !isFirstLoad.current && !isJumpMode) {
+        container.scrollTop = scrollHeight;
+      }
     });
 
     const content = container.firstElementChild;
     if (content) resizeObserver.observe(content);
 
     return () => resizeObserver.disconnect();
-  }, [convoId]);
+  }, [convoId, isJumpMode]);
+
 
   useEffect(() => {
     isFirstLoad.current = true;
+    prevLastItemIdRef.current = undefined;
     prevMessageCount.current = 0;
-    loadingOlderRef.current = false;
+    loadingMoreRef.current = false;
     prevScrollHeightRef.current = 0;
   }, [convoId]);
+
 
   useEffect(() => {
     prevMessageCount.current = messages.length;
   }, [messages.length]);
 
-  const handleScroll = useCallback(() => {
-    const container = scrollRef.current;
-    if (!container || !convoId) return;
-    if (loadingOlderRef.current) return;
-
-    const canFetchMoreMessages = hasMore && !messageLoading;
-
-    if (container.scrollTop < 100 && canFetchMoreMessages) {
-      prevScrollHeightRef.current = container.scrollHeight;
-      loadingOlderRef.current = true;
-
-      fetchMessages(convoId);
-    }
-  }, [convoId, hasMore, messageLoading, fetchMessages]);
-
-  useEffect(() => {
-    if (!convoId || !loadingOlderRef.current) return;
-    if (messageLoading) return;
-
-    const container = scrollRef.current;
-    if (!container) {
-      loadingOlderRef.current = false;
-      return;
-    }
-
-    const previousHeight = prevScrollHeightRef.current;
-    const newHeight = container.scrollHeight;
-    const delta = Math.max(0, newHeight - previousHeight);
-
-    if (delta > 0) {
-      container.scrollTop += delta;
-    }
-
-    loadingOlderRef.current = false;
-
-    const stillCanFetch = hasMore && !messageLoading;
-    if (stillCanFetch && container.scrollTop < 24) {
-      requestAnimationFrame(() => handleScroll());
-    }
-  }, [messages.length, messageLoading, convoId, hasMore, handleScroll]);
-
   if (!convoId || !selectedConvo) {
     return <ChatWelcomeScreen />;
   }
 
-  if (messages.length === 0 && activeTypingUserIds.length === 0) {
+  if (messages.length === 0 && activeTypingUserIds.length === 0 && !messageLoading) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
         Chưa có tin nhắn nào trong cuộc trò chuyện này!
@@ -157,17 +241,18 @@ const ChatWindowBody: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-primary-foreground overflow-hidden">
+    <div className="flex flex-col h-full bg-primary-foreground overflow-hidden relative">
       <PinnedMessagesBanner />
 
       <div
         ref={scrollRef}
-        onScroll={handleScroll}
         className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4 pb-2"
       >
-        {messageLoading && hasMore && (
+        <div ref={topSentinelRef} className="h-1 shrink-0" />
+
+        {messageLoading && (
           <div className="flex justify-center py-4 text-sm text-muted-foreground">
-            Đang tải tin nhắn cũ...
+            {isJumpMode ? "Đang tải dữ liệu quanh tin nhắn..." : "Đang tải tin nhắn..."}
           </div>
         )}
 
@@ -189,7 +274,7 @@ const ChatWindowBody: React.FC = () => {
           return (
             <div
               key={`msg-${message._id ?? index}`}
-              id={`msg-${message._id}`}
+              id={`message-${message._id}`}
             >
               <MessageItem
                 message={message}
@@ -220,10 +305,43 @@ const ChatWindowBody: React.FC = () => {
           </div>
         )}
 
+        <div ref={bottomSentinelRef} className="h-1 shrink-0" />
         <div ref={bottomRef} />
       </div>
+
+      {(isJumpMode || showScrollToBottom) && (
+        <div className="absolute bottom-24 left-0 right-0 flex justify-center z-20 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-2 bg-slate-800/95 backdrop-blur
+                          text-sm text-slate-100 px-4 py-2 rounded-full shadow-2xl border border-slate-700/50 pointer-events-auto">
+            <span className="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
+            <span>Bạn đang xem tin nhắn cũ</span>
+            <div className="w-px h-4 bg-slate-600 mx-1"></div>
+            <button
+              onClick={async () => {
+                if (isJumpMode) {
+                  await exitJumpMode(convoId);
+                  setTimeout(() => {
+                    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
+                  }, 150);
+                } else {
+                  scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
+                }
+              }}
+
+              className="text-blue-400 hover:text-blue-300 font-bold transition-colors"
+            >
+              Về tin mới nhất ↓
+            </button>
+
+          </div>
+        </div>
+      )}
+
+
+
     </div>
   );
 };
+
 
 export default ChatWindowBody;
