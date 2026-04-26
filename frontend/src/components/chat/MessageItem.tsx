@@ -1888,7 +1888,7 @@ const MessageItem = ({
 								reactionSummary && !isImage && !isLink && !isSticker && "min-w-[85px]",
 								isRecalled
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
-									: isLink || isSticker
+									: isImage || isLink || isSticker
 										? "bg-transparent border-0 shadow-none"
 										: isOwn
 											? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
