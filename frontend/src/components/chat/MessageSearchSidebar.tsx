@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import UserAvatar from "./UserAvatar";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useMaxWidth } from "@/hooks/use-max-width";
+import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
 
 interface MessageSearchSidebarProps {
   onClose: () => void;
@@ -136,6 +138,8 @@ function Dropdown({
 // Main component
 export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarProps) {
   const isMobile = useIsMobile();
+  const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
+  const useOverlay = isMobile || isTabletOrBelow;
   const { searchMessages, searchResults, clearSearch, activeConversationId, conversations } = useChatStore();
 
   // Find current conversation participants
@@ -229,13 +233,13 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
       void (el as HTMLElement).offsetWidth;
       el.classList.add('animate-jump-highlight');
       setTimeout(() => el.classList.remove('animate-jump-highlight'), 3000);
-      if (isMobile) onClose();
+      if (useOverlay) onClose();
       return;
     }
 
     if (activeConversationId) {
       await useChatStore.getState().jumpToMessage(activeConversationId, messageId);
-      if (isMobile) onClose();
+      if (useOverlay) onClose();
     }
   };
 
@@ -254,8 +258,8 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
 
   return (
     <>
-      {/* Mobile: dim backdrop */}
-      {isMobile && (
+      {/* Mobile/Tablet: dim backdrop */}
+      {useOverlay && (
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[1px] animate-in fade-in duration-200"
           onClick={onClose}
@@ -264,8 +268,8 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
       <aside
         className={cn(
           "flex flex-col bg-background border-l border-border/40 overflow-hidden",
-          isMobile
-            // Mobile: fixed right-side panel full height, sits above backdrop
+          useOverlay
+            // Mobile/Tablet: fixed right-side panel full height, sits above backdrop
             ? "fixed right-0 top-0 bottom-0 z-50 w-[min(350px,100vw)] shadow-2xl animate-in slide-in-from-right duration-300"
             // Desktop: flex sibling, fixed width
             : "h-full w-[350px] min-w-[350px]"
