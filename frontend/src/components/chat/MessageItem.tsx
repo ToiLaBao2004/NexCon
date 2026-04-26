@@ -322,6 +322,11 @@ interface MessageItemProps {
 
 function MessageContent({ message, isOwn, downloadUrl, participants }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[] }) {
 	const type: MessageType = message.type ?? "text";
+	const [showAudioText, setShowAudioText] = useState(false);
+
+	useEffect(() => {
+		setShowAudioText(false);
+	}, [message._id]);
 
 	if (message.isRecalled) {
 		return (
@@ -390,11 +395,41 @@ function MessageContent({ message, isOwn, downloadUrl, participants }: { message
 	}
 
 	if (type === "audio" && (message.filePublicId || message.fileUrl)) {
+		const hasAudioText = Boolean(message.content?.trim());
+
 		return (
 			<div className="flex flex-col gap-1.5">
-				<AudioPlayer src={downloadUrl} isOwn={isOwn} />
-				{message.content && (
-					<p className="text-sm px-1">{renderMentionedText(message.content, message.mentions, isOwn, participants)}</p>
+				<div className="flex items-center gap-2">
+					<AudioPlayer src={downloadUrl} isOwn={isOwn} />
+
+					{hasAudioText && (
+						<button
+							type="button"
+							onClick={() => setShowAudioText((current) => !current)}
+							className={cn(
+								"shrink-0 h-7 min-w-7 px-2 rounded-full text-[11px] font-bold transition-colors border cursor-pointer",
+								isOwn
+									? "bg-white/15 hover:bg-white/25 border-white/20 text-white"
+									: "bg-muted hover:bg-muted/80 border-border text-foreground"
+							)}
+							title={showAudioText ? "Ẩn nội dung thoại" : "Hiện nội dung thoại"}
+						>
+							[A]
+						</button>
+					)}
+				</div>
+
+				{hasAudioText && showAudioText && (
+					<p
+						className={cn(
+							"text-sm px-2 py-1.5 rounded-lg max-w-[260px] whitespace-pre-wrap break-words",
+							isOwn
+								? "bg-white/10 text-white"
+								: "bg-muted/70 text-foreground"
+						)}
+					>
+						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
+					</p>
 				)}
 			</div>
 		);

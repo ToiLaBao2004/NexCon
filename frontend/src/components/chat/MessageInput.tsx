@@ -232,7 +232,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		try {
 			await sendMessage(payload, (_pct) => {
-				// Progress is now handled by the bubble in the store
 			});
 		} catch (error: any) {
 			const isModerationError =
@@ -240,7 +239,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				error?.message?.toLowerCase().includes("tiêu chuẩn cộng đồng");
 
 			if (isModerationError) {
-				// ❌ KHÔNG restore lại nội dung
 				setValue("");
 				setAttachment(null);
 
@@ -249,7 +247,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					"Tin nhắn vi phạm tiêu chuẩn cộng đồng."
 				);
 			} else {
-				// ✅ lỗi bình thường → restore lại để user không bị mất text
 				setValue(currValue);
 				setAttachment(prevAttachment);
 				setSelectedMentions(prevMentions);
@@ -447,6 +444,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const sendAudio = useCallback(async (file: File) => {
 		setIsRecording(false);
 
+		const currValue = value;
+		const prevAttachment = attachment;
+		const prevMentions = selectedMentions;
+
 		const payload: Parameters<typeof sendMessage>[0] = { type: "audio", file };
 
 		if (selectedConvo.type === "direct") {
@@ -458,8 +459,28 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		setSending(true);
 		try {
 			await sendMessage(payload);
-		} catch {
-			toast.error("Gửi tin nhắn thoại thất bại. Vui lòng thử lại!");
+		} catch (error: any) {
+			const isModerationError =
+				error?.response?.data?.moderation ||
+				error?.message?.toLowerCase().includes("tiêu chuẩn cộng đồng");
+
+			if (isModerationError) {
+				setValue("");
+				setAttachment(null);
+
+				toast.error(
+					error?.response?.data?.message ||
+					"Tin nhắn vi phạm tiêu chuẩn cộng đồng."
+				);
+			} else {
+				setValue(currValue);
+				setAttachment(prevAttachment);
+				setSelectedMentions(prevMentions);
+
+				toast.error(
+					error?.message ?? "Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại!"
+				);
+			}
 		} finally {
 			setSending(false);
 			setTimeout(() => textInputRef.current?.focus(), 0);
@@ -545,15 +566,15 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 										? "Tin nhắn đã thu hồi"
 										: replyingTo.type === "image"
 											? "Hình ảnh"
-										: replyingTo.type === "sticker"
-											? "Nhãn dán"
-											: replyingTo.type === "audio"
-												? "🎙️ Tin nhắn thoại"
-												: replyingTo.type === "file"
-													? (replyingTo.fileName ?? "Tệp đính kèm")
-													: (replyingTo.content && replyingTo.content.length > 50
-														? replyingTo.content.slice(0, 50) + "…"
-														: replyingTo.content ?? "")}
+											: replyingTo.type === "sticker"
+												? "Nhãn dán"
+												: replyingTo.type === "audio"
+													? "🎙️ Tin nhắn thoại"
+													: replyingTo.type === "file"
+														? (replyingTo.fileName ?? "Tệp đính kèm")
+														: (replyingTo.content && replyingTo.content.length > 50
+															? replyingTo.content.slice(0, 50) + "…"
+															: replyingTo.content ?? "")}
 								</span>
 							</div>
 						</div>

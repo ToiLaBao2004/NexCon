@@ -19,6 +19,7 @@ import { moderateLinkMessage } from '../services/moderation/moderationLinkServic
 import { fetchLinkPreview } from '../utils/linkPreview.js';
 import { createNotification } from '../services/notificationServices.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
+import { transcribeAudioFromBuffer } from '../services/audio/transcribeAudio.js';
 
 const parseMentionPayload = (rawMentions) => {
     if (Array.isArray(rawMentions)) {
@@ -234,11 +235,48 @@ export async function sendMessage(req, res) {
 
             case 'audio': {
                 if (!uploadedFile) {
-                    return res.status(400).json({ message: 'Audio file is required.' });
+                    return res.status(400).json({
+                        message: 'Audio file is required.',
+                    });
                 }
+
+                if (uploadedFile.mimetype !== 'audio/webm') {
+                    return res.status(400).json({
+                        message: 'Chỉ hỗ trợ định dạng audio/webm.',
+                    });
+                }
+
                 if (uploadedFile.size > MAX_FILE_SIZE) {
                     return res.status(413).json({
                         message: `File quá lớn. Kích thước tối đa là ${MAX_FILE_SIZE / 1024 / 1024}MB.`,
+                    });
+                }
+
+                const transcript = await transcribeAudioFromBuffer(
+                    uploadedFile.buffer,
+                    uploadedFile.originalname || 'voice_message.webm',
+                    uploadedFile.mimetype || 'audio/webm'
+                );
+
+                const cleanTranscript = transcript;
+
+                if (!cleanTranscript) {
+                    return res.status(400).json({
+                        message: 'Không thể chuyển audio thành văn bản để kiểm duyệt.',
+                    });
+                }
+
+                const moderationResult = await moderateTextMessage(cleanTranscript);
+
+                if (moderationResult.blocked) {
+                    return res.status(400).json({
+                        message: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng.',
+                        moderation: {
+                            category: moderationResult.category,
+                            reason: moderationResult.reason,
+                            source: moderationResult.source,
+                            confidence: moderationResult.confidence ?? null,
+                        },
                     });
                 }
 
@@ -247,11 +285,13 @@ export async function sendMessage(req, res) {
                     uploadedFile.buffer,
                     uploadedFile.originalname || 'voice_message.webm'
                 );
+
                 messageData.filePublicId = result.public_id;
                 messageData.fileName = uploadedFile.originalname || 'voice_message.webm';
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
-                if (content?.trim()) messageData.content = content.trim();
+                messageData.content = cleanTranscript;
+
                 break;
             }
 
