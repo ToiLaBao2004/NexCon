@@ -372,7 +372,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 type="button"
                 onClick={handlePickGroupAvatar}
                 disabled={groupAvatarLoading}
-                className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70 z-10"
+                className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70 z-40"
                 title="Đổi ảnh đại diện nhóm"
               >
                 {groupAvatarLoading ? (
