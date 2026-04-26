@@ -563,7 +563,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants }: { message
 				rel="noopener noreferrer"
 				className={cn(
 					"flex items-center gap-1.5 hover:underline underline-offset-4 transition-colors",
-					isOwn ? "decoration-white/60" : "decoration-primary/40 text-primary dark:text-blue-400"
+					isOwn ? "decoration-emerald-500/60" : "decoration-primary/40 text-primary dark:text-blue-400"
 				)}
 			>
 				<Link2 className="size-3.5 shrink-0" />
@@ -674,7 +674,7 @@ function ReplyQuoteInline({
 				"border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30",
 				"px-3 py-1.5 rounded-xl shadow-sm",
 				"flex flex-col gap-0",
-				isOwn ? "border-white/60 bg-white/20" : "border-blue-500",
+				isOwn ? "border-emerald-500/60 bg-emerald-500/20" : "border-blue-500",
 			)}
 			style={{ boxShadow: "0 2px 8px 0 rgba(0, 120, 255, 0.08)" }}
 			onClick={(e) => {
@@ -682,8 +682,8 @@ function ReplyQuoteInline({
 				const el = document.getElementById(`msg-${replyTo._id}`);
 				if (el) {
 					el.scrollIntoView({ behavior: "smooth", block: "center" });
-					el.classList.add("ring-2", "ring-primary/40", "rounded-2xl");
-					setTimeout(() => el.classList.remove("ring-2", "ring-primary/40", "rounded-2xl"), 2000);
+					el.classList.add("ring-2", "ring-emerald-500/40", "rounded-2xl");
+					setTimeout(() => el.classList.remove("ring-2", "ring-emerald-500/40", "rounded-2xl"), 2000);
 				}
 			}}
 		>
@@ -711,6 +711,68 @@ function ReplyQuoteInline({
 }
 
 import { getSystemMessageText } from "@/utils/chatUtils";
+
+// ── Detect date/time hints in Vietnamese text ─────────────────────────────────
+// NOTE: Avoid Unicode lookbehind (unsupported in some JS engines).
+const DATE_TIME_PATTERNS: RegExp[] = [
+	// Multi-word relative phrases
+	/(ngày mai|ngày kia|ngày mốt|tuần tới|tuần sau|tháng tới|tháng sau|năm tới|năm sau|cuối tuần|đầu tuần|cuối tháng|đầu tháng|hôm nay|chiều nay|sáng nay|tối nay|đêm nay|trưa nay)/i,
+	// "mai" / "mốt" surrounded by whitespace, punctuation, or string boundaries
+	/(^|[\s,.:;!?([\-\u2013])mai($|[\s,.:;!?)[\]\u2013\-])/i,
+	/(^|[\s,.:;!?([\-\u2013])mốt($|[\s,.:;!?)[\]\u2013\-])/i,
+	// Explicit date formats: dd/mm/yyyy, dd/mm/yy, dd-mm-yyyy
+	/\d{1,2}[\/\-]\d{1,2}([\/\-]\d{2,4})?/,
+	// "ngày X tháng Y" or "X tháng Y năm Z"
+	/(ngày\s*)?\d{1,2}\s*tháng\s*\d{1,2}(\s*(năm\s*)?\d{2,4})?/i,
+	// Weekday references
+	/(thứ\s*(hai|ba|tư|năm|sáu|bảy)|chủ\s*nhật)/i,
+	// Time expressions: "X giờ", "X:XX giờ", "lúc X"
+	/\d{1,2}(:\d{2})?\s*(giờ|\bh\b)/i,
+	/lúc\s+\d{1,2}/i,
+	// "X ngày/tuần/tháng nữa"
+	/\d+\s*(ngày|tuần|tháng|giờ|phút)\s*(nữa|sau)/i,
+];
+
+function detectDateTimeInText(text: string): boolean {
+	if (!text) return false;
+	try {
+		return DATE_TIME_PATTERNS.some((pattern) => pattern.test(text));
+	} catch {
+		return false;
+	}
+}
+
+// ── Quick reminder button shown below a message bubble ────────────────────────
+function SmartReminderButton({
+	isOwn,
+	onOpen,
+}: {
+	message: Message;
+	isOwn: boolean;
+	onOpen: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			onClick={(e) => {
+				e.stopPropagation();
+				onOpen();
+			}}
+			className={cn(
+				"mt-1 flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-medium border",
+				"transition-all duration-150 animate-in fade-in slide-in-from-top-1",
+				"hover:opacity-80 active:scale-95 select-none cursor-pointer",
+
+				isOwn
+					? "bg-white/10 text-white border-white/20"
+					: "bg-muted text-foreground border-border"
+			)}
+		>
+			<BellPlus className="size-3 shrink-0" />
+			Tạo nhắc hẹn
+		</button>
+	);
+}
 
 function SystemMessageComponent({
 	message,
@@ -1800,6 +1862,23 @@ const MessageItem = ({
 		return { uniqueEmojis, totalCount, myReaction };
 	}, [message.reactions, currentUserId]);
 
+	// ── Smart reminder detection ───────────────────────────────────────────────
+	const showSmartReminderButton = useMemo(() => {
+		if (isRecalled) return false;
+		if (isDisbanded) return false;
+		if (message.type !== "text") return false;
+		if (!message.content) return false;
+		return detectDateTimeInText(message.content);
+	}, [isRecalled, isDisbanded, message.type, message.content]);
+
+	const openSmartReminder = useCallback(() => {
+		setReminderTargetMessage({
+			messageId: message._id,
+			messagePreview: message.content ?? "Tin nhắn",
+		});
+	}, [message._id, message.content]);
+	// ─────────────────────────────────────────────────────────────────────────
+
 	const handleEmojiSelect = async (emoji: any) => {
 		if (isReacting) return;
 		setIsReacting(true);
@@ -1920,6 +1999,14 @@ const MessageItem = ({
 										isOwn ? "self-end" : "self-start",
 										(isOwn && !isLink) ? "text-white/60" : "text-muted-foreground/60"
 									)}>
+										{/* ── Smart Reminder Button ─────────────────────────────────────────── */}
+										{showSmartReminderButton && (
+											<SmartReminderButton
+												message={message}
+												isOwn={isOwn}
+												onOpen={openSmartReminder}
+											/>
+										)}
 										<span className="text-[10px] sm:text-[10.5px] font-medium leading-none whitespace-nowrap">
 											{formatMessageTime(new Date(message.createdAt))}
 										</span>
@@ -1928,6 +2015,7 @@ const MessageItem = ({
 										)}
 									</div>
 								)}
+
 							</div>
 						</Card>
 
