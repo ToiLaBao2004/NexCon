@@ -213,6 +213,9 @@ export const getLivekitToken = async (req, res) => {
                 joinedAt: new Date().toISOString(),
                 metadata: metadataValue,
             });
+            if (isHost) {
+                emitWaitingRoomUpdateToHost(normalizedRoomName, room);
+            }
         } else {
             return res.status(400).json({ message: 'Yêu cầu không hợp lệ: thiếu mode create/join.' });
         }
@@ -226,7 +229,64 @@ export const getLivekitToken = async (req, res) => {
         res.json({
             token: jwt,
             isHost: room.hostId === userId,
+            waitingRoom: (room.hostId === userId) ? serializeWaitingRoom(room.waitingRoom) : [],
         });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+export const endLivekitMeeting = async (req, res) => {
+    try {
+        const normalizedRoomName = normalizeRoomName(req.params.roomName);
+        const userId = req.user?._id?.toString();
+
+        if (!normalizedRoomName || !MEETING_CODE_REGEX.test(normalizedRoomName)) {
+            return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
+        }
+
+        if (!userId) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const room = meetingRegistry.get(normalizedRoomName);
+        if (!room) {
+            return res.status(404).json({ message: 'Phòng họp không tồn tại.' });
+        }
+
+        if (room.hostId !== userId) {
+            return res.status(403).json({ message: 'Chỉ chủ phòng mới có thể kết thúc cuộc họp.' });
+        }
+
+        // Clear timeouts
+        for (const waiter of room.waitingRoom || []) {
+            if (waiter.timeoutId) {
+                clearTimeout(waiter.timeoutId);
+            }
+        }
+
+        const { io, getReceiverSocketId } = getSocketGateway();
+        if (io && getReceiverSocketId) {
+            for (const participantId of room.participants.keys()) {
+                const targetSocketId = getReceiverSocketId(participantId);
+                if (targetSocketId) {
+                    io.to(targetSocketId).emit('meeting-ended', { roomName: normalizedRoomName });
+                }
+            }
+
+            for (const waiter of room.waitingRoom || []) {
+                const targetSocketId = getReceiverSocketId(waiter.userId);
+                if (targetSocketId) {
+                    io.to(targetSocketId).emit('participant-rejected', {
+                        roomName: normalizedRoomName,
+                        reason: 'meeting-ended',
+                    });
+                }
+            }
+        }
+
+        meetingRegistry.delete(normalizedRoomName);
+        res.json({ message: 'Đã kết thúc cuộc họp.' });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }

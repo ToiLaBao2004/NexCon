@@ -705,6 +705,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useMeetStore.getState().setCallStatus('rejected');
     });
 
+    socket.on('meeting-ended', ({ roomName }) => {
+      const meetState = useMeetStore.getState();
+      if (meetState.roomName && String(meetState.roomName) === String(roomName)) {
+        toast.info('Chủ phòng đã kết thúc cuộc họp.');
+        meetState.leaveMeeting();
+      }
+    });
+
     socket.on("approval-requested", ({ conversationId }) => {
       const chatState = useChatStore.getState();
       const currentUserId = useAuthStore.getState().user?._id;

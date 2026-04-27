@@ -108,26 +108,15 @@ const MeetPage = () => {
             setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tạo cuộc họp.');
             return;
         }
-        setLoading(true);
-        setError('');
-        try {
-            const res = await api.post('/livekit/token', {
-                roomName: meetingCode,
-                identity,
-                metadata: user?.avatarUrl ?? '',
-                mode: 'create',
-            });
-            useMeetStore.getState().joinMeeting(
-                res.data.token,
-                meetingCode,
-                meetingTitle.trim(),
-                Boolean(res.data?.isHost),
-            );
-        } catch (err) {
-            setError(getApiErrorMessage(err));
-        } finally {
-            setLoading(false);
-        }
+        
+        // Show preview screen first instead of joining immediately
+        setPreviewData({
+            code: meetingCode,
+            label: meetingTitle.trim(),
+            isRejoin: false,
+            isHostPreview: true,
+            isCreatingNewRoom: true, // indicates that we need to use mode: 'create'
+        });
     };
 
     const handleJoin = async () => {
@@ -200,6 +189,7 @@ const MeetPage = () => {
                 previewData.code,
                 previewData.label,
                 Boolean(res.data?.isHost),
+                res.data?.waitingRoom,
             );
             setPreviewData(null);
         } catch (err) {

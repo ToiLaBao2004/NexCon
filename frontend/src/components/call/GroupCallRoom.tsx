@@ -33,6 +33,7 @@ interface GroupCallRoomProps {
   onMaximize?: () => void;
   enablePresenceToasts?: boolean;
   onParticipantsChange?: (participants: RoomParticipantSummary[]) => void;
+  onLeaveIntercept?: (disconnect: () => void) => void;
 }
 
 export interface RoomParticipantSummary {
@@ -220,7 +221,7 @@ const RoomHeader = ({ roomLabel, onMinimize }: { roomName: string; roomLabel?: s
 };
 
 /* ─── Control Bar ─── */
-const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
+const ControlBar = ({ onLeave, onLeaveIntercept }: { onLeave?: () => void; onLeaveIntercept?: (disconnect: () => void) => void }) => {
   const { toggle: toggleMic, enabled: micOn, pending: micPending } = useTrackToggle({
     source: Track.Source.Microphone,
   });
@@ -249,8 +250,15 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
   const { buttonProps: leaveProps } = useDisconnectButton({ stopTracks: true });
 
   const handleLeave = () => {
-    leaveProps.onClick();
-    onLeave?.();
+    if (onLeaveIntercept) {
+      onLeaveIntercept(() => {
+        leaveProps.onClick({} as any);
+        onLeave?.();
+      });
+    } else {
+      leaveProps.onClick({} as any);
+      onLeave?.();
+    }
   };
 
   return (
@@ -312,7 +320,7 @@ const ControlBar = ({ onLeave }: { onLeave?: () => void }) => {
 };
 
 /* ─── Mini Controls (PiP mode) ─── */
-const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => void; onLeave?: () => void; roomLabel?: string }) => {
+const MiniControls = ({ onMaximize, onLeave, roomLabel, onLeaveIntercept }: { onMaximize?: () => void; onLeave?: () => void; roomLabel?: string; onLeaveIntercept?: (disconnect: () => void) => void }) => {
   const { toggle: toggleMic, enabled: micOn } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn } = useTrackToggle({ source: Track.Source.Camera });
 
@@ -333,8 +341,15 @@ const MiniControls = ({ onMaximize, onLeave, roomLabel }: { onMaximize?: () => v
   const { buttonProps: leaveProps } = useDisconnectButton({ stopTracks: true });
 
   const handleLeave = () => {
-    leaveProps.onClick();
-    onLeave?.();
+    if (onLeaveIntercept) {
+      onLeaveIntercept(() => {
+        leaveProps.onClick({} as any);
+        onLeave?.();
+      });
+    } else {
+      leaveProps.onClick({} as any);
+      onLeave?.();
+    }
   };
 
   return (
@@ -570,6 +585,7 @@ const GroupCallRoom = ({
   onMaximize,
   enablePresenceToasts = false,
   onParticipantsChange,
+  onLeaveIntercept,
 }: GroupCallRoomProps) => {
   return (
     <LiveKitRoom
@@ -590,14 +606,14 @@ const GroupCallRoom = ({
       <ParticipantsSync onParticipantsChange={onParticipantsChange} />
       <RoomAudioRenderer />
       {minimized ? (
-        <MiniControls onMaximize={onMaximize} onLeave={onLeave} roomLabel={roomLabel} />
+        <MiniControls onMaximize={onMaximize} onLeave={onLeave} roomLabel={roomLabel} onLeaveIntercept={onLeaveIntercept} />
       ) : (
         <>
           <RoomHeader roomName={roomName} roomLabel={roomLabel} onMinimize={onMinimize} />
           <div className="flex-1 overflow-hidden">
             <Stage />
           </div>
-          <ControlBar onLeave={onLeave} />
+          <ControlBar onLeave={onLeave} onLeaveIntercept={onLeaveIntercept} />
         </>
       )}
     </LiveKitRoom>
