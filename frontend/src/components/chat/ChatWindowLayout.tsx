@@ -197,7 +197,7 @@ const ChatWindowLayout = () => {
       {activeSidebar === 'search' && (
         <MessageSearchSidebar
           onClose={() => {
-            setActiveSidebar('info');
+            setActiveSidebar(useOverlayInfoSidebar ? null : 'info');
             clearSearch();
           }}
         />

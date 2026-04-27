@@ -581,11 +581,13 @@ function ReplyQuoteInline({
 	isOwn,
 	participants,
 	currentUserId,
+	conversationId,
 }: {
 	replyTo: ReplyToMessage;
 	isOwn: boolean;
 	participants: Participant[];
 	currentUserId: string;
+	conversationId: string;
 }) {
 	const senderId =
 		typeof replyTo.senderId === "object"
@@ -677,13 +679,16 @@ function ReplyQuoteInline({
 				isOwn ? "border-emerald-500/60 bg-emerald-500/20" : "border-blue-500",
 			)}
 			style={{ boxShadow: "0 2px 8px 0 rgba(0, 120, 255, 0.08)" }}
-			onClick={(e) => {
+			onClick={async (e) => {
 				e.stopPropagation();
-				const el = document.getElementById(`msg-${replyTo._id}`);
+				const el = document.getElementById(`message-${replyTo._id}`);
 				if (el) {
 					el.scrollIntoView({ behavior: "smooth", block: "center" });
-					el.classList.add("ring-2", "ring-emerald-500/40", "rounded-2xl");
-					setTimeout(() => el.classList.remove("ring-2", "ring-emerald-500/40", "rounded-2xl"), 2000);
+					el.classList.add("animate-jump-highlight");
+					setTimeout(() => el.classList.remove("animate-jump-highlight"), 3000);
+				} else {
+					// Message not in DOM, use store jump functionality
+					await useChatStore.getState().jumpToMessage(conversationId, replyTo._id);
 				}
 			}}
 		>
@@ -1980,6 +1985,7 @@ const MessageItem = ({
 									isOwn={isOwn}
 									participants={selectedConvo.participants}
 									currentUserId={currentUserId}
+									conversationId={selectedConvo._id}
 								/>
 							)}
 							{!isRecalled && message.metadata?.forwardedFrom && (

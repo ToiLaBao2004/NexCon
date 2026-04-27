@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { useCallStore } from "@/stores/useCallStore";
 import { useGroupCallStore } from "@/stores/useGroupCallStore";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useMaxWidth } from "@/hooks/use-max-width";
+import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
 
 const PanelRightIcon = ({ className, filled }: { className?: string; filled?: boolean }) => (
   <svg
@@ -49,6 +51,8 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   const { startGroupCall, status: groupCallStatus } = useGroupCallStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const isMobile = useIsMobile();
+  const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
+  const useOverlayInfoSidebar = isMobile || isTabletOrBelow;
   let otherUser: Participant | null | undefined;
 
   chat = chat ?? conversations.find((c) => c._id === activeConversationId);
@@ -110,7 +114,10 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
     if (activeSidebar !== 'search') {
       setActiveSidebar('search');
     } else {
-      setActiveSidebar('info');
+      // Toggle off search mode. 
+      // On desktop, we might want to default back to info. 
+      // On mobile/tablet, we want to close it (null).
+      setActiveSidebar(useOverlayInfoSidebar ? null : 'info');
     }
   };
 
