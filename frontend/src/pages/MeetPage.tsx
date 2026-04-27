@@ -16,6 +16,8 @@ interface PreviewData {
     code: string;
     label: string;
     isRejoin: boolean;
+    isHostPreview?: boolean;
+    isCreatingNewRoom?: boolean;
 }
 
 const getApiErrorMessage = (error: unknown, fallback = 'Không thể kết nối') => {
@@ -109,13 +111,12 @@ const MeetPage = () => {
             return;
         }
         
-        // Show preview screen first instead of joining immediately
         setPreviewData({
             code: meetingCode,
             label: meetingTitle.trim(),
             isRejoin: false,
             isHostPreview: true,
-            isCreatingNewRoom: true, // indicates that we need to use mode: 'create'
+            isCreatingNewRoom: true,
         });
     };
 
@@ -140,6 +141,7 @@ const MeetPage = () => {
                 code,
                 label,
                 isRejoin: Boolean(infoRes.data?.canRejoin),
+                isHostPreview: Boolean(infoRes.data?.isHost),
             });
         } catch (err) {
             setError(getApiErrorMessage(err));
@@ -167,7 +169,7 @@ const MeetPage = () => {
                 roomName: previewData.code,
                 identity,
                 metadata: user?.avatarUrl ?? '',
-                mode: 'join',
+                mode: previewData.isCreatingNewRoom ? 'create' : 'join',
             });
 
             if (res.data?.status === 'waiting') {
@@ -259,6 +261,7 @@ const MeetPage = () => {
             <PreviewScreen
                 roomLabel={previewData.label}
                 isRejoin={previewData.isRejoin}
+                isHostPreview={previewData.isHostPreview}
                 onRequestJoin={handleRequestJoin}
                 onCancel={() => setPreviewData(null)}
             />

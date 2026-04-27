@@ -5,12 +5,19 @@ import { nameToColor } from '@/lib/utils';
 
 interface PreviewScreenProps {
   roomLabel: string;
-  isRejoin: boolean;
+  isRejoin?: boolean;
+  isHostPreview?: boolean;
   onRequestJoin: (prefs: { cameraEnabled: boolean; micEnabled: boolean }) => void;
   onCancel: () => void;
 }
 
-const PreviewScreen = ({ roomLabel, isRejoin, onRequestJoin, onCancel }: PreviewScreenProps) => {
+const PreviewScreen = ({
+  roomLabel,
+  isRejoin = false,
+  isHostPreview = false,
+  onRequestJoin,
+  onCancel,
+}: PreviewScreenProps) => {
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [isMicOn, setIsMicOn] = useState(true);
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null);
@@ -139,9 +146,11 @@ const PreviewScreen = ({ roomLabel, isRejoin, onRequestJoin, onCancel }: Preview
               <h2 className="mt-1.5 text-xl font-bold text-foreground md:text-2xl">{roomLabel}</h2>
 
               <p className="mt-2 text-sm text-muted-foreground">
-                {isRejoin
-                  ? 'Bạn đã từng tham gia phòng này. Bấm bên dưới để vào lại nhanh.'
-                  : 'Bạn cần gửi yêu cầu để chủ phòng duyệt trước khi vào.'}
+                {isHostPreview
+                  ? 'Bạn là chủ phòng. Hãy kiểm tra camera và micro trước khi bắt đầu.'
+                  : isRejoin
+                    ? 'Bạn đã từng tham gia phòng này. Bấm bên dưới để vào lại nhanh.'
+                    : 'Bạn cần gửi yêu cầu để chủ phòng duyệt trước khi vào.'}
               </p>
             </div>
 
@@ -150,7 +159,7 @@ const PreviewScreen = ({ roomLabel, isRejoin, onRequestJoin, onCancel }: Preview
                 onClick={handleRequestJoin}
                 className="h-10 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 md:w-fit md:min-w-[170px]"
               >
-                {isRejoin ? 'Tham gia lại' : 'Yêu cầu tham gia'}
+                {isRejoin ? 'Tham gia lại' : isHostPreview ? 'Tham gia' : 'Yêu cầu tham gia'}
               </button>
               <button
                 onClick={() => {
