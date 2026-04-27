@@ -13,6 +13,7 @@ import { isMuted } from "@/utils/isMuted";
 import useMediaCacheStore from "./useMediaCacheStore";
 import { useReminderStore } from "./useReminderStore";
 import { showReminderToast } from "@/components/reminder/showReminderToast";
+import { useMeetStore } from "./useMeetStore";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -95,6 +96,39 @@ const localizeNotificationTitle = (title?: string) => {
   }
 
   return safeTitle || "NexCon";
+};
+
+const playWaitingRoomKnock = () => {
+  const knockAudio = new Audio('/sounds/waiting-room-knock.mp3');
+  knockAudio.volume = 0.5;
+
+  knockAudio.play().catch(() => {
+    if (typeof window === 'undefined' || !window.AudioContext) {
+      return;
+    }
+
+    try {
+      const ctx = new window.AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.frequency.value = 800;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.3);
+
+      osc.onended = () => {
+        void ctx.close();
+      };
+    } catch {
+      // Ignore sound playback errors.
+    }
+  });
 };
 
 export const useSocketStore = create<SocketState>((set, get) => ({
@@ -636,6 +670,47 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("group-call:error", (payload) => {
       useGroupCallStore.getState().handleGroupCallError(payload);
+    });
+
+    socket.on('waiting-room-update', ({ roomName, waitingRoom }) => {
+      const meetState = useMeetStore.getState();
+      const nextWaitingRoom = Array.isArray(waitingRoom) ? waitingRoom : [];
+      const prevWaitingRoom = meetState.waitingRoom || [];
+
+      if (nextWaitingRoom.length > prevWaitingRoom.length) {
+        playWaitingRoomKnock();
+      }
+
+      if (!meetState.roomName || String(meetState.roomName) === String(roomName || '')) {
+        meetState.setWaitingRoom(nextWaitingRoom);
+      }
+    });
+
+    socket.on('participant-admitted', ({ roomName, token, isHost }) => {
+      const meetState = useMeetStore.getState();
+      const targetRoomName = String(roomName || '').trim();
+      if (!targetRoomName || !token) {
+        return;
+      }
+
+      if (meetState.roomName && String(meetState.roomName) !== targetRoomName) {
+        return;
+      }
+
+      meetState.joinMeeting(token, targetRoomName, meetState.roomLabel || targetRoomName, Boolean(isHost));
+    });
+
+    socket.on('participant-rejected', ({ reason }) => {
+      useMeetStore.getState().setRejectedReason(reason ?? null);
+      useMeetStore.getState().setCallStatus('rejected');
+    });
+
+    socket.on('meeting-ended', ({ roomName }) => {
+      const meetState = useMeetStore.getState();
+      if (meetState.roomName && String(meetState.roomName) === String(roomName)) {
+        toast.info('Chủ phòng đã kết thúc cuộc họp.');
+        meetState.leaveMeeting();
+      }
     });
 
     socket.on("approval-requested", ({ conversationId }) => {
