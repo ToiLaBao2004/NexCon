@@ -1,6 +1,7 @@
 import { AccessToken } from 'livekit-server-sdk';
 import Conversation from '../models/conversationModel.js';
 import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
+import { getMeetingSession, serializeWaitingRoom } from '../controllers/livekitController.js';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
@@ -39,6 +40,31 @@ function countJoined(groupCall) {
         if (participant.status === 'joined') n++;
     }
     return n;
+}
+
+function normalizeRoomName(roomName) {
+    return String(roomName || '').trim().toLowerCase();
+}
+
+function emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, roomName) {
+    const hostSocketId = getReceiverSocketId(session.hostId);
+    if (!hostSocketId) {
+        return;
+    }
+
+    io.to(hostSocketId).emit('waiting-room-update', {
+        roomName,
+        waitingRoom: serializeWaitingRoom(session.waitingRoom),
+    });
+}
+
+function removeWaiterFromQueue(session, idx) {
+    const waiter = session.waitingRoom[idx];
+    if (waiter?.timeoutId) {
+        clearTimeout(waiter.timeoutId);
+    }
+    session.waitingRoom.splice(idx, 1);
+    return waiter;
 }
 
 function toFinalParticipantStatus(participant, endedAtIso) {
@@ -129,7 +155,7 @@ async function checkAutoEnd(conversationId, io) {
     }
 }
 
-function registerGroupCallHandlers(socket, user, onlineUsers, io) {
+function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSocketId) {
     const userId = user._id.toString();
 
     // START
@@ -365,6 +391,171 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io) {
                 conversationId,
                 active: false,
             });
+        }
+    });
+
+    socket.on('admit-participant', async ({ roomName, targetUserId }) => {
+        try {
+            const normalizedRoomName = normalizeRoomName(roomName);
+            const waiterUserId = String(targetUserId || '').trim();
+            if (!normalizedRoomName || !waiterUserId) {
+                return;
+            }
+
+            const session = getMeetingSession(normalizedRoomName);
+            if (!session || session.hostId !== userId) {
+                return;
+            }
+
+            const idx = session.waitingRoom.findIndex((waiter) => waiter.userId === waiterUserId);
+            if (idx === -1) {
+                return;
+            }
+
+            const waiter = removeWaiterFromQueue(session, idx);
+            if (!waiter) {
+                return;
+            }
+
+            const token = await generateToken(
+                normalizedRoomName,
+                waiter.userId,
+                waiter.displayName,
+                waiter.metadata ?? '',
+            );
+
+            session.participants.set(waiter.userId, {
+                userId: waiter.userId,
+                displayName: waiter.displayName,
+                avatarUrl: waiter.avatarUrl ?? null,
+                joinedAt: new Date().toISOString(),
+                metadata: waiter.metadata ?? '',
+            });
+
+            const targetSocketId = getReceiverSocketId(waiter.userId);
+            if (targetSocketId) {
+                io.to(targetSocketId).emit('participant-admitted', {
+                    roomName: normalizedRoomName,
+                    token,
+                    isHost: session.hostId === waiter.userId,
+                });
+            }
+
+            emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, normalizedRoomName);
+        } catch (error) {
+            console.error('[Meet] admit-participant error:', error);
+        }
+    });
+
+    socket.on('reject-participant', ({ roomName, targetUserId }) => {
+        try {
+            const normalizedRoomName = normalizeRoomName(roomName);
+            const waiterUserId = String(targetUserId || '').trim();
+            if (!normalizedRoomName || !waiterUserId) {
+                return;
+            }
+
+            const session = getMeetingSession(normalizedRoomName);
+            if (!session || session.hostId !== userId) {
+                return;
+            }
+
+            const idx = session.waitingRoom.findIndex((waiter) => waiter.userId === waiterUserId);
+            if (idx === -1) {
+                return;
+            }
+
+            const waiter = removeWaiterFromQueue(session, idx);
+            if (!waiter) {
+                return;
+            }
+
+            const targetSocketId = getReceiverSocketId(waiter.userId);
+            if (targetSocketId) {
+                io.to(targetSocketId).emit('participant-rejected', {
+                    roomName: normalizedRoomName,
+                    reason: 'host-rejected',
+                });
+            }
+
+            emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, normalizedRoomName);
+        } catch (error) {
+            console.error('[Meet] reject-participant error:', error);
+        }
+    });
+
+    socket.on('admit-all-participants', async ({ roomName }) => {
+        try {
+            const normalizedRoomName = normalizeRoomName(roomName);
+            if (!normalizedRoomName) {
+                return;
+            }
+
+            const session = getMeetingSession(normalizedRoomName);
+            if (!session || session.hostId !== userId) {
+                return;
+            }
+
+            const waitingSnapshot = [...session.waitingRoom];
+
+            for (const waiter of waitingSnapshot) {
+                if (waiter.timeoutId) {
+                    clearTimeout(waiter.timeoutId);
+                }
+
+                const token = await generateToken(
+                    normalizedRoomName,
+                    waiter.userId,
+                    waiter.displayName,
+                    waiter.metadata ?? '',
+                );
+
+                session.participants.set(waiter.userId, {
+                    userId: waiter.userId,
+                    displayName: waiter.displayName,
+                    avatarUrl: waiter.avatarUrl ?? null,
+                    joinedAt: new Date().toISOString(),
+                    metadata: waiter.metadata ?? '',
+                });
+
+                const targetSocketId = getReceiverSocketId(waiter.userId);
+                if (targetSocketId) {
+                    io.to(targetSocketId).emit('participant-admitted', {
+                        roomName: normalizedRoomName,
+                        token,
+                        isHost: session.hostId === waiter.userId,
+                    });
+                }
+            }
+
+            session.waitingRoom = [];
+            emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, normalizedRoomName);
+        } catch (error) {
+            console.error('[Meet] admit-all-participants error:', error);
+        }
+    });
+
+    socket.on('cancel-waiting', ({ roomName }) => {
+        try {
+            const normalizedRoomName = normalizeRoomName(roomName);
+            if (!normalizedRoomName) {
+                return;
+            }
+
+            const session = getMeetingSession(normalizedRoomName);
+            if (!session) {
+                return;
+            }
+
+            const idx = session.waitingRoom.findIndex((waiter) => waiter.userId === userId);
+            if (idx === -1) {
+                return;
+            }
+
+            removeWaiterFromQueue(session, idx);
+            emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, normalizedRoomName);
+        } catch (error) {
+            console.error('[Meet] cancel-waiting error:', error);
         }
     });
 }

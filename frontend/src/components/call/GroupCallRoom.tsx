@@ -25,11 +25,21 @@ interface GroupCallRoomProps {
   roomName: string;
   roomLabel?: string;
   token: string;
+  initialVideoEnabled?: boolean;
+  initialAudioEnabled?: boolean;
   onLeave?: () => void;
   minimized?: boolean;
   onMinimize?: () => void;
   onMaximize?: () => void;
   enablePresenceToasts?: boolean;
+  onParticipantsChange?: (participants: RoomParticipantSummary[]) => void;
+}
+
+export interface RoomParticipantSummary {
+  userId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isLocal: boolean;
 }
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
@@ -188,15 +198,12 @@ const Stage = () => {
 
 /* ─── Header ─── */
 const RoomHeader = ({ roomLabel, onMinimize }: { roomName: string; roomLabel?: string; onMinimize?: () => void }) => {
-  const participants = useParticipants();
   return (
     <div className="flex items-center justify-between px-5 py-3 shrink-0 bg-card border-b border-border">
       <div className="flex items-center gap-2.5">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-        <span className="text-sm font-semibold text-foreground">{roomLabel ?? 'Cuộc gọi'}</span>
-        <span className="text-xs text-muted-foreground flex items-center gap-1">
-          <Users size={12} />
-          {participants.length}
+        <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm font-semibold text-foreground">
+          {roomLabel ?? 'Cuộc họp'}
         </span>
       </div>
       {onMinimize && (
@@ -515,21 +522,59 @@ const ScreenShareToasts = () => {
   return null;
 };
 
+const ParticipantsSync = ({
+  onParticipantsChange,
+}: {
+  onParticipantsChange?: (participants: RoomParticipantSummary[]) => void;
+}) => {
+  const participants = useParticipants();
+
+  useEffect(() => {
+    if (!onParticipantsChange) {
+      return;
+    }
+
+    const mappedParticipants = participants.map((participant) => {
+      let avatarUrl: string | null = null;
+      try {
+        const meta = JSON.parse(participant.metadata || '{}');
+        avatarUrl = meta.avatarUrl ?? null;
+      } catch {
+        avatarUrl = participant.metadata || null;
+      }
+
+      return {
+        userId: String(participant.identity || '').trim(),
+        displayName: String(participant.name || '').trim() || String(participant.identity || 'Người dùng'),
+        avatarUrl,
+        isLocal: participant.isLocal,
+      };
+    });
+
+    onParticipantsChange(mappedParticipants);
+  }, [onParticipantsChange, participants]);
+
+  return null;
+};
+
 /* ─── Main Component ─── */
 const GroupCallRoom = ({
   roomName,
   roomLabel,
   token,
+  initialVideoEnabled = true,
+  initialAudioEnabled = true,
   onLeave,
   minimized,
   onMinimize,
   onMaximize,
   enablePresenceToasts = false,
+  onParticipantsChange,
 }: GroupCallRoomProps) => {
   return (
     <LiveKitRoom
-      video={true}
-      audio={true}
+      video={initialVideoEnabled}
+      audio={initialAudioEnabled}
       token={token}
       serverUrl={LIVEKIT_URL}
       connectOptions={LIVEKIT_CONNECT_OPTIONS}
@@ -542,6 +587,7 @@ const GroupCallRoom = ({
       <ScreenShareCleanup />
       <PresenceToasts enabled={enablePresenceToasts} />
       <ScreenShareToasts />
+      <ParticipantsSync onParticipantsChange={onParticipantsChange} />
       <RoomAudioRenderer />
       {minimized ? (
         <MiniControls onMaximize={onMaximize} onLeave={onLeave} roomLabel={roomLabel} />

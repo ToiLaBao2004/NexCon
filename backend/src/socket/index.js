@@ -7,6 +7,7 @@ import { searchUserByEmailAndPhone } from "../controllers/userController.js";
 import Conversation from "../models/conversationModel.js";
 import { registerCallHandlers, handleCallDisconnect } from "./callHandler.js";
 import { registerGroupCallHandlers, handleGroupCallDisconnect } from "./groupCallHandler.js";
+import { configureSocketGateway } from "./socketGateway.js";
 
 const app = express();
 
@@ -39,6 +40,8 @@ function emitToUser(userId, event, data) {
     io.to(socketId).emit(event, data);
     return true;
 }
+
+configureSocketGateway(io, getReceiverSocketId);
 
 io.on("connection", async (socket) => {
     const user = socket.user;
@@ -80,7 +83,7 @@ io.on("connection", async (socket) => {
     registerCallHandlers(socket, user, activeCalls, onlineUsers, io, getReceiverSocketId);
 
     // Group call handlers
-    registerGroupCallHandlers(socket, user, onlineUsers, io);
+    registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSocketId);
 
     // Disconnect
     socket.on("disconnect", async () => {

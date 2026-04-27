@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMeetStore } from '@/stores/useMeetStore';
 import { useGroupCallStore } from '@/stores/useGroupCallStore';
+import PreviewScreen from '@/components/call/PreviewScreen';
+import WaitingScreen from '@/components/call/WaitingScreen';
 import api from '@/lib/axios';
 import ReminderFormModal from '@/components/reminder/ReminderFormModal';
 import type { CreateReminderPayload } from '@/types/reminder';
@@ -9,6 +11,12 @@ import { buildMeetingUrl, extractMeetingCode, extractMeetingTitle, generateMeeti
 import { toast } from 'sonner';
 
 type Mode = 'select' | 'create' | 'join';
+
+interface PreviewData {
+    code: string;
+    label: string;
+    isRejoin: boolean;
+}
 
 const getApiErrorMessage = (error: unknown, fallback = 'Không thể kết nối') => {
     if (typeof error === 'object' && error !== null) {
@@ -21,7 +29,7 @@ const getApiErrorMessage = (error: unknown, fallback = 'Không thể kết nối
 
 const MeetPage = () => {
     const { user } = useAuthStore();
-    const { isInMeeting, roomName: activeRoomName, roomLabel: activeRoomLabel, maximize } = useMeetStore();
+    const { isInMeeting, roomName: activeRoomName, roomLabel: activeRoomLabel, callStatus, maximize } = useMeetStore();
     const [mode, setMode] = useState<Mode>('select');
     const [meetingTitle, setMeetingTitle] = useState('');
     const [meetingCode, setMeetingCode] = useState('');
@@ -29,6 +37,7 @@ const MeetPage = () => {
     const [joinLabel, setJoinLabel] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [previewData, setPreviewData] = useState<PreviewData | null>(null);
     const [showMeetingReminderModal, setShowMeetingReminderModal] = useState(false);
     const [meetingReminderPrefill, setMeetingReminderPrefill] = useState<Partial<CreateReminderPayload> | undefined>(undefined);
     const meetingLink = useMemo(() => {
@@ -64,6 +73,8 @@ const MeetPage = () => {
     const handleOpenCreate = () => {
         setMeetingCode(generateMeetingCode());
         setMeetingTitle('');
+        useMeetStore.getState().setCallStatus('idle');
+        useMeetStore.getState().setRejectedReason(null);
         setMode('create');
     };
 
@@ -106,7 +117,12 @@ const MeetPage = () => {
                 metadata: user?.avatarUrl ?? '',
                 mode: 'create',
             });
-            useMeetStore.getState().joinMeeting(res.data.token, meetingCode, meetingTitle.trim());
+            useMeetStore.getState().joinMeeting(
+                res.data.token,
+                meetingCode,
+                meetingTitle.trim(),
+                Boolean(res.data?.isHost),
+            );
         } catch (err) {
             setError(getApiErrorMessage(err));
         } finally {
@@ -122,38 +138,72 @@ const MeetPage = () => {
         }
         const code = parseMeetingInput(joinCode);
         const titleFromLink = extractMeetingTitle(joinCode) || '';
+        const label = joinLabel.trim() || titleFromLink || code;
         if (!code) return;
         setLoading(true);
         setError('');
         try {
+            const infoRes = await api.get('/livekit/room-info', {
+                params: { roomName: code },
+            });
+
+            setPreviewData({
+                code,
+                label,
+                isRejoin: Boolean(infoRes.data?.canRejoin),
+            });
+        } catch (err) {
+            setError(getApiErrorMessage(err));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRequestJoin = async ({ cameraEnabled, micEnabled }: { cameraEnabled: boolean; micEnabled: boolean }) => {
+        if (!previewData) return;
+        if (useGroupCallStore.getState().status !== 'idle') {
+            setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tham gia cuộc họp.');
+            return;
+        }
+
+        useMeetStore.getState().setJoinPreferences({
+            cameraEnabled,
+            micEnabled,
+        });
+
+        setLoading(true);
+        setError('');
+        try {
             const res = await api.post('/livekit/token', {
-                roomName: code,
+                roomName: previewData.code,
                 identity,
                 metadata: user?.avatarUrl ?? '',
                 mode: 'join',
             });
-            useMeetStore.getState().joinMeeting(res.data.token, code, joinLabel.trim() || titleFromLink || code);
-        } catch (err) {
-            const joinErrorMessage = getApiErrorMessage(err);
-            const canFallbackToCreate = /khong ton tai|không tồn tại|chua duoc tao|chưa được tạo/i.test(joinErrorMessage);
 
-            if (canFallbackToCreate) {
-                try {
-                    const createRes = await api.post('/livekit/token', {
-                        roomName: code,
-                        identity,
-                        metadata: user?.avatarUrl ?? '',
-                        mode: 'create',
-                    });
-                    useMeetStore.getState().joinMeeting(createRes.data.token, code, joinLabel.trim() || titleFromLink || code);
-                    return;
-                } catch (createErr) {
-                    setError(getApiErrorMessage(createErr, joinErrorMessage));
-                    return;
-                }
+            if (res.data?.status === 'waiting') {
+                const meetStore = useMeetStore.getState();
+                meetStore.setCallStatus('waiting');
+                meetStore.setRejectedReason(null);
+                meetStore.setParticipantCount(0);
+                useMeetStore.setState({
+                    roomName: previewData.code,
+                    roomLabel: previewData.label,
+                    isHost: false,
+                });
+                setPreviewData(null);
+                return;
             }
 
-            setError(joinErrorMessage);
+            useMeetStore.getState().joinMeeting(
+                res.data.token,
+                previewData.code,
+                previewData.label,
+                Boolean(res.data?.isHost),
+            );
+            setPreviewData(null);
+        } catch (err) {
+            setError(getApiErrorMessage(err));
         } finally {
             setLoading(false);
         }
@@ -207,6 +257,21 @@ const MeetPage = () => {
                     </div>
                 </div>
             </div>
+        );
+    }
+
+    if (callStatus === 'waiting' || callStatus === 'rejected') {
+        return <WaitingScreen />;
+    }
+
+    if (previewData) {
+        return (
+            <PreviewScreen
+                roomLabel={previewData.label}
+                isRejoin={previewData.isRejoin}
+                onRequestJoin={handleRequestJoin}
+                onCancel={() => setPreviewData(null)}
+            />
         );
     }
 
@@ -266,7 +331,11 @@ const MeetPage = () => {
                                 Tạo cuộc họp mới
                             </button>
                             <button
-                                onClick={() => setMode('join')}
+                                onClick={() => {
+                                    useMeetStore.getState().setCallStatus('idle');
+                                    useMeetStore.getState().setRejectedReason(null);
+                                    setMode('join');
+                                }}
                                 className="flex h-12 md:h-14 items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-white/95 text-[15px] md:text-base font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90 cursor-pointer"
                             >
                                 <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -372,7 +441,7 @@ const MeetPage = () => {
                                 onClick={handleJoin}
                                 className="mt-1 md:mt-0 h-11 md:h-12 rounded-xl bg-white/95 text-[15px] md:text-sm font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
                             >
-                                {loading ? 'Đang kết nối...' : 'Tham gia'}
+                                {loading ? 'Đang kiểm tra phòng...' : 'Tham gia'}
                             </button>
                             <button
                                 disabled={!joinCode.trim()}
