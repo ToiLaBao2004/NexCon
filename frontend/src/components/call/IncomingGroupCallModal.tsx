@@ -54,7 +54,7 @@ const IncomingGroupCallModal = () => {
             onClick={() => joinGroupCall(conversationId)}
             className="flex flex-col items-center gap-1.5 group"
           >
-            <span className="flex items-center justify-center w-14 h-14 rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 group-hover:scale-105 transition-transform">
+            <span className="flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 group-hover:scale-105 transition-transform">
               {callType === "video" ? (
                 <Video className="h-6 w-6" />
               ) : (

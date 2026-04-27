@@ -87,7 +87,7 @@ const WaitingRoomPanel = ({ roomName, isHost, participants, onClose }: WaitingRo
             <div className="px-3 pb-2">
               <button
                 onClick={() => roomName && admitAllParticipants(roomName)}
-                className="w-full rounded-xl border border-emerald-400/40 bg-emerald-500 py-2 text-xs font-bold text-white transition-colors hover:bg-emerald-400"
+                className="w-full rounded-xl border border-primary/40 bg-primary py-2 text-xs font-bold text-white transition-colors hover:bg-primary/90"
               >
                 Chấp nhận tất cả ({waitingRoom.length})
               </button>
@@ -137,7 +137,7 @@ const WaitingRoomPanel = ({ roomName, isHost, participants, onClose }: WaitingRo
                   </button>
                   <button
                     onClick={() => admitParticipant(roomName, participant.userId)}
-                    className="flex-1 rounded-lg border border-emerald-400/40 bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-400"
+                    className="flex-1 rounded-lg border border-primary/40 bg-primary px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-primary/90"
                   >
                     Chấp nhận
                   </button>

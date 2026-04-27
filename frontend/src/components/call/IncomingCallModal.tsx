@@ -56,7 +56,7 @@ const IncomingCallModal = () => {
             disabled={isConnecting}
             className="flex flex-col items-center gap-1.5 group disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <span className="flex items-center justify-center w-14 h-14 rounded-full bg-green-500 text-white shadow-lg shadow-green-500/30 group-hover:scale-105 transition-transform">
+            <span className="flex items-center justify-center w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 group-hover:scale-105 transition-transform">
               {isConnecting ? (
                 <LoaderCircle className="h-6 w-6 animate-spin" />
               ) : callType === "video" ? (

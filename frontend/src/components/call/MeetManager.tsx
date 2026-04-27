@@ -74,7 +74,7 @@ const MeetManager = () => {
             {isHost && waitingRoom.length > 0 ? (
               <button
                 onClick={() => setIsSidebarOpen((prev) => !prev)}
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-emerald-400/60 bg-emerald-500 px-4 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-emerald-400"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-primary/40 bg-primary px-4 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-primary/90"
               >
                 Cho phép {waitingRoom.length} khách vào
                 <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-white/20 px-1.5 text-xs font-bold text-white">
