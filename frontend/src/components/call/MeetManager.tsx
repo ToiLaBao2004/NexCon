@@ -11,7 +11,6 @@ const MeetManager = () => {
     isInMeeting,
     token,
     roomName,
-    roomLabel,
     waitingRoom,
     isHost,
     preferredCameraEnabled,
@@ -69,7 +68,6 @@ const MeetManager = () => {
       >
         <GroupCallRoom
           roomName={roomName}
-          roomLabel={roomLabel || undefined}
           token={token}
           initialVideoEnabled={preferredCameraEnabled}
           initialAudioEnabled={preferredMicEnabled}
@@ -92,7 +90,6 @@ const MeetManager = () => {
         <div className="relative flex min-w-0 flex-1">
           <GroupCallRoom
             roomName={roomName}
-            roomLabel={roomLabel || undefined}
             token={token}
             initialVideoEnabled={preferredCameraEnabled}
             initialAudioEnabled={preferredMicEnabled}

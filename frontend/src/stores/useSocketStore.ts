@@ -697,7 +697,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         return;
       }
 
-      meetState.joinMeeting(token, targetRoomName, meetState.roomLabel || targetRoomName, Boolean(isHost));
+      meetState.joinMeeting(token, targetRoomName, Boolean(isHost));
     });
 
     socket.on('participant-rejected', ({ reason }) => {

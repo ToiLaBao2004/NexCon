@@ -23,7 +23,6 @@ import { toast } from 'sonner';
 
 interface GroupCallRoomProps {
   roomName: string;
-  roomLabel?: string;
   token: string;
   initialVideoEnabled?: boolean;
   initialAudioEnabled?: boolean;
@@ -198,13 +197,13 @@ const Stage = () => {
 };
 
 /* ─── Header ─── */
-const RoomHeader = ({ roomLabel, onMinimize }: { roomName: string; roomLabel?: string; onMinimize?: () => void }) => {
+const RoomHeader = ({ onMinimize }: { roomName: string; onMinimize?: () => void }) => {
   return (
     <div className="flex items-center justify-between px-5 py-3 shrink-0 bg-card border-b border-border">
       <div className="flex items-center gap-2.5">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm font-semibold text-foreground">
-          {roomLabel ?? 'Cuộc họp'}
+          Cuộc họp video
         </span>
       </div>
       {onMinimize && (
@@ -320,7 +319,7 @@ const ControlBar = ({ onLeave, onLeaveIntercept }: { onLeave?: () => void; onLea
 };
 
 /* ─── Mini Controls (PiP mode) ─── */
-const MiniControls = ({ onMaximize, onLeave, roomLabel, onLeaveIntercept }: { onMaximize?: () => void; onLeave?: () => void; roomLabel?: string; onLeaveIntercept?: (disconnect: () => void) => void }) => {
+const MiniControls = ({ onMaximize, onLeave, onLeaveIntercept }: { onMaximize?: () => void; onLeave?: () => void; onLeaveIntercept?: (disconnect: () => void) => void }) => {
   const { toggle: toggleMic, enabled: micOn } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn } = useTrackToggle({ source: Track.Source.Camera });
 
@@ -358,7 +357,7 @@ const MiniControls = ({ onMaximize, onLeave, roomLabel, onLeaveIntercept }: { on
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
           <span className="text-sm font-semibold truncate text-foreground">
-            {roomLabel ?? 'Cuộc gọi'}
+            Cuộc họp video
           </span>
         </div>
         <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
@@ -575,7 +574,6 @@ const ParticipantsSync = ({
 /* ─── Main Component ─── */
 const GroupCallRoom = ({
   roomName,
-  roomLabel,
   token,
   initialVideoEnabled = true,
   initialAudioEnabled = true,
@@ -606,10 +604,10 @@ const GroupCallRoom = ({
       <ParticipantsSync onParticipantsChange={onParticipantsChange} />
       <RoomAudioRenderer />
       {minimized ? (
-        <MiniControls onMaximize={onMaximize} onLeave={onLeave} roomLabel={roomLabel} onLeaveIntercept={onLeaveIntercept} />
+        <MiniControls onMaximize={onMaximize} onLeave={onLeave} onLeaveIntercept={onLeaveIntercept} />
       ) : (
         <>
-          <RoomHeader roomName={roomName} roomLabel={roomLabel} onMinimize={onMinimize} />
+          <RoomHeader roomName={roomName} onMinimize={onMinimize} />
           <div className="flex-1 overflow-hidden">
             <Stage />
           </div>

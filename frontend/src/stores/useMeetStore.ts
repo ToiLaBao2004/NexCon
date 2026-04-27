@@ -15,7 +15,6 @@ interface MeetState {
   isInMeeting: boolean;
   token: string | null;
   roomName: string | null;
-  roomLabel: string | null;
   isHost: boolean;
   preferredCameraEnabled: boolean;
   preferredMicEnabled: boolean;
@@ -25,7 +24,7 @@ interface MeetState {
   participantCount: number;
   rejectedReason: string | null;
 
-  joinMeeting: (token: string, roomName: string, roomLabel: string, isHost?: boolean, initialWaitingRoom?: WaitingRoomParticipant[]) => void;
+  joinMeeting: (token: string, roomName: string, isHost?: boolean, initialWaitingRoom?: WaitingRoomParticipant[]) => void;
   leaveMeeting: () => void;
   setMinimized: (v: boolean) => void;
   maximize: () => void;
@@ -44,7 +43,6 @@ const IDLE_STATE = {
   isInMeeting: false,
   token: null,
   roomName: null,
-  roomLabel: null,
   isHost: false,
   preferredCameraEnabled: true,
   preferredMicEnabled: true,
@@ -58,12 +56,11 @@ const IDLE_STATE = {
 export const useMeetStore = create<MeetState>((set, get) => ({
   ...IDLE_STATE,
 
-  joinMeeting: (token, roomName, roomLabel, isHost = false, initialWaitingRoom = []) =>
+  joinMeeting: (token, roomName, isHost = false, initialWaitingRoom = []) =>
     set((state) => ({
       isInMeeting: true,
       token,
       roomName,
-      roomLabel: roomLabel || null,
       isHost,
       preferredCameraEnabled: state.preferredCameraEnabled,
       preferredMicEnabled: state.preferredMicEnabled,

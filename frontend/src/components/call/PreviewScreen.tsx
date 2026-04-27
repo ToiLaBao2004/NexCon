@@ -4,7 +4,6 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { nameToColor } from '@/lib/utils';
 
 interface PreviewScreenProps {
-  roomLabel: string;
   isRejoin?: boolean;
   isHostPreview?: boolean;
   onRequestJoin: (prefs: { cameraEnabled: boolean; micEnabled: boolean }) => void;
@@ -12,7 +11,6 @@ interface PreviewScreenProps {
 }
 
 const PreviewScreen = ({
-  roomLabel,
   isRejoin = false,
   isHostPreview = false,
   onRequestJoin,
@@ -143,7 +141,7 @@ const PreviewScreen = ({
           <div className="flex flex-col justify-between rounded-2xl border border-border/50 bg-background/80 p-4 md:p-5">
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sẵn sàng tham gia?</p>
-              <h2 className="mt-1.5 text-xl font-bold text-foreground md:text-2xl">{roomLabel}</h2>
+              <h2 className="mt-1.5 text-xl font-bold text-foreground md:text-2xl">Cuộc họp video</h2>
 
               <p className="mt-2 text-sm text-muted-foreground">
                 {isHostPreview
