@@ -2,33 +2,62 @@ import type { ThemeState } from "@/types/store";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export const useThemeStore = create<ThemeState>() (
-    persist(
-        (set, get) => ({
-            isDark: false,
+const applyTheme = (dark: boolean) => {
+	document.documentElement.classList.toggle("dark", dark);
+};
 
-            toggleTheme: () => {
-                const newValue = !get().isDark;
-                set({isDark: newValue});
+const getSystemTheme = () => {
+	return window.matchMedia("(prefers-color-scheme: dark)").matches;
+};
 
-                if (newValue) {
-                    document.documentElement.classList.add("dark");
-                }
-                else {
-                    document.documentElement.classList.remove("dark");
-                }
-            },  
-            setTheme: (dark: boolean) => {
-                set({ isDark: dark });
-                if (dark) {
-                    document.documentElement.classList.add("dark");
-                } else {
-                    document.documentElement.classList.remove("dark");
-                }
-            },
-        }),
-        { 
-            name: "theme-storage"
-        }
-    )
-)
+export const useThemeStore = create<ThemeState>()(
+	persist(
+		(set, get) => ({
+			isDark: false,
+			isManual: false,
+
+			initTheme: () => {
+				const { isManual, isDark } = get();
+
+				const dark = isManual ? isDark : getSystemTheme();
+
+				set({ isDark: dark });
+				applyTheme(dark);
+			},
+
+			toggleTheme: () => {
+				const newValue = !get().isDark;
+
+				set({
+					isDark: newValue,
+					isManual: true,
+				});
+
+				applyTheme(newValue);
+			},
+
+			setTheme: (dark: boolean) => {
+				set({
+					isDark: dark,
+					isManual: true,
+				});
+
+				applyTheme(dark);
+			},
+
+			useSystemTheme: () => {
+				const dark = getSystemTheme();
+
+				set({
+					isDark: dark,
+					isManual: false,
+				});
+
+				applyTheme(dark);
+			},
+		}),
+		{
+			name: "theme-storage",
+		}
+	)
+);
