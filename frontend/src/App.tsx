@@ -116,7 +116,7 @@ function App() {
   }, [accessToken, isSupported, requestPermission, subscribe]);
 
   return (
-    <>
+    <BrowserRouter>
       <Toaster
         richColors
         expand
@@ -132,28 +132,26 @@ function App() {
       <GroupCallManager />
       <MeetManager />
       <ImageViewerModal />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/signin" element={<SignInPage />} />
-          <Route path="/signup" element={<SignUpPage />} />
-          <Route path="/otp" element={<OtpPage />} />
-          <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
-          <Route path="/reset-password" element={<ResetPassPage />} />
-          <Route path="/oauth-success" element={<OAuthSuccess />} />
-          <Route element={<ProtectedRoute />}>
-            <Route element={<AppLayout />}>
-              <Route path="/chat" element={<ChatAppPage />} />
-              <Route path="/meet" element={<MeetPage />} />
-              <Route path="/people" element={<PeoplePage />} />
-              <Route path="/reminder" element={<ReminderPage />} />
-              <Route path="/reminders" element={<ReminderPage />} />
-              <Route path="/notification" element={<NotificationPage />} />
-              <Route path="/" element={<Navigate to="/chat" replace />} />
-            </Route>
+      <Routes>
+        <Route path="/signin" element={<SignInPage />} />
+        <Route path="/signup" element={<SignUpPage />} />
+        <Route path="/otp" element={<OtpPage />} />
+        <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
+        <Route path="/reset-password" element={<ResetPassPage />} />
+        <Route path="/oauth-success" element={<OAuthSuccess />} />
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route path="/chat" element={<ChatAppPage />} />
+            <Route path="/meet" element={<MeetPage />} />
+            <Route path="/people" element={<PeoplePage />} />
+            <Route path="/reminder" element={<ReminderPage />} />
+            <Route path="/reminders" element={<ReminderPage />} />
+            <Route path="/notification" element={<NotificationPage />} />
+            <Route path="/" element={<Navigate to="/chat" replace />} />
           </Route>
-        </Routes>
-      </BrowserRouter>
-    </>
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 

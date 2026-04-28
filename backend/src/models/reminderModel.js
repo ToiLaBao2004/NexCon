@@ -49,6 +49,17 @@ const reminderSchema = new mongoose.Schema({
         ref: 'Conversation',
         index: true,
     },
+    meetingId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Meeting',
+        default: null,
+        index: true,
+    },
+    meetingRoomName: {
+        type: String,
+        default: null,
+        trim: true,
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

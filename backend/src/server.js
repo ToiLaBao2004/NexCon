@@ -12,6 +12,7 @@ import messageRouter from './routes/messageRoute.js';
 import conversationRouter from './routes/conversationRoute.js';
 import notificationRouter from './routes/notificationRoute.js';
 import livekitRouter from './routes/livekitRoute.js';
+import meetingRouter from './routes/meetingRoutes.js';
 import reminderRouter from './routes/reminderRoute.js';
 import pushRouter from './routes/pushRoute.js';
 import { app, server } from './socket/index.js';
@@ -46,6 +47,7 @@ app.use('/api/messages', messageRouter);
 app.use('/api/conversations', conversationRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/livekit', livekitRouter);
+app.use('/api/meetings', meetingRouter);
 app.use('/api/reminders', reminderRouter);
 
 connectDB().then(() => {

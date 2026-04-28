@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Bell, CalendarClock, X } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { useReminderStore } from '@/stores/useReminderStore';
+import { useMeetStore } from '@/stores/useMeetStore';
 import type { Reminder } from '@/types/reminder';
 import { buildMeetingUrl, extractFirstHttpUrl, extractMeetingCode, generateMeetingCode } from '@/utils/meetingLink';
 import { cn } from '@/lib/utils';
@@ -23,10 +25,13 @@ const formatReminderTime = (isoDate: string): string =>
   }).format(new Date(isoDate));
 
 export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps) {
+  const navigate = useNavigate();
   const [loadingAction, setLoadingAction] = useState<'snooze' | null>(null);
+  const [joiningMeeting, setJoiningMeeting] = useState(false);
   const [showSnoozeOptions, setShowSnoozeOptions] = useState(false);
   const snoozeAreaRef = useRef<HTMLDivElement | null>(null);
   const snoozeReminderAsync = useReminderStore((state) => state.snoozeReminderAsync);
+  const joinExistingMeeting = useMeetStore((state) => state.joinExistingMeeting);
   const reminderContent = String(reminder.content || '').trim() || [reminder.title, reminder.note].filter(Boolean).join('\n').trim();
   const meetingUrlInContent = extractFirstHttpUrl(reminderContent);
   const fallbackMeetingUrl =
@@ -43,6 +48,9 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
     }
     return fallbackMeetingUrl;
   }, [fallbackMeetingUrl, meetingUrlInContent]);
+  const canJoinMeeting = Boolean(reminder.meetingRoomName)
+    && (reminder.meetingStatus === 'active' || reminder.meetingStatus === 'scheduled');
+  const isMeetingEnded = Boolean(reminder.meetingRoomName) && reminder.meetingStatus === 'ended';
 
   const meetingUrlParts = useMemo(() => {
     if (!meetingUrlInContent) {
@@ -101,6 +109,21 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
   const handleCloseToast = () => {
     toast.dismiss(toastId);
     setShowSnoozeOptions(false);
+  };
+
+  const handleJoinMeeting = async () => {
+    if (!reminder.meetingRoomName) return;
+
+    try {
+      setJoiningMeeting(true);
+      await joinExistingMeeting(reminder.meetingRoomName);
+      toast.dismiss(toastId);
+      navigate('/meet');
+    } catch {
+      toast.error('Không thể tham gia cuộc họp lúc này');
+    } finally {
+      setJoiningMeeting(false);
+    }
   };
 
   return (
@@ -163,6 +186,25 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
               </>
             )}
           </div>
+
+          {isMeetingEnded && (
+            <span className="mt-2 inline-block text-xs text-muted-foreground">
+              Cuộc họp đã kết thúc
+            </span>
+          )}
+
+          {canJoinMeeting && (
+            <button
+              type="button"
+              onClick={() => {
+                void handleJoinMeeting();
+              }}
+              disabled={joiningMeeting}
+              className="mt-2 inline-flex h-8 items-center rounded-md border border-primary/35 bg-primary/10 px-3 text-xs font-semibold text-primary animate-pulse transition-colors hover:bg-primary/15 disabled:animate-none disabled:opacity-60"
+            >
+              {joiningMeeting ? 'Đang vào phòng...' : 'Tham gia cuộc họp'}
+            </button>
+          )}
         </div>
       </div>
 

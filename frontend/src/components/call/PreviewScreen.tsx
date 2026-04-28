@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useMeetStore } from '@/stores/useMeetStore';
 import { nameToColor } from '@/lib/utils';
 
 interface PreviewScreenProps {
+  roomName: string;
   isRejoin?: boolean;
   isHostPreview?: boolean;
   onRequestJoin: (prefs: { cameraEnabled: boolean; micEnabled: boolean }) => void;
@@ -11,6 +13,7 @@ interface PreviewScreenProps {
 }
 
 const PreviewScreen = ({
+  roomName,
   isRejoin = false,
   isHostPreview = false,
   onRequestJoin,
@@ -23,8 +26,35 @@ const PreviewScreen = ({
   const streamRef = useRef<MediaStream | null>(null);
 
   const user = useAuthStore((state) => state.user);
+  const currentMeeting = useMeetStore((state) => state.currentMeeting);
+  const fetchMeetingInfo = useMeetStore((state) => state.fetchMeetingInfo);
   const displayName = user?.displayName || 'Khách';
   const initial = displayName.charAt(0).toUpperCase();
+
+  useEffect(() => {
+    if (!roomName) return;
+
+    void fetchMeetingInfo(roomName);
+  }, [fetchMeetingInfo, roomName]);
+
+  const hostProfile = useMemo(() => {
+    const host = currentMeeting?.hostId;
+    if (!host || typeof host === 'string') {
+      return {
+        name: 'Không xác định',
+        avatar: null as string | null,
+      };
+    }
+
+    return {
+      name: host.fullName || host.displayName || 'Không xác định',
+      avatar: host.avatar || host.avatarUrl || null,
+    };
+  }, [currentMeeting?.hostId]);
+
+
+
+
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -90,8 +120,8 @@ const PreviewScreen = ({
     <div className="flex h-full flex-1 items-center justify-center overflow-auto bg-background px-3 py-4 md:px-6 md:py-6">
       <div className="w-full max-w-[1120px] rounded-2xl border border-border/60 bg-card/80 p-3 shadow-xl backdrop-blur-sm md:p-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1.55fr)_minmax(300px,370px)] md:items-stretch">
-          <div className="rounded-2xl border border-border/50 bg-slate-900/80 p-2.5">
-            <div className="relative aspect-video max-h-[62vh] overflow-hidden rounded-2xl bg-slate-900">
+          <div className="rounded-2xl border border-border/50 bg-muted/30 p-2.5">
+            <div className="relative aspect-video max-h-[62vh] overflow-hidden rounded-2xl bg-muted shadow-inner">
               {isCameraOn && videoStream ? (
                 <video
                   ref={videoRef}
@@ -101,7 +131,7 @@ const PreviewScreen = ({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted via-background to-muted">
                   {user?.avatarUrl ? (
                     <img
                       src={user.avatarUrl}
@@ -122,14 +152,14 @@ const PreviewScreen = ({
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-3 p-4">
                 <button
                   onClick={() => setIsCameraOn((prev) => !prev)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/45 text-white transition-colors hover:bg-black/65"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground transition-colors hover:bg-background shadow-sm"
                   title={isCameraOn ? 'Tắt camera' : 'Bật camera'}
                 >
                   {isCameraOn ? <Video size={18} /> : <VideoOff size={18} />}
                 </button>
                 <button
                   onClick={() => setIsMicOn((prev) => !prev)}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-black/45 text-white transition-colors hover:bg-black/65"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground transition-colors hover:bg-background shadow-sm"
                   title={isMicOn ? 'Tắt micro' : 'Bật micro'}
                 >
                   {isMicOn ? <Mic size={18} /> : <MicOff size={18} />}
@@ -142,6 +172,31 @@ const PreviewScreen = ({
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Sẵn sàng tham gia?</p>
               <h2 className="mt-1.5 text-xl font-bold text-foreground md:text-2xl">Cuộc họp video</h2>
+
+              <div className="mt-2 rounded-xl border border-border/60 bg-muted/40 px-3 py-2">
+                <div className="flex items-center gap-2.5">
+                  {hostProfile.avatar ? (
+                    <img
+                      src={hostProfile.avatar}
+                      alt={hostProfile.name}
+                      className="h-8 w-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-white"
+                      style={{ background: nameToColor(hostProfile.name) }}
+                    >
+                      {hostProfile.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-foreground">{hostProfile.name}</p>
+                    <p className="text-xs text-muted-foreground">Chủ trì cuộc họp</p>
+                  </div>
+                </div>
+
+
+              </div>
 
               <p className="mt-2 text-sm text-muted-foreground">
                 {isHostPreview
@@ -157,7 +212,7 @@ const PreviewScreen = ({
                 onClick={handleRequestJoin}
                 className="h-10 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 md:w-fit md:min-w-[170px]"
               >
-                {isRejoin ? 'Tham gia lại' : isHostPreview ? 'Tham gia' : 'Yêu cầu tham gia'}
+                {isHostPreview ? 'Tham gia' : isRejoin ? 'Tham gia lại' : 'Yêu cầu tham gia'}
               </button>
               <button
                 onClick={() => {

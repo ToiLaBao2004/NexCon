@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import Reminder from '../models/reminderModel.js';
+import Meeting from '../models/meetingModel.js';
 import Conversation from '../models/conversationModel.js';
 import User from '../models/userModel.js';
 import { emitToUser } from '../socket/index.js';
@@ -90,8 +91,25 @@ async function processReminder(reminder, now) {
     const normalizedReminder = updated.toObject();
     normalizedReminder.content = resolveReminderContent(normalizedReminder);
     normalizedReminder.source = normalizeReminderSource(normalizedReminder.source);
+    const reminderPayload = {
+        ...normalizedReminder,
+        meetingId: updated.meetingId?.toString?.() || undefined,
+        meetingRoomName: updated.meetingRoomName || undefined,
+    };
 
-    const delivered = emitToUser(updated.userId.toString(), 'reminder-triggered', { reminder: normalizedReminder });
+    if (updated.meetingId) {
+        const meeting = await Meeting.findById(updated.meetingId)
+            .select('roomName status hostId')
+            .populate('hostId', 'displayName fullName');
+
+        if (meeting) {
+            reminderPayload.meetingRoomName = meeting.roomName;
+            reminderPayload.meetingStatus = meeting.status;
+            reminderPayload.meetingId = meeting._id.toString();
+        }
+    }
+
+    const delivered = emitToUser(updated.userId.toString(), 'reminder-triggered', { reminder: reminderPayload });
 
     const offsetMs = 7 * 60 * 60 * 1000;
     const localDate = new Date(updated.remindAt.getTime() + offsetMs);
@@ -101,7 +119,7 @@ async function processReminder(reminder, now) {
     const MM = String(localDate.getUTCMonth() + 1).padStart(2, '0');
     const YYYY = localDate.getUTCFullYear();
     const formattedTime = `${HH}:${mm} ${DD}/${MM}/${YYYY}`;
-    const reminderContent = resolveReminderContent(normalizedReminder);
+    const reminderContent = resolveReminderContent(reminderPayload);
     const reminderUrl = `/reminders?tab=all&focus=${encodeURIComponent(updated._id.toString())}`;
     let mutedForReminderNotification = false;
 
@@ -113,7 +131,8 @@ async function processReminder(reminder, now) {
             ).lean();
 
             const participant = conversation?.participants?.[0];
-            const isMeetingReminder = Boolean(updated.meetingLink)
+            const isMeetingReminder = Boolean(reminderPayload.meetingRoomName)
+                || Boolean(reminderPayload.meetingId)
                 || updated.type === 'meeting'
                 || updated.source?.type === 'meeting';
             const muteType = isMeetingReminder ? 'meetings' : 'messages';
@@ -167,7 +186,7 @@ export function startReminderCron() {
 
         try {
             const reminders = await Reminder.find(buildDueReminderQuery(now))
-                .select('userId content title note remindAt repeatRule status snoozeUntil notifyChannels source');
+                .select('userId content title note remindAt repeatRule status snoozeUntil notifyChannels source meetingId meetingRoomName');
 
             for (const reminder of reminders) {
                 try {
