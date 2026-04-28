@@ -117,12 +117,6 @@ export const getReminderContent = (reminder: Reminder): string => {
   return [reminder.title, reminder.note].filter(Boolean).join('\n').trim();
 };
 
-export const getReminderMeetingTitle = (reminder: Reminder): string | null => {
-  const content = getReminderContent(reminder);
-  const title = (content.match(/Nhắc về cuộc họp:\s*(.+)/i)?.[1] || '').trim();
-  return title || null;
-};
-
 export const getReminderMeetingUrl = (reminder: Reminder): string | null => {
   const content = getReminderContent(reminder);
   const contentUrl = extractFirstHttpUrl(content);

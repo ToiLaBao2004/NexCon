@@ -3,7 +3,7 @@ import { toast } from 'sonner';
 import { Bell, CalendarClock, X } from 'lucide-react';
 import { useReminderStore } from '@/stores/useReminderStore';
 import type { Reminder } from '@/types/reminder';
-import { buildMeetingUrl, extractFirstHttpUrl, extractMeetingCode, generateMeetingCode, rememberMeetingTitle } from '@/utils/meetingLink';
+import { buildMeetingUrl, extractFirstHttpUrl, extractMeetingCode, generateMeetingCode } from '@/utils/meetingLink';
 import { cn } from '@/lib/utils';
 
 type ToastId = string | number;
@@ -28,7 +28,6 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
   const snoozeAreaRef = useRef<HTMLDivElement | null>(null);
   const snoozeReminderAsync = useReminderStore((state) => state.snoozeReminderAsync);
   const reminderContent = String(reminder.content || '').trim() || [reminder.title, reminder.note].filter(Boolean).join('\n').trim();
-  const reminderMeetingTitle = (reminderContent.match(/Nhắc về cuộc họp:\s*(.+)/i)?.[1] || '').trim();
   const meetingUrlInContent = extractFirstHttpUrl(reminderContent);
   const fallbackMeetingUrl =
     reminder.source?.type === 'meeting' && reminder.source.refId
@@ -96,8 +95,6 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
   const handleMeetingLinkNavigate = (event: React.MouseEvent<HTMLAnchorElement>, targetUrl: string) => {
     event.preventDefault();
     event.stopPropagation();
-    const roomCode = extractMeetingCode(targetUrl);
-    if (roomCode && reminderMeetingTitle) rememberMeetingTitle(roomCode, reminderMeetingTitle);
     window.location.assign(targetUrl);
   };
 

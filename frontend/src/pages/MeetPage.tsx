@@ -7,14 +7,13 @@ import WaitingScreen from '@/components/call/WaitingScreen';
 import api from '@/lib/axios';
 import ReminderFormModal from '@/components/reminder/ReminderFormModal';
 import type { CreateReminderPayload } from '@/types/reminder';
-import { buildMeetingUrl, extractMeetingCode, extractMeetingTitle, generateMeetingCode, getRememberedMeetingTitle } from '@/utils/meetingLink';
+import { buildMeetingUrl, extractMeetingCode, generateMeetingCode } from '@/utils/meetingLink';
 import { toast } from 'sonner';
 
 type Mode = 'select' | 'create' | 'join';
 
 interface PreviewData {
     code: string;
-    label: string;
     isRejoin: boolean;
     isHostPreview?: boolean;
     isCreatingNewRoom?: boolean;
@@ -31,12 +30,10 @@ const getApiErrorMessage = (error: unknown, fallback = 'Không thể kết nối
 
 const MeetPage = () => {
     const { user } = useAuthStore();
-    const { isInMeeting, roomName: activeRoomName, roomLabel: activeRoomLabel, callStatus, maximize } = useMeetStore();
+    const { isInMeeting, roomName: activeRoomName, callStatus, maximize } = useMeetStore();
     const [mode, setMode] = useState<Mode>('select');
-    const [meetingTitle, setMeetingTitle] = useState('');
     const [meetingCode, setMeetingCode] = useState('');
     const [joinCode, setJoinCode] = useState('');
-    const [joinLabel, setJoinLabel] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [previewData, setPreviewData] = useState<PreviewData | null>(null);
@@ -63,18 +60,14 @@ const MeetPage = () => {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const room = (params.get('room') || '').trim();
-        const title = (params.get('title') || '').trim();
         if (room) {
             setJoinCode(buildMeetingUrl(room));
-            const rememberedTitle = getRememberedMeetingTitle(room);
-            setJoinLabel(title || rememberedTitle || '');
             setMode('join');
         }
     }, []);
 
     const handleOpenCreate = () => {
         setMeetingCode(generateMeetingCode());
-        setMeetingTitle('');
         useMeetStore.getState().setCallStatus('idle');
         useMeetStore.getState().setRejectedReason(null);
         setMode('create');
@@ -86,13 +79,12 @@ const MeetPage = () => {
         return extractMeetingCode(raw) || raw.toLowerCase();
     };
 
-    const openMeetingReminderModal = (rawCode: string, rawLabel?: string) => {
+    const openMeetingReminderModal = (rawCode: string) => {
         const code = parseMeetingInput(rawCode);
-        const label = rawLabel?.trim() || code || 'cuộc họp';
         const meetingUrl = code ? buildMeetingUrl(code) : '';
         const content = meetingUrl
-            ? `Nhắc về cuộc họp: ${label}\nLink cuộc họp: ${meetingUrl}`
-            : `Nhắc về cuộc họp: ${label}`;
+            ? `Nhắc về cuộc họp\nLink cuộc họp: ${meetingUrl}`
+            : `Nhắc về cuộc họp`;
 
         setMeetingReminderPrefill({
             content,
@@ -105,7 +97,6 @@ const MeetPage = () => {
     };
 
     const handleStart = async () => {
-        if (!meetingTitle.trim()) return;
         if (useGroupCallStore.getState().status !== 'idle') {
             setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tạo cuộc họp.');
             return;
@@ -113,7 +104,6 @@ const MeetPage = () => {
         
         setPreviewData({
             code: meetingCode,
-            label: meetingTitle.trim(),
             isRejoin: false,
             isHostPreview: true,
             isCreatingNewRoom: true,
@@ -127,8 +117,6 @@ const MeetPage = () => {
             return;
         }
         const code = parseMeetingInput(joinCode);
-        const titleFromLink = extractMeetingTitle(joinCode) || '';
-        const label = joinLabel.trim() || titleFromLink || code;
         if (!code) return;
         setLoading(true);
         setError('');
@@ -139,7 +127,6 @@ const MeetPage = () => {
 
             setPreviewData({
                 code,
-                label,
                 isRejoin: Boolean(infoRes.data?.canRejoin),
                 isHostPreview: Boolean(infoRes.data?.isHost),
             });
@@ -179,7 +166,6 @@ const MeetPage = () => {
                 meetStore.setParticipantCount(0);
                 useMeetStore.setState({
                     roomName: previewData.code,
-                    roomLabel: previewData.label,
                     isHost: false,
                 });
                 setPreviewData(null);
@@ -189,7 +175,6 @@ const MeetPage = () => {
             useMeetStore.getState().joinMeeting(
                 res.data.token,
                 previewData.code,
-                previewData.label,
                 Boolean(res.data?.isHost),
                 res.data?.waitingRoom,
             );
@@ -230,7 +215,7 @@ const MeetPage = () => {
                             <span className="h-3 w-3 animate-pulse rounded-full bg-emerald-500" />
                         </div>
                         <h2 className="text-xl font-semibold text-foreground">Bạn đang trong cuộc họp</h2>
-                        <p className="mt-1 text-sm text-muted-foreground">{activeRoomLabel || activeRoomName}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{activeRoomName}</p>
 
                         <div className="mt-6 flex flex-col gap-3">
                             <button
@@ -240,7 +225,7 @@ const MeetPage = () => {
                                 Quay lại cuộc họp
                             </button>
                             <button
-                                onClick={() => openMeetingReminderModal(activeRoomName || activeRoomLabel || '', activeRoomLabel || activeRoomName || 'cuộc họp hiện tại')}
+                                onClick={() => openMeetingReminderModal(activeRoomName || '')}
                                 className="h-10 rounded-xl border border-primary/30 bg-background px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
                             >
                                 Tạo nhắc hẹn cho cuộc họp này
@@ -259,7 +244,6 @@ const MeetPage = () => {
     if (previewData) {
         return (
             <PreviewScreen
-                roomLabel={previewData.label}
                 isRejoin={previewData.isRejoin}
                 isHostPreview={previewData.isHostPreview}
                 onRequestJoin={handleRequestJoin}
@@ -343,19 +327,6 @@ const MeetPage = () => {
                     {mode === 'create' && (
                         <div className="mt-4 md:mt-6 flex flex-col gap-3 md:gap-4">
                             <div className="flex flex-col gap-1 md:gap-1.5">
-                                <label className="text-[13px] md:text-sm font-medium text-white">Tên phòng họp</label>
-                                <input
-                                    type="text"
-                                    value={meetingTitle}
-                                    onChange={e => setMeetingTitle(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleStart()}
-                                    placeholder="VD: Cuộc họp của..."
-                                    autoFocus
-                                    className="h-10 md:h-11 rounded-xl border border-white/30 bg-white/15 px-3 text-sm text-white placeholder:text-blue-200/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/40"
-                                />
-                            </div>
-
-                            <div className="flex flex-col gap-1 md:gap-1.5">
                                 <label className="text-[13px] md:text-sm font-medium text-white">Liên kết cuộc họp</label>
                                 <div className="flex items-center gap-2">
                                     <div className="flex h-10 md:h-11 min-w-0 flex-1 select-all items-center overflow-hidden rounded-xl border border-white/30 bg-white/10 px-3 font-mono text-[13px] md:text-sm tracking-widest text-white">
@@ -378,14 +349,14 @@ const MeetPage = () => {
                             </div>
 
                             <button
-                                disabled={!meetingTitle.trim() || loading}
+                                disabled={loading}
                                 onClick={handleStart}
                                 className="mt-1 md:mt-0 h-11 md:h-12 rounded-xl bg-white/95 text-[15px] md:text-sm font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
                             >
                                 {loading ? 'Đang kết nối...' : 'Bắt đầu cuộc họp'}
                             </button>
                             <button
-                                onClick={() => openMeetingReminderModal(meetingCode, meetingTitle || meetingCode)}
+                                onClick={() => openMeetingReminderModal(meetingCode)}
                                 className="h-9 md:h-10 rounded-xl border border-white/40 text-[13px] md:text-sm font-semibold text-white transition-colors hover:bg-white/15"
                             >
                                 Tạo nhắc hẹn cuộc họp
@@ -415,20 +386,6 @@ const MeetPage = () => {
                                 />
                             </div>
 
-                            <div className="flex flex-col gap-1 md:gap-1.5">
-                                <label className="text-[13px] md:text-sm font-medium text-white">
-                                    Tên phòng <span className="font-normal opacity-60">(tùy chọn)</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    value={joinLabel}
-                                    onChange={e => setJoinLabel(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleJoin()}
-                                    placeholder="Đặt tên để dễ nhận biết"
-                                    className="h-10 md:h-10 rounded-xl border border-white/30 bg-white/15 px-3 text-[13px] md:text-sm text-white placeholder:text-blue-200/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/40"
-                                />
-                            </div>
-
                             <button
                                 disabled={!joinCode.trim() || loading}
                                 onClick={handleJoin}
@@ -438,13 +395,13 @@ const MeetPage = () => {
                             </button>
                             <button
                                 disabled={!joinCode.trim()}
-                                onClick={() => openMeetingReminderModal(joinCode, joinLabel || extractMeetingTitle(joinCode) || joinCode)}
+                                onClick={() => openMeetingReminderModal(joinCode)}
                                 className="h-9 md:h-10 rounded-xl border border-white/40 text-[13px] md:text-sm font-semibold text-white transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
                             >
                                 Tạo nhắc hẹn cuộc họp
                             </button>
                             <button
-                                onClick={() => { setMode('select'); setJoinLabel(''); }}
+                                onClick={() => { setMode('select'); }}
                                 className="text-[13px] md:text-sm text-blue-100 transition-colors hover:text-white"
                             >
                                 Quay lại

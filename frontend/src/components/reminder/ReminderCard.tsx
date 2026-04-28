@@ -10,9 +10,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { Reminder } from '@/types/reminder';
 import { REPEAT_MINUTE_OPTIONS, REPEAT_TEXT, SOURCE_TEXT } from '@/pages/reminder/constants';
-import { getReminderContent, getReminderMeetingTitle, getReminderMeetingUrl, formatClock } from '@/pages/reminder/utils';
+import { getReminderContent, getReminderMeetingUrl, formatClock } from '@/pages/reminder/utils';
 import type { ReminderCardOptions, ReminderTab } from '@/pages/reminder/types';
-import { extractFirstHttpUrl, extractMeetingCode, rememberMeetingTitle } from '@/utils/meetingLink';
+import { extractFirstHttpUrl } from '@/utils/meetingLink';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useChatStore } from '@/stores/useChatStore';
 import UserAvatar from '@/components/chat/UserAvatar';
@@ -62,7 +62,6 @@ export default function ReminderCard({
     : 'Xóa nhắc nhở cá nhân';
 
   const reminderContent = getReminderContent(reminder);
-  const reminderMeetingTitle = getReminderMeetingTitle(reminder);
   const meetingUrl = getReminderMeetingUrl(reminder);
   const rawMeetingUrlInContent = extractFirstHttpUrl(reminderContent);
   const meetingUrlIndex = rawMeetingUrlInContent ? reminderContent.indexOf(rawMeetingUrlInContent) : -1;
@@ -95,12 +94,6 @@ export default function ReminderCard({
   const handleMeetingLinkClick = (event: React.MouseEvent<HTMLAnchorElement>, targetUrl: string) => {
     event.preventDefault();
     event.stopPropagation();
-
-    const roomCode = extractMeetingCode(targetUrl);
-    if (roomCode && reminderMeetingTitle) {
-      rememberMeetingTitle(roomCode, reminderMeetingTitle);
-    }
-
     window.location.assign(targetUrl);
   };
 

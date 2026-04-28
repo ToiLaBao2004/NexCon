@@ -23,7 +23,7 @@ import { useReminderStore } from '@/stores/useReminderStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { reminderService } from '@/services/reminderService';
-import { extractMeetingCode, rememberMeetingTitle } from '@/utils/meetingLink';
+
 import type {
     CreateReminderPayload,
     GetRemindersParams,
@@ -50,7 +50,6 @@ import {
     getDefaultReuseRemindAt,
     getMonthGridCells,
     getReminderContent,
-    getReminderMeetingTitle,
     getReminderMeetingUrl,
     getReminderTabFromQuery,
     getWeekStartMonday,
@@ -787,12 +786,6 @@ const ReminderPage = () => {
     const openReminderMeetingLink = useCallback((reminder: Reminder) => {
         const targetUrl = getReminderMeetingUrl(reminder);
         if (!targetUrl) return;
-
-        const roomCode = extractMeetingCode(targetUrl);
-        const meetingTitle = getReminderMeetingTitle(reminder);
-        if (roomCode && meetingTitle) {
-            rememberMeetingTitle(roomCode, meetingTitle);
-        }
 
         window.location.assign(targetUrl);
     }, []);
