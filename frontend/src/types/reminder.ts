@@ -3,6 +3,7 @@ export type ReminderRepeatRule = 'none' | 'daily' | 'weekly' | 'monthly';
 export type ReminderStatus = 'pending' | 'triggered' | 'snoozed' | 'dismissed';
 
 export type ReminderSourceType = 'manual' | 'message' | 'meeting';
+export type ReminderMeetingStatus = 'active' | 'ended' | 'scheduled';
 
 export type ReminderNotifyChannel = 'inapp' | 'email';
 export type ReminderScope = 'personal' | 'shared';
@@ -30,6 +31,9 @@ export interface Reminder {
   repeatRule: ReminderRepeatRule;
   status: ReminderStatus;
   source?: ReminderSource;
+  meetingId?: string;
+  meetingRoomName?: string;
+  meetingStatus?: ReminderMeetingStatus;
   notifyChannels: ReminderNotifyChannel[];
   createdAt: string;
   updatedAt: string;

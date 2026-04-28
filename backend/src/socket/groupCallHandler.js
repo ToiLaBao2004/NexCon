@@ -1,7 +1,15 @@
 import { AccessToken } from 'livekit-server-sdk';
 import Conversation from '../models/conversationModel.js';
+import Meeting from '../models/meetingModel.js';
+import User from '../models/userModel.js';
 import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
-import { getMeetingSession, serializeWaitingRoom } from '../controllers/livekitController.js';
+import {
+    clearWaitingTimeout,
+    emitWaitingRoomUpdate,
+    generateParticipantToken,
+    normalizeRoomName,
+    waitingTimeouts,
+} from '../controllers/meetingController.js';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
@@ -40,31 +48,6 @@ function countJoined(groupCall) {
         if (participant.status === 'joined') n++;
     }
     return n;
-}
-
-function normalizeRoomName(roomName) {
-    return String(roomName || '').trim().toLowerCase();
-}
-
-function emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, roomName) {
-    const hostSocketId = getReceiverSocketId(session.hostId);
-    if (!hostSocketId) {
-        return;
-    }
-
-    io.to(hostSocketId).emit('waiting-room-update', {
-        roomName,
-        waitingRoom: serializeWaitingRoom(session.waitingRoom),
-    });
-}
-
-function removeWaiterFromQueue(session, idx) {
-    const waiter = session.waitingRoom[idx];
-    if (waiter?.timeoutId) {
-        clearTimeout(waiter.timeoutId);
-    }
-    session.waitingRoom.splice(idx, 1);
-    return waiter;
 }
 
 function toFinalParticipantStatus(participant, endedAtIso) {
@@ -394,83 +377,84 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSoc
         }
     });
 
-    socket.on('admit-participant', async ({ roomName, targetUserId }) => {
+    socket.on('admit-participant', async ({ roomName, targetUserId, userId: payloadUserId }) => {
         try {
             const normalizedRoomName = normalizeRoomName(roomName);
-            const waiterUserId = String(targetUserId || '').trim();
+            const waiterUserId = String(targetUserId || payloadUserId || '').trim();
             if (!normalizedRoomName || !waiterUserId) {
                 return;
             }
 
-            const session = getMeetingSession(normalizedRoomName);
-            if (!session || session.hostId !== userId) {
+            const meeting = await Meeting.findOne({ roomName: normalizedRoomName });
+            if (!meeting || meeting.hostId.toString() !== userId) {
                 return;
             }
 
-            const idx = session.waitingRoom.findIndex((waiter) => waiter.userId === waiterUserId);
-            if (idx === -1) {
-                return;
+            const key = `${normalizedRoomName}:${waiterUserId}`;
+            if (waitingTimeouts.has(key)) {
+                clearWaitingTimeout(normalizedRoomName, waiterUserId);
             }
 
-            const waiter = removeWaiterFromQueue(session, idx);
-            if (!waiter) {
-                return;
-            }
-
-            const token = await generateToken(
-                normalizedRoomName,
-                waiter.userId,
-                waiter.displayName,
-                waiter.metadata ?? '',
+            const alreadyParticipant = meeting.participants.some(
+                (participant) => participant.userId.toString() === waiterUserId
             );
 
-            session.participants.set(waiter.userId, {
-                userId: waiter.userId,
-                displayName: waiter.displayName,
-                avatarUrl: waiter.avatarUrl ?? null,
-                joinedAt: new Date().toISOString(),
-                metadata: waiter.metadata ?? '',
-            });
+            const update = {
+                $pull: { waitingRoom: waiterUserId },
+            };
 
-            const targetSocketId = getReceiverSocketId(waiter.userId);
+            if (!alreadyParticipant) {
+                update.$push = {
+                    participants: {
+                        userId: waiterUserId,
+                        joinedAt: new Date(),
+                    },
+                };
+            }
+
+            await Meeting.findByIdAndUpdate(meeting._id, update);
+
+            const targetUser = await User.findById(waiterUserId).select('displayName avatarUrl');
+            const token = await generateParticipantToken(normalizedRoomName, waiterUserId, targetUser);
+
+            const targetSocketId = getReceiverSocketId(waiterUserId);
             if (targetSocketId) {
                 io.to(targetSocketId).emit('participant-admitted', {
                     roomName: normalizedRoomName,
                     token,
-                    isHost: session.hostId === waiter.userId,
+                    isHost: false,
                 });
             }
 
-            emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, normalizedRoomName);
+            await emitWaitingRoomUpdate(normalizedRoomName, userId);
         } catch (error) {
             console.error('[Meet] admit-participant error:', error);
         }
     });
 
-    socket.on('reject-participant', ({ roomName, targetUserId }) => {
+    socket.on('reject-participant', async ({ roomName, targetUserId, userId: payloadUserId }) => {
         try {
             const normalizedRoomName = normalizeRoomName(roomName);
-            const waiterUserId = String(targetUserId || '').trim();
+            const waiterUserId = String(targetUserId || payloadUserId || '').trim();
             if (!normalizedRoomName || !waiterUserId) {
                 return;
             }
 
-            const session = getMeetingSession(normalizedRoomName);
-            if (!session || session.hostId !== userId) {
+            const meeting = await Meeting.findOne({ roomName: normalizedRoomName });
+            if (!meeting || meeting.hostId.toString() !== userId) {
                 return;
             }
 
-            const idx = session.waitingRoom.findIndex((waiter) => waiter.userId === waiterUserId);
-            if (idx === -1) {
-                return;
+            const key = `${normalizedRoomName}:${waiterUserId}`;
+            if (waitingTimeouts.has(key)) {
+                clearWaitingTimeout(normalizedRoomName, waiterUserId);
             }
 
-            const waiter = removeWaiterFromQueue(session, idx);
-            if (!waiter) {
-                return;
-            }
+            await Meeting.findByIdAndUpdate(meeting._id, {
+                $pull: { waitingRoom: waiterUserId },
+            });
 
-            const targetSocketId = getReceiverSocketId(waiter.userId);
+            const targetSocketId = getReceiverSocketId(waiterUserId);
             if (targetSocketId) {
                 io.to(targetSocketId).emit('participant-rejected', {
                     roomName: normalizedRoomName,
@@ -478,7 +462,7 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSoc
                 });
             }
 
-            emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, normalizedRoomName);
+            await emitWaitingRoomUpdate(normalizedRoomName, userId);
         } catch (error) {
             console.error('[Meet] reject-participant error:', error);
         }
@@ -491,69 +475,88 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSoc
                 return;
             }
 
-            const session = getMeetingSession(normalizedRoomName);
-            if (!session || session.hostId !== userId) {
+            const meeting = await Meeting.findOne({ roomName: normalizedRoomName });
+            if (!meeting || meeting.hostId.toString() !== userId) {
                 return;
             }
 
-            const waitingSnapshot = [...session.waitingRoom];
+            const toAdmit = meeting.waitingRoom.map((item) => item.toString());
+            const now = new Date();
 
-            for (const waiter of waitingSnapshot) {
-                if (waiter.timeoutId) {
-                    clearTimeout(waiter.timeoutId);
-                }
+            const users = await User.find({ _id: { $in: toAdmit } }).select('_id displayName avatarUrl');
+            const userMap = new Map(users.map((item) => [item._id.toString(), item]));
 
-                const token = await generateToken(
-                    normalizedRoomName,
-                    waiter.userId,
-                    waiter.displayName,
-                    waiter.metadata ?? '',
-                );
-
-                session.participants.set(waiter.userId, {
-                    userId: waiter.userId,
-                    displayName: waiter.displayName,
-                    avatarUrl: waiter.avatarUrl ?? null,
-                    joinedAt: new Date().toISOString(),
-                    metadata: waiter.metadata ?? '',
-                });
-
-                const targetSocketId = getReceiverSocketId(waiter.userId);
-                if (targetSocketId) {
-                    io.to(targetSocketId).emit('participant-admitted', {
-                        roomName: normalizedRoomName,
-                        token,
-                        isHost: session.hostId === waiter.userId,
-                    });
+            for (const waiterUserId of toAdmit) {
+                const key = `${normalizedRoomName}:${waiterUserId}`;
+                if (waitingTimeouts.has(key)) {
+                    clearWaitingTimeout(normalizedRoomName, waiterUserId);
                 }
             }
 
-            session.waitingRoom = [];
-            emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, normalizedRoomName);
+            const existingParticipantSet = new Set(
+                meeting.participants.map((participant) => participant.userId.toString())
+            );
+            const participantsToInsert = toAdmit
+                .filter((targetId) => !existingParticipantSet.has(targetId))
+                .map((targetId) => ({ userId: targetId, joinedAt: now }));
+
+            const update = {
+                $set: { waitingRoom: [] },
+            };
+
+            if (participantsToInsert.length > 0) {
+                update.$push = {
+                    participants: {
+                        $each: participantsToInsert,
+                    },
+                };
+            }
+
+            await Meeting.findByIdAndUpdate(meeting._id, update);
+
+            for (const targetId of toAdmit) {
+                const token = await generateParticipantToken(normalizedRoomName, targetId, userMap.get(targetId));
+                const targetSocketId = getReceiverSocketId(targetId);
+                if (!targetSocketId) {
+                    continue;
+                }
+
+                io.to(targetSocketId).emit('participant-admitted', {
+                    roomName: normalizedRoomName,
+                    token,
+                    isHost: false,
+                });
+            }
+
+            await emitWaitingRoomUpdate(normalizedRoomName, userId);
         } catch (error) {
             console.error('[Meet] admit-all-participants error:', error);
         }
     });
 
-    socket.on('cancel-waiting', ({ roomName }) => {
+    socket.on('cancel-waiting', async ({ roomName }) => {
         try {
             const normalizedRoomName = normalizeRoomName(roomName);
             if (!normalizedRoomName) {
                 return;
             }
 
-            const session = getMeetingSession(normalizedRoomName);
-            if (!session) {
+            const key = `${normalizedRoomName}:${userId}`;
+            if (waitingTimeouts.has(key)) {
+                clearWaitingTimeout(normalizedRoomName, userId);
+            }
+
+            const meeting = await Meeting.findOneAndUpdate(
+                { roomName: normalizedRoomName },
+                { $pull: { waitingRoom: userId } },
+                { new: true }
+            );
+
+            if (!meeting) {
                 return;
             }
 
-            const idx = session.waitingRoom.findIndex((waiter) => waiter.userId === userId);
-            if (idx === -1) {
-                return;
-            }
-
-            removeWaiterFromQueue(session, idx);
-            emitHostWaitingRoomUpdate(io, getReceiverSocketId, session, normalizedRoomName);
+            await emitWaitingRoomUpdate(normalizedRoomName, meeting.hostId.toString());
         } catch (error) {
             console.error('[Meet] cancel-waiting error:', error);
         }

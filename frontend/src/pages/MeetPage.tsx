@@ -1,22 +1,20 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMeetStore } from '@/stores/useMeetStore';
 import { useGroupCallStore } from '@/stores/useGroupCallStore';
 import PreviewScreen from '@/components/call/PreviewScreen';
 import WaitingScreen from '@/components/call/WaitingScreen';
-import api from '@/lib/axios';
 import ReminderFormModal from '@/components/reminder/ReminderFormModal';
 import type { CreateReminderPayload } from '@/types/reminder';
-import { buildMeetingUrl, extractMeetingCode, generateMeetingCode } from '@/utils/meetingLink';
+import { buildMeetingUrl, extractMeetingCode } from '@/utils/meetingLink';
 import { toast } from 'sonner';
 
 type Mode = 'select' | 'create' | 'join';
 
 interface PreviewData {
     code: string;
-    isRejoin: boolean;
+    isRejoin?: boolean;
     isHostPreview?: boolean;
-    isCreatingNewRoom?: boolean;
 }
 
 const getApiErrorMessage = (error: unknown, fallback = 'Không thể kết nối') => {
@@ -30,19 +28,33 @@ const getApiErrorMessage = (error: unknown, fallback = 'Không thể kết nối
 
 const MeetPage = () => {
     const { user } = useAuthStore();
-    const { isInMeeting, roomName: activeRoomName, callStatus, maximize } = useMeetStore();
+    const {
+        isInMeeting,
+        roomName: activeRoomName,
+        callStatus,
+        maximize,
+        token,
+        createMeeting,
+        joinExistingMeeting,
+        joinMeeting,
+        isLoadingMeeting,
+        setJoinPreferences,
+        setCallStatus,
+        setRejectedReason,
+    } = useMeetStore();
     const [mode, setMode] = useState<Mode>('select');
-    const [meetingCode, setMeetingCode] = useState('');
+    const [createdRoomName, setCreatedRoomName] = useState('');
     const [joinCode, setJoinCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [previewData, setPreviewData] = useState<PreviewData | null>(null);
     const [showMeetingReminderModal, setShowMeetingReminderModal] = useState(false);
     const [meetingReminderPrefill, setMeetingReminderPrefill] = useState<Partial<CreateReminderPayload> | undefined>(undefined);
+
     const meetingLink = useMemo(() => {
-        if (!meetingCode) return '';
-        return buildMeetingUrl(meetingCode);
-    }, [meetingCode]);
+        if (!createdRoomName) return '';
+        return buildMeetingUrl(createdRoomName);
+    }, [createdRoomName]);
 
     const identity = user?.displayName ?? 'Khách';
 
@@ -67,15 +79,22 @@ const MeetPage = () => {
     }, []);
 
     const handleOpenCreate = () => {
-        setMeetingCode(generateMeetingCode());
-        useMeetStore.getState().setCallStatus('idle');
-        useMeetStore.getState().setRejectedReason(null);
+        setCreatedRoomName('');
+        setPreviewData(null);
+        setCallStatus('idle');
+        setRejectedReason(null);
+        setError('');
         setMode('create');
+        handleStart(); // Tự động bắt đầu tạo
     };
 
     const parseMeetingInput = (input: string) => {
         const raw = input.trim();
         if (!raw) return '';
+        const matchFromMeetUrl = raw.match(/([a-z]{3}-[a-z]{4}-[a-z]{3})/i);
+        if (matchFromMeetUrl?.[1]) {
+            return matchFromMeetUrl[1].toLowerCase();
+        }
         return extractMeetingCode(raw) || raw.toLowerCase();
     };
 
@@ -96,18 +115,24 @@ const MeetPage = () => {
         setShowMeetingReminderModal(true);
     };
 
+
+
     const handleStart = async () => {
         if (useGroupCallStore.getState().status !== 'idle') {
             setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tạo cuộc họp.');
             return;
         }
-        
-        setPreviewData({
-            code: meetingCode,
-            isRejoin: false,
-            isHostPreview: true,
-            isCreatingNewRoom: true,
-        });
+
+        setLoading(true);
+        setError('');
+        try {
+            const meeting = await createMeeting({ requireApproval: true });
+            setCreatedRoomName(meeting.roomName);
+        } catch (err) {
+            setError(getApiErrorMessage(err, 'Không thể tạo cuộc họp'));
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleJoin = async () => {
@@ -121,16 +146,25 @@ const MeetPage = () => {
         setLoading(true);
         setError('');
         try {
-            const infoRes = await api.get('/livekit/room-info', {
-                params: { roomName: code },
-            });
+            await joinExistingMeeting(code);
 
-            setPreviewData({
-                code,
-                isRejoin: Boolean(infoRes.data?.canRejoin),
-                isHostPreview: Boolean(infoRes.data?.isHost),
-            });
+            const meetState = useMeetStore.getState();
+            if (meetState.token || meetState.meetingStatus === 'preview') {
+                setPreviewData({
+                    code,
+                    isRejoin: !!meetState.token,
+                    isHostPreview: meetState.isHost,
+                });
+            }
         } catch (err) {
+            const maybeError = err as { response?: { status?: number } };
+            if (maybeError?.response?.status === 404) {
+                toast.error('Không tìm thấy phòng họp');
+            } else if (maybeError?.response?.status === 410) {
+                toast.error('Cuộc họp này đã kết thúc');
+            } else {
+                toast.error('Đã có lỗi xảy ra, thử lại sau');
+            }
             setError(getApiErrorMessage(err));
         } finally {
             setLoading(false);
@@ -144,47 +178,30 @@ const MeetPage = () => {
             return;
         }
 
-        useMeetStore.getState().setJoinPreferences({
+        setJoinPreferences({
             cameraEnabled,
             micEnabled,
         });
 
-        setLoading(true);
-        setError('');
-        try {
-            const res = await api.post('/livekit/token', {
-                roomName: previewData.code,
-                identity,
-                metadata: user?.avatarUrl ?? '',
-                mode: previewData.isCreatingNewRoom ? 'create' : 'join',
-            });
+        const currentToken = token || useMeetStore.getState().token;
+        const currentRoomName = activeRoomName || useMeetStore.getState().roomName;
 
-            if (res.data?.status === 'waiting') {
-                const meetStore = useMeetStore.getState();
-                meetStore.setCallStatus('waiting');
-                meetStore.setRejectedReason(null);
-                meetStore.setParticipantCount(0);
-                useMeetStore.setState({
-                    roomName: previewData.code,
-                    isHost: false,
-                });
-                setPreviewData(null);
-                return;
-            }
-
-            useMeetStore.getState().joinMeeting(
-                res.data.token,
-                previewData.code,
-                Boolean(res.data?.isHost),
-                res.data?.waitingRoom,
-            );
+        if (currentToken && currentRoomName) {
+            const meetState = useMeetStore.getState();
+            joinMeeting(currentToken, currentRoomName, Boolean(previewData.isHostPreview), meetState.waitingRoom);
             setPreviewData(null);
-        } catch (err) {
-            setError(getApiErrorMessage(err));
-        } finally {
-            setLoading(false);
+        } else if (currentRoomName) {
+            // Guest first time request
+            await joinExistingMeeting(currentRoomName, true);
+            setPreviewData(null);
+        } else {
+            setError('Không thể lấy thông tin cuộc họp, vui lòng thử lại.');
         }
     };
+
+    useEffect(() => {
+        return () => { };
+    }, []);
 
     // Already in a meeting
     if (isInMeeting) {
@@ -244,6 +261,7 @@ const MeetPage = () => {
     if (previewData) {
         return (
             <PreviewScreen
+                roomName={previewData.code}
                 isRejoin={previewData.isRejoin}
                 isHostPreview={previewData.isHostPreview}
                 onRequestJoin={handleRequestJoin}
@@ -292,7 +310,7 @@ const MeetPage = () => {
                     </div>
 
                     {error && (
-                        <p className="-mt-2 rounded-lg bg-red-500/20 px-3 py-2 text-center text-sm text-white">{error}</p>
+                        <p className="mt-4 rounded-lg bg-red-500/20 px-3 py-2 text-center text-sm text-white">{error}</p>
                     )}
 
                     {/* Mode: select */}
@@ -311,6 +329,7 @@ const MeetPage = () => {
                                 onClick={() => {
                                     useMeetStore.getState().setCallStatus('idle');
                                     useMeetStore.getState().setRejectedReason(null);
+                                    setError('');
                                     setMode('join');
                                 }}
                                 className="flex h-12 md:h-14 items-center justify-center gap-2 rounded-xl md:rounded-2xl bg-white/95 text-[15px] md:text-base font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90 cursor-pointer"
@@ -326,43 +345,53 @@ const MeetPage = () => {
                     {/* Mode: create */}
                     {mode === 'create' && (
                         <div className="mt-4 md:mt-6 flex flex-col gap-3 md:gap-4">
-                            <div className="flex flex-col gap-1 md:gap-1.5">
-                                <label className="text-[13px] md:text-sm font-medium text-white">Liên kết cuộc họp</label>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex h-10 md:h-11 min-w-0 flex-1 select-all items-center overflow-hidden rounded-xl border border-white/30 bg-white/10 px-3 font-mono text-[13px] md:text-sm tracking-widest text-white">
-                                        <span className="truncate w-full">{meetingLink}</span>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            navigator.clipboard.writeText(meetingLink);
-                                            toast.success('Đã sao chép link cuộc họp');
-                                        }}
-                                        title="Sao chép liên kết"
-                                        className="flex h-10 w-10 md:h-11 md:w-11 shrink-0 items-center justify-center rounded-xl border border-white/30 bg-white/15 transition-colors hover:bg-white/25"
-                                    >
-                                        <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                        </svg>
-                                    </button>
-                                </div>
-                                <p className="text-[11px] md:text-xs text-blue-100 mt-0.5">Chia sẻ link này để mời người khác vào phòng</p>
-                            </div>
+                            {!createdRoomName && (
+                                <button
+                                    disabled={loading || isLoadingMeeting}
+                                    onClick={handleStart}
+                                    className="mt-1 md:mt-0 h-11 md:h-12 rounded-xl bg-white/95 text-[15px] md:text-sm font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
+                                >
+                                    {loading || isLoadingMeeting ? 'Đang tạo...' : 'Thử lại'}
+                                </button>
+                            )}
 
+                            {createdRoomName && (
+                                <div className="rounded-xl border border-white/30 bg-white/10 p-3">
+                                    <label className="text-[13px] md:text-sm font-medium text-white">Liên kết cuộc họp</label>
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                        <div className="flex h-10 md:h-11 min-w-0 flex-1 select-all items-center overflow-hidden rounded-xl border border-white/30 bg-white/10 px-3 font-mono text-[13px] md:text-sm tracking-widest text-white">
+                                            <span className="truncate w-full">{meetingLink}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(meetingLink);
+                                                toast.success('Đã sao chép link');
+                                            }}
+                                            title="Sao chép liên kết"
+                                            className="flex h-10 w-10 md:h-11 md:w-11 shrink-0 items-center justify-center rounded-xl border border-white/30 bg-white/15 transition-colors hover:bg-white/25"
+                                        >
+                                            <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    {/* Nút tham gia đã bị gỡ bỏ theo yêu cầu */}
+                                </div>
+                            )}
+
+                            {createdRoomName && (
+                                <button
+                                    onClick={() => openMeetingReminderModal(createdRoomName)}
+                                    className="h-9 md:h-10 rounded-xl border border-white/40 text-[13px] md:text-sm font-semibold text-white transition-colors hover:bg-white/15"
+                                >
+                                    Tạo nhắc hẹn cuộc họp
+                                </button>
+                            )}
                             <button
-                                disabled={loading}
-                                onClick={handleStart}
-                                className="mt-1 md:mt-0 h-11 md:h-12 rounded-xl bg-white/95 text-[15px] md:text-sm font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
-                            >
-                                {loading ? 'Đang kết nối...' : 'Bắt đầu cuộc họp'}
-                            </button>
-                            <button
-                                onClick={() => openMeetingReminderModal(meetingCode)}
-                                className="h-9 md:h-10 rounded-xl border border-white/40 text-[13px] md:text-sm font-semibold text-white transition-colors hover:bg-white/15"
-                            >
-                                Tạo nhắc hẹn cuộc họp
-                            </button>
-                            <button
-                                onClick={() => setMode('select')}
+                                onClick={() => {
+                                    setMode('select');
+                                    setError('');
+                                }}
                                 className="text-[13px] md:text-sm text-blue-100 transition-colors hover:text-white"
                             >
                                 Quay lại
@@ -387,21 +416,25 @@ const MeetPage = () => {
                             </div>
 
                             <button
-                                disabled={!joinCode.trim() || loading}
+                                disabled={!joinCode.trim() || loading || isLoadingMeeting}
                                 onClick={handleJoin}
                                 className="mt-1 md:mt-0 h-11 md:h-12 rounded-xl bg-white/95 text-[15px] md:text-sm font-semibold text-blue-700 shadow-lg shadow-black/10 transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-900/70 dark:text-blue-100 dark:hover:bg-slate-900/90"
                             >
-                                {loading ? 'Đang kiểm tra phòng...' : 'Tham gia'}
+                                {loading || isLoadingMeeting ? 'Đang kiểm tra phòng...' : 'Tham gia'}
                             </button>
+                            {joinCode.trim() && (
+                                <button
+                                    onClick={() => openMeetingReminderModal(joinCode)}
+                                    className="h-9 md:h-10 rounded-xl border border-white/40 text-[13px] md:text-sm font-semibold text-white transition-colors hover:bg-white/15"
+                                >
+                                    Tạo nhắc hẹn cuộc họp
+                                </button>
+                            )}
                             <button
-                                disabled={!joinCode.trim()}
-                                onClick={() => openMeetingReminderModal(joinCode)}
-                                className="h-9 md:h-10 rounded-xl border border-white/40 text-[13px] md:text-sm font-semibold text-white transition-colors hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                                Tạo nhắc hẹn cuộc họp
-                            </button>
-                            <button
-                                onClick={() => { setMode('select'); }}
+                                onClick={() => {
+                                    setMode('select');
+                                    setError('');
+                                }}
                                 className="text-[13px] md:text-sm text-blue-100 transition-colors hover:text-white"
                             >
                                 Quay lại

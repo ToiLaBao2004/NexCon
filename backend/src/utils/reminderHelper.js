@@ -79,6 +79,8 @@ export function normalizeReminderOutput(reminder) {
         participationStatus: normalizedParticipation,
         createdBy: toIdString(raw.createdBy),
         conversationId: toIdString(raw.conversationId),
+        meetingId: toIdString(raw.meetingId),
+        meetingRoomName: typeof raw.meetingRoomName === 'string' ? raw.meetingRoomName : undefined,
         sharedKey: typeof raw.sharedKey === 'string' ? raw.sharedKey : undefined,
     };
 }

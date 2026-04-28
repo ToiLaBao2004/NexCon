@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 
 interface GroupCallRoomProps {
   roomName: string;
+  roomLabel?: string;
   token: string;
   initialVideoEnabled?: boolean;
   initialAudioEnabled?: boolean;
@@ -197,14 +198,15 @@ const Stage = () => {
 };
 
 /* ─── Header ─── */
-const RoomHeader = ({ onMinimize }: { roomName: string; onMinimize?: () => void }) => {
+const RoomHeader = ({ roomName, roomLabel, onMinimize }: { roomName: string; roomLabel?: string; onMinimize?: () => void }) => {
   return (
     <div className="flex items-center justify-between px-5 py-3 shrink-0 bg-card border-b border-border">
       <div className="flex items-center gap-2.5">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm font-semibold text-foreground">
-          Cuộc họp video
+          {roomLabel || 'Cuộc họp video'}
         </span>
+        {!roomLabel && <span className="text-xs text-muted-foreground font-mono">{roomName}</span>}
       </div>
       {onMinimize && (
         <button
@@ -574,6 +576,7 @@ const ParticipantsSync = ({
 /* ─── Main Component ─── */
 const GroupCallRoom = ({
   roomName,
+  roomLabel,
   token,
   initialVideoEnabled = true,
   initialAudioEnabled = true,
@@ -607,7 +610,7 @@ const GroupCallRoom = ({
         <MiniControls onMaximize={onMaximize} onLeave={onLeave} onLeaveIntercept={onLeaveIntercept} />
       ) : (
         <>
-          <RoomHeader roomName={roomName} onMinimize={onMinimize} />
+          <RoomHeader roomName={roomName} roomLabel={roomLabel} onMinimize={onMinimize} />
           <div className="flex-1 overflow-hidden">
             <Stage />
           </div>

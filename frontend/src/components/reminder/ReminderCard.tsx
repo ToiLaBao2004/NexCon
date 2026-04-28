@@ -15,6 +15,8 @@ import type { ReminderCardOptions, ReminderTab } from '@/pages/reminder/types';
 import { extractFirstHttpUrl } from '@/utils/meetingLink';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useChatStore } from '@/stores/useChatStore';
+import { useMeetStore } from '@/stores/useMeetStore';
+import { useNavigate } from 'react-router';
 import UserAvatar from '@/components/chat/UserAvatar';
 
 interface ReminderCardProps {
@@ -38,7 +40,9 @@ export default function ReminderCard({
   onRepeat,
   onBindRef,
 }: ReminderCardProps) {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
+  const joinExistingMeeting = useMeetStore((state) => state.joinExistingMeeting);
   const conversation = useChatStore(state => state.conversations.find(c => c._id === reminder.conversationId));
 
   const faded = options?.faded ?? false;
@@ -63,6 +67,9 @@ export default function ReminderCard({
 
   const reminderContent = getReminderContent(reminder);
   const meetingUrl = getReminderMeetingUrl(reminder);
+  const canJoinMeeting = Boolean(reminder.meetingRoomName)
+    && (reminder.meetingStatus === 'active' || reminder.meetingStatus === 'scheduled');
+  const isMeetingEnded = Boolean(reminder.meetingRoomName) && reminder.meetingStatus === 'ended';
   const rawMeetingUrlInContent = extractFirstHttpUrl(reminderContent);
   const meetingUrlIndex = rawMeetingUrlInContent ? reminderContent.indexOf(rawMeetingUrlInContent) : -1;
   const hasInlineMeetingUrl = meetingUrlIndex >= 0;
@@ -95,6 +102,22 @@ export default function ReminderCard({
     event.preventDefault();
     event.stopPropagation();
     window.location.assign(targetUrl);
+  };
+
+  const handleJoinMeeting = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!reminder.meetingRoomName) {
+      return;
+    }
+
+    try {
+      await joinExistingMeeting(reminder.meetingRoomName);
+      navigate('/meet');
+    } catch {
+      // Ignore errors here and keep reminder card interaction stable.
+    }
   };
 
   return (
@@ -145,6 +168,24 @@ export default function ReminderCard({
             >
               {meetingUrl}
             </a>
+          )}
+
+          {isMeetingEnded && (
+            <span className="mt-1.5 inline-block text-xs text-muted-foreground">
+              Cuộc họp đã kết thúc
+            </span>
+          )}
+
+          {canJoinMeeting && (
+            <button
+              type="button"
+              onClick={(event) => {
+                void handleJoinMeeting(event);
+              }}
+              className="mt-2 inline-flex h-8 items-center rounded-md border border-primary/35 bg-primary/10 px-3 text-xs font-semibold text-primary animate-pulse transition-colors hover:bg-primary/15"
+            >
+              Tham gia cuộc họp
+            </button>
           )}
 
           <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">

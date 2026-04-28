@@ -1,115 +1,32 @@
-import { AccessToken } from 'livekit-server-sdk';
-import { getSocketGateway } from '../socket/socketGateway.js';
+import Meeting from '../models/meetingModel.js';
+import {
+    createMeeting,
+    emitWaitingRoomUpdate,
+    endMeeting,
+    generateHostToken,
+    generateParticipantToken,
+    getMeeting,
+    joinMeeting,
+    normalizeRoomName,
+    scheduleWaitingTimeout,
+} from './meetingController.js';
 
-const API_KEY = process.env.LIVEKIT_API_KEY;
-const API_SECRET = process.env.LIVEKIT_API_SECRET;
-// Đảm bảo người dùng nhập mã cuộc họp đúng dạng xxx-xxxx-xxx và 
-// quy định mỗi cuộc họp chỉ tồn tại tối đa 12 giờ.
-const MEETING_CODE_REGEX = /^[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}$/;
-const MEETING_TTL_MS = 12 * 60 * 60 * 1000;
+const MEETING_CODE_REGEX = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
 
-// roomName -> {
-//   hostId,
-//   createdAt,
-//   participants: Map<userId, { userId, displayName, avatarUrl, joinedAt, metadata }>,
-//   waitingRoom: Array<{ userId, displayName, avatarUrl, metadata, joinedAt, timeoutId }>
-// }
-const meetingRegistry = new Map();
+const mapWaitingRoom = (users = []) => users.map((userDoc) => ({
+    userId: userDoc?._id?.toString?.() || '',
+    displayName: userDoc?.displayName || userDoc?.fullName || 'Người dùng',
+    avatarUrl: userDoc?.avatarUrl || userDoc?.avatar || null,
+    joinedAt: new Date().toISOString(),
+}));
 
-function normalizeRoomName(roomName) {
-    return String(roomName || '').trim().toLowerCase();
-}
+export { createMeeting, joinMeeting, getMeeting, endMeeting };
 
-function serializeWaitingRoom(waitingRoom = []) {
-    return waitingRoom.map(({ timeoutId: _timeoutId, ...rest }) => rest);
-}
-
-function emitWaitingRoomUpdateToHost(roomName, room) {
-    const { io, getReceiverSocketId } = getSocketGateway();
-    if (!io || !getReceiverSocketId || !room?.hostId) {
-        return;
-    }
-
-    const hostSocketId = getReceiverSocketId(room.hostId);
-    if (!hostSocketId) {
-        return;
-    }
-
-    io.to(hostSocketId).emit('waiting-room-update', {
-        roomName,
-        waitingRoom: serializeWaitingRoom(room.waitingRoom),
-    });
-}
-
-function scheduleWaitingTimeout(roomName, userId) {
-    return setTimeout(() => {
-        const room = meetingRegistry.get(roomName);
-        if (!room) return;
-
-        const idx = room.waitingRoom.findIndex((waiter) => waiter.userId === userId);
-        if (idx === -1) return;
-
-        room.waitingRoom.splice(idx, 1);
-
-        const { io, getReceiverSocketId } = getSocketGateway();
-        if (io && getReceiverSocketId) {
-            const targetSocketId = getReceiverSocketId(userId);
-            if (targetSocketId) {
-                io.to(targetSocketId).emit('participant-rejected', {
-                    roomName,
-                    reason: 'timeout',
-                });
-            }
-        }
-
-        emitWaitingRoomUpdateToHost(roomName, room);
-    }, 5 * 60 * 1000);
-}
-
-export function getMeetingSession(roomName) {
-    return meetingRegistry.get(normalizeRoomName(roomName));
-}
-
-export { meetingRegistry, serializeWaitingRoom };
-
-function cleanupMeetingRegistry() {
-    const now = Date.now();
-    for (const [roomName, room] of meetingRegistry.entries()) {
-        if (now - room.createdAt > MEETING_TTL_MS) {
-            for (const waiter of room.waitingRoom || []) {
-                if (waiter.timeoutId) {
-                    clearTimeout(waiter.timeoutId);
-                }
-            }
-            meetingRegistry.delete(roomName);
-        }
-    }
-}
-
-async function buildToken({ roomName, userId, displayName, metadata }) {
-    const token = new AccessToken(API_KEY, API_SECRET, {
-        identity: userId,
-        name: displayName,
-        ttl: '6h',
-        metadata: metadata ?? '',
-    });
-    token.addGrant({
-        roomJoin: true,
-        room: roomName,
-        canPublish: true,
-        canSubscribe: true,
-        canPublishData: true,
-    });
-
-    return token.toJwt();
-}
-
-export const getLivekitRoomInfo = async (req, res) => {
+export async function getLivekitRoomInfo(req, res) {
     try {
-        cleanupMeetingRegistry();
-
         const normalizedRoomName = normalizeRoomName(req.query.roomName);
         const userId = req.user?._id?.toString();
+
         if (!normalizedRoomName || !MEETING_CODE_REGEX.test(normalizedRoomName)) {
             return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
         }
@@ -118,30 +35,29 @@ export const getLivekitRoomInfo = async (req, res) => {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const room = meetingRegistry.get(normalizedRoomName);
-        if (!room) {
+        const meeting = await Meeting.findOne({ roomName: normalizedRoomName });
+        if (!meeting || meeting.status === 'ended') {
             return res.status(404).json({ message: 'Phòng họp không tồn tại hoặc chưa bắt đầu.' });
         }
 
+        const isHost = meeting.hostId.toString() === userId;
+        const canRejoin = isHost || meeting.participants.some((item) => item.userId.toString() === userId);
+
         return res.json({
             roomName: normalizedRoomName,
-            canRejoin: room.participants.has(userId),
+            canRejoin,
+            isHost,
         });
-    } catch (err) {
-        return res.status(500).json({ message: err.message });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
     }
-};
+}
 
-export const getLivekitToken = async (req, res) => {
+export async function getLivekitToken(req, res) {
     try {
-        cleanupMeetingRegistry();
-
-        const { roomName, metadata, mode } = req.body;
+        const { roomName, mode } = req.body;
         const normalizedRoomName = normalizeRoomName(roomName);
         const userId = req.user?._id?.toString();
-        const displayName = req.user?.displayName || userId;
-        const avatarUrl = req.user?.avatarUrl ?? null;
-        const metadataValue = metadata ?? '';
 
         if (!normalizedRoomName || !MEETING_CODE_REGEX.test(normalizedRoomName)) {
             return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
@@ -151,97 +67,130 @@ export const getLivekitToken = async (req, res) => {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        let room = meetingRegistry.get(normalizedRoomName);
+        let meeting = await Meeting.findOne({ roomName: normalizedRoomName });
 
         if (mode === 'create') {
-            if (room && room.hostId !== userId) {
+            if (meeting && meeting.hostId.toString() !== userId) {
                 return res.status(409).json({ message: 'Mã cuộc họp đã tồn tại. Vui lòng tạo mã khác.' });
             }
 
-            if (!room) {
-                room = {
+            if (!meeting) {
+                meeting = await Meeting.create({
+                    roomName: normalizedRoomName,
                     hostId: userId,
-                    participants: new Map(),
-                    waitingRoom: [],
-                    createdAt: Date.now(),
-                };
-                meetingRegistry.set(normalizedRoomName, room);
-            }
-
-            room.participants.set(userId, {
-                userId,
-                displayName,
-                avatarUrl,
-                joinedAt: new Date().toISOString(),
-                metadata: metadataValue,
-            });
-        } else if (mode === 'join') {
-            if (!room) {
-                return res.status(404).json({ message: 'Phòng họp không tồn tại hoặc chưa được tạo.' });
-            }
-
-            const alreadyJoined = room.participants.has(userId);
-            const isHost = room.hostId === userId;
-
-            if (!alreadyJoined && !isHost) {
-                const waitingIdx = room.waitingRoom.findIndex((waiter) => waiter.userId === userId);
-                if (waitingIdx === -1) {
-                    room.waitingRoom.push({
-                        userId,
-                        displayName,
-                        avatarUrl,
-                        metadata: metadataValue,
-                        joinedAt: new Date().toISOString(),
-                    });
-
-                    const timeoutId = scheduleWaitingTimeout(normalizedRoomName, userId);
-                    room.waitingRoom[room.waitingRoom.length - 1].timeoutId = timeoutId;
-
-                    emitWaitingRoomUpdateToHost(normalizedRoomName, room);
-                }
-
-                return res.json({
-                    status: 'waiting',
-                    message: 'Yêu cầu tham gia đã được gửi. Vui lòng chờ chủ phòng duyệt.',
+                    status: 'active',
+                    startedAt: new Date(),
+                    requireApproval: true,
+                    participants: [{ userId, joinedAt: new Date() }],
                 });
             }
 
-            room.participants.set(userId, {
-                userId,
-                displayName,
-                avatarUrl,
-                joinedAt: new Date().toISOString(),
-                metadata: metadataValue,
-            });
-            if (isHost) {
-                emitWaitingRoomUpdateToHost(normalizedRoomName, room);
+            const alreadyIn = meeting.participants.some((participant) => participant.userId.toString() === userId);
+            if (!alreadyIn) {
+                await Meeting.findByIdAndUpdate(meeting._id, {
+                    $push: {
+                        participants: {
+                            userId,
+                            joinedAt: new Date(),
+                        },
+                    },
+                    $set: {
+                        status: 'active',
+                        startedAt: meeting.startedAt || new Date(),
+                    },
+                });
             }
-        } else {
+
+            const fullMeeting = await Meeting.findById(meeting._id)
+                .populate('waitingRoom', 'displayName fullName avatarUrl avatar');
+
+            const token = await generateHostToken(normalizedRoomName, userId, req.user);
+            return res.json({
+                token,
+                isHost: true,
+                waitingRoom: mapWaitingRoom(fullMeeting?.waitingRoom || []),
+            });
+        }
+
+        if (mode !== 'join') {
             return res.status(400).json({ message: 'Yêu cầu không hợp lệ: thiếu mode create/join.' });
         }
 
-        const jwt = await buildToken({
-            roomName: normalizedRoomName,
-            userId,
-            displayName,
-            metadata: metadataValue,
-        });
-        res.json({
-            token: jwt,
-            isHost: room.hostId === userId,
-            waitingRoom: (room.hostId === userId) ? serializeWaitingRoom(room.waitingRoom) : [],
-        });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-};
+        if (!meeting) {
+            return res.status(404).json({ message: 'Phòng họp không tồn tại hoặc chưa được tạo.' });
+        }
 
-export const endLivekitMeeting = async (req, res) => {
+        if (meeting.status === 'ended') {
+            return res.status(410).json({ message: 'Cuộc họp đã kết thúc' });
+        }
+
+        const isHost = meeting.hostId.toString() === userId;
+        const alreadyJoined = meeting.participants.some((item) => item.userId.toString() === userId);
+
+        if (isHost || alreadyJoined) {
+            if (meeting.status === 'scheduled') {
+                meeting = await Meeting.findByIdAndUpdate(
+                    meeting._id,
+                    { status: 'active', startedAt: new Date() },
+                    { new: true }
+                );
+            }
+
+            const token = isHost
+                ? await generateHostToken(normalizedRoomName, userId, req.user)
+                : await generateParticipantToken(normalizedRoomName, userId, req.user);
+
+            const roomForHost = isHost
+                ? await Meeting.findById(meeting._id).populate('waitingRoom', 'displayName fullName avatarUrl avatar')
+                : null;
+
+            return res.json({
+                token,
+                isHost,
+                waitingRoom: isHost ? mapWaitingRoom(roomForHost?.waitingRoom || []) : [],
+            });
+        }
+
+        if (!meeting.requireApproval) {
+            await Meeting.findByIdAndUpdate(meeting._id, {
+                $push: {
+                    participants: {
+                        userId,
+                        joinedAt: new Date(),
+                    },
+                },
+            });
+
+            const token = await generateParticipantToken(normalizedRoomName, userId, req.user);
+            return res.json({
+                token,
+                isHost: false,
+                waitingRoom: [],
+            });
+        }
+
+        await Meeting.findByIdAndUpdate(meeting._id, {
+            $addToSet: { waitingRoom: userId },
+        });
+
+        scheduleWaitingTimeout(normalizedRoomName, userId, meeting._id);
+        await emitWaitingRoomUpdate(normalizedRoomName, meeting.hostId.toString());
+
+        return res.json({
+            status: 'waiting',
+            message: 'Yêu cầu tham gia đã được gửi. Vui lòng chờ chủ phòng duyệt.',
+        });
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
+    }
+}
+
+export async function endLivekitMeeting(req, res) {
     try {
-        const normalizedRoomName = normalizeRoomName(req.params.roomName);
+        const roomName = normalizeRoomName(req.params.roomName);
         const userId = req.user?._id?.toString();
 
-        if (!normalizedRoomName || !MEETING_CODE_REGEX.test(normalizedRoomName)) {
+        if (!roomName || !MEETING_CODE_REGEX.test(roomName)) {
             return res.status(400).json({ message: 'Mã cuộc họp không hợp lệ.' });
         }
 
@@ -249,45 +198,8 @@ export const endLivekitMeeting = async (req, res) => {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const room = meetingRegistry.get(normalizedRoomName);
-        if (!room) {
-            return res.status(404).json({ message: 'Phòng họp không tồn tại.' });
-        }
-
-        if (room.hostId !== userId) {
-            return res.status(403).json({ message: 'Chỉ chủ phòng mới có thể kết thúc cuộc họp.' });
-        }
-
-        // Clear timeouts
-        for (const waiter of room.waitingRoom || []) {
-            if (waiter.timeoutId) {
-                clearTimeout(waiter.timeoutId);
-            }
-        }
-
-        const { io, getReceiverSocketId } = getSocketGateway();
-        if (io && getReceiverSocketId) {
-            for (const participantId of room.participants.keys()) {
-                const targetSocketId = getReceiverSocketId(participantId);
-                if (targetSocketId) {
-                    io.to(targetSocketId).emit('meeting-ended', { roomName: normalizedRoomName });
-                }
-            }
-
-            for (const waiter of room.waitingRoom || []) {
-                const targetSocketId = getReceiverSocketId(waiter.userId);
-                if (targetSocketId) {
-                    io.to(targetSocketId).emit('participant-rejected', {
-                        roomName: normalizedRoomName,
-                        reason: 'meeting-ended',
-                    });
-                }
-            }
-        }
-
-        meetingRegistry.delete(normalizedRoomName);
-        res.json({ message: 'Đã kết thúc cuộc họp.' });
-    } catch (err) {
-        res.status(500).json({ message: err.message });
+        return endMeeting(req, res);
+    } catch (error) {
+        return res.status(500).json({ message: error.message });
     }
-};
+}
