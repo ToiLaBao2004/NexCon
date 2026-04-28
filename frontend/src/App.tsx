@@ -28,14 +28,18 @@ import ImageViewerModal from "./components/chat/ImageViewerModal";
 import { usePushNotification } from "./hooks/usePushNotification";
 
 function App() {
-  const { isDark, setTheme } = useThemeStore();
+  const initTheme = useThemeStore((state) => state.initTheme);
   const { accessToken } = useAuthStore();
   const { connectSocket, disconnectSocket } = useSocketStore();
   const { isSupported, requestPermission, subscribe } = usePushNotification();
 
   useEffect(() => {
-    setTheme(isDark);
-  }, [isDark, setTheme]);
+    useThemeStore.getState().initTheme();
+  }, []);
+
+  useEffect(() => {
+    initTheme();
+  }, [initTheme]);
 
   useEffect(() => {
     const unlockAudio = async () => {

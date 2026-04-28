@@ -22,11 +22,14 @@ export interface SendMessagePayload {
   mentions?: Mention[];
 }
 
-export interface ThemeState {
+export type ThemeState = {
   isDark: boolean;
+  isManual: boolean;
+  initTheme: () => void;
   toggleTheme: () => void;
   setTheme: (dark: boolean) => void;
-}
+  useSystemTheme: () => void;
+};
 
 export interface MediaState {
   images: Message[];
