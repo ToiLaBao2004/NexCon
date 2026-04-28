@@ -4,7 +4,7 @@ import { Navigate, Outlet } from 'react-router';
 
 const ProtectedRoute = () => {
   const { accessToken, user, loading, refreshToken, fetchMe } = useAuthStore();
-  const [ starting, setStarting ] = useState(true);
+  const [starting, setStarting] = useState(true);
   const ranRef = useRef(false); // to prevent double execution in StrictMode
 
   const init = async () => {
@@ -30,7 +30,12 @@ const ProtectedRoute = () => {
   }, []);
 
   if (starting || loading) {
-    return <div className='flex h-screen items-center justify-center'>Loading...</div>;
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-primary"></div>
+        <p className="text-sm text-muted-foreground">Đang tải...</p>
+      </div>
+    );
   }
 
   if (!accessToken) {
@@ -39,7 +44,7 @@ const ProtectedRoute = () => {
     )
   }
   return (
-		<Outlet></Outlet>
+    <Outlet></Outlet>
   );
 }
 
