@@ -70,6 +70,12 @@ const PreviewScreen = ({
   }, []);
 
   useEffect(() => {
+    if (videoRef.current && videoStream) {
+      videoRef.current.srcObject = videoStream;
+    }
+  }, [videoStream]);
+
+  useEffect(() => {
     if (!isCameraOn) {
       stopCamera();
       return;
@@ -87,12 +93,9 @@ const PreviewScreen = ({
 
         streamRef.current = stream;
         setVideoStream(stream);
-
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("Preview camera error:", err);
         setIsCameraOn(false);
       });
 
@@ -128,6 +131,9 @@ const PreviewScreen = ({
                   autoPlay
                   muted
                   playsInline
+                  onLoadedMetadata={(e) => {
+                    e.currentTarget.play().catch(err => console.error("Video play error:", err));
+                  }}
                   className="h-full w-full object-cover"
                 />
               ) : (

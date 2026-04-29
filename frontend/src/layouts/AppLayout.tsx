@@ -24,7 +24,7 @@ const AppLayout = () => {
 
     return (
         <div className="flex bg-background h-svh w-full overflow-hidden p-0 md:p-2 md:gap-2 relative">
-            <div className="z-50 shrink-0 h-full">
+            <div className="z-[100] shrink-0 h-full">
                 <MainSidebar />
             </div>
 

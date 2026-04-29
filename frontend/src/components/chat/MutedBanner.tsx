@@ -27,31 +27,32 @@ export function MutedBanner() {
   if (!isMsgMuted && !isMeetMuted) return null;
 
   const getMuteText = () => {
-    const formatTime = (dateStr: string | null | undefined) => {
-      if (!dateStr) return "";
-      if (dateStr === "9999-12-31T23:59:59.999Z") return "khi bạn bật lại";
-      return new Date(dateStr).toLocaleString("vi-VN", {
-        dateStyle: "short",
-        timeStyle: "short",
-      });
-    };
-
     const mUntil = muteData?.messages;
     const mtUntil = muteData?.meetings;
 
+    const formatPart = (until: string | null | undefined) => {
+      if (!until) return "";
+      const date = new Date(until);
+      if (date.getFullYear() >= 9999) return "cho đến khi bạn bật lại";
+      return `đến ${date.toLocaleString("vi-VN", {
+        dateStyle: "short",
+        timeStyle: "short",
+      })}`;
+    };
+
     if (isMsgMuted && isMeetMuted) {
       if (mUntil === mtUntil) {
-        return `Đã tắt thông báo tin nhắn và cuộc gọi đến ${formatTime(mUntil)}`;
+        return `Đã tắt thông báo tin nhắn và cuộc gọi ${formatPart(mUntil)}`;
       }
-      return `Đã tắt thông báo tin nhắn đến (${formatTime(mUntil)}) và cuộc gọi đến (${formatTime(mtUntil)})`;
+      return `Đã tắt thông báo tin nhắn (${formatPart(mUntil)}) và cuộc gọi (${formatPart(mtUntil)})`;
     }
 
     if (isMsgMuted) {
-      return `Đã tắt thông báo tin nhắn đến ${formatTime(mUntil)}`;
+      return `Đã tắt thông báo tin nhắn ${formatPart(mUntil)}`;
     }
 
     if (isMeetMuted) {
-      return `Đã tắt thông báo cuộc gọi đến ${formatTime(mtUntil)}`;
+      return `Đã tắt thông báo cuộc gọi ${formatPart(mtUntil)}`;
     }
 
     return "";

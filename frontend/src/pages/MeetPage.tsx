@@ -241,12 +241,6 @@ const MeetPage = () => {
                             >
                                 Quay lại cuộc họp
                             </button>
-                            <button
-                                onClick={() => openMeetingReminderModal(activeRoomName || '')}
-                                className="h-10 rounded-xl border border-primary/30 bg-background px-5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
-                            >
-                                Tạo nhắc hẹn cho cuộc họp này
-                            </button>
                         </div>
                     </div>
                 </div>

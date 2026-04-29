@@ -198,7 +198,7 @@ const Stage = () => {
 };
 
 /* ─── Header ─── */
-const RoomHeader = ({ roomName, roomLabel, onMinimize }: { roomName: string; roomLabel?: string; onMinimize?: () => void }) => {
+const RoomHeader = ({ roomName, roomLabel }: { roomName: string; roomLabel?: string }) => {
   return (
     <div className="flex items-center justify-between px-5 py-3 shrink-0 bg-card border-b border-border">
       <div className="flex items-center gap-2.5">
@@ -208,21 +208,12 @@ const RoomHeader = ({ roomName, roomLabel, onMinimize }: { roomName: string; roo
         </span>
         {!roomLabel && <span className="text-xs text-muted-foreground font-mono">{roomName}</span>}
       </div>
-      {onMinimize && (
-        <button
-          onClick={onMinimize}
-          className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          title="Thu nhỏ"
-        >
-          <Minimize2 size={16} />
-        </button>
-      )}
     </div>
   );
 };
 
 /* ─── Control Bar ─── */
-const ControlBar = ({ onLeave, onLeaveIntercept }: { onLeave?: () => void; onLeaveIntercept?: (disconnect: () => void) => void }) => {
+const ControlBar = ({ onLeave, onMinimize, onLeaveIntercept }: { onLeave?: () => void; onMinimize?: () => void; onLeaveIntercept?: (disconnect: () => void) => void }) => {
   const { toggle: toggleMic, enabled: micOn, pending: micPending } = useTrackToggle({
     source: Track.Source.Microphone,
   });
@@ -316,6 +307,16 @@ const ControlBar = ({ onLeave, onLeaveIntercept }: { onLeave?: () => void; onLea
       >
         <PhoneOff size={20} />
       </button>
+
+      {onMinimize && (
+        <button
+          className="p-3.5 rounded-full bg-muted hover:bg-muted/70 text-foreground transition-all duration-150 ml-2"
+          onClick={onMinimize}
+          title="Thu nhỏ"
+        >
+          <Minimize2 size={20} />
+        </button>
+      )}
     </div>
   );
 };
@@ -610,11 +611,11 @@ const GroupCallRoom = ({
         <MiniControls onMaximize={onMaximize} onLeave={onLeave} onLeaveIntercept={onLeaveIntercept} />
       ) : (
         <>
-          <RoomHeader roomName={roomName} roomLabel={roomLabel} onMinimize={onMinimize} />
+          <RoomHeader roomName={roomName} roomLabel={roomLabel} />
           <div className="flex-1 overflow-hidden">
             <Stage />
           </div>
-          <ControlBar onLeave={onLeave} onLeaveIntercept={onLeaveIntercept} />
+          <ControlBar onLeave={onLeave} onMinimize={onMinimize} onLeaveIntercept={onLeaveIntercept} />
         </>
       )}
     </LiveKitRoom>
