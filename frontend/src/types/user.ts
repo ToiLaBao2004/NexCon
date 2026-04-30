@@ -1,3 +1,7 @@
+export interface UserMusic {
+  trackId: string;
+}
+
 export interface User {
   _id: string;
   email: string;
@@ -6,6 +10,7 @@ export interface User {
   bio?: string;
   phone?: string;
   googleId?: string;
+  music?: UserMusic;
   createdAt?: string;
   updatedAt?: string;
 }

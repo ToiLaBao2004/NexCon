@@ -37,6 +37,9 @@ const userSchema = new mongoose.Schema({
         unique: true,
         sparse: true // allows multiple null values
     },
+    music: {
+        trackId: String
+    },
 }, { timestamps: true });
 
 const UserModel = mongoose.models.User || mongoose.model('User', userSchema);

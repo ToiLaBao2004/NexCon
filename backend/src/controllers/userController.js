@@ -1,6 +1,7 @@
 import User from '../models/userModel.js';
 import { upLoadImageFromBuffer, deleteImage } from '../middlewares/uploadMiddleware.js';
 import bcrypt from 'bcrypt';
+import { searchSpotifyTracks } from '../services/spotifyService.js';
 
 export async function getCurrentUser(req, res) {
     try {
@@ -129,6 +130,64 @@ export async function updateAvatar(req, res) {
     } catch (error) {
         console.error('Update avatar error:', error);
         return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function searchMusic(req, res) {
+    try {
+        const { q } = req.query;
+
+        if (!q || !q.trim()) {
+            return res.status(400).json({ message: "Missing search query" });
+        }
+
+        const tracks = await searchSpotifyTracks(q.trim());
+
+        return res.status(200).json({ tracks });
+    } catch (error) {
+        console.error("Search music error:", error);
+        return res.status(500).json({ message: "Search music failed" });
+    }
+}
+
+export async function updateMusic(req, res) {
+    try {
+        const userId = req.user._id;
+        const { trackId } = req.body;
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: {
+                    music: { trackId }
+                }
+            },
+            { new: true }
+        ).select("-password");
+
+        res.json(updatedUser);
+    } catch (err) {
+        res.status(500).json({ message: "Error" });
+    }
+}
+
+export async function removeMusic(req, res) {
+    try {
+        const userId = req.user._id;
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $unset: { music: "" } },
+            { new: true }
+        ).select("-password");
+
+        return res.status(200).json({
+            message: "Music removed successfully",
+            user: updatedUser
+        });
+    } catch (error) {
+        console.error("Remove music error:", error);
+        return res.status(500).json({ message: "Remove music failed" });
     }
 }
 

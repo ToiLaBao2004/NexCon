@@ -1,4 +1,5 @@
 import api from '@/lib/axios';
+import type { UserMusic } from '@/types/user';
 
 export const userService = {
     updateProfile: async (data: { displayName?: string; bio?: string; phone?: string }) => {
@@ -25,5 +26,23 @@ export const userService = {
     changePassword: async (data: { currentPassword?: string; newPassword?: string }) => {
         const response = await api.put('/users/change-password', data);
         return response.data;
-    }
+    },
+
+    searchMusic: async (q: string): Promise<UserMusic[]> => {
+        const response = await api.get('/users/music/search', {
+            params: { q },
+        });
+
+        return response.data.tracks;
+    },
+
+    updateMusic: async (music: UserMusic) => {
+        const response = await api.put('/users/me/music', music);
+        return response.data;
+    },
+
+    removeMusic: async () => {
+        const response = await api.delete('/users/me/music');
+        return response.data;
+    },
 };
