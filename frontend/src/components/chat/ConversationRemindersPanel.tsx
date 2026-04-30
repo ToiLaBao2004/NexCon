@@ -21,6 +21,7 @@ import {
 import { reminderService } from "@/services/reminderService";
 import type { Reminder } from "@/types/reminder";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { useChatStore } from "@/stores/useChatStore";
 import {
   getReminderContent,
   formatClock,
@@ -29,6 +30,7 @@ import {
 } from "@/pages/reminder/utils";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import UserAvatar from "@/components/chat/UserAvatar";
 
 //  Types 
 
@@ -94,6 +96,36 @@ interface ReminderRowProps {
 }
 
 function ReminderRow({ reminder, onClick }: ReminderRowProps) {
+  const currentUser = useAuthStore((state) => state.user);
+  const currentUserId = currentUser?._id;
+  const conversation = useChatStore((state) =>
+    state.conversations.find((c) => c._id === reminder.conversationId)
+  );
+
+  let creatorNameDisplay = "Bạn";
+  let creatorAvatarUrl: string | null | undefined = undefined;
+
+  if (reminder.createdBy && reminder.createdBy !== currentUserId?.toString()) {
+    if (conversation) {
+      const creatorParticipant = conversation.participants.find(
+        (p: any) => p.userId?._id?.toString() === reminder.createdBy?.toString()
+      );
+      if (creatorParticipant) {
+        creatorNameDisplay = creatorParticipant.userId?.nickname?.trim()
+          ? creatorParticipant.userId.nickname
+          : creatorParticipant.userId?.displayName || "Thành viên";
+        creatorAvatarUrl = creatorParticipant.userId?.avatarUrl;
+      } else {
+        creatorNameDisplay = "Thành viên";
+      }
+    } else {
+      creatorNameDisplay = "Thành viên";
+    }
+  } else if (reminder.createdBy) {
+    creatorNameDisplay = "Bạn";
+    creatorAvatarUrl = currentUser?.avatarUrl;
+  }
+
   const content = getReminderContent(reminder);
   const date = new Date(reminder.remindAt);
   const cfg = STATUS_CONFIG[reminder.status];
@@ -148,6 +180,17 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
             {cfg.label}
           </span>
           <ParticipationBadge status={reminder.participationStatus} />
+          {reminder.createdBy && (
+            <span className="inline-flex items-center gap-1 rounded-full pr-1.5 pl-0.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground border border-border/40">
+              <UserAvatar
+                type="seen"
+                name={creatorNameDisplay}
+                avatarUrl={creatorAvatarUrl ?? undefined}
+                className="h-3.5 w-3.5"
+              />
+              Tạo bởi: {creatorNameDisplay}
+            </span>
+          )}
         </div>
       </div>
     </button>

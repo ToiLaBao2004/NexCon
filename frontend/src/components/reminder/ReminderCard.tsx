@@ -98,6 +98,26 @@ export default function ReminderCard({
     }
   }
 
+  let creatorNameDisplay = 'Bạn';
+  let creatorAvatarUrl: string | null | undefined = undefined;
+
+  if (reminder.createdBy && reminder.createdBy !== user?._id?.toString()) {
+    if (conversation) {
+      const creatorParticipant = conversation.participants.find((p: any) => p.userId?._id?.toString() === reminder.createdBy?.toString());
+      if (creatorParticipant) {
+        creatorNameDisplay = creatorParticipant.userId?.nickname?.trim() ? creatorParticipant.userId.nickname : (creatorParticipant.userId?.displayName || 'Thành viên');
+        creatorAvatarUrl = creatorParticipant.userId?.avatarUrl;
+      } else {
+        creatorNameDisplay = 'Thành viên';
+      }
+    } else {
+      creatorNameDisplay = 'Thành viên';
+    }
+  } else if (reminder.createdBy) {
+    creatorNameDisplay = 'Bạn';
+    creatorAvatarUrl = user?.avatarUrl;
+  }
+
   const handleMeetingLinkClick = (event: React.MouseEvent<HTMLAnchorElement>, targetUrl: string) => {
     event.preventDefault();
     event.stopPropagation();
@@ -224,6 +244,12 @@ export default function ReminderCard({
             {activeTab === 'past' && (
               <span className={subtleBadgeClass}>
                 Đã nhắc
+              </span>
+            )}
+            {reminder.createdBy && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted pr-2.5 pl-1 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors group-hover:bg-muted/80">
+                <UserAvatar type="seen" name={creatorNameDisplay} avatarUrl={creatorAvatarUrl ?? undefined} className="h-4 w-4" />
+                Tạo bởi: {creatorNameDisplay}
               </span>
             )}
           </div>
