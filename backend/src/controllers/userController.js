@@ -18,26 +18,27 @@ export async function getCurrentUser(req, res) {
     }
 }
 
-export async function searchUserByEmailAndPhone(socket, { query }) {
-    if (!query || !query.trim()) {
-        socket.emit('search-user-result', { user: null, status: 'empty' });
-        return;
-    }
-
+export async function searchUsers(req, res) {
     try {
-        const isEmail = query.includes('@');
-        const searchQuery = isEmail ? { email: query.trim() } : { phone: query.trim() };
+        const { keyword } = req.query;
+        const currentUserId = req.user._id;
 
-        const foundUser = await User.findOne(searchQuery).select('_id displayName email avatarUrl bio phone');
-
-        if (foundUser) {
-            socket.emit('search-user-result', { user: foundUser, status: 'found' });
-        } else {
-            socket.emit('search-user-result', { user: null, status: 'not-found' });
+        if (!keyword || !keyword.trim()) {
+            return res.status(200).json({ users: [] });
         }
+
+        const searchEmail = keyword.trim();
+
+        const users = await User.find({
+            email: searchEmail
+        })
+            .select('_id displayName avatarUrl email')
+            .limit(20);
+
+        return res.status(200).json({ users });
     } catch (error) {
-        console.error('Search user by email/phone error:', error);
-        socket.emit('search-user-result', { user: null, status: 'error' });
+        console.error('Search users error:', error);
+        return res.status(500).json({ message: 'Server error' });
     }
 }
 

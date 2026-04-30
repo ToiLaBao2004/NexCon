@@ -25,5 +25,10 @@ export const userService = {
     changePassword: async (data: { currentPassword?: string; newPassword?: string }) => {
         const response = await api.put('/users/change-password', data);
         return response.data;
+    },
+
+    searchUsers: async (keyword: string) => {
+        const response = await api.get('/users/search', { params: { keyword } });
+        return response.data;
     }
 };
