@@ -1,5 +1,6 @@
 import React from "react";
 import { useChatStore } from "@/stores/useChatStore";
+import { ChevronsDown } from "lucide-react";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import MessageItem from "./MessageItem";
 import CallMessageItem from "./CallMessageItem";
@@ -310,31 +311,24 @@ const ChatWindowBody: React.FC = () => {
       </div>
 
       {(isJumpMode || showScrollToBottom) && (
-        <div className="absolute bottom-24 left-0 right-0 flex justify-center z-20 pointer-events-none animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center gap-2 bg-slate-800/95 backdrop-blur
-                          text-sm text-slate-100 px-4 py-2 rounded-full shadow-2xl border border-slate-700/50 pointer-events-auto">
-            <span className="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
-            <span>Bạn đang xem tin nhắn cũ</span>
-            <div className="w-px h-4 bg-slate-600 mx-1"></div>
-            <button
-              onClick={async () => {
-                if (isJumpMode) {
-                  await exitJumpMode(convoId);
-                  setTimeout(() => {
-                    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
-                  }, 150);
-                } else {
-                  scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
-                }
-              }}
-
-              className="text-blue-400 hover:text-blue-300 font-bold transition-colors"
-            >
-              Về tin mới nhất ↓
-            </button>
-
-          </div>
-        </div>
+        <button
+          onClick={async () => {
+            if (isJumpMode) {
+              await exitJumpMode(convoId);
+              setTimeout(() => {
+                scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
+              }, 150);
+            } else {
+              scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+            }
+          }}
+          className="absolute bottom-6 right-6 z-20 flex h-11 w-11 items-center justify-center 
+                     rounded-full bg-white dark:bg-slate-800 shadow-xl border border-slate-200 dark:border-slate-700
+                     hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-90
+                     animate-in fade-in slide-in-from-bottom-4 zoom-in-50 duration-300 group"
+        >
+          <ChevronsDown className="h-9 w-9 text-slate-600 dark:text-slate-300 group-hover:translate-y-0.5 transition-transform stroke-[1.5px]" />
+        </button>
       )}
 
 
