@@ -2,8 +2,10 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Reminder from '../models/reminderModel.js';
 import Conversation from '../models/conversationModel.js';
+import Meeting from '../models/meetingModel.js';
 import Message from '../models/messageModel.js';
 import User from '../models/userModel.js';
+import { generateRoomCode } from './meetingController.js';
 import { emitToUser, io } from '../socket/index.js';
 import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
 import {
@@ -384,6 +386,151 @@ export async function createSharedReminderFromMessage(req, res) {
         }
         console.error('Create shared reminder from message error:', error);
         return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function scheduleMeeting(req, res) {
+    try {
+        const userId = req.user._id;
+        const userIdStr = toObjectIdString(userId);
+        const { conversationId, content, remindAt } = req.body;
+
+        if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+            return res.status(400).json({ message: 'conversationId không hợp lệ.' });
+        }
+
+        const normalizedContent = resolveReminderContent({ content });
+        if (!normalizedContent) {
+            return res.status(400).json({ message: 'Vui lòng nhập tên buổi họp.' });
+        }
+
+        if (!remindAt || !isValidDateInput(remindAt)) {
+            return res.status(400).json({ message: 'Thời gian họp không hợp lệ.' });
+        }
+
+        const remindAtDate = normalizeDate(remindAt);
+        if (remindAtDate.getTime() <= Date.now() + REMIND_AT_MIN_LEAD_TIME_MS) {
+            return res.status(400).json({ message: 'Thời gian họp cần ít nhất 10 giây trong tương lai.' });
+        }
+
+        // 1. Generate a unique meeting room code
+        let roomName;
+        for (let i = 0; i < 6; i += 1) {
+            const candidate = generateRoomCode();
+            const exists = await Meeting.exists({ roomName: candidate });
+            if (!exists) {
+                roomName = candidate;
+                break;
+            }
+        }
+        if (!roomName) {
+            return res.status(500).json({ message: 'Không thể tạo mã phòng họp, vui lòng thử lại.' });
+        }
+
+        // 2. Create the meeting record (always active upon creation)
+        const meeting = await Meeting.create({
+            roomName,
+            hostId: userId,
+            conversationId,
+            requireApproval: true,
+            status: 'active',
+            scheduledAt: remindAtDate,
+            participants: [],
+        });
+
+        // 3. Build shared reminder for all participants
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) {
+            return res.status(404).json({ message: 'Cuộc trò chuyện không tồn tại.' });
+        }
+
+        if (conversation.type === 'group' && conversation.disbanded === true) {
+            return res.status(403).json({ message: 'Nhóm đã giải tán.' });
+        }
+
+        const participantIds = Array.from(new Set(
+            conversation.participants
+                .map((p) => toObjectIdString(p.userId?._id || p.userId))
+                .filter(Boolean)
+        ));
+
+        if (!participantIds.includes(userIdStr)) {
+            return res.status(403).json({ message: 'Bạn không thuộc cuộc trò chuyện này.' });
+        }
+
+        const sharedKey = crypto.randomBytes(24).toString('hex');
+        const reminderPayload = participantIds.map((participantId) => ({
+            userId: participantId,
+            scope: 'shared',
+            sharedKey,
+            conversationId: conversation._id,
+            createdBy: userId,
+            participationStatus: 'joined',
+            content: normalizedContent,
+            remindAt: remindAtDate,
+            repeatRule: 'none',
+            source: { type: 'meeting' },
+            meetingId: meeting._id,
+            meetingRoomName: roomName,
+            notifyChannels: ['inapp'],
+        }));
+
+        const createdReminders = await Reminder.insertMany(reminderPayload, { ordered: true });
+        const creatorReminder = createdReminders.find((item) => toObjectIdString(item.userId) === userIdStr);
+
+        // 4. Create system message in chat
+        const messageMetadata = {
+            sharedKey,
+            creatorId: userIdStr,
+            creatorName: req.user.displayName || 'Một thành viên',
+            participantCount: participantIds.length,
+            participantUserIds: participantIds,
+            reminderContent: normalizedContent,
+            remindAt: remindAtDate.toISOString(),
+            sourceType: 'meeting',
+            meetingRoomName: roomName,
+        };
+
+        const systemMessage = await Message.create({
+            conversationId: conversation._id,
+            senderId: userId,
+            senderInfo: {
+                displayName: req.user.displayName,
+                avatarUrl: req.user.avatarUrl,
+            },
+            type: 'system',
+            systemType: 'shared_reminder_created',
+            content: 'Đã lên lịch cuộc họp',
+            metadata: messageMetadata,
+        });
+
+        updateConversationLastMessage(conversation, systemMessage, userId);
+        await conversation.save();
+
+        // 5. Emit real-time events
+        emitNewMessage(io, conversation, systemMessage);
+
+        for (const reminder of createdReminders) {
+            const targetUserId = toObjectIdString(reminder.userId);
+            if (!targetUserId || targetUserId === userIdStr) continue;
+            emitToUser(targetUserId, 'reminder-created', {
+                reminder: normalizeReminderOutput(reminder),
+            });
+        }
+
+        return res.status(201).json({
+            reminder: normalizeReminderOutput(creatorReminder),
+            meeting: {
+                _id: meeting._id,
+                roomName,
+                status: meeting.status,
+            },
+            sharedKey,
+            participantCount: participantIds.length,
+        });
+    } catch (error) {
+        console.error('Schedule meeting error:', error);
+        return res.status(500).json({ message: 'Không thể lên lịch cuộc họp.' });
     }
 }
 

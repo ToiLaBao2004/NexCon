@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMeetStore } from '@/stores/useMeetStore';
 import { useGroupCallStore } from '@/stores/useGroupCallStore';
@@ -69,14 +69,57 @@ const MeetPage = () => {
         };
     }, []);
 
+    const autoJoinedRef = useRef(false);
+
     useEffect(() => {
+        if (autoJoinedRef.current) return;
+
         const params = new URLSearchParams(window.location.search);
-        const room = (params.get('room') || '').trim();
-        if (room) {
-            setJoinCode(buildMeetingUrl(room));
+        const codeParam = (params.get('code') || params.get('room') || '').trim();
+        
+        if (codeParam) {
+            autoJoinedRef.current = true;
+            const fullUrl = buildMeetingUrl(codeParam);
+            setJoinCode(fullUrl);
             setMode('join');
+
+            const code = parseMeetingInput(codeParam);
+            if (code) {
+                const executeAutoJoin = async () => {
+                    if (useGroupCallStore.getState().status !== 'idle') {
+                        setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tham gia cuộc họp.');
+                        return;
+                    }
+                    setLoading(true);
+                    setError('');
+                    try {
+                        await joinExistingMeeting(code);
+                        const meetState = useMeetStore.getState();
+                        if (meetState.token || meetState.meetingStatus === 'preview') {
+                            setPreviewData({
+                                code,
+                                isRejoin: !!meetState.token,
+                                isHostPreview: meetState.isHost,
+                            });
+                        }
+                    } catch (err) {
+                        const maybeError = err as { response?: { status?: number } };
+                        if (maybeError?.response?.status === 404) {
+                            toast.error('Không tìm thấy phòng họp');
+                        } else if (maybeError?.response?.status === 410) {
+                            toast.error('Cuộc họp này đã kết thúc');
+                        } else {
+                            toast.error('Đã có lỗi xảy ra, thử lại sau');
+                        }
+                        setError(getApiErrorMessage(err));
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                executeAutoJoin();
+            }
         }
-    }, []);
+    }, [joinExistingMeeting]);
 
     const handleOpenCreate = () => {
         setCreatedRoomName('');
@@ -150,6 +193,7 @@ const MeetPage = () => {
 
             const meetState = useMeetStore.getState();
             if (meetState.token || meetState.meetingStatus === 'preview') {
+                window.history.replaceState({}, '', `/meet?code=${code}`);
                 setPreviewData({
                     code,
                     isRejoin: !!meetState.token,
@@ -259,7 +303,10 @@ const MeetPage = () => {
                 isRejoin={previewData.isRejoin}
                 isHostPreview={previewData.isHostPreview}
                 onRequestJoin={handleRequestJoin}
-                onCancel={() => setPreviewData(null)}
+                onCancel={() => {
+                    setPreviewData(null);
+                    window.history.replaceState({}, '', '/meet');
+                }}
             />
         );
     }
@@ -385,6 +432,7 @@ const MeetPage = () => {
                                 onClick={() => {
                                     setMode('select');
                                     setError('');
+                                    window.history.replaceState({}, '', '/meet');
                                 }}
                                 className="text-[13px] md:text-sm text-blue-100 transition-colors hover:text-white"
                             >
@@ -428,6 +476,7 @@ const MeetPage = () => {
                                 onClick={() => {
                                     setMode('select');
                                     setError('');
+                                    window.history.replaceState({}, '', '/meet');
                                 }}
                                 className="text-[13px] md:text-sm text-blue-100 transition-colors hover:text-white"
                             >

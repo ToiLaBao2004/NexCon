@@ -1,4 +1,4 @@
-import { Bell, Check, Clock3, CopyPlus, SquarePen, Trash2 } from 'lucide-react';
+import { Bell, Check, Clock3, Copy, CopyPlus, SquarePen, Trash2, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -16,7 +16,8 @@ import { extractFirstHttpUrl } from '@/utils/meetingLink';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useChatStore } from '@/stores/useChatStore';
 import { useMeetStore } from '@/stores/useMeetStore';
-import { useNavigate } from 'react-router';
+import { useNavigate, Link } from 'react-router';
+import { toast } from 'sonner';
 import UserAvatar from '@/components/chat/UserAvatar';
 
 interface ReminderCardProps {
@@ -169,18 +170,48 @@ export default function ReminderCard({
           <h3 className="text-[17px] font-semibold leading-snug tracking-tight text-foreground whitespace-pre-wrap break-words">
             {contentBeforeMeetingUrl}
             {hasInlineMeetingUrl && rawMeetingUrlInContent && (
-              <a
-                href={meetingUrl || rawMeetingUrlInContent}
-                onClick={(event) => handleMeetingLinkClick(event, meetingUrl || rawMeetingUrlInContent)}
-                className="font-medium underline text-primary transition-colors hover:text-primary/80 break-all"
-              >
-                {rawMeetingUrlInContent}
-              </a>
+              (!reminder.meetingRoomName || !rawMeetingUrlInContent.includes(reminder.meetingRoomName)) ? (
+                <a
+                  href={meetingUrl || rawMeetingUrlInContent}
+                  onClick={(event) => handleMeetingLinkClick(event, meetingUrl || rawMeetingUrlInContent)}
+                  className="font-medium underline text-primary transition-colors hover:text-primary/80 break-all"
+                >
+                  {rawMeetingUrlInContent}
+                </a>
+              ) : null
             )}
             {contentAfterMeetingUrl}
           </h3>
 
-          {!hasInlineMeetingUrl && meetingUrl && (
+          {/* Meeting Link Box */}
+          {reminder.meetingRoomName && (
+            <div
+              className="mt-2.5 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Video className="h-4 w-4 shrink-0 text-primary" />
+              <Link
+                to={`/meet?code=${reminder.meetingRoomName}`}
+                className="flex-1 truncate text-[13px] font-medium text-primary underline-offset-2 hover:underline transition-colors"
+              >
+                {`${window.location.origin}/meet?code=${reminder.meetingRoomName}`}
+              </Link>
+              <button
+                type="button"
+                className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                title="Sao chép link cuộc họp"
+                onClick={() => {
+                  const url = `${window.location.origin}/meet?code=${reminder.meetingRoomName}`;
+                  navigator.clipboard.writeText(url);
+                  toast.success('Đã sao chép link cuộc họp');
+                }}
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+
+          {!reminder.meetingRoomName && !hasInlineMeetingUrl && meetingUrl && (
             <a
               href={meetingUrl}
               onClick={(event) => handleMeetingLinkClick(event, meetingUrl)}

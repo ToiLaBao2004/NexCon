@@ -13,9 +13,11 @@ import {
   Calendar,
   Check,
   Clock3,
+  Copy,
   Loader2,
   UserMinus,
   UserPlus,
+  Video,
   X,
 } from "lucide-react";
 import { reminderService } from "@/services/reminderService";
@@ -30,6 +32,7 @@ import {
 } from "@/pages/reminder/utils";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Link } from "react-router";
 import UserAvatar from "@/components/chat/UserAvatar";
 
 //  Types 
@@ -165,6 +168,35 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
         <p className="text-[13px] font-semibold text-foreground leading-snug line-clamp-2 break-words">
           {content}
         </p>
+
+        {/* Meeting Link Box (compact) */}
+        {reminder.meetingRoomName && (
+          <div
+            className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2 py-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Video className="h-3 w-3 shrink-0 text-primary" />
+            <Link
+              to={`/meet?code=${reminder.meetingRoomName}`}
+              className="flex-1 truncate text-[11px] font-medium text-primary underline-offset-2 hover:underline transition-colors"
+            >
+              {`${window.location.origin}/meet?code=${reminder.meetingRoomName}`}
+            </Link>
+            <button
+              type="button"
+              className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+              title="Sao chép link"
+              onClick={() => {
+                const url = `${window.location.origin}/meet?code=${reminder.meetingRoomName}`;
+                navigator.clipboard.writeText(url);
+                toast.success('Đã sao chép link cuộc họp');
+              }}
+            >
+              <Copy className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
             <Clock3 className="h-3 w-3 shrink-0" />
@@ -209,6 +241,10 @@ interface DetailDialogProps {
 
 function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelSharedForAll }: DetailDialogProps) {
   const [isActing, setIsActing] = useState(false);
+  const currentUser = useAuthStore((state) => state.user);
+  const conversation = useChatStore((state) =>
+    state.conversations.find((c) => c._id === reminder?.conversationId)
+  );
 
   if (!reminder) return null;
 
@@ -219,6 +255,30 @@ function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelShar
   const isDeclined = reminder.participationStatus === "declined";
   const sharedKey = reminder.sharedKey;
   const isCreator = String(reminder.createdBy || "") === String(currentUserId || "");
+
+  let creatorNameDisplay = "Bạn";
+  let creatorAvatarUrl: string | null | undefined = undefined;
+
+  if (reminder.createdBy && reminder.createdBy !== currentUserId?.toString()) {
+    if (conversation) {
+      const creatorParticipant = conversation.participants.find(
+        (p: any) => p.userId?._id?.toString() === reminder.createdBy?.toString()
+      );
+      if (creatorParticipant) {
+        creatorNameDisplay = creatorParticipant.userId?.nickname?.trim()
+          ? creatorParticipant.userId.nickname
+          : creatorParticipant.userId?.displayName || "Thành viên";
+        creatorAvatarUrl = creatorParticipant.userId?.avatarUrl;
+      } else {
+        creatorNameDisplay = "Thành viên";
+      }
+    } else {
+      creatorNameDisplay = "Thành viên";
+    }
+  } else if (reminder.createdBy) {
+    creatorNameDisplay = "Bạn";
+    creatorAvatarUrl = currentUser?.avatarUrl;
+  }
 
   const handleParticipation = async (participate: boolean) => {
     if (!sharedKey) {
@@ -303,6 +363,34 @@ function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelShar
                 </button>
               </div>
 
+              {/* Meeting Link Box */}
+              {reminder.meetingRoomName && (
+                <div
+                  className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Video className="h-4 w-4 shrink-0 text-primary" />
+                  <Link
+                    to={`/meet?code=${reminder.meetingRoomName}`}
+                    className="flex-1 truncate text-[13px] font-medium text-primary underline-offset-2 hover:underline transition-colors"
+                  >
+                    {`${window.location.origin}/meet?code=${reminder.meetingRoomName}`}
+                  </Link>
+                  <button
+                    type="button"
+                    className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                    title="Sao chép link cuộc họp"
+                    onClick={() => {
+                      const url = `${window.location.origin}/meet?code=${reminder.meetingRoomName}`;
+                      navigator.clipboard.writeText(url);
+                      toast.success('Đã sao chép link cuộc họp');
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+
               {/* Info rows */}
               <div className="flex flex-col gap-2 rounded-xl bg-muted/30 px-4 py-3 border border-border/40">
                 {/* Date */}
@@ -325,6 +413,21 @@ function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelShar
                     {cfg.label}
                   </span>
                 </div>
+                {/* Creator */}
+                {reminder.createdBy && (
+                  <div className="flex items-center gap-2.5 text-[13px] text-foreground mt-1 pt-2 border-t border-border/40">
+                    <span className="text-muted-foreground text-[12px]">Người tạo:</span>
+                    <span className="inline-flex items-center gap-1.5 font-medium">
+                      <UserAvatar
+                        type="seen"
+                        name={creatorNameDisplay}
+                        avatarUrl={creatorAvatarUrl ?? undefined}
+                        className="h-4 w-4"
+                      />
+                      {creatorNameDisplay}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Participation status */}
