@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { BellRing, Clock3, Hourglass, MessageSquareQuote, MoonStar, Sunrise, Timer } from 'lucide-react';
+import { Clock3, Hourglass, MessageSquareQuote, MoonStar, Sunrise, Timer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -189,15 +189,14 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
       {/* Secondary Edit Action */}
       <div className="pt-3">
         <Button
-          variant="outline"
-          className="w-full h-11 rounded-xl border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/80 text-slate-900 dark:text-slate-200 text-sm font-bold transition-all hover:bg-slate-200 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 shadow-sm"
+          className="w-full h-11 rounded-xl bg-primary text-white hover:bg-primary/90 text-sm font-bold transition-all shadow-md active:scale-[0.98]"
           disabled={isSubmitting}
           onClick={() => {
             setOpenQuick(false);
             setOpenCustomForm(true);
           }}
         >
-          <Clock3 className="h-4 w-4 mr-2 text-slate-500" />
+          <Clock3 className="h-4 w-4 mr-2" />
           Chỉnh sửa chi tiết
         </Button>
       </div>
