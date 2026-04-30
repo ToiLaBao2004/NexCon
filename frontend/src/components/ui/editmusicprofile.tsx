@@ -17,7 +17,7 @@ export default function EditMusicProfile() {
         removeMusic,
     } = useUserStore();
 
-    const debounceRef = useRef<NodeJS.Timeout | null>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Debounce thủ công
     const debouncedSearch = useCallback((value: string) => {
