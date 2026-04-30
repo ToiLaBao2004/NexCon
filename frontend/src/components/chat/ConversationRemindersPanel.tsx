@@ -231,7 +231,7 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
 
 //  Detail dialog 
 
-interface DetailDialogProps {
+export interface DetailDialogProps {
   reminder: Reminder | null;
   onClose: () => void;
   onUpdate: (updated: Reminder) => void;
@@ -239,7 +239,7 @@ interface DetailDialogProps {
   onCancelSharedForAll: (sharedKey: string) => void;
 }
 
-function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelSharedForAll }: DetailDialogProps) {
+export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCancelSharedForAll }: DetailDialogProps) {
   const [isActing, setIsActing] = useState(false);
   const currentUser = useAuthStore((state) => state.user);
   const conversation = useChatStore((state) =>

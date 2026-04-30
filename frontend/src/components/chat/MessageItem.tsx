@@ -31,6 +31,7 @@ import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
 import ReminderFormModal from "@/components/reminder/ReminderFormModal";
 import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder";
 import ForwardMessageModal from "./ForwardMessageModal";
+import { DetailDialog } from "./ConversationRemindersPanel";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -814,6 +815,7 @@ function SystemMessageComponent({
 	const [isParticipantDialogOpen, setIsParticipantDialogOpen] = useState(false);
 	const [participantSearchTerm, setParticipantSearchTerm] = useState('');
 	const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
+	const [selectedReminderForDialog, setSelectedReminderForDialog] = useState<Reminder | null>(null);
 	const [isSharedReminderUnavailable, setIsSharedReminderUnavailable] = useState(false);
 	const lastSharedOverviewRefreshTriggerRef = useRef<string | null>(null);
 	const isSharedReminderCancelled = useMemo(() => {
@@ -1446,6 +1448,11 @@ function SystemMessageComponent({
 			if (isReminderUnavailable) return;
 			const focusId = String(linkedReminder?._id || reminderIdFromMeta || '').trim();
 
+			if (linkedReminder) {
+				setSelectedReminderForDialog(linkedReminder);
+				return;
+			}
+
 			if (focusId) {
 				window.location.assign(`/reminder?tab=${targetDetailTab}&focus=${encodeURIComponent(focusId)}`);
 				return;
@@ -1685,6 +1692,20 @@ function SystemMessageComponent({
 						if (isShared) {
 							void loadSharedOverview(true);
 						}
+					}}
+				/>
+
+				<DetailDialog
+					reminder={selectedReminderForDialog}
+					onClose={() => setSelectedReminderForDialog(null)}
+					onUpdate={(updated) => {
+						useReminderStore.getState().updateReminderInStore(updated);
+						setSelectedReminderForDialog(updated);
+					}}
+					currentUserId={currentUserId}
+					onCancelSharedForAll={(sharedKey) => {
+						useReminderStore.getState().removeRemindersBySharedKey(sharedKey);
+						setSelectedReminderForDialog(null);
 					}}
 				/>
 			</>
