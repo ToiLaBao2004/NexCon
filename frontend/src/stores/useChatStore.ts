@@ -49,6 +49,7 @@ export const useChatStore = create<ChatState>()(
             messageLoading: false,
             jumpContexts: {},
             replyingTo: null,
+            drafts: {},
 
             activeSidebar: null,
             searchResults: {
@@ -155,6 +156,7 @@ export const useChatStore = create<ChatState>()(
                     replyingTo: null,
                     activeSidebar: null,
                     searchResults: { items: [], isSearching: false, query: '' },
+                    drafts: {},
                 });
             },
             fetchConversations: async () => {
@@ -636,9 +638,10 @@ export const useChatStore = create<ChatState>()(
                         });
                     }
 
-
-
-
+                    // Clear draft when message is sent successfully
+                    if (convoId) {
+                        get().clearDraft(convoId);
+                    }
                 } catch (error) {
                     if (tempId && convoId) {
                         set((state) => {
@@ -899,18 +902,61 @@ export const useChatStore = create<ChatState>()(
             },
             markMessageDelivered: (messageId: string, conversationId: string) => {
                 set((state) => {
+                    const convoIdx = state.conversations.findIndex(c => c._id === conversationId);
+                    if (convoIdx === -1) return state;
+
+                    const nextConvos = [...state.conversations];
+                    const convo = nextConvos[convoIdx];
+
+                    if (convo.lastMessage?._id === messageId) {
+                        const user = useAuthStore.getState().user;
+                        if (!user?._id) return state;
+
+                        const nextLastMsg = {
+                            ...convo.lastMessage,
+                            deliveredTo: Array.from(new Set([...(convo.lastMessage.deliveredTo || []), user._id]))
+                        };
+
+                        nextConvos[convoIdx] = { ...convo, lastMessage: nextLastMsg };
+                    }
+
                     const convoMessages = state.messages[conversationId];
-                    if (!convoMessages) return state;
-                    const idx = convoMessages.items.findIndex((m) => m._id === messageId);
-                    if (idx === -1 || convoMessages.items[idx].isDelivered) return state;
-                    const updatedItems = [...convoMessages.items];
-                    updatedItems[idx] = { ...updatedItems[idx], isDelivered: true };
+                    if (!convoMessages) return { conversations: nextConvos };
+
+                    const nextItems = convoMessages.items.map(m => {
+                        if (m._id === messageId) {
+                            const user = useAuthStore.getState().user;
+                            if (!user?._id) return m;
+                            return {
+                                ...m,
+                                deliveredTo: Array.from(new Set([...(m.deliveredTo || []), user._id]))
+                            };
+                        }
+                        return m;
+                    });
+
                     return {
+                        conversations: nextConvos,
                         messages: {
                             ...state.messages,
-                            [conversationId]: { ...convoMessages, items: updatedItems },
-                        },
+                            [conversationId]: { ...convoMessages, items: nextItems }
+                        }
                     };
+                });
+            },
+            setDraft: (conversationId: string, text: string) => {
+                set((state) => ({
+                    drafts: {
+                        ...state.drafts,
+                        [conversationId]: text
+                    }
+                }));
+            },
+            clearDraft: (conversationId: string) => {
+                set((state) => {
+                    const nextDrafts = { ...state.drafts };
+                    delete nextDrafts[conversationId];
+                    return { drafts: nextDrafts };
                 });
             },
             toggleConversationPin: async (conversationId: string) => {
@@ -1677,6 +1723,7 @@ export const useChatStore = create<ChatState>()(
             name: "chat-storage",
             partialize: (state) => ({
                 conversations: state.conversations,
+                drafts: state.drafts,
             })
         }
     )

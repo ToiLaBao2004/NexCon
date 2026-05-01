@@ -57,7 +57,7 @@ const decodeMentionTokens = (text: string, convo: Conversation) => {
 
 const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const { user } = useAuthStore();
-  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation, toggleConversationPin, markAsUnread, markAsSeen } = useChatStore();
+  const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation, toggleConversationPin, markAsUnread, markAsSeen, drafts } = useChatStore();
   const { onlineUsers } = useSocketStore();
   const { setNickName, loading } = useFriendStore();
   const active = focusedConversationId === convo._id;
@@ -358,6 +358,16 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
           unreadCount > 0 ? "font-bold text-foreground" : "text-muted-foreground"
         )}>
           {(() => {
+            const draftText = drafts[convo._id];
+            if (draftText && draftText.trim()) {
+              return (
+                <span className="flex items-center gap-1 w-full truncate">
+                  <span className="text-red-500 font-bold shrink-0">[Bản nháp]:</span>
+                  <span className="truncate italic">{draftText}</span>
+                </span>
+              );
+            }
+
             if (!convo.lastMessage) return "";
             const msgObj = convo.lastMessage as any;
             const content = msgObj.content ?? "";

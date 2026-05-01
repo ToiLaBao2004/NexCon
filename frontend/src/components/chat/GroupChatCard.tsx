@@ -56,6 +56,7 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 		focusedConversationId,
 		setActiveConversation,
 		messages,
+		drafts,
 		fetchMessages,
 		fetchConversations,
 		updateGroupName,
@@ -349,6 +350,16 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 			subtitle={
 				<div className={`flex items-center text-sm truncate w-full ${unreadCount > 0 ? "font-bold text-foreground" : "text-muted-foreground"}`}>
 					{(() => {
+						const draftText = drafts[convo._id];
+						if (draftText && draftText.trim()) {
+							return (
+								<span className="flex items-center gap-1 w-full truncate">
+									<span className="text-red-500 font-bold shrink-0">[Bản nháp]:</span>
+									<span className="truncate italic">{draftText}</span>
+								</span>
+							);
+						}
+
 						if (!convo.lastMessage) return <span className="truncate">{convo.participants.length} Thành Viên</span>;
 						const msgObj = convo.lastMessage as any;
 						const type = msgObj.type ?? "text";
