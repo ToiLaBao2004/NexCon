@@ -12,6 +12,7 @@ interface UserStore {
     searchMusic: (q: string) => Promise<void>;
     updateMusic: (music: UserMusic) => Promise<void>;
     removeMusic: () => Promise<void>;
+    getUserById: (id: string) => Promise<User>;
 }
 
 export const useUserStore = create<UserStore>((set) => ({
@@ -49,4 +50,9 @@ export const useUserStore = create<UserStore>((set) => ({
         const res = await userService.removeMusic();
         set({ user: res.user });
     },
+
+    getUserById: async (id: string) => {
+        const user = await userService.getUserById(id);
+        return user;
+    }
 }));

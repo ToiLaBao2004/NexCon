@@ -49,5 +49,10 @@ export const userService = {
     searchUsers: async (keyword: string) => {
         const response = await api.get('/users/search', { params: { keyword } });
         return response.data;
+    },
+
+    getUserById: async (id: string) => {
+        const response = await api.get(`/users/get-user-by-id/${id}`);
+        return response.data.user;
     }
 };

@@ -10,12 +10,14 @@ import { UserActionDropdown } from "./UserActionDropdown";
 import { FriendActionButtons } from "@/components/people/FriendActionButtons";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useFriendStore } from "@/stores/useFriendStore";
-import { useState } from "react";
+import { useUserStore } from "@/stores/useUserStore";
+import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { Loader2, UserMinus, UserPlus, Mail, Phone, Info, Check, X as CloseIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { User } from "@/types/user";
 
 interface UserProfile {
     _id: string;
@@ -35,6 +37,7 @@ interface UserProfileDialogProps {
 
 export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: UserProfileDialogProps) {
     const { user: currentUser } = useAuthStore();
+    const { getUserById } = useUserStore();
     const {
         friends, sentRequests, incomingRequests,
         sendFriendRequest, cancelFriendRequest, unfriendUser,
@@ -44,6 +47,24 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     const [actionLoading, setActionLoading] = useState(false);
     const [requestMessage, setRequestMessage] = useState("");
     const [unfriendModalOpen, setUnfriendModalOpen] = useState(false);
+    const [fullUser, setFullUser] = useState<User | null>(null);
+    const [albumArt, setAlbumArt] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (open && user?._id) {
+            setFullUser(null);
+            setAlbumArt(null);
+            getUserById(user._id).then((u) => {
+                setFullUser(u);
+                if (u?.music?.trackId) {
+                    fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${u.music.trackId}`)
+                        .then((r) => r.json())
+                        .then((data) => setAlbumArt(data.thumbnail_url ?? null))
+                        .catch(() => null);
+                }
+            }).catch(console.error);
+        }
+    }, [open, user?._id]);
 
     if (!user) return null;
 
@@ -167,26 +188,47 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={(val) => { onOpenChange(val); if (!val) { setFullUser(null); setAlbumArt(null); } }}>
             <DialogContent className="sm:max-w-md border-primary/10 shadow-2xl p-0 overflow-hidden rounded-2xl bg-background">
-                <div className="h-32 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent relative">
+
+                {/* Banner */}
+                <div className="relative overflow-hidden" style={{ height: fullUser?.music?.trackId ? "152px" : "128px" }}>
+                    {/* Background: album art blur hoặc gradient */}
+                    {albumArt ? (
+                        <>
+                            <img src={albumArt} alt="" className="absolute inset-0 w-full h-full object-cover scale-110" />
+                            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+                        </>
+                    ) : (
+                        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent" />
+                    )}
+
                     <DialogHeader className="p-4 absolute top-0 left-0">
                         <DialogTitle className="text-sm font-medium opacity-0">Thông tin cá nhân</DialogTitle>
-                        <DialogDescription className="opacity-0">
-                            Xem thong tin nguoi dung va thuc hien cac thao tac ket ban.
-                        </DialogDescription>
+                        <DialogDescription className="opacity-0">.</DialogDescription>
                     </DialogHeader>
+
+                    {fullUser?.music?.trackId && (
+                        <div className="absolute bottom-4 left-0 right-1 px-4 pb-0">
+                            <iframe
+                                src={`https://open.spotify.com/embed/track/${fullUser.music.trackId}?utm_source=generator&theme=0`}
+                                width="100%"
+                                height="80"
+                                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                                loading="lazy"
+                                className="rounded-t-xl"
+                            />
+                        </div>
+                    )}
                 </div>
 
                 <div className="px-8 pb-8 -mt-16 flex flex-col items-center">
-                    <div className="relative group">
-                        <Avatar className="h-32 w-32 ring-4 ring-background border-4 border-background shadow-xl mb-4 bg-muted">
-                            <AvatarImage src={user.avatarUrl} className="object-cover" />
-                            <AvatarFallback className="text-4xl font-bold bg-primary/10 text-primary">
-                                {user.displayName.charAt(0)}
-                            </AvatarFallback>
-                        </Avatar>
-                    </div>
+                    <Avatar className="h-32 w-32 ring-4 ring-background border-4 border-background shadow-xl mb-4 bg-muted">
+                        <AvatarImage src={user.avatarUrl} className="object-cover" />
+                        <AvatarFallback className="text-4xl font-bold bg-primary/10 text-primary">
+                            {user.displayName.charAt(0)}
+                        </AvatarFallback>
+                    </Avatar>
 
                     <div className="text-center w-full">
                         <h3 className="text-2xl font-bold text-foreground">
