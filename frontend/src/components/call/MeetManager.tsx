@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 import { useMeetStore } from "@/stores/useMeetStore";
 import GroupCallRoom, { type RoomParticipantSummary } from "./GroupCallRoom";
 import { useDraggable } from "@/hooks/useDraggable";
@@ -57,48 +58,37 @@ const MeetManager = () => {
   };
 
   if (!isInMeeting || !token || !roomName) return null;
-
+ 
   return (
     <>
-      {isMinimized ? (
-        <div
-          ref={dragRef}
-          style={dragStyle}
-          {...dragHandlers}
-          className="z-[90] w-80 rounded-2xl shadow-2xl border border-border bg-card flex flex-col overflow-hidden cursor-grab active:cursor-grabbing"
-        >
-          <GroupCallRoom
-            roomName={roomName}
-            token={token}
-            initialVideoEnabled={preferredCameraEnabled}
-            initialAudioEnabled={preferredMicEnabled}
-            onLeave={leaveMeeting}
-            minimized={true}
-            onMinimize={() => setMinimized(true)}
-            onMaximize={() => setMinimized(false)}
-            enablePresenceToasts
-            onParticipantsChange={setParticipants}
-            onLeaveIntercept={handleLeaveIntercept}
-          />
-        </div>
-      ) : (
-        <div className="fixed top-0 right-0 bottom-0 left-0 md:top-2 md:right-2 md:bottom-2 md:left-[5rem] z-[90] bg-background md:rounded-2xl md:border md:border-border/40 md:shadow-soft overflow-hidden">
-          <div className="flex h-full min-w-0">
-            <div className="relative flex min-w-0 flex-1">
-              <GroupCallRoom
-                roomName={roomName}
-                token={token}
-                initialVideoEnabled={preferredCameraEnabled}
-                initialAudioEnabled={preferredMicEnabled}
-                onLeave={leaveMeeting}
-                minimized={false}
-                onMinimize={() => setMinimized(true)}
-                onMaximize={() => setMinimized(false)}
-                enablePresenceToasts
-                onParticipantsChange={setParticipants}
-                onLeaveIntercept={handleLeaveIntercept}
-              />
-
+      <div
+        ref={isMinimized ? dragRef : null}
+        style={isMinimized ? dragStyle : undefined}
+        {...(isMinimized ? dragHandlers : {})}
+        className={cn(
+          "z-[90] overflow-hidden transition-all duration-300",
+          isMinimized
+            ? "fixed w-80 rounded-2xl shadow-2xl border border-border bg-card flex flex-col cursor-grab active:cursor-grabbing"
+            : "fixed top-0 right-0 bottom-0 left-0 md:top-2 md:right-2 md:bottom-2 md:left-[5rem] bg-background md:rounded-2xl md:border md:border-border/40 md:shadow-soft"
+        )}
+      >
+        <div className={cn("flex h-full min-w-0", isMinimized ? "flex-col" : "")}>
+          <div className="relative flex min-w-0 flex-1">
+            <GroupCallRoom
+              roomName={roomName}
+              token={token}
+              initialVideoEnabled={preferredCameraEnabled}
+              initialAudioEnabled={preferredMicEnabled}
+              onLeave={leaveMeeting}
+              minimized={isMinimized}
+              onMinimize={() => setMinimized(true)}
+              onMaximize={() => setMinimized(false)}
+              enablePresenceToasts
+              onParticipantsChange={setParticipants}
+              onLeaveIntercept={handleLeaveIntercept}
+            />
+ 
+            {!isMinimized && (
               <div className="absolute right-4 top-[7px] z-20 flex items-center gap-2">
                 {isHost && waitingRoom.length > 0 ? (
                   <button
@@ -120,10 +110,23 @@ const MeetManager = () => {
                   </button>
                 )}
               </div>
+            )}
+          </div>
+ 
+          {!isMinimized && isSidebarOpen && roomName && (
+            <div className="hidden h-full w-[23rem] shrink-0 border-l border-border/60 bg-card/70 p-3 dark:border-border/50 dark:bg-slate-900/70 md:block">
+              <WaitingRoomPanel
+                roomName={roomName}
+                isHost={isHost}
+                participants={participants}
+                onClose={() => setIsSidebarOpen(false)}
+              />
             </div>
-
-            {isSidebarOpen && roomName && (
-              <div className="hidden h-full w-[23rem] shrink-0 border-l border-border/60 bg-card/70 p-3 dark:border-border/50 dark:bg-slate-900/70 md:block">
+          )}
+ 
+          {!isMinimized && isSidebarOpen && roomName && (
+            <div className="absolute inset-0 z-30 bg-black/40 p-3 md:hidden">
+              <div className="ml-auto h-full w-[min(24rem,100%)]">
                 <WaitingRoomPanel
                   roomName={roomName}
                   isHost={isHost}
@@ -131,23 +134,10 @@ const MeetManager = () => {
                   onClose={() => setIsSidebarOpen(false)}
                 />
               </div>
-            )}
-
-            {isSidebarOpen && roomName && (
-              <div className="absolute inset-0 z-30 bg-black/40 p-3 md:hidden">
-                <div className="ml-auto h-full w-[min(24rem,100%)]">
-                  <WaitingRoomPanel
-                    roomName={roomName}
-                    isHost={isHost}
-                    participants={participants}
-                    onClose={() => setIsSidebarOpen(false)}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Leave Meeting Modal for Host */}
       {showLeaveModal && (
