@@ -601,11 +601,8 @@ export const useChatStore = create<ChatState>()(
                     }
 
 
-                    set((state) => ({
-                        conversations: state.conversations.map((c) =>
-                            c._id === activeConversationId ? { ...c, seenBy: [] } : c
-                        ),
-                    }));
+
+
                 } catch (error) {
                     if (tempId && convoId) {
                         set((state) => {
@@ -812,6 +809,7 @@ export const useChatStore = create<ChatState>()(
                     if (!isUnread) return;
 
                     await chatService.markAsSeen(targetId);
+                    const lastMsgId = convo.lastMessage?._id || null;
                     set((state) => ({
                         conversations: state.conversations.map((c) => (
                             c._id === targetId && c.lastMessage ? {
@@ -829,6 +827,8 @@ export const useChatStore = create<ChatState>()(
                                     return {
                                         ...participant,
                                         unreadMentionCount: 0,
+                                        lastReadMessageId: lastMsgId,
+                                        lastReadAt: new Date().toISOString(),
                                     };
                                 })
                             }

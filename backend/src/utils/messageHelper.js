@@ -118,7 +118,15 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
         conversation.unreadCounts.set(memberId, isSender ? 0 : prevCount + 1);
     });
 
-    conversation.seenBy = [senderId];
+    const senderIdStr = senderId.toString();
+    const senderParticipant = conversation.participants.find(
+        (p) => (p.userId._id || p.userId).toString() === senderIdStr
+    );
+    if (senderParticipant) {
+        senderParticipant.lastReadMessageId = message._id;
+        senderParticipant.lastReadAt = new Date();
+    }
+    conversation.markModified('participants');
 };
 
 export const emitNewMessage = (io, conversation, message, signedUrl = null) => {
@@ -140,7 +148,6 @@ export const emitNewMessage = (io, conversation, message, signedUrl = null) => {
             _id: conversation._id,
             lastMessage: lastMsgPayload,
             lastMessageAt: conversation.lastMessageAt,
-            seenBy: conversation.seenBy,
         },
         unreadCounts: conversation.unreadCounts,
     });

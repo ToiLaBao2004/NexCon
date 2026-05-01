@@ -4,6 +4,7 @@ import UserAvatar from "./UserAvatar";
 import CallMessageBubble from "./CallMessageBubble";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { parseCallSnapshot } from "@/utils/callMessageUtils";
+import { useMemo } from "react";
 
 interface CallMessageItemProps {
   message: Message;
@@ -41,10 +42,23 @@ const CallMessageItem = ({
   const avatarUserId = avatarUser?._id?.toString?.() || "";
   const avatarStatus = avatarUserId && onlineUsers.includes(avatarUserId) ? "online" : "offline";
 
-  const seenByOthers =
-    selectedConvo.seenBy?.filter(
-      (s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
-    ) ?? [];
+
+  const seenUsersForThisMessage = useMemo(() => {
+    const users: { _id: string; displayName: string; avatarUrl?: string | null }[] = [];
+    if (!selectedConvo.participants) return users;
+    for (const p of selectedConvo.participants) {
+      const pid = p.userId?._id?.toString();
+      if (!pid || pid === currentUserId) continue;
+      if (p.lastReadMessageId === message._id) {
+        users.push({
+          _id: pid,
+          displayName: p.userId.displayName ?? "User",
+          avatarUrl: p.userId.avatarUrl,
+        });
+      }
+    }
+    return users;
+  }, [selectedConvo.participants, currentUserId, message._id]);
 
   return (
     <div
@@ -85,23 +99,15 @@ const CallMessageItem = ({
         {/* Trạng thái đã xem / đã gửi (chỉ hiện cho item cuối cùng của mình) */}
         {isInitiator && isLast && (
           <div className="flex items-center gap-1.5 mt-0.5 px-1.5">
-            {seenByOthers.length > 0 ? (
-              seenByOthers.map((seenId) => {
-                const seenUserId =
-                  typeof seenId === "string" ? seenId : (seenId as any)._id?.toString();
-                const seenParticipant = selectedConvo.participants.find(
-                  (p) => p.userId?._id?.toString() === seenUserId
-                );
-
-                return seenParticipant ? (
-                  <UserAvatar
-                    key={seenUserId}
-                    type="seen"
-                    name={seenParticipant.userId.displayName ?? ""}
-                    avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
-                  />
-                ) : null;
-              })
+            {seenUsersForThisMessage.length > 0 ? (
+              seenUsersForThisMessage.map((seenUser) => (
+                <UserAvatar
+                  key={seenUser._id}
+                  type="seen"
+                  name={seenUser.displayName}
+                  avatarUrl={seenUser.avatarUrl ?? undefined}
+                />
+              ))
             ) : (
               <span className="text-xs text-muted-foreground">Đã gửi</span>
             )}

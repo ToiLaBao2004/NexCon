@@ -68,7 +68,6 @@ export async function createConversation(req, res) {
 		}
 		await conversation.populate([
 			{ path: 'participants.userId', select: 'displayName avatarUrl email bio phone' },
-			{ path: 'seenBy', select: 'displayName avatarUrl' },
 			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
 		]);
 
@@ -102,7 +101,6 @@ export async function getConversations(req, res) {
 			.sort({ "lastMessage.createdAt": -1, updatedAt: -1 })
 			.populate("participants.userId", "displayName avatarUrl email bio phone")
 			.populate("lastMessage.senderId", "displayName avatarUrl")
-			.populate("seenBy", "displayName avatarUrl")
 			.lean();
 
 		conversations = await Promise.all(conversations.map(async (conversation) => {
@@ -126,7 +124,6 @@ export async function getConversations(req, res) {
 				return {
 					...conversation,
 					lastMessage: null,
-					seenBy: [],
 				};
 			}
 
@@ -134,19 +131,18 @@ export async function getConversations(req, res) {
 				? Object.fromEntries(fallback.metadata)
 				: (fallback.metadata || null);
 
-			return {
-				...conversation,
-				lastMessage: {
-					_id: fallback._id,
-					content: fallback.content,
-					type: fallback.type,
-					systemType: fallback.systemType || null,
-					metadata: fallbackMetadata,
-					createdAt: fallback.createdAt,
-					senderId: fallback.senderId,
-				},
-				seenBy: [],
-			};
+				return {
+					...conversation,
+					lastMessage: {
+						_id: fallback._id,
+						content: fallback.content,
+						type: fallback.type,
+						systemType: fallback.systemType || null,
+						metadata: fallbackMetadata,
+						createdAt: fallback.createdAt,
+						senderId: fallback.senderId,
+					},
+				};
 		}));
 
 		conversations = conversations.filter(c => {
@@ -457,24 +453,23 @@ export async function markAsSeen(req, res) {
 	try {
 		const { conversationId } = req.params;
 		const userId = req.user._id.toString();
-		const conversation = await Conversation.findById(conversationId).lean();
-		if (!conversation) {
-			return res.status(404).json({ message: "Conversation not found" });
-		}
-		const last = conversation.lastMessage;
-		if (!last) {
+
+
+		const latestMessage = await Message.findOne({ conversationId }).sort({ createdAt: -1 }).select('_id').lean();
+		if (!latestMessage) {
 			return res.status(200).json({ message: "No messages in conversation" });
 		}
 
-		if (last.senderId.toString() === userId) {
-			return res.status(200).json({ message: "Cannot mark own message as seen" });
-		}
-
+		const now = new Date();
 		const updated = await Conversation.findOneAndUpdate(
 			{ _id: conversationId, 'participants.userId': userId },
 			{
-				$addToSet: { seenBy: userId },
-				$set: { [`unreadCounts.${userId}`]: 0, 'participants.$.unreadMentionCount': 0 },
+				$set: {
+					[`unreadCounts.${userId}`]: 0,
+					'participants.$.unreadMentionCount': 0,
+					'participants.$.lastReadMessageId': latestMessage._id,
+					'participants.$.lastReadAt': now,
+				},
 			},
 			{ new: true }
 		);
@@ -485,22 +480,15 @@ export async function markAsSeen(req, res) {
 
 		io.to(conversationId).emit("read-message", {
 			conversationId: conversationId,
-			seenBy: updated.seenBy,
-			lastMessage: {
-				_id: updated.lastMessage._id,
-				content: updated.lastMessage.content,
-				type: updated.lastMessage.type,
-				systemType: updated.lastMessage.systemType,
-				metadata: updated.lastMessage.metadata,
-				createdAt: updated.lastMessage.createdAt,
-				senderId: updated.lastMessage.senderId,
-			}
+			userId: userId,
+			lastReadMessageId: latestMessage._id,
+			lastReadAt: now.toISOString(),
 		});
 
 		return res.status(200).json({
 			message: "Conversation marked as seen",
-			seenBy: updated?.seenBy,
-			myunreadCount: updated?.unreadCounts[userId] || 0,
+			lastReadMessageId: latestMessage._id,
+			myunreadCount: 0,
 		});
 
 	} catch (error) {
@@ -519,11 +507,6 @@ export async function markAsUnread(req, res) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
 
-		const last = conversation.lastMessage;
-		if (last && last.senderId && last.senderId.toString() === userId) {
-			return res.status(200).json({ message: "Cannot mark own message as unread" });
-		}
-
 		const updated = await Conversation.findByIdAndUpdate(conversationId,
 			{
 				$set: { [`unreadCounts.${userId}`]: 1 },
@@ -538,13 +521,12 @@ export async function markAsUnread(req, res) {
 		if (receiverSocketId) {
 			io.to(receiverSocketId).emit('conversation-updated', {
 				conversationId: updated._id,
-				conversation: { unreadCounts: updated.unreadCounts, seenBy: updated.seenBy }
+				conversation: { unreadCounts: updated.unreadCounts }
 			});
 		}
 
 		return res.status(200).json({
 			message: "Conversation marked as unread",
-			seenBy: updated?.seenBy,
 			myunreadCount: 1,
 		});
 
@@ -1078,7 +1060,6 @@ export async function addMembers(req, res) {
 		await conversation.save();
 		await conversation.populate([
 			{ path: 'participants.userId', select: 'displayName avatarUrl email bio phone' },
-			{ path: 'seenBy', select: 'displayName avatarUrl' },
 			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
 		]);
 		const newParticipants = conversation.participants.filter(p =>

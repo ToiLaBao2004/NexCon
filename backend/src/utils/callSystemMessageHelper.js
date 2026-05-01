@@ -51,14 +51,24 @@ function applyCallConversationState(conversation, message, initiatorId, particip
         },
     });
 
-    const seenBy = new Set([initiatorIdStr]);
+
+    const seenUserIds = new Set([initiatorIdStr]);
     participants.forEach((participant) => {
         const pid = participant.userId?._id?.toString?.() || '';
         if (pid && SEEN_STATUSES.has(participant.status)) {
-            seenBy.add(pid);
+            seenUserIds.add(pid);
         }
     });
-    conversation.seenBy = Array.from(seenBy);
+
+    const now = new Date();
+    conversation.participants.forEach((participant) => {
+        const memberId = (participant.userId?._id || participant.userId).toString();
+        if (seenUserIds.has(memberId)) {
+            participant.lastReadMessageId = message._id;
+            participant.lastReadAt = now;
+        }
+    });
+    conversation.markModified('participants');
 
     conversation.participants.forEach((participant) => {
         const memberId = (participant.userId?._id || participant.userId).toString();

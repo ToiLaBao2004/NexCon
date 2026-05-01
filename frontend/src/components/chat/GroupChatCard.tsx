@@ -294,26 +294,27 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 	const lastMessageSenderId = lastMessageObj?.sender?._id || lastMessageObj?.senderId?._id || lastMessageObj?.senderId;
 	const isMyLastMessage = lastMessageSenderId?.toString() === user._id.toString();
 
-	const seenByOthers = convo.seenBy?.filter(
-		(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== user._id.toString()
-	) ?? [];
+
+	const lastMsgId = convo.lastMessage?._id?.toString();
+	const seenByOthers = lastMsgId
+		? convo.participants.filter((p) => {
+			const pid = p.userId?._id?.toString();
+			return pid && pid !== user._id.toString() && p.lastReadMessageId === lastMsgId;
+		})
+		: [];
 
 	let statusIcon = null;
 	if (!hideStatusIcon && isMyLastMessage && seenByOthers.length > 0) {
 		statusIcon = (
 			<div className="flex -space-x-1">
-				{[...seenByOthers].reverse().slice(0, 3).map((seenId) => {
-					const seenUserId = typeof seenId === "string" ? seenId : seenId._id?.toString();
-					const seenParticipant = convo.participants.find(
-						(p) => p.userId?._id?.toString() === seenUserId
-					);
-					if (!seenParticipant) return null;
+				{[...seenByOthers].reverse().slice(0, 3).map((p) => {
+					const pid = p.userId?._id?.toString();
 					return (
 						<UserAvatar
-							key={seenUserId}
+							key={pid}
 							type="seen"
-							name={seenParticipant.userId.displayName ?? ""}
-							avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
+							name={p.userId.displayName ?? ""}
+							avatarUrl={p.userId.avatarUrl ?? undefined}
 							className="border-[1px] border-background"
 						/>
 					);

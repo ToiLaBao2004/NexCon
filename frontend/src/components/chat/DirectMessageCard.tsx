@@ -309,26 +309,24 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const lastMessageSenderId = lastMessageObj?.sender?._id || lastMessageObj?.senderId?._id || lastMessageObj?.senderId;
   const isMyLastMessage = lastMessageSenderId?.toString() === user._id.toString();
 
-  const seenByOthers = convo.seenBy?.filter(
-    (s: any) => (typeof s === "string" ? s : s._id?.toString()) !== user._id.toString()
-  ) ?? [];
+
+  const lastMsgId = convo.lastMessage?._id?.toString();
+  const seenByOther = lastMsgId
+    ? convo.participants.find((p) => {
+      const pid = p.userId?._id?.toString();
+      return pid && pid !== user._id.toString() && p.lastReadMessageId === lastMsgId;
+    })
+    : null;
 
   let statusIcon = null;
-  if (isMyLastMessage && seenByOthers.length > 0) {
-    const seenId = seenByOthers[0];
-    const seenUserId = typeof seenId === "string" ? seenId : seenId._id?.toString();
-    const seenParticipant = convo.participants.find(
-      (p) => p.userId?._id?.toString() === seenUserId
+  if (isMyLastMessage && seenByOther) {
+    statusIcon = (
+      <UserAvatar
+        type="seen"
+        name={seenByOther.userId.displayName ?? ""}
+        avatarUrl={seenByOther.userId.avatarUrl ?? undefined}
+      />
     );
-    if (seenParticipant) {
-      statusIcon = (
-        <UserAvatar
-          type="seen"
-          name={seenParticipant.userId.displayName ?? ""}
-          avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
-        />
-      );
-    }
   }
 
   return (
