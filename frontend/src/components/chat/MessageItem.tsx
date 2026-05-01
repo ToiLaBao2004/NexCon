@@ -1818,7 +1818,7 @@ const MessageItem = ({
 			let targetMessageId: string | null = null;
 			for (let i = lastReadIndex; i >= 0; i -= 1) {
 				const msg = messages[i];
-				if (resolveSenderId(msg) === currentUserIdStr) {
+				if (!(msg.type === "system" && msg.systemType !== "call") && resolveSenderId(msg) === currentUserIdStr) {
 					targetMessageId = msg._id;
 					break;
 				}
