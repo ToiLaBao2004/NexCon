@@ -140,7 +140,7 @@ function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: numb
 const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const { user } = useAuthStore();
 	const { emitTyping, emitStopTyping } = useSocketStore();
-	const { sendMessage, markAsSeen, replyingTo, setReplyingTo } = useChatStore();
+	const { sendMessage, markAsSeen, replyingTo, setReplyingTo, setDraft, clearDraft } = useChatStore();
 	const { blockedUsers, blockedBy } = useFriendStore();
 	const currentUserId = user?._id ?? "";
 
@@ -154,6 +154,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const [mentionOpen, setMentionOpen] = useState(false);
 	const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 	const [selectedMentions, setSelectedMentions] = useState<MentionCandidate[]>([]);
+	const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const imageInputRef = useRef<HTMLInputElement>(null);
@@ -352,6 +353,16 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			emitStopTyping(selectedConvo._id);
 			if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 		}
+
+		// Handle Draft
+		if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+		draftTimeoutRef.current = setTimeout(() => {
+			if (nextValue.trim()) {
+				setDraft(selectedConvo._id, nextValue);
+			} else {
+				clearDraft(selectedConvo._id);
+			}
+		}, 300);
 	};
 
 	useEffect(() => {
@@ -363,12 +374,24 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}, [attachment]);
 
 	useEffect(() => {
-		setValue("");
+		const existingDraft = useChatStore.getState().drafts[selectedConvo._id] || "";
+		setValue(existingDraft);
 		setAttachment(null);
 		setSelectedMentions([]);
 		setMentionOpen(false);
 		setMentionQuery("");
 		setMentionRange(null);
+
+		// Focus and adjust height for draft
+		if (existingDraft && textInputRef.current) {
+			setTimeout(() => {
+				if (textInputRef.current) {
+					textInputRef.current.style.height = "auto";
+					textInputRef.current.style.height = `${textInputRef.current.scrollHeight}px`;
+					textInputRef.current.focus();
+				}
+			}, 0);
+		}
 	}, [selectedConvo._id]);
 
 	const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {

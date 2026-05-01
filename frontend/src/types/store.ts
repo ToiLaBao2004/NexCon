@@ -84,6 +84,7 @@ export interface ChatState {
   messageLoading: boolean;
   jumpContexts: Record<string, JumpContext | null>;
   replyingTo: Message | null;
+  drafts: Record<string, string>;
 
   reset: () => void;
 
@@ -146,6 +147,8 @@ export interface ChatState {
   loadOlderInJumpMode: (conversationId: string) => Promise<void>;
   loadNewerInJumpMode: (conversationId: string) => Promise<void>;
   exitJumpMode: (conversationId: string) => Promise<void>;
+  setDraft: (conversationId: string, text: string) => void;
+  clearDraft: (conversationId: string) => void;
 }
 
 
