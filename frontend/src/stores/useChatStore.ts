@@ -163,7 +163,7 @@ export const useChatStore = create<ChatState>()(
                 try {
                     set({ convoLoading: true });
                     const { conversations } = await chatService.fetchConversations();
-                    
+
                     // Emit message-delivered cho lastMessage của các cuộc hội thoại 1-1
                     const { useSocketStore } = await import('./useSocketStore');
                     const sock = useSocketStore.getState().socket;
@@ -453,7 +453,7 @@ export const useChatStore = create<ChatState>()(
             exitJumpMode: async (conversationId: string) => {
                 const { user } = useAuthStore.getState();
                 const currentMessages = get().messages[conversationId];
-                
+
                 set({ messageLoading: true });
 
                 try {
@@ -838,9 +838,9 @@ export const useChatStore = create<ChatState>()(
                     const { user } = useAuthStore.getState();
                     const { activeConversationId, conversations } = get();
                     const targetId = conversationId || activeConversationId;
-                    
+
                     if (!targetId || !user) return;
-                    
+
                     const convo = conversations.find((c) => c._id === targetId);
                     if (!convo || !convo.lastMessage) return;
 
@@ -883,7 +883,7 @@ export const useChatStore = create<ChatState>()(
                 try {
                     const { user } = useAuthStore.getState();
                     if (!user) return;
-                    
+
                     await chatService.markAsUnread(conversationId);
                     set((state) => ({
                         conversations: state.conversations.map((c) => (
@@ -909,12 +909,10 @@ export const useChatStore = create<ChatState>()(
                     const convo = nextConvos[convoIdx];
 
                     if (convo.lastMessage?._id === messageId) {
-                        const user = useAuthStore.getState().user;
-                        if (!user?._id) return state;
-
                         const nextLastMsg = {
                             ...convo.lastMessage,
-                            deliveredTo: Array.from(new Set([...(convo.lastMessage.deliveredTo || []), user._id]))
+                            isDelivered: true,
+                            deliveredTo: Array.from(new Set([...(convo.lastMessage.deliveredTo || []), "delivered_placeholder"]))
                         };
 
                         nextConvos[convoIdx] = { ...convo, lastMessage: nextLastMsg };
@@ -925,11 +923,10 @@ export const useChatStore = create<ChatState>()(
 
                     const nextItems = convoMessages.items.map(m => {
                         if (m._id === messageId) {
-                            const user = useAuthStore.getState().user;
-                            if (!user?._id) return m;
                             return {
                                 ...m,
-                                deliveredTo: Array.from(new Set([...(m.deliveredTo || []), user._id]))
+                                isDelivered: true,
+                                deliveredTo: Array.from(new Set([...(m.deliveredTo || []), "delivered_placeholder"]))
                             };
                         }
                         return m;
