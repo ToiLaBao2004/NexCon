@@ -246,13 +246,29 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       }
     });
 
-    socket.on("read-message", ({ conversationId, lastMessage, seenBy }) => {
-      const updated = {
-        _id: typeof conversationId === 'object' ? conversationId._id : conversationId,
-        lastMessage,
-        seenBy,
-      };
-      useChatStore.getState().updateConversation(updated as any);
+    socket.on("read-message", ({ conversationId, userId, lastReadMessageId, lastReadAt }) => {
+      useChatStore.setState((state) => {
+        const targetId = typeof conversationId === 'object' ? conversationId._id : conversationId;
+        const updatedConversations = state.conversations.map((c) => {
+          if (c._id !== targetId) return c;
+          return {
+            ...c,
+            participants: c.participants.map((p) => {
+              const pid = (p.userId?._id || p.userId)?.toString();
+              if (pid !== userId) return p;
+              return {
+                ...p,
+                lastReadMessageId,
+                lastReadAt: lastReadAt || new Date().toISOString(),
+              };
+            }),
+          };
+        });
+
+        return {
+          conversations: updatedConversations,
+        };
+      });
     });
 
     socket.on("new-friend-request", ({ friendRequest }) => {

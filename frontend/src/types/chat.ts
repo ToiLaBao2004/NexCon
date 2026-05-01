@@ -14,6 +14,8 @@ export interface Participant {
     messages?: string | null;
     meetings?: string | null;
   };
+  lastReadMessageId?: string | null;
+  lastReadAt?: string | null;
 }
 
 export interface SeenUser {
@@ -70,7 +72,6 @@ export interface Conversation {
   isPinned?: boolean;
   pinnedAt?: string | null;
   lastMessageAt: string;
-  seenBy: SeenUser[];
   lastMessage: LastMessage | null;
   unreadCounts: Record<string, number>;
   createdAt: string;

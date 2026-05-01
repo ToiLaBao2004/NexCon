@@ -489,7 +489,6 @@ export async function createReminderSystemMessage(req, res) {
                 _id: conversation._id,
                 lastMessage: lastMsgPayload,
                 lastMessageAt: conversation.lastMessage?.createdAt || conversation.updatedAt,
-                seenBy: conversation.seenBy,
             },
             unreadCounts: conversation.unreadCounts,
         };

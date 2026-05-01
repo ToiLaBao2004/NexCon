@@ -27,6 +27,15 @@ const participantSchema = new mongoose.Schema({
     unreadMentionCount: {
         type: Number,
         default: 0,
+    },
+    lastReadMessageId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Message',
+        default: null,
+    },
+    lastReadAt: {
+        type: Date,
+        default: null,
     }
 }, { _id: false });
 
@@ -101,10 +110,7 @@ const conversationSchema = new mongoose.Schema({
     lastMessage: {
         type: lastMessageSchema,
     },
-    seenBy: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    }],
+
     unreadCounts: {
         type: Map,
         of: Number,

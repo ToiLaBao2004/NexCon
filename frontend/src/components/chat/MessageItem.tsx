@@ -1792,10 +1792,50 @@ const MessageItem = ({
 		}
 	}, [message._id, message.type, message.filePublicId, message.fileUrl, cachedMediaUrl]);
 
-	const seenByOthers =
-		selectedConvo.seenBy?.filter(
-			(s: any) => (typeof s === "string" ? s : s._id?.toString()) !== currentUserId
-		) ?? [];
+	const readReceiptsMap = useMemo(() => {
+		const map: Record<string, { _id: string; displayName: string; avatarUrl?: string | null }[]> = {};
+		if (!selectedConvo.participants || !messages?.length || !currentUserId) return map;
+
+		const currentUserIdStr = currentUserId.toString();
+		const messageIndexById = new Map<string, number>();
+		messages.forEach((msg, idx) => {
+			messageIndexById.set(msg._id, idx);
+		});
+
+		const resolveSenderId = (msg: Message) => {
+			const senderObj = typeof msg.senderId === "object" ? (msg.senderId as any) : null;
+			return (senderObj ? senderObj._id : msg.senderId)?.toString?.() ?? "";
+		};
+
+		for (const p of selectedConvo.participants) {
+			const pid = p.userId?._id?.toString();
+			if (!pid || pid === currentUserIdStr) continue;
+			const lastReadId = p.lastReadMessageId;
+			if (!lastReadId) continue;
+			const lastReadIndex = messageIndexById.get(String(lastReadId));
+			if (lastReadIndex === undefined) continue;
+
+			let targetMessageId: string | null = null;
+			for (let i = lastReadIndex; i >= 0; i -= 1) {
+				const msg = messages[i];
+				if (resolveSenderId(msg) === currentUserIdStr) {
+					targetMessageId = msg._id;
+					break;
+				}
+			}
+
+			if (!targetMessageId) continue;
+			if (!map[targetMessageId]) map[targetMessageId] = [];
+			map[targetMessageId].push({
+				_id: pid,
+				displayName: p.userId.nickname ?? p.userId.displayName ?? "User",
+				avatarUrl: p.userId.avatarUrl,
+			});
+		}
+		return map;
+	}, [selectedConvo.participants, currentUserId, messages]);
+
+	const seenUsersForThisMessage = readReceiptsMap[message._id] ?? [];
 
 	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage } = useChatStore();
 	const [showConfirmRecall, setShowConfirmRecall] = useState(false);
@@ -2357,27 +2397,23 @@ const MessageItem = ({
 				</div>
 			</div>
 
-			{isOwn && isLast && (!message.status || message.status === "sent") && (
-				<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end">
-					{seenByOthers.length > 0 ? (
-						seenByOthers.map((seenId) => {
-							const seenUserId = typeof seenId === "string" ? seenId : seenId._id?.toString();
-							const seenParticipant = selectedConvo.participants.find(
-								(p) => p.userId?._id?.toString() === seenUserId
-							);
-							return seenParticipant ? (
-								<UserAvatar
-									key={seenUserId}
-									type="seen"
-									name={seenParticipant.userId.nickname ?? seenParticipant.userId.displayName ?? "User"}
-									avatarUrl={seenParticipant.userId.avatarUrl ?? undefined}
-								/>
-							) : null;
-						})
-					) : (
+			{isOwn && (!message.status || message.status === "sent") && (
+				seenUsersForThisMessage.length > 0 ? (
+					<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end">
+						{seenUsersForThisMessage.map((seenUser) => (
+							<UserAvatar
+								key={seenUser._id}
+								type="seen"
+								name={seenUser.displayName}
+								avatarUrl={seenUser.avatarUrl ?? undefined}
+							/>
+						))}
+					</div>
+				) : isLast ? (
+					<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end">
 						<span className="text-[11px] text-muted-foreground">Đã gửi</span>
-					)}
-				</div>
+					</div>
+				) : null
 			)}
 
 			<ConfirmationModal
