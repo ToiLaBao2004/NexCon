@@ -188,8 +188,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const currentUserId = useAuthStore.getState().user?._id;
       if (currentUserId) {
         const chatState = useChatStore.getState();
-        const directConvos = chatState.conversations.filter((c) => c.type === "direct");
-        for (const convo of directConvos) {
+        const allConvos = chatState.conversations;
+        for (const convo of allConvos) {
           // 1. Kiểm tra lastMessage
           const lastMsg = convo.lastMessage;
           if (lastMsg) {
