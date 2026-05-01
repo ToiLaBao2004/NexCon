@@ -1,4 +1,4 @@
-import { getGeminiModel } from '../getGeminiModelService.js';
+import { getGeminiModelForText } from '../getGeminiModelService.js';
 
 const BLOCKED_LINK_HOSTS = [
     'xvideos.com',
@@ -163,7 +163,7 @@ function containsBlockedLink(url = '') {
 }
 
 async function checkLinkWithGemini(url) {
-    const geminiModel = getGeminiModel();
+    const geminiModel = getGeminiModelForText();
     if (!geminiModel) {
         return {
             blocked: false,

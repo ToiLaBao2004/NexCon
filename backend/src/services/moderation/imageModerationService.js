@@ -1,4 +1,4 @@
-import { getGeminiModel } from '../getGeminiModelService.js';
+import { getGeminiModelForImage } from '../getGeminiModelService.js';
 
 const IMAGE_MODERATION_FAIL_CLOSED = 'true';
 
@@ -43,7 +43,7 @@ const normalizeModerationResult = (data) => {
 
 export const moderateImageMessage = async (imageBuffer, mimeType = 'image/jpeg') => {
     try {
-        const geminiModel = getGeminiModel();
+        const geminiModel = getGeminiModelForImage();
 
         if (!geminiModel) {
             return {

@@ -1,4 +1,4 @@
-import { getGeminiModel } from '../getGeminiModelService.js';
+import { getGeminiModelForText } from '../getGeminiModelService.js';
 
 const LOCAL_BLOCKLIST = [
     'địt', 'đụ', 'lồn', 'cặc', 'buồi', 'đéo', 'dm', 'vkl', 'cc', 'cút mẹ',
@@ -96,7 +96,7 @@ function shouldUseAI(text = '') {
 let model = null;
 
 async function checkWithGemini(text) {
-    const geminiModel = getGeminiModel();
+    const geminiModel = getGeminiModelForText();
     if (!geminiModel) {
         return {
             blocked: false,
