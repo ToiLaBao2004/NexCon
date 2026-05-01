@@ -338,7 +338,7 @@ const ChatWindowBody: React.FC = () => {
                 scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
               }, 150);
             } else {
-              scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+              scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
             }
           }}
           className="absolute bottom-6 right-6 z-20 flex h-11 w-11 items-center justify-center 
