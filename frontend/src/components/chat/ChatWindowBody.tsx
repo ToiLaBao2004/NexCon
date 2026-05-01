@@ -305,26 +305,29 @@ const ChatWindowBody: React.FC = () => {
             </div>
           );
         })}
-
-        {activeTypingParticipants.length > 0 && (
-          <div className="flex gap-2 mx-2 px-1 mt-0.5 justify-start">
-            <div className="w-8 shrink-0 pt-0.5" />
-            <div className="px-3.5 py-2.5 text-sm bg-gray-100 dark:bg-gray-800 text-foreground rounded-2xl rounded-bl-none shadow-sm border-0 flex items-center gap-1">
-              <span className="flex gap-1 items-center h-5">
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
-              </span>
-              <span className="ml-2 text-xs italic text-muted-foreground max-w-[56vw] truncate sm:max-w-none sm:truncate-none">
-                {activeTypingParticipants.map(p => p?.userId?.displayName || "Ai đó").join(", ")} đang soạn tin nhắn...
-              </span>
-            </div>
-          </div>
-        )}
-
         <div ref={bottomSentinelRef} className="h-1 shrink-0" />
         <div ref={bottomRef} />
       </div>
+
+      {activeTypingParticipants.length > 0 && (
+        <div className="absolute bottom-0 left-4 md:left-6 z-30 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center gap-2.5 px-3.5 py-1.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-border/40 rounded-full shadow-lg shadow-black/5">
+            <span className="flex gap-1 items-center h-5">
+              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce"></span>
+            </span>
+            <span className="text-[12px] font-medium text-foreground/80 pr-1">
+              <span className="font-bold text-foreground">
+                {activeTypingParticipants.length === 1 
+                  ? activeTypingParticipants[0]?.userId?.nickname || activeTypingParticipants[0]?.userId?.displayName
+                  : `${activeTypingParticipants.length} người`}
+              </span>
+              {" "}đang soạn tin nhắn...
+            </span>
+          </div>
+        </div>
+      )}
 
       {(isJumpMode || showScrollToBottom) && (
         <button
