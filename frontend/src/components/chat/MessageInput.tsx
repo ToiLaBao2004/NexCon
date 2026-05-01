@@ -215,6 +215,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		setMentionRange(null);
 		emitStopTyping(selectedConvo._id);
 		if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+		if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+		clearDraft(selectedConvo._id);
 
 		const payload: Parameters<typeof sendMessage>[0] = { type };
 

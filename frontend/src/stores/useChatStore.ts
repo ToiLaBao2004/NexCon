@@ -638,9 +638,10 @@ export const useChatStore = create<ChatState>()(
                         });
                     }
 
-
-
-
+                    // Clear draft when message is sent successfully
+                    if (convoId) {
+                        get().clearDraft(convoId);
+                    }
                 } catch (error) {
                     if (tempId && convoId) {
                         set((state) => {
