@@ -358,14 +358,43 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
           unreadCount > 0 ? "font-bold text-foreground" : "text-muted-foreground"
         )}>
           {(() => {
-            const draftText = drafts[convo._id];
-            if (draftText && draftText.trim()) {
-              return (
-                <span className="flex items-center gap-1 w-full truncate">
-                  <span className="text-red-500 font-bold shrink-0">[Bản nháp]:</span>
-                  <span className="truncate italic">{draftText}</span>
-                </span>
-              );
+            const rawDraft = drafts[convo._id];
+            if (rawDraft) {
+              let draftText = typeof rawDraft === 'string' ? rawDraft : rawDraft.content;
+              const draftType = typeof rawDraft === 'string' ? 'text' : rawDraft.type;
+
+              if (draftText && draftText.trim()) {
+                return (
+                  <span className="flex items-center gap-1 w-full truncate">
+                    <span className="text-red-500 font-bold shrink-0">[Bản nháp]:</span>
+                    <span className="truncate italic">{decodeMentionTokens(draftText, convo)}</span>
+                  </span>
+                );
+              }
+
+              if (draftType && draftType !== 'text') {
+                let DraftIcon = null;
+                let label = "";
+
+                if (draftType === 'image') {
+                  DraftIcon = ImageIcon;
+                  label = "Ảnh";
+                } else if (draftType === 'file') {
+                  DraftIcon = Paperclip;
+                  label = "File";
+                } else if (draftType === 'audio') {
+                  DraftIcon = Mic;
+                  label = "Tin nhắn thoại";
+                }
+
+                return (
+                  <span className="flex items-center gap-1 w-full truncate text-red-500 font-medium">
+                    <span className="font-bold shrink-0">[Bản nháp]:</span>
+                    {DraftIcon && <DraftIcon className="size-3.5 shrink-0" />}
+                    <span className="truncate italic">{label}</span>
+                  </span>
+                );
+              }
             }
 
             if (!convo.lastMessage) return "";
