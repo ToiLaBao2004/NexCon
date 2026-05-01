@@ -57,11 +57,12 @@ export interface LastMessage {
   systemType?: string | null;
   metadata?: MessageMetadata;
   createdAt: string;
-  sender: {
+  senderId?: {
     _id: string;
     displayName: string;
     avatarUrl?: string | null;
-  };
+  } | string;
+  deliveredTo?: string[];
 }
 
 export interface Conversation {
@@ -156,6 +157,8 @@ export interface Message {
   replyTo?: ReplyToMessage | null;
   reactions?: { userId: string; emoji: string }[];
   mentions?: Mention[];
+  deliveredTo?: string[];
+  isDelivered?: boolean;
 }
 
 export interface MentionMessage {

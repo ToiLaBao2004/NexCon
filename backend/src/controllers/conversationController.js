@@ -111,7 +111,7 @@ export async function getConversations(req, res) {
 				? lastMetadata.visibleToUserIds.map((id) => id.toString())
 				: [];
 
-			if (!visibleToUserIds.length || visibleToUserIds.includes(myId)) {
+			if ((!visibleToUserIds.length || visibleToUserIds.includes(myId)) && (!conversation.lastMessage || conversation.lastMessage._id)) {
 				return conversation;
 			}
 

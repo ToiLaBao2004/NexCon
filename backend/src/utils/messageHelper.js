@@ -96,6 +96,7 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
 
     conversation.set({
         lastMessage: {
+            _id: message._id,
             content: resolveLastMessagePreview(message),
             type: message.type ?? 'text',
             systemType: message.systemType || null,

@@ -161,6 +161,21 @@ export const useChatStore = create<ChatState>()(
                 try {
                     set({ convoLoading: true });
                     const { conversations } = await chatService.fetchConversations();
+                    
+                    // Emit message-delivered cho lastMessage của các cuộc hội thoại 1-1
+                    const { useSocketStore } = await import('./useSocketStore');
+                    const sock = useSocketStore.getState().socket;
+                    const { user } = useAuthStore.getState();
+                    if (sock && user?._id) {
+                        for (const convo of conversations as any[]) {
+                            if (convo.type === 'direct' && convo.lastMessage) {
+                                const msgSenderId = (convo.lastMessage.senderId as any)?._id || convo.lastMessage.senderId;
+                                if (String(msgSenderId) !== String(user._id) && !convo.lastMessage.deliveredTo?.includes(String(user._id))) {
+                                    sock.emit('message-delivered', { messageId: convo.lastMessage._id, conversationId: convo._id });
+                                }
+                            }
+                        }
+                    }
 
                     set({ conversations: sortConversations(conversations as any), convoLoading: false });
                 } catch (error) {
@@ -189,9 +204,18 @@ export const useChatStore = create<ChatState>()(
                     });
                     const { messages: fetched, cursor, pinnedMessages, hasMore: backendHasMore } = response;
 
+                    const convo = get().conversations.find((c) => c._id === convoId);
+                    const isDirectConvo = convo?.type === 'direct';
+                    const recipientId = isDirectConvo
+                        ? convo?.participants.find((p) => (p.userId?._id || p.userId)?.toString() !== user?._id)?.userId?._id
+                        : null;
+
                     const processed = fetched.map((m) => ({
                         ...m,
                         isOwn: m.senderId === user?._id || (m.senderId as any)?._id === user?._id,
+                        isDelivered: isDirectConvo && recipientId
+                            ? (m.deliveredTo?.includes(recipientId) ?? false)
+                            : undefined,
                     }));
 
                     set((state) => {
@@ -226,6 +250,18 @@ export const useChatStore = create<ChatState>()(
                         };
                     });
 
+                    if (isDirectConvo) {
+                        const { useSocketStore } = await import('./useSocketStore');
+                        const sock = useSocketStore.getState().socket;
+                        if (sock) {
+                            for (const m of fetched) {
+                                const msgSenderId = (m.senderId as any)?._id || m.senderId;
+                                if (String(msgSenderId) !== String(user?._id) && !m.deliveredTo?.includes(user?._id ?? '')) {
+                                    sock.emit('message-delivered', { messageId: m._id, conversationId: convoId });
+                                }
+                            }
+                        }
+                    }
 
                 } catch (error) {
                     console.error("Lỗi khi tải tin nhắn:", error);
@@ -860,6 +896,22 @@ export const useChatStore = create<ChatState>()(
                 } catch (error) {
                     console.error("Lỗi khi đánh dấu chưa đọc:", error);
                 }
+            },
+            markMessageDelivered: (messageId: string, conversationId: string) => {
+                set((state) => {
+                    const convoMessages = state.messages[conversationId];
+                    if (!convoMessages) return state;
+                    const idx = convoMessages.items.findIndex((m) => m._id === messageId);
+                    if (idx === -1 || convoMessages.items[idx].isDelivered) return state;
+                    const updatedItems = [...convoMessages.items];
+                    updatedItems[idx] = { ...updatedItems[idx], isDelivered: true };
+                    return {
+                        messages: {
+                            ...state.messages,
+                            [conversationId]: { ...convoMessages, items: updatedItems },
+                        },
+                    };
+                });
             },
             toggleConversationPin: async (conversationId: string) => {
                 const existing = get().conversations.find((c) => c._id === conversationId);

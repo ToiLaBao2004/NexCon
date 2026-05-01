@@ -60,6 +60,20 @@ const ChatWindowBody: React.FC = () => {
     selectedConvo?.participants.find(p => p.userId?._id?.toString() === id)
   );
 
+  const lastMyMessageId = useMemo(() => {
+    if (!user?._id || messages.length === 0) return null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.type === "system" && m.systemType !== "call") continue;
+      const mSenderObj = typeof m.senderId === "object" ? (m.senderId as any) : null;
+      const mSenderId = mSenderObj ? mSenderObj._id : m.senderId;
+      if (mSenderId?.toString() === user._id.toString()) {
+        return m._id;
+      }
+    }
+    return null;
+  }, [messages, user?._id]);
+
   const loadingMoreRef = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
@@ -259,6 +273,7 @@ const ChatWindowBody: React.FC = () => {
 
         {messages.map((message, index) => {
           const isCallMessage = message.type === "system" && message.systemType === "call";
+          const isLastMyMsg = message._id === lastMyMessageId;
 
           if (isCallMessage) {
             return (
@@ -268,6 +283,7 @@ const ChatWindowBody: React.FC = () => {
                 currentUserId={user?._id ?? ""}
                 selectedConvo={selectedConvo}
                 isLast={message._id === lastItemId}
+                isLastMyMessage={isLastMyMsg}
               />
             );
           }
@@ -283,7 +299,7 @@ const ChatWindowBody: React.FC = () => {
                 messages={messages}
                 selectedConvo={selectedConvo}
                 currentUserId={user?._id ?? ""}
-                isLast={message._id === lastItemId}
+                isLastMyMessage={isLastMyMsg}
                 onReply={setReplyingTo}
               />
             </div>

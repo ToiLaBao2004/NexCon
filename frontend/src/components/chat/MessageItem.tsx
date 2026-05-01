@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
-import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions, Check, CheckCheck } from "lucide-react";
 import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -390,7 +390,7 @@ interface MessageItemProps {
 	messages: Message[];
 	selectedConvo: Conversation;
 	currentUserId: string;
-	isLast?: boolean;
+	isLastMyMessage?: boolean;
 	onReply?: (message: Message) => void;
 }
 
@@ -1729,7 +1729,7 @@ const MessageItem = ({
 	messages,
 	selectedConvo,
 	currentUserId,
-	isLast,
+	isLastMyMessage,
 	onReply,
 }: MessageItemProps) => {
 	if (message.type === "system") {
@@ -1765,6 +1765,7 @@ const MessageItem = ({
 	}
 
 	const isOwn = actualSenderId?.toString() === currentUserId?.toString();
+	
 	const { onlineUsers } = useSocketStore();
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
@@ -2409,10 +2410,26 @@ const MessageItem = ({
 							/>
 						))}
 					</div>
-				) : isLast ? (
-					<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end">
-						<span className="text-[11px] text-muted-foreground">Đã gửi</span>
-					</div>
+				) : isLastMyMessage ? (
+					selectedConvo.type === "direct" ? (
+						<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end text-[11px] text-muted-foreground">
+							{message.isDelivered ? (
+								<>
+									<CheckCheck className="size-3.5" strokeWidth={2.2} />
+									<span>Đã nhận</span>
+								</>
+							) : (
+								<>
+									<Check className="size-3.5" strokeWidth={2.2} />
+									<span>Đã gửi</span>
+								</>
+							)}
+						</div>
+					) : (
+						<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end">
+							<span className="text-[11px] text-muted-foreground">Đã gửi</span>
+						</div>
+					)
 				) : null
 			)}
 

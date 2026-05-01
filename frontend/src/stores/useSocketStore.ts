@@ -183,6 +183,45 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("connect", () => {
       console.log("Connected to Socket");
+
+      // B online trở lại -> duyệt qua các msg chưa có B trong deliveredTo -> emit
+      const currentUserId = useAuthStore.getState().user?._id;
+      if (currentUserId) {
+        const chatState = useChatStore.getState();
+        const directConvos = chatState.conversations.filter((c) => c.type === "direct");
+        for (const convo of directConvos) {
+          // 1. Kiểm tra lastMessage
+          const lastMsg = convo.lastMessage;
+          if (lastMsg) {
+            const senderId = (lastMsg.senderId as any)?._id || lastMsg.senderId;
+            if (
+              String(senderId) !== String(currentUserId) &&
+              !lastMsg.deliveredTo?.includes(currentUserId)
+            ) {
+              socket.emit("message-delivered", {
+                messageId: lastMsg._id,
+                conversationId: convo._id,
+              });
+            }
+          }
+
+          // 2. Kiểm tra messages đã cache
+          const cached = chatState.messages[convo._id];
+          if (!cached?.items?.length) continue;
+          for (const msg of cached.items) {
+            const msgSenderId = (msg.senderId as any)?._id || msg.senderId;
+            if (
+              String(msgSenderId) !== String(currentUserId) &&
+              !msg.deliveredTo?.includes(currentUserId)
+            ) {
+              socket.emit("message-delivered", {
+                messageId: msg._id,
+                conversationId: convo._id,
+              });
+            }
+          }
+        }
+      }
     });
 
     socket.on("connect_error", async (err) => {
@@ -244,6 +283,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       if (!isMine && !mutedMessages) {
         void playMessageSound();
       }
+
+      if (!isMine && currentConversation?.type === "direct") {
+        socket.emit("message-delivered", {
+          messageId: message._id,
+          conversationId: message.conversationId,
+        });
+      }
     });
 
     socket.on("read-message", ({ conversationId, userId, lastReadMessageId, lastReadAt }) => {
@@ -269,6 +315,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           conversations: updatedConversations,
         };
       });
+    });
+
+    socket.on("message-delivered-ack", ({ messageId, conversationId }) => {
+      useChatStore.getState().markMessageDelivered(messageId, conversationId);
     });
 
     socket.on("new-friend-request", ({ friendRequest }) => {

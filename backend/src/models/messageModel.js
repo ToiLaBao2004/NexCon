@@ -84,6 +84,7 @@ const messageSchema = new mongoose.Schema({
             emoji: { type: String, required: true }
         }
     ],
+    deliveredTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
 }, { timestamps: true });
 
 // Pre-save hook to normalize content for search

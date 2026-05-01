@@ -124,6 +124,7 @@ export interface ChatState {
   leaveGroup: (conversationId: string, silent?: boolean, newAdminId?: string) => Promise<void>;
   forwardMessage: (messageId: string, targetConversationIds: string[]) => Promise<{ forwarded: number; errors: { conversationId: string; reason: string }[] }>;
   muteConversation: (conversationId: string, target: 'messages' | 'meetings' | 'both', duration: '1h' | '8h' | '24h' | 'forever' | 'off') => Promise<void>;
+  markMessageDelivered: (messageId: string, conversationId: string) => void;
 
 
   // Sidebar

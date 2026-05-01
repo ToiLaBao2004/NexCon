@@ -5,12 +5,14 @@ import CallMessageBubble from "./CallMessageBubble";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { parseCallSnapshot } from "@/utils/callMessageUtils";
 import { useMemo } from "react";
+import { Check, CheckCheck } from "lucide-react";
 
 interface CallMessageItemProps {
   message: Message;
   currentUserId: string;
   selectedConvo: Conversation;
   isLast?: boolean;
+  isLastMyMessage?: boolean;
 }
 
 /**
@@ -21,7 +23,7 @@ const CallMessageItem = ({
   message,
   currentUserId,
   selectedConvo,
-  isLast,
+  isLastMyMessage,
 }: CallMessageItemProps) => {
   const snapshot = parseCallSnapshot(message);
   if (!snapshot) return null;
@@ -97,7 +99,7 @@ const CallMessageItem = ({
         </span>
 
         {/* Trạng thái đã xem / đã gửi (chỉ hiện cho item cuối cùng của mình) */}
-        {isInitiator && isLast && (
+        {isInitiator && isLastMyMessage && (
           <div className="flex items-center gap-1.5 mt-0.5 px-1.5">
             {seenUsersForThisMessage.length > 0 ? (
               seenUsersForThisMessage.map((seenUser) => (
@@ -108,6 +110,20 @@ const CallMessageItem = ({
                   avatarUrl={seenUser.avatarUrl ?? undefined}
                 />
               ))
+            ) : selectedConvo.type === "direct" ? (
+              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                {message.isDelivered ? (
+                  <>
+                    <CheckCheck className="size-3.5" strokeWidth={2.2} />
+                    <span>Đã nhận</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="size-3.5" strokeWidth={2.2} />
+                    <span>Đã gửi</span>
+                  </>
+                )}
+              </div>
             ) : (
               <span className="text-xs text-muted-foreground">Đã gửi</span>
             )}
