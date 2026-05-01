@@ -113,17 +113,17 @@ async function checkWithGemini(text) {
         Nhiệm vụ: Phân tích tin nhắn sau và quyết định có VI PHẠM tiêu chuẩn cộng đồng hay không.
 
         Các loại vi phạm phải chặn (blocked = true):
-        - Từ ngữ thô tục, chửi thề nặng (kể cả viết né, viết tắt)
-        - Xúc phạm, công kích, body shaming, kỳ thị
-        - Đe dọa bạo lực, tự hại, giết chóc
-        - Nội dung tình dục rõ ràng hoặc gợi dục mạnh
-        - Lừa đảo, dụ dỗ, ma túy, khủng bố, hack
-        - Phản động, chống phá nhà nước
+            - Từ ngữ thô tục, chửi thề nặng (kể cả viết né, viết tắt)
+            - Xúc phạm, công kích, body shaming, kỳ thị
+            - Đe dọa bạo lực, tự hại, giết chóc
+            - Nội dung tình dục rõ ràng hoặc gợi dục mạnh
+            - Lừa đảo, dụ dỗ, ma túy, khủng bố, hack
+            - Phản động, chống phá nhà nước
 
         Hướng dẫn:
-        - Xem xét slang tiếng Việt, nói đùa thô, sarcasm.
-        - Chỉ blocked khi rõ ràng vi phạm nghiêm trọng.
-        - Nói đùa nhẹ, chửi vui bạn bè → có thể cho qua, nhưng chửi căng (có từ tục nặng) phải blocked.
+            - Xem xét slang tiếng Việt, nói đùa thô, sarcasm.
+            - Chỉ blocked khi rõ ràng vi phạm nghiêm trọng.
+            - Nói đùa nhẹ, chửi vui bạn bè → có thể cho qua, nhưng chửi căng (có từ tục nặng) phải blocked.
 
         Trả về đúng JSON không thêm gì khác:
 
@@ -209,7 +209,7 @@ export async function moderateTextMessage(text) {
     if (shouldUseAI(cleaned)) {
         const aiResult = await checkWithGemini(cleaned);
 
-        if (aiResult.blocked && aiResult.confidence >= 0.5) {
+        if (aiResult.blocked && aiResult.confidence >= 0.8) {
             console.log(`[Moderation] Blocked by GEMINI: ${aiResult.reason}`);
 
             return {
