@@ -261,7 +261,7 @@ const ChatWindowBody: React.FC = () => {
 
       <div
         ref={scrollRef}
-        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4 pb-2"
+        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4 pb-8"
       >
         <div ref={topSentinelRef} className="h-1 shrink-0" />
 
@@ -319,7 +319,7 @@ const ChatWindowBody: React.FC = () => {
             </span>
             <span className="text-[12px] font-medium text-foreground/80 pr-1">
               <span className="font-bold text-foreground">
-                {activeTypingParticipants.length === 1 
+                {activeTypingParticipants.length === 1
                   ? activeTypingParticipants[0]?.userId?.nickname || activeTypingParticipants[0]?.userId?.displayName
                   : `${activeTypingParticipants.length} người`}
               </span>
