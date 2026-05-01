@@ -177,28 +177,28 @@ async function checkLinkWithGemini(url) {
 
     const prompt = `Bạn là AI kiểm duyệt link chat tiếng Việt.
 
-Nhiệm vụ: Phân tích URL sau và đánh giá xem link này có khả năng cao dẫn tới nội dung vi phạm tiêu chuẩn cộng đồng hay không.
+        Nhiệm vụ: Phân tích URL sau và đánh giá xem link này có khả năng cao dẫn tới nội dung vi phạm tiêu chuẩn cộng đồng hay không.
 
-Chặn (blocked = true) nếu URL có dấu hiệu rõ ràng thuộc một trong các nhóm:
-- Nội dung khiêu dâm / gợi dục / 18+
-- Lừa đảo, phishing, dụ bấm link
-- Ma túy, hack, khủng bố, tự hại
-- Nội dung nguy hiểm hoặc bất hợp pháp
+        Chặn (blocked = true) nếu URL có dấu hiệu rõ ràng thuộc một trong các nhóm:
+            - Nội dung khiêu dâm / gợi dục / 18+
+            - Lừa đảo, phishing, dụ bấm link
+            - Ma túy, hack, khủng bố, tự hại
+            - Nội dung nguy hiểm hoặc bất hợp pháp
 
-Lưu ý:
-- Chỉ dựa trên chính chuỗi URL, domain, path, query.
-- Nếu không đủ cơ sở rõ ràng thì ưu tiên blocked = false.
-- Không suy diễn quá mức.
-- Trả về đúng JSON, không thêm gì khác.
+        Lưu ý:
+            - Chỉ dựa trên chính chuỗi URL, domain, path, query.
+            - Nếu không đủ cơ sở rõ ràng thì ưu tiên blocked = false.
+            - Không suy diễn quá mức.
+            - Trả về đúng JSON, không thêm gì khác.
 
-{
-  "blocked": true/false,
-  "category": "sexual"|"scam"|"dangerous"|"unsafe_link"|"safe",
-  "confidence": number,
-  "reason": "Giải thích ngắn gọn bằng tiếng Việt"
-}
+        {
+            "blocked": true/false,
+            "category": "sexual"|"scam"|"dangerous"|"unsafe_link"|"safe",
+            "confidence": number,
+            "reason": "Giải thích ngắn gọn bằng tiếng Việt"
+        }
 
-URL: """${url}"""`;
+        URL: """${url}"""`;
 
     try {
         const result = await geminiModel.generateContent({
@@ -262,7 +262,7 @@ export async function moderateLinkMessage(url) {
 
         const aiResult = await checkLinkWithGemini(url);
 
-        if (aiResult.blocked && aiResult.confidence >= 0.6) {
+        if (aiResult.blocked && aiResult.confidence >= 0.8) {
             console.log(`[Moderation] Blocked LINK by GEMINI: ${aiResult.reason}`);
             return {
                 allowed: false,
