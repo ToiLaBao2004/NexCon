@@ -45,4 +45,9 @@ export const userService = {
         const response = await api.delete('/users/me/music');
         return response.data;
     },
+
+    searchUsers: async (keyword: string) => {
+        const response = await api.get('/users/search', { params: { keyword } });
+        return response.data;
+    }
 };

@@ -7,7 +7,7 @@ import UserAvatar from "./UserAvatar";
 import StatusBadge from "./StatusBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { useSocketStore } from "@/stores/useSocketStore";
-import { Phone, Video, Search, ArrowLeft } from "lucide-react";
+import { Phone, Video, Search, ArrowLeft, CalendarClock } from "lucide-react";
 import { Button } from "../ui/button";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { useState } from "react";
@@ -17,6 +17,7 @@ import { useGroupCallStore } from "@/stores/useGroupCallStore";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMaxWidth } from "@/hooks/use-max-width";
 import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
+import ScheduleMeetingModal from "@/components/reminder/ScheduleMeetingModal";
 
 const PanelRightIcon = ({ className, filled }: { className?: string; filled?: boolean }) => (
   <svg
@@ -50,6 +51,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   const { startCall, status: callStatus } = useCallStore();
   const { startGroupCall, status: groupCallStatus } = useGroupCallStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const isMobile = useIsMobile();
   const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
   const useOverlayInfoSidebar = isMobile || isTabletOrBelow;
@@ -187,6 +189,15 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                   variant="ghost"
                   size="icon"
                   className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                  title="Lên lịch họp"
+                  onClick={() => setIsScheduleOpen(true)}
+                >
+                  <CalendarClock className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
                   disabled={!canCall}
                   title="Gọi thoại"
                   onClick={handleVoiceCall}
@@ -208,16 +219,28 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
 
             {/* group call button */}
             {chat.type === "group" && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
-                disabled={groupCallStatus !== "idle" || chat.disbanded === true}
-                title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi nhóm"}
-                onClick={() => startGroupCall(chat._id, "video")}
-              >
-                <Video className="h-[19px] w-[19px] md:h-[22px] md:w-[22px]" strokeWidth={1.5} />
-              </Button>
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                  disabled={chat.disbanded === true}
+                  title={chat.disbanded === true ? "Nhóm đã giải tán" : "Lên lịch họp"}
+                  onClick={() => setIsScheduleOpen(true)}
+                >
+                  <CalendarClock className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                  disabled={groupCallStatus !== "idle" || chat.disbanded === true}
+                  title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi nhóm"}
+                  onClick={() => startGroupCall(chat._id, "video")}
+                >
+                  <Video className="h-[19px] w-[19px] md:h-[22px] md:w-[22px]" strokeWidth={1.5} />
+                </Button>
+              </>
             )}
 
             {/* Search toggle button */}
@@ -270,6 +293,14 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
             phone: otherUser.userId.phone,
           }}
           onOpenChat={() => setIsProfileOpen(false)}
+        />
+      )}
+
+      {chat && (
+        <ScheduleMeetingModal
+          open={isScheduleOpen}
+          onOpenChange={setIsScheduleOpen}
+          conversationId={chat._id}
         />
       )}
     </header>

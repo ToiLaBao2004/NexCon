@@ -1,16 +1,17 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Search, Loader2, X, UserMinus, UserPlus } from "lucide-react";
 import { UserActionDropdown } from "./UserActionDropdown";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useSocketStore } from "@/stores/useSocketStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { FriendActionButtons } from "@/components/people/FriendActionButtons";
 import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import { cn } from "@/lib/utils";
+import { useDebounce } from "@/hooks/useDebounce";
+import { userService } from "@/services/userService";
 
 interface SearchedUser {
     _id: string;
@@ -28,47 +29,24 @@ interface UserSearchProps {
     onOpenChat?: (friend: any) => void;
 }
 
-const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
-    const [query, setQuery] = useState("");
-    const [user, setUser] = useState<SearchedUser | null>(null);
-    const [status, setStatus] = useState<SearchStatus>("idle");
+const UserSearchItem = ({ user, onOpenChat }: { user: SearchedUser, onOpenChat?: (friend: any) => void }) => {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [requestMessage, setRequestMessage] = useState("");
     const [unfriendModalOpen, setUnfriendModalOpen] = useState(false);
 
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const socket = useSocketStore((state) => state.socket);
     const {
         sendFriendRequest, cancelFriendRequest, unfriendUser,
         sentRequests, friends, fetchSentRequests
     } = useFriendStore();
 
-    const pendingRequest = user ? sentRequests.find((r) => r.to._id === user._id) : null;
-    const isFriend = !!(user && friends.find(f => f.friendId === user._id));
+    const { user: currentUser } = useAuthStore();
+    const isSelf = currentUser?._id === user._id;
 
-    useEffect(() => {
-        if (!socket) return;
-        const handleResult = ({ user, status }: any) => {
-            setUser(user);
-            setStatus(status);
-            setRequestMessage("");
-        };
-        socket.on("search-user-result", handleResult);
-        return () => { socket.off("search-user-result", handleResult); };
-    }, [socket]);
-
-    useEffect(() => {
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        if (!query.trim()) {
-            setStatus("idle"); setUser(null); return;
-        }
-        setStatus("searching");
-        debounceRef.current = setTimeout(() => {
-            socket?.emit("search-user", { query });
-        }, 500);
-        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-    }, [query, socket]);
+    const pendingRequest = sentRequests.find((r) => r.to._id === user._id);
+    const friendRecord = friends.find((f) => f.friendId === user._id);
+    const isFriend = !!friendRecord;
+    const displayAlias = friendRecord?.nickname || user.displayName;
 
     const handleAction = async (action: () => Promise<void>) => {
         try {
@@ -81,7 +59,6 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
 
     const onSendRequest = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!user) return;
         handleAction(async () => {
             await sendFriendRequest(user.email, requestMessage);
             await fetchSentRequests();
@@ -96,27 +73,23 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
     };
 
     const onUnfriend = () => {
-        if (!user) return;
         handleAction(async () => {
             await unfriendUser(user._id);
             setUnfriendModalOpen(false);
         });
     };
 
-    const { user: currentUser } = useAuthStore();
-    const isSelf = currentUser?._id === user?._id;
-
     const renderSecondaryActions = (mode: "icon" | "full") => {
         if (isSelf) return null;
         if (isFriend) {
             return (
                 <FriendActionButtons
-                    userId={user?._id || ""}
-                    displayName={user?.displayName || ""}
+                    userId={user._id}
+                    displayName={displayAlias}
                     onChat={(e) => {
                         e.stopPropagation();
                         setIsDialogOpen(false);
-                        onOpenChat?.({ friendId: user?._id, ...user });
+                        onOpenChat?.({ friendId: user._id, ...user });
                     }}
                     onUnfriend={(e) => {
                         e.stopPropagation();
@@ -131,8 +104,8 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
 
         const blockAction = (
             <UserActionDropdown
-                userId={user?._id || ""}
-                displayName={user?.displayName || ""}
+                userId={user._id}
+                displayName={displayAlias}
                 variant={mode === "full" ? "outline" : "ghost"}
                 mode={mode === "full" ? "button" : "dropdown"}
             />
@@ -182,18 +155,111 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
     };
 
     return (
-        <div className={cn("w-full border-b border-border/40", className)}>
+        <>
+            <div onClick={() => setIsDialogOpen(true)} className="mt-2 w-full flex flex-col gap-2 p-3 rounded-lg border border-border/60 bg-card hover:bg-muted/50 transition-all cursor-pointer group">
+                <div className="flex items-center gap-3 w-full">
+                    <Avatar className="h-8 w-8 shrink-0">
+                        <AvatarImage src={user.avatarUrl} />
+                        <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">{user.displayName.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{displayAlias} {isSelf && "(Bạn)"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
+                    <div className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
+                        {renderSecondaryActions("icon")}
+                    </div>
+                </div>
+                {!pendingRequest && !isFriend && !isSelf && (
+                    <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                        <Input
+                            placeholder="Nhập lời nhắn..."
+                            value={requestMessage}
+                            onChange={(e) => setRequestMessage(e.target.value)}
+                            className="h-8 text-xs bg-muted/20 border-border/40"
+                        />
+                    </div>
+                )}
+            </div>
+
+            <UserProfileDialog
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
+                user={{
+                    _id: user._id,
+                    displayName: user.displayName,
+                    email: user.email,
+                    avatarUrl: user.avatarUrl,
+                    bio: user.bio,
+                    phone: user.phone,
+                }}
+                onOpenChat={(friend) => {
+                    setIsDialogOpen(false);
+                    onOpenChat?.(friend);
+                }}
+            />
+
+            <ConfirmationModal
+                isOpen={unfriendModalOpen}
+                onClose={() => setUnfriendModalOpen(false)}
+                onConfirm={onUnfriend}
+                title="Hủy kết bạn?"
+                description={`Bạn có chắc chắn muốn hủy kết bạn với ${displayAlias}?`}
+                confirmText="Hủy kết bạn"
+                variant="destructive"
+                isLoading={actionLoading}
+            />
+        </>
+    );
+};
+
+const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
+    const [query, setQuery] = useState("");
+    const debouncedQuery = useDebounce(query, 500);
+    const [users, setUsers] = useState<SearchedUser[]>([]);
+    const [status, setStatus] = useState<SearchStatus>("idle");
+
+    useEffect(() => {
+        if (!debouncedQuery.trim()) {
+            setStatus("idle");
+            setUsers([]);
+            return;
+        }
+
+        const fetchUsers = async () => {
+            try {
+                setStatus("searching");
+                const response = await userService.searchUsers(debouncedQuery);
+                const results = response.users || [];
+                if (results.length > 0) {
+                    setUsers(results);
+                    setStatus("found");
+                } else {
+                    setUsers([]);
+                    setStatus("not-found");
+                }
+            } catch (error) {
+                setUsers([]);
+                setStatus("error");
+            }
+        };
+
+        fetchUsers();
+    }, [debouncedQuery]);
+
+    return (
+        <div className={cn("w-full border-b border-border/40 pb-3", className)}>
             <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10">
                     {status === "searching" ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Search className="h-4 w-4 text-muted-foreground" />}
                 </span>
                 <input
-                    placeholder="Tìm kiếm theo email hoặc SĐT..."
+                    placeholder="Tìm kiếm theo email..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="flex h-9 w-full rounded-lg border border-border/60 bg-muted/30 px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-9 pr-8"
                 />
-                {query && <button onClick={() => { setQuery(""); setUser(null); setStatus("idle"); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
+                {query && <button onClick={() => { setQuery(""); setUsers([]); setStatus("idle"); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
             </div>
 
             {status === "searching" && (
@@ -205,7 +271,7 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
             {status === "not-found" && (
                 <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/10 text-destructive animate-in fade-in slide-in-from-top-1 duration-200">
                     <span className="h-4 w-4 shrink-0 flex items-center justify-center font-bold text-xs ring-1 ring-destructive rounded-full">!</span>
-                    <p className="text-xs font-medium">Không tìm thấy người dùng này.</p>
+                    <p className="text-xs font-medium">Không tìm thấy người dùng nào phù hợp.</p>
                 </div>
             )}
 
@@ -216,63 +282,13 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
                 </div>
             )}
 
-            {status === "found" && user && (
-                <>
-                    <div onClick={() => setIsDialogOpen(true)} className="mt-2 w-full flex flex-col gap-2 p-3 rounded-lg border border-border/60 bg-card hover:bg-muted/50 transition-all cursor-pointer group">
-                        <div className="flex items-center gap-3 w-full">
-                            <Avatar className="h-8 w-8 shrink-0">
-                                <AvatarImage src={user.avatarUrl} />
-                                <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">{user.displayName.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">{user.displayName} {isSelf && "(Bạn)"}</p>
-                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                            </div>
-                            <div className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
-                                {renderSecondaryActions("icon")}
-                            </div>
-                        </div>
-                        {!pendingRequest && !isFriend && !isSelf && (
-                            <div className="mt-1" onClick={(e) => e.stopPropagation()}>
-                                <Input
-                                    placeholder="Nhập lời nhắn..."
-                                    value={requestMessage}
-                                    onChange={(e) => setRequestMessage(e.target.value)}
-                                    className="h-8 text-xs bg-muted/20 border-border/40"
-                                />
-                            </div>
-                        )}
-                    </div>
-
-                    <UserProfileDialog
-                        open={isDialogOpen}
-                        onOpenChange={setIsDialogOpen}
-                        user={user ? {
-                            _id: user._id,
-                            displayName: user.displayName,
-                            email: user.email,
-                            avatarUrl: user.avatarUrl,
-                            bio: user.bio,
-                            phone: user.phone,
-                        } : null}
-                        onOpenChat={(friend) => {
-                            setIsDialogOpen(false);
-                            onOpenChat?.(friend);
-                        }}
-                    />
-                </>
+            {status === "found" && users.length > 0 && (
+                <div className="mt-2 max-h-[300px] overflow-y-auto beautiful-scrollbar pr-1 flex flex-col gap-1">
+                    {users.map((user) => (
+                        <UserSearchItem key={user._id} user={user} onOpenChat={onOpenChat} />
+                    ))}
+                </div>
             )}
-
-            <ConfirmationModal
-                isOpen={unfriendModalOpen}
-                onClose={() => setUnfriendModalOpen(false)}
-                onConfirm={onUnfriend}
-                title="Hủy kết bạn?"
-                description={`Bạn có chắc chắn muốn hủy kết bạn với ${user?.displayName}?`}
-                confirmText="Hủy kết bạn"
-                variant="destructive"
-                isLoading={actionLoading}
-            />
         </div>
     );
 };

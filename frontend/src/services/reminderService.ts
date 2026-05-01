@@ -43,6 +43,11 @@ export const reminderService = {
     return response.data;
   },
 
+  async scheduleMeeting(data: { conversationId: string; content: string; remindAt: string }): Promise<SharedReminderResponse> {
+    const response = await api.post<SharedReminderResponse>('/reminders/schedule-meeting', data);
+    return response.data;
+  },
+
   async updateSharedReminderParticipation(sharedKey: string, participate: boolean): Promise<ReminderResponse> {
     const response = await api.patch<ReminderResponse>(`/reminders/shared/${encodeURIComponent(sharedKey)}/participation`, { participate });
     return response.data;

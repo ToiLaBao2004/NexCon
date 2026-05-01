@@ -225,7 +225,7 @@ export async function createMeeting(req, res) {
             hostId: userId,
             conversationId: conversationId || null,
             requireApproval: Boolean(requireApproval),
-            status: isImmediate ? 'active' : 'scheduled',
+            status: 'active',
             startedAt: isImmediate ? now : null,
             scheduledAt: parsedSchedule,
             participants: isImmediate ? [{ userId, joinedAt: now }] : [],

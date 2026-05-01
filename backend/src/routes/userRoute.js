@@ -1,7 +1,7 @@
 import express from 'express';
 import {
     getCurrentUser, updateAvatar, updateProfile, updateMusic, searchMusic,
-    removeMusic, changePassword
+    removeMusic, changePassword, searchUsers
 } from '../controllers/userController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 import { upload } from '../middlewares/uploadMiddleware.js';
@@ -9,6 +9,7 @@ import { upload } from '../middlewares/uploadMiddleware.js';
 const userRouter = express.Router();
 
 userRouter.get('/me', authMiddleware, getCurrentUser);
+userRouter.get('/search', authMiddleware, searchUsers);
 userRouter.put('/update-profile', authMiddleware, updateProfile);
 userRouter.post('/update-avatar', authMiddleware, upload.single('file'), updateAvatar);
 userRouter.put('/me/music/', authMiddleware, updateMusic);

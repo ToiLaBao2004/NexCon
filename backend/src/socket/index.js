@@ -3,7 +3,6 @@ import http from "http";
 import express from "express";
 import { socketAuthMiddleware } from "../middlewares/socketMiddleware.js";
 import { getUserConversationsForSocketIO } from "../controllers/conversationController.js";
-import { searchUserByEmailAndPhone } from "../controllers/userController.js";
 import Conversation from "../models/conversationModel.js";
 import { registerCallHandlers, handleCallDisconnect } from "./callHandler.js";
 import { registerGroupCallHandlers, handleGroupCallDisconnect } from "./groupCallHandler.js";
@@ -66,9 +65,6 @@ io.on("connection", async (socket) => {
             console.log(`Socket ${socket.id} joined conversation ${conversationId}`);
         }
     });
-
-    // Search user
-    socket.on("search-user", (payload) => searchUserByEmailAndPhone(socket, payload));
 
     // Typing indicators
     socket.on("typing", ({ conversationId }) => {

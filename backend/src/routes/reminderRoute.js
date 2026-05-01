@@ -3,6 +3,7 @@ import { authMiddleware } from '../middlewares/authMiddleware.js';
 import {
     createReminder,
     createSharedReminderFromMessage,
+    scheduleMeeting,
     getReminderSummary,
     getSharedReminderOverview,
     getReminderById,
@@ -21,6 +22,7 @@ reminderRouter.use(authMiddleware);
 
 reminderRouter.post('/', createReminder);
 reminderRouter.post('/shared/from-message', createSharedReminderFromMessage);
+reminderRouter.post('/schedule-meeting', scheduleMeeting);
 reminderRouter.patch('/shared/:sharedKey/participation', updateSharedReminderParticipation);
 reminderRouter.get('/shared/:sharedKey/overview', getSharedReminderOverview);
 reminderRouter.get('/', getReminders);
