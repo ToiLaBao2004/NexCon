@@ -302,6 +302,7 @@ export async function createSharedReminderFromMessage(req, res) {
                 reminderContent: normalizedContent,
                 remindAt: remindAtDate.toISOString(),
                 sourceType: 'message',
+                isCancelled: false,
             };
 
             const systemMessageData = {
@@ -489,6 +490,7 @@ export async function scheduleMeeting(req, res) {
             remindAt: remindAtDate.toISOString(),
             sourceType: 'meeting',
             meetingRoomName: roomName,
+            isCancelled: false,
         };
 
         const systemMessage = await Message.create({
@@ -1275,6 +1277,16 @@ export async function deleteReminder(req, res) {
                     sharedKey: reminder.sharedKey,
                     scope: 'shared',
                 });
+
+                await Message.updateMany(
+                    {
+                        systemType: 'shared_reminder_created',
+                        'metadata.sharedKey': reminder.sharedKey
+                    },
+                    {
+                        $set: { 'metadata.isCancelled': true }
+                    }
+                );
 
                 for (const participantUserId of participantUserIds) {
                     emitToUser(participantUserId, 'shared-reminder-cancelled', {

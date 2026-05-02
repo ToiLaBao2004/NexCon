@@ -1294,9 +1294,13 @@ function SystemMessageComponent({
 	]);
 
 	const loadSharedOverview = useCallback(async (forceRefresh = false) => {
-		if (message.systemType !== 'shared_reminder_created' || !sharedKey || isSharedReminderCancelled) {
+		const isCancelledFromMetadata = metadata?.isCancelled === true;
+
+		if (message.systemType !== 'shared_reminder_created' || !sharedKey || isSharedReminderCancelled || isCancelledFromMetadata) {
 			setSharedOverview(null);
-			if (isSharedReminderCancelled) {
+			if (isSharedReminderCancelled || isCancelledFromMetadata) {
+				setIsSharedReminderUnavailable(true);
+			} else {
 				setIsSharedReminderUnavailable(false);
 			}
 			return;
