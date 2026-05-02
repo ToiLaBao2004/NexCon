@@ -189,7 +189,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
 
     return (
         <Dialog open={open} onOpenChange={(val) => { onOpenChange(val); if (!val) { setFullUser(null); setAlbumArt(null); } }}>
-            <DialogContent className="sm:max-w-md border-primary/10 shadow-2xl p-0 overflow-hidden rounded-2xl bg-background">
+            <DialogContent className="sm:max-w-md border-primary/10 shadow-2xl p-0 overflow-hidden rounded-2xl bg-background z-[210]">
 
                 {/* Banner */}
                 <div className="relative overflow-hidden" style={{ height: fullUser?.music?.trackId ? "152px" : "128px" }}>

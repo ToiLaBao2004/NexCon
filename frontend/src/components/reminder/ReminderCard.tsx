@@ -240,8 +240,14 @@ export default function ReminderCard({
           )}
 
           <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-            <Clock3 className="h-3.5 w-3.5 text-muted-foreground" />
+            <Clock3 className={`h-3.5 w-3.5 ${reminder.status === 'snoozed' ? 'text-blue-500' : 'text-muted-foreground'}`} />
             <span>{formatClock(reminder.remindAt)}</span>
+            {reminder.status === 'snoozed' && reminder.snoozeUntil && (
+              <span className="flex items-center gap-1 text-blue-600">
+                <span className="mx-1">→</span>
+                <span className="font-bold font-sans">Nhắc lại lúc {formatClock(reminder.snoozeUntil)}</span>
+              </span>
+            )}
           </p>
 
           <div className="mt-3 flex flex-wrap items-center gap-1.5">

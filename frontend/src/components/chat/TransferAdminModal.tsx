@@ -68,7 +68,7 @@ export function TransferAdminModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[425px] p-0 gap-0 overflow-hidden flex flex-col max-h-[85vh]">
+        <DialogContent className="sm:max-w-[425px] p-0 gap-0 overflow-hidden flex flex-col max-h-[85vh] z-[210]">
           <DialogHeader className="px-6 py-4 border-b">
             <DialogTitle className="text-center text-lg font-semibold">Chọn trưởng nhóm mới</DialogTitle>
           </DialogHeader>
