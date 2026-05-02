@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Shield, KeyRound, ChevronRight, ArrowLeft } from "lucide-react";
+import { Shield, KeyRound, ChevronRight, ArrowLeft, Monitor, Trash2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/useAuthStore";
+import type { SessionInfo } from "@/types/authState";
 
 const changePasswordSchema = z.object({
     currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
@@ -24,8 +25,24 @@ interface SecurityTabProps {
 }
 
 export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
-    const [view, setView] = useState<"overview" | "change-password">("overview");
-    const { changePassword } = useAuthStore();
+    const [view, setView] = useState<"overview" | "change-password" | "sessions">("overview");
+    const { changePassword, getSessions, signOutBySession, signOutAll, sessions, sessionsLoading } = useAuthStore();
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    const handleSignOutBySession = async (sessionId: string) => {
+        setDeletingId(sessionId);
+        try {
+            await signOutBySession(sessionId);
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
+    useEffect(() => {
+        if (view === "sessions") {
+            getSessions();
+        }
+    }, [view]);
 
     const {
         register,
@@ -51,6 +68,76 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
             }
         }
     };
+
+    if (view === "sessions") {
+        return (
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                <div className="flex items-center gap-2 -ml-2">
+                    <Button variant="ghost" size="icon" onClick={() => setView("overview")}>
+                        <ArrowLeft className="w-5 h-5" />
+                    </Button>
+                    <div>
+                        <h3 className="text-lg font-semibold">Thiết bị đăng nhập</h3>
+                        <p className="text-sm text-muted-foreground">Quản lý các phiên đang hoạt động</p>
+                    </div>
+                </div>
+
+                {sessionsLoading ? (
+                    <p className="text-sm text-muted-foreground">Đang tải...</p>
+                ) : (
+                    <div className="space-y-3">
+                        {sessions.map((session: SessionInfo) => (
+                            <div
+                                key={session.sessionId}
+                                className="flex items-center justify-between p-4 border border-border/50 rounded-lg"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-muted rounded-full">
+                                        <Monitor className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-medium">{session.deviceName}</p>
+                                            {session.isCurrent && (
+                                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                    Thiết bị này
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">{session.ip}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Đăng nhập lúc {new Date(session.loginAt).toLocaleString('vi-VN')}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    disabled={deletingId === session.sessionId} // 👈
+                                    onClick={() => handleSignOutBySession(session.sessionId)} // 👈
+                                >
+                                    {deletingId === session.sessionId
+                                        ? <span className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
+                                        : <Trash2 className="w-4 h-4" />
+                                    }
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <Button
+                    variant="destructive"
+                    className="w-full"
+                    onClick={signOutAll}
+                >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Đăng xuất tất cả thiết bị
+                </Button>
+            </div>
+        );
+    }
 
     if (view === "change-password") {
         return (
@@ -138,6 +225,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                 <p className="text-sm text-muted-foreground">Bảo vệ thông tin và tài khoản của bạn</p>
             </div>
             <div className="space-y-4">
+                {/* Giữ nguyên item đổi mật khẩu */}
                 <div
                     className="flex items-center justify-between p-4 border border-border/50 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors group"
                     onClick={() => setView("change-password")}
@@ -146,8 +234,23 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                         <div className="p-2.5 bg-primary/10 rounded-full text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                             <KeyRound className="w-5 h-5" />
                         </div>
+                        <p className="font-medium">Đổi mật khẩu</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </div>
+
+                {/* 👇 Thêm item mới */}
+                <div
+                    className="flex items-center justify-between p-4 border border-border/50 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors group"
+                    onClick={() => setView("sessions")}
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="p-2.5 bg-primary/10 rounded-full text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                            <Monitor className="w-5 h-5" />
+                        </div>
                         <div>
-                            <p className="font-medium">Đổi mật khẩu</p>
+                            <p className="font-medium">Thiết bị đăng nhập</p>
+                            <p className="text-sm text-muted-foreground">Quản lý các phiên đang hoạt động</p>
                         </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />

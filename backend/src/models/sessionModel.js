@@ -14,6 +14,11 @@ const sessionSchema = new mongoose.Schema({
     expiresAt: {
         type: Date,
         required: true
+    },
+    deviceInfo: {
+        userAgent: { type: String },
+        ip: { type: String },
+        deviceName: { type: String }
     }
 }, { timestamps: true });
 

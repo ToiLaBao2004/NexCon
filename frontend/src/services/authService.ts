@@ -59,6 +59,23 @@ export const authService = {
     );
   },
 
+  signOutAll: async () => {
+    return await api.post(
+      '/auth/signout-all',
+      {},
+      { withCredentials: true }
+    );
+  },
+
+  getSessions: async () => {
+    const response = await api.get('/auth/sessions', { withCredentials: true });
+    return response.data.sessions;
+  },
+
+  signOutBySession: async (sessionId: string) => {
+    await api.delete(`/auth/sessions/${sessionId}`, { withCredentials: true });
+  },
+
   loginGoogle: () => {
     window.location.href = `${BACKEND_URL}/auth/google`;
   },

@@ -1,9 +1,20 @@
 import type { User } from './user';
 
+export interface SessionInfo {
+  sessionId: string;
+  deviceName: string;
+  ip: string;
+  loginAt: string;
+  expiresAt: string;
+  isCurrent: boolean;
+}
+
 export default interface AuthState {
   accessToken: string | null;
   user: User | null;
   loading: boolean;
+  sessions: SessionInfo[];
+  sessionsLoading: boolean;
 
   setAccessToken: (accessToken: string | null) => void;
 
@@ -51,4 +62,10 @@ export default interface AuthState {
   updateProfile: (data: { displayName?: string; bio?: string; phone?: string }) => Promise<void>;
 
   updateAvatar: (file: File) => Promise<void>;
+
+  getSessions: () => Promise<void>;
+
+  signOutBySession: (sessionId: string) => Promise<void>;
+
+  signOutAll: () => Promise<void>;
 }

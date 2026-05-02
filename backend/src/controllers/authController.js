@@ -7,8 +7,27 @@ import Otp from '../models/otpModel.js';
 import validator from 'validator';
 import { removeSubscription } from '../services/pushNotificationService.js';
 
-const ACCESS_TOKEN_TTL = '30m';
+const ACCESS_TOKEN_TTL = '60s';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
+
+function parseDeviceName(userAgent = '') {
+    if (!userAgent) return 'Unknown Device';
+
+    let browser = 'Unknown Browser';
+    if (userAgent.includes('Chrome')) browser = 'Chrome';
+    else if (userAgent.includes('Firefox')) browser = 'Firefox';
+    else if (userAgent.includes('Safari')) browser = 'Safari';
+    else if (userAgent.includes('Edge')) browser = 'Edge';
+
+    let os = 'Unknown OS';
+    if (userAgent.includes('Windows')) os = 'Windows';
+    else if (userAgent.includes('Mac')) os = 'MacOS';
+    else if (userAgent.includes('Linux')) os = 'Linux';
+    else if (userAgent.includes('Android')) os = 'Android';
+    else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS';
+
+    return `${browser} on ${os}`;
+}
 
 export async function verifyValidFieldsSignUp(req, res) {
     try {
@@ -74,19 +93,31 @@ export async function signIn(req, res) {
         if (!isPasswordValid) {
             return res.status(401).json({ message: 'Invalid email or password.' });
         }
+
+        const userAgent = req.headers['user-agent'] || '';
+        const ip = req.ip || req.socket?.remoteAddress || '';
+
         const accessToken = jwt.sign({ userId: user._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
         const refreshToken = crypto.randomBytes(64).toString('hex');
+
         await Session.create({
             userId: user._id,
             refreshToken: refreshToken,
-            expiresAt: Date.now() + REFRESH_TOKEN_TTL
+            expiresAt: Date.now() + REFRESH_TOKEN_TTL,
+            deviceInfo: {
+                userAgent,
+                ip,
+                deviceName: parseDeviceName(userAgent)
+            }
         });
+
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true, // cannot be accessed via JavaScript
             secure: true, // set to true if using HTTPS
             sameSite: 'none', // backend and frontend are on different domains (if same domain, use 'lax' or 'strict')
             maxAge: REFRESH_TOKEN_TTL
-        })
+        });
+
         return res.status(200).json({ message: `User ${user.displayName} logged in successfully.`, accessToken: accessToken });
     } catch (error) {
         console.error('Error during login:', error);
@@ -114,6 +145,94 @@ export async function signOut(req, res) {
         return res.status(200).json({ message: 'User logged out successfully.' });
     } catch (error) {
         console.error('Error during logout:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function signOutAll(req, res) {
+    try {
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken) {
+            return res.status(400).json({ message: 'Refresh token not found.' });
+        }
+        const session = await Session.findOne({ refreshToken });
+        if (!session) {
+            return res.status(401).json({ message: 'Invalid session.' });
+        }
+        await Session.deleteMany({ userId: session.userId });
+        res.clearCookie('refreshToken', { httpOnly: true, secure: true, sameSite: 'none' });
+        return res.status(200).json({ message: 'Logged out from all devices successfully.' });
+    } catch (error) {
+        console.error('Error during sign out all:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function getSessions(req, res) {
+    try {
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken) {
+            return res.status(401).json({ message: 'Unauthorized.' });
+        }
+        const currentSession = await Session.findOne({ refreshToken });
+        if (!currentSession) {
+            return res.status(401).json({ message: 'Invalid session.' });
+        }
+        const sessions = await Session.find({ userId: currentSession.userId })
+            .select('_id deviceInfo createdAt expiresAt')
+            .sort({ createdAt: -1 });
+
+        const result = sessions.map(s => ({
+            sessionId: s._id,
+            deviceName: s.deviceInfo?.deviceName || 'Unknown Device',
+            ip: s.deviceInfo?.ip || 'Unknown',
+            loginAt: s.createdAt,
+            expiresAt: s.expiresAt,
+            isCurrent: s._id.equals(currentSession._id)
+        }));
+
+        return res.status(200).json({ sessions: result });
+    } catch (error) {
+        console.error('Error fetching sessions:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function signOutBySession(req, res) {
+    try {
+        const refreshToken = req.cookies?.refreshToken;
+        const { sessionId } = req.params;
+
+        if (!refreshToken) {
+            return res.status(401).json({ message: 'Unauthorized.' });
+        }
+        const currentSession = await Session.findOne({ refreshToken });
+        if (!currentSession) {
+            return res.status(401).json({ message: 'Invalid session.' });
+        }
+
+        const targetSession = await Session.findOne({
+            _id: sessionId,
+            userId: currentSession.userId
+        });
+        if (!targetSession) {
+            return res.status(404).json({ message: 'Session not found.' });
+        }
+
+        await Session.deleteOne({ _id: sessionId });
+
+        const isDeletingCurrent = targetSession._id.equals(currentSession._id);
+        if (isDeletingCurrent) {
+            res.clearCookie('refreshToken', { httpOnly: true, secure: true, sameSite: 'none' });
+        }
+
+        return res.status(200).json({
+            message: isDeletingCurrent
+                ? 'Logged out from this device.'
+                : `Logged out session ${sessionId} successfully.`
+        });
+    } catch (error) {
+        console.error('Error during sign out by session:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }

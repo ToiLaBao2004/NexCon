@@ -13,6 +13,8 @@ export const useAuthStore = create<AuthState>()(
     accessToken: null,
     user: null,
     loading: false,
+    sessions: [],
+    sessionsLoading: false,
 
     setAccessToken: (accessToken: string | null) => {
       set({ accessToken });
@@ -154,6 +156,57 @@ export const useAuthStore = create<AuthState>()(
       } catch (error) {
         console.error('Lỗi khi đăng nhập bằng Google:', error);
         toast.error('Đăng nhập bằng Google thất bại.');
+      }
+    },
+
+    getSessions: async () => {
+      try {
+        set({ sessionsLoading: true });
+        const sessions = await authService.getSessions();
+        set({ sessions });
+      } catch (error: any) {
+        console.error('Lỗi khi lấy danh sách phiên:', error);
+        toast.error('Không thể tải danh sách thiết bị.');
+      } finally {
+        set({ sessionsLoading: false });
+      }
+    },
+
+    signOutBySession: async (sessionId: string) => {
+      try {
+        const { sessions } = get();
+        const target = sessions.find(s => s.sessionId === sessionId);
+
+        await authService.signOutBySession(sessionId);
+
+        if (target?.isCurrent) {
+          // Đang logout thiết bị hiện tại
+          get().clearState();
+          toast.success('Đã đăng xuất thiết bị này.');
+        } else {
+          // Logout thiết bị khác — cập nhật lại list
+          set({ sessions: sessions.filter(s => s.sessionId !== sessionId) });
+          toast.success('Đã đăng xuất thiết bị thành công.');
+        }
+      } catch (error: any) {
+        console.error('Lỗi khi đăng xuất phiên:', error);
+        toast.error('Đăng xuất thiết bị thất bại. Vui lòng thử lại.');
+        throw error;
+      }
+    },
+
+    signOutAll: async () => {
+      try {
+        set({ loading: true });
+        await authService.signOutAll();
+        get().clearState();
+        toast.success('Đã đăng xuất tất cả thiết bị.');
+      } catch (error: any) {
+        console.error('Lỗi khi đăng xuất tất cả:', error);
+        toast.error('Đăng xuất thất bại. Vui lòng thử lại.');
+        throw error;
+      } finally {
+        set({ loading: false });
       }
     },
 
