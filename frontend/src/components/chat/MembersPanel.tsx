@@ -32,7 +32,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
 
   const [approvalQueue, setApprovalQueue] = useState<any[]>([]);
   const [loadingApproval, setLoadingApproval] = useState(false);
-  const { handleApproval, removeMember } = useChatStore();
+  const { handleApproval, removeMember, openChat } = useChatStore();
 
   const [userToRemove, setUserToRemove] = useState<any>(null);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
@@ -140,7 +140,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
                       </div>
                     ) : (
                       <div className="flex flex-col gap-0.5">
-                        {approvalQueue?.map((item: any) => {
+                        {approvalQueue.map((item: any) => {
                           const u = item.userId;
                           if (!u) return null;
                           const name = u.displayName || "Người dùng";
@@ -170,8 +170,9 @@ export default function MembersPanel({ conversationId, participants, memberCount
                   </div>
                 )}
 
-                <div className="px-3 py-2 mt-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Danh sách thành viên
+                <div className="px-3 py-2 mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                  <span>Danh sách thành viên</span>
+                  <span className="bg-muted/50 px-2 py-0.5 rounded-full text-[10px]">{participants.length}</span>
                 </div>
                 {participants.map((p: any) => {
                   const u = p.userId || p;
@@ -212,7 +213,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <button className="p-1.5 rounded-full hover:bg-muted/20 opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100 outline-none">
+                          <button className="p-1.5 rounded-full hover:bg-muted/20 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100 outline-none">
                             <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </DropdownMenuTrigger>
@@ -250,6 +251,11 @@ export default function MembersPanel({ conversationId, participants, memberCount
             avatarUrl: selectedUser.avatarUrl,
             bio: selectedUser.bio,
             phone: selectedUser.phone
+          }}
+          onOpenChat={async (user) => {
+            setIsProfileOpen(false);
+            setOpen(false);
+            await openChat({ userId: user.friendId || user._id });
           }}
         />
       )}

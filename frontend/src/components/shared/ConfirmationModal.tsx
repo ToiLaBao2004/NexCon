@@ -17,7 +17,7 @@ export const ConfirmationModal = ({
     confirmText = "Xác nhận", variant = "default", isLoading = false
 }: ConfirmationModalProps) => (
     <Dialog open={isOpen} onOpenChange={(v) => !v && onClose()}>
-        <DialogContent className="sm:max-w-[400px] rounded-2xl">
+        <DialogContent className="sm:max-w-[400px] rounded-2xl z-[300]">
             <DialogHeader>
                 <DialogTitle>{title}</DialogTitle>
                 <DialogDescription>{description}</DialogDescription>
