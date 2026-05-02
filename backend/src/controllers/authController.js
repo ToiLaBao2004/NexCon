@@ -266,7 +266,12 @@ export async function googleAuthCallback(req, res) {
         await Session.create({
             userId: user._id,
             refreshToken: refreshToken,
-            expiresAt: Date.now() + REFRESH_TOKEN_TTL
+            expiresAt: Date.now() + REFRESH_TOKEN_TTL,
+            deviceInfo: {
+                userAgent,
+                ip,
+                deviceName: parseDeviceName(userAgent)
+            }
         });
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
