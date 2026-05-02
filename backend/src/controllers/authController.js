@@ -7,7 +7,7 @@ import Otp from '../models/otpModel.js';
 import validator from 'validator';
 import { removeSubscription } from '../services/pushNotificationService.js';
 
-const ACCESS_TOKEN_TTL = '60s';
+const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 
 function parseIp(req) {
@@ -103,10 +103,9 @@ export async function signIn(req, res) {
         const userAgent = req.headers['user-agent'] || '';
         const ip = parseIp(req);
 
-        const accessToken = jwt.sign({ userId: user._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
         const refreshToken = crypto.randomBytes(64).toString('hex');
 
-        await Session.create({
+        const session = await Session.create({
             userId: user._id,
             refreshToken: refreshToken,
             expiresAt: Date.now() + REFRESH_TOKEN_TTL,
@@ -116,6 +115,8 @@ export async function signIn(req, res) {
                 deviceName: parseDeviceName(userAgent)
             }
         });
+
+        const accessToken = jwt.sign({ userId: user._id, sessionId: session._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true, // cannot be accessed via JavaScript
@@ -309,7 +310,7 @@ export async function googleSuccess(req, res) {
         }
 
         const accessToken = jwt.sign(
-            { userId: session.userId },
+            { userId: session.userId, sessionId: session._id },
             process.env.ACCESS_TOKEN_SECRET,
             { expiresIn: ACCESS_TOKEN_TTL }
         );
@@ -330,7 +331,7 @@ export async function refreshToken(req, res) {
         if (!session || session.expiresAt < Date.now()) {
             return res.status(403).json({ message: 'Invalid or expired refresh token.' });
         }
-        const accessToken = jwt.sign({ userId: session.userId }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+        const accessToken = jwt.sign({ userId: session.userId, sessionId: session._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
         return res.status(200).json({ accessToken: accessToken });
     } catch (error) {
         console.error('Error during token refresh:', error);

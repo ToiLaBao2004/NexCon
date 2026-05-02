@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
+import Session from '../models/sessionModel.js';
 
 export async function authMiddleware(req, res, next) {
     try {
@@ -13,11 +14,15 @@ export async function authMiddleware(req, res, next) {
         if (!user) {
             return res.status(401).json({ message: 'User not found.' });
         }
+        const session = await Session.findById(payload.sessionId);
+        if (!session || session.expiresAt < Date.now()) {
+            return res.status(403).json({ message: 'Session expired or not found.' });
+        }
         req.user = user;
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
-            return res.status(403).json({ success: false, message: 'Token expired' });
+            return res.status(401).json({ success: false, message: 'Token expired' });
         }
         return res.status(401).json({ success: false, message: 'Invalid token' });
     }

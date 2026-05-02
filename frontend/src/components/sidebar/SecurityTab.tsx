@@ -225,7 +225,6 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                 <p className="text-sm text-muted-foreground">Bảo vệ thông tin và tài khoản của bạn</p>
             </div>
             <div className="space-y-4">
-                {/* Giữ nguyên item đổi mật khẩu */}
                 <div
                     className="flex items-center justify-between p-4 border border-border/50 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors group"
                     onClick={() => setView("change-password")}
@@ -239,7 +238,6 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>
 
-                {/* 👇 Thêm item mới */}
                 <div
                     className="flex items-center justify-between p-4 border border-border/50 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors group"
                     onClick={() => setView("sessions")}
