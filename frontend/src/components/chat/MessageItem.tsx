@@ -1294,9 +1294,13 @@ function SystemMessageComponent({
 	]);
 
 	const loadSharedOverview = useCallback(async (forceRefresh = false) => {
-		if (message.systemType !== 'shared_reminder_created' || !sharedKey || isSharedReminderCancelled) {
+		const isCancelledFromMetadata = metadata?.isCancelled === true;
+
+		if (message.systemType !== 'shared_reminder_created' || !sharedKey || isSharedReminderCancelled || isCancelledFromMetadata) {
 			setSharedOverview(null);
-			if (isSharedReminderCancelled) {
+			if (isSharedReminderCancelled || isCancelledFromMetadata) {
+				setIsSharedReminderUnavailable(true);
+			} else {
 				setIsSharedReminderUnavailable(false);
 			}
 			return;
@@ -1777,7 +1781,7 @@ const MessageItem = ({
 	}
 
 	const isOwn = actualSenderId?.toString() === currentUserId?.toString();
-	
+
 	const { onlineUsers } = useSocketStore();
 	const isRecalled = message.isRecalled === true;
 	const isPinned = message.isPinned === true;
@@ -2210,7 +2214,15 @@ const MessageItem = ({
 											</button>
 										</DropdownMenuTrigger>
 
-										<DropdownMenuContent align={isOwn ? "end" : "start"} className="w-46">
+										<DropdownMenuContent
+											align={isOwn ? "end" : "start"}
+											className="w-46"
+											onCloseAutoFocus={(e) => {
+												if (useChatStore.getState().replyingTo) {
+													e.preventDefault();
+												}
+											}}
+										>
 											{!isDisbanded && (
 												<DropdownMenuItem onClick={() => { setShowTouchActions(false); onReply?.(message); }}>
 													<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
@@ -2283,6 +2295,11 @@ const MessageItem = ({
 											<DialogContent
 												className="w-[92vw] max-w-[380px] rounded-[24px] shadow-2xl bg-background/95 backdrop-blur-xl border-border/10 p-5 pt-6 gap-5"
 												showCloseButton={false}
+												onCloseAutoFocus={(e) => {
+													if (useChatStore.getState().replyingTo) {
+														e.preventDefault();
+													}
+												}}
 											>
 												<DialogTitle className="sr-only">Thao tác tin nhắn</DialogTitle>
 												<div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-1">
