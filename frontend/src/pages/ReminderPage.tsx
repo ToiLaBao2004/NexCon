@@ -73,7 +73,7 @@ const ReminderPage = () => {
         fetchReminders,
         fetchMoreReminders,
         fetchUpcomingCount,
-        createReminderAsync,
+        snoozeReminderAsync,
         updateSharedReminderParticipationAsync,
         deleteReminderAsync,
         deleteRemindersByScopeAsync,
@@ -570,20 +570,10 @@ const ReminderPage = () => {
 
     const handleRepeatReminder = async (reminder: Reminder, minutes: number) => {
         try {
-            const payload: CreateReminderPayload = {
-                content: getReminderContent(reminder),
-                remindAt: new Date(Date.now() + minutes * 60000).toISOString(),
-                repeatRule: reminder.repeatRule,
-                notifyChannels: reminder.notifyChannels,
-                source: reminder.source,
-            };
-
-            await createReminderAsync(payload, {
-                syncStore: false,
-                refreshSummary: false,
+            await snoozeReminderAsync(reminder._id, minutes as 5 | 10 | 30 | 60, {
+                syncStore: true,
+                refreshSummary: true,
             });
-            await fetchReminders(currentQueryParams);
-            void fetchUpcomingCount();
             toast.success(`Đã hẹn nhắc lại sau ${minutes} phút`);
         } catch (error) {
             console.error('Repeat reminder failed:', error);

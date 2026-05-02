@@ -8,6 +8,7 @@ import User from '../models/userModel.js';
 import { generateRoomCode } from './meetingController.js';
 import { emitToUser, io } from '../socket/index.js';
 import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
+import { scheduleReminderJob, removeReminderJob } from '../config/reminderQueue.js';
 import {
     REMINDER_REPEAT_RULES,
     REMINDER_STATUSES,
@@ -180,6 +181,11 @@ export async function createReminder(req, res) {
 
         emitToUser(userId.toString(), 'reminder-created', {
             reminder: normalizedReminder,
+        });
+
+        // Lập lịch job nhắc hẹn qua BullMQ
+        scheduleReminderJob(reminder).catch((err) => {
+            console.error(`[ReminderQueue] Lỗi lập lịch sau khi tạo (${reminder._id}):`, err);
         });
 
         return res.status(201).json({ reminder: normalizedReminder });
@@ -375,6 +381,13 @@ export async function createSharedReminderFromMessage(req, res) {
             });
         }
 
+        // Lập lịch job cho tất cả thành viên trong nhắc hẹn chung
+        for (const reminder of creationResult.createdReminders) {
+            scheduleReminderJob(reminder).catch((err) => {
+                console.error(`[ReminderQueue] Lỗi lập lịch nhắc hẹn chung (${reminder._id}):`, err);
+            });
+        }
+
         return res.status(201).json({
             reminder: normalizeReminderOutput(creationResult.creatorReminder),
             sharedKey: creationResult.sharedKey,
@@ -517,6 +530,13 @@ export async function scheduleMeeting(req, res) {
             if (!targetUserId || targetUserId === userIdStr) continue;
             emitToUser(targetUserId, 'reminder-created', {
                 reminder: normalizeReminderOutput(reminder),
+            });
+        }
+
+        // Lập lịch job cho tất cả thành viên tham gia buổi họp
+        for (const reminder of createdReminders) {
+            scheduleReminderJob(reminder).catch((err) => {
+                console.error(`[ReminderQueue] Lỗi lập lịch nhắc hẹn họp (${reminder._id}):`, err);
             });
         }
 
@@ -952,6 +972,15 @@ export async function updateReminder(req, res) {
                 });
             }
 
+            // Cập nhật lại lịch job cho tất cả thành viên sau khi update nội dung/thời gian
+            for (const sharedReminder of refreshedSharedReminders) {
+                const sid = toObjectIdString(sharedReminder._id);
+                await removeReminderJob(sid);
+                scheduleReminderJob(sharedReminder).catch((err) => {
+                    console.error(`[ReminderQueue] Lỗi lập lịch lại nhắc hẹn chung (${sid}):`, err);
+                });
+            }
+
             const updatedSelf = refreshedSharedReminders.find(
                 (item) => toObjectIdString(item.userId) === userIdStr
             ) || reminder;
@@ -1001,6 +1030,12 @@ export async function updateReminder(req, res) {
 
         await reminder.save();
 
+        // Cập nhật lại lịch job cá nhân
+        await removeReminderJob(id);
+        scheduleReminderJob(reminder).catch((err) => {
+            console.error(`[ReminderQueue] Lỗi lập lịch lại sau khi update (${id}):`, err);
+        });
+
         const normalizedReminder = normalizeReminderOutput(reminder);
         emitToUser(userIdStr, 'reminder-updated', { reminder: normalizedReminder });
 
@@ -1044,6 +1079,12 @@ export async function snoozeReminder(req, res) {
         reminder.snoozeCount = (reminder.snoozeCount || 0) + 1;
         await reminder.save();
 
+        // Lập lịch lại job theo thời gian tạm hoãn (snoozeUntil)
+        await removeReminderJob(id);
+        scheduleReminderJob(reminder).catch((err) => {
+            console.error(`[ReminderQueue] Lỗi lập lịch lại sau khi snooze (${id}):`, err);
+        });
+
         const outputReminder = normalizeReminderOutput(reminder);
 
         emitToUser(userId.toString(), 'reminder-snoozed', { reminder: outputReminder });
@@ -1077,6 +1118,11 @@ export async function dismissReminder(req, res) {
         reminder.status = 'dismissed';
         reminder.snoozeUntil = undefined;
         await reminder.save();
+
+        // Hủy job BullMQ - nhắc hẹn đã bị bỏ qua thì không cần trigger nữa
+        removeReminderJob(id).catch((err) => {
+            console.error(`[ReminderQueue] Lỗi xóa job sau khi dismiss (${id}):`, err);
+        });
 
         const normalizedReminder = normalizeReminderOutput(reminder);
         emitToUser(userIdStr, 'reminder-updated', { reminder: normalizedReminder });
@@ -1139,6 +1185,20 @@ export async function updateSharedReminderParticipation(req, res) {
         }
 
         await reminder.save();
+
+        // Xử lý lập lịch dựa trên việc thay đổi trạng thái tham gia
+        const participantReminderId = toObjectIdString(reminder._id);
+        if (participate) {
+            // Tham gia lại: lập lịch nhắc hẹn
+            scheduleReminderJob(reminder).catch((err) => {
+                console.error(`[ReminderQueue] Lỗi lập lịch sau khi tham gia lại (${participantReminderId}):`, err);
+            });
+        } else {
+            // Từ chối: hủy bỏ job
+            removeReminderJob(participantReminderId).catch((err) => {
+                console.error(`[ReminderQueue] Lỗi xóa job sau khi từ chối (${participantReminderId}):`, err);
+            });
+        }
 
         const refreshedSharedReminders = await emitSharedReminderEventToParticipants(sharedKey, 'reminder-participation-updated');
         const selfReminder = refreshedSharedReminders.find(
@@ -1214,8 +1274,18 @@ export async function deleteRemindersByScope(req, res) {
             query.status = { $in: BULK_DELETE_SCOPES[scope] };
         }
 
+        // Fetch IDs of reminders to be bulk-deleted so we can remove their BullMQ jobs.
+        const toDeleteReminders = await Reminder.find(query).select('_id').lean();
+
         const result = await Reminder.deleteMany(query);
         const deletedCount = result.deletedCount || 0;
+
+        // Hủy job BullMQ cho tất cả nhắc hẹn bị xóa hàng loạt
+        for (const rem of toDeleteReminders) {
+            removeReminderJob(toObjectIdString(rem._id)).catch((err) => {
+                console.error(`[ReminderQueue] Lỗi xóa job xóa hàng loạt (${rem._id}):`, err);
+            });
+        }
 
         emitToUser(userIdStr, 'reminders-bulk-deleted', {
             scope,
@@ -1271,6 +1341,13 @@ export async function deleteReminder(req, res) {
 
                 if (!participantUserIds.includes(userIdStr)) {
                     participantUserIds.push(userIdStr);
+                }
+
+                // Hủy job cho tất cả thành viên trước khi xóa khỏi DB
+                for (const pReminder of sharedParticipantReminders) {
+                    removeReminderJob(toObjectIdString(pReminder._id)).catch((err) => {
+                        console.error(`[ReminderQueue] Lỗi xóa job chung (${pReminder._id}):`, err);
+                    });
                 }
 
                 const result = await Reminder.deleteMany({
@@ -1337,6 +1414,11 @@ export async function deleteReminder(req, res) {
             reminder.snoozeUntil = undefined;
             await reminder.save();
 
+            // Hủy job cho thành viên vừa từ chối nhắc hẹn chung
+            removeReminderJob(id).catch((err) => {
+                console.error(`[ReminderQueue] Lỗi xóa job sau khi từ chối chung (${id}):`, err);
+            });
+
             const refreshedSharedReminders = await emitSharedReminderEventToParticipants(
                 reminder.sharedKey,
                 'reminder-participation-updated'
@@ -1382,6 +1464,9 @@ export async function deleteReminder(req, res) {
                 reminder: normalized,
             });
         }
+
+        // Hủy job BullMQ trước khi xóa khỏi DB
+        await removeReminderJob(toObjectIdString(reminder._id));
 
         await Reminder.deleteOne({ _id: reminder._id });
 

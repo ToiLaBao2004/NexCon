@@ -17,7 +17,7 @@ import reminderRouter from './routes/reminderRoute.js';
 import pushRouter from './routes/pushRoute.js';
 import { app, server } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
-import { startReminderCron } from './utils/reminderCron.js';
+import { startReminderWorker, reloadPendingReminders } from './workers/reminderWorker.js';
 
 const PORT = process.env.PORT;
 
@@ -51,7 +51,8 @@ app.use('/api/meetings', meetingRouter);
 app.use('/api/reminders', reminderRouter);
 
 connectDB().then(() => {
-    startReminderCron();
+    startReminderWorker();
+    reloadPendingReminders();
     server.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
     });
