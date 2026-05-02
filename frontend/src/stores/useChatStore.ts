@@ -1,6 +1,6 @@
 import { chatService } from '@/services/chatService';
 import { toast } from 'sonner';
-import type { ChatState, SendMessagePayload } from '@/types/store';
+import type { ChatState, DraftInfo, SendMessagePayload } from '@/types/store';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
@@ -941,11 +941,11 @@ export const useChatStore = create<ChatState>()(
                     };
                 });
             },
-            setDraft: (conversationId: string, text: string) => {
+            setDraft: (conversationId: string, draft: DraftInfo | null) => {
                 set((state) => ({
                     drafts: {
                         ...state.drafts,
-                        [conversationId]: text
+                        [conversationId]: draft
                     }
                 }));
             },
@@ -1720,7 +1720,12 @@ export const useChatStore = create<ChatState>()(
             name: "chat-storage",
             partialize: (state) => ({
                 conversations: state.conversations,
-                drafts: state.drafts,
+                drafts: Object.fromEntries(
+                    Object.entries(state.drafts).map(([id, draft]) => [
+                        id,
+                        draft ? { ...draft, attachment: null } : null
+                    ])
+                ),
             })
         }
     )

@@ -476,24 +476,36 @@ function MessageContent({ message, isOwn, downloadUrl, participants }: { message
 
 	if (type === "file" && (message.filePublicId || message.fileUrl)) {
 		return (
-			<a
-				href={downloadUrl}
-				target="_blank"
-				rel="noopener noreferrer"
-				className="flex items-center gap-2.5 hover:opacity-80 transition-opacity group/file"
-				download={message.fileName ?? true}
-			>
-				<div className={cn("p-2 rounded-lg shrink-0", isOwn ? "bg-white/20" : "bg-primary/10")}>
-					<FileText className={cn("size-5", isOwn ? "text-white" : "text-primary")} />
-				</div>
-				<div className="flex flex-col min-w-0">
-					<span className="text-sm font-medium truncate max-w-[180px]">{message.fileName ?? "File"}</span>
-					<span className={cn("text-xs", isOwn ? "text-white/70" : "text-muted-foreground")}>
-						{message.fileSize ? formatBytes(message.fileSize) : (message.mimeType ?? "")}
-					</span>
-				</div>
-				<ExternalLink className={cn("size-3.5 shrink-0 ml-1 opacity-0 group-hover/file:opacity-70 transition-opacity", isOwn ? "text-white" : "text-muted-foreground")} />
-			</a>
+			<div className="flex flex-col gap-2">
+				<a
+					href={downloadUrl}
+					target="_blank"
+					rel="noopener noreferrer"
+					className={cn(
+						"flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all group/file",
+						isOwn
+							? "bg-white/12 border border-white/10 hover:bg-white/18"
+							: "bg-background/50 dark:bg-black/20 border border-border/40 hover:bg-background/80 dark:hover:bg-black/30"
+					)}
+					download={message.fileName ?? true}
+				>
+					<div className={cn("p-2 rounded-lg shrink-0", isOwn ? "bg-white/20" : "bg-primary/10")}>
+						<FileText className={cn("size-5", isOwn ? "text-white" : "text-primary")} />
+					</div>
+					<div className="flex flex-col min-w-0">
+						<span className="text-sm font-medium truncate max-w-[180px]">{message.fileName ?? "File"}</span>
+						<span className={cn("text-xs", isOwn ? "text-white/70" : "text-muted-foreground")}>
+							{message.fileSize ? formatBytes(message.fileSize) : (message.mimeType ?? "")}
+						</span>
+					</div>
+					<ExternalLink className={cn("size-3.5 shrink-0 ml-1 opacity-0 group-hover/file:opacity-70 transition-opacity", isOwn ? "text-white" : "text-muted-foreground")} />
+				</a>
+				{message.content && (
+					<div className="text-sm px-1 leading-relaxed whitespace-pre-wrap break-words">
+						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
+					</div>
+				)}
+			</div>
 		);
 	}
 
@@ -1774,6 +1786,9 @@ const MessageItem = ({
 	const isSticker = message.type === "sticker" && !isRecalled;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
+	const hasContent = !!message.content?.trim();
+	const isVisualOnly = (isImage || isSticker) && !hasContent && !message.replyTo && !message.metadata?.forwardedFrom;
+
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
 	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
 	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
@@ -2030,11 +2045,11 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								(isImage || isLink || isSticker) ? "p-0 bg-transparent border-0 shadow-none" : "px-2 py-1.5 text-sm",
-								reactionSummary && !isImage && !isLink && !isSticker && "min-w-[85px]",
+								isVisualOnly ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-1.5 text-sm" : "px-2 py-1.5 text-sm"),
+								reactionSummary && !isVisualOnly && "min-w-[85px]",
 								isRecalled
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
-									: isImage || isLink || isSticker
+									: isVisualOnly
 										? "bg-transparent border-0 shadow-none"
 										: isOwn
 											? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
@@ -2061,7 +2076,7 @@ const MessageItem = ({
 									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} participants={selectedConvo.participants} />
 								</div>
 
-								{!isImage && !isSticker && (
+								{!isVisualOnly && (
 									<div className={cn(
 										"flex items-center gap-1 select-none -mt-0.5 pb-1",
 										isOwn ? "self-end" : "self-start",

@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
 import { isUrl, formatBytes } from "@/lib/utils";
+import { draftStorage } from "@/lib/draftStorage";
 
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -217,6 +218,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 		if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
 		clearDraft(selectedConvo._id);
+		draftStorage.delete(selectedConvo._id);
 
 		const payload: Parameters<typeof sendMessage>[0] = { type };
 
@@ -355,17 +357,37 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			emitStopTyping(selectedConvo._id);
 			if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 		}
+	};
 
-		// Handle Draft
+	useEffect(() => {
 		if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+
 		draftTimeoutRef.current = setTimeout(() => {
-			if (nextValue.trim()) {
-				setDraft(selectedConvo._id, nextValue);
+			if (value.trim() || attachment) {
+				setDraft(selectedConvo._id, {
+					content: value,
+					type: attachment ? attachment.type : (isUrl(value) ? "link" : "text"),
+					attachment: attachment ? {
+						type: attachment.type,
+						file: attachment.file,
+						preview: attachment.preview
+					} : null
+				});
+				if (attachment) {
+					draftStorage.save(selectedConvo._id, attachment.file, attachment.type);
+				} else {
+					draftStorage.delete(selectedConvo._id);
+				}
 			} else {
 				clearDraft(selectedConvo._id);
+				draftStorage.delete(selectedConvo._id);
 			}
 		}, 300);
-	};
+
+		return () => {
+			if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+		};
+	}, [value, attachment, selectedConvo._id, setDraft, clearDraft]);
 
 	useEffect(() => {
 		return () => {
@@ -376,15 +398,44 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}, [attachment]);
 
 	useEffect(() => {
-		const existingDraft = useChatStore.getState().drafts[selectedConvo._id] || "";
+		const rawDraft = useChatStore.getState().drafts[selectedConvo._id];
+		const existingDraft = typeof rawDraft === "string" ? rawDraft : (rawDraft?.content || "");
+		const draftAttachment = (rawDraft && typeof rawDraft === 'object') ? rawDraft.attachment : null;
+
 		setValue(existingDraft);
-		setAttachment(null);
+
+		if (draftAttachment && draftAttachment.file) {
+			const preview = draftAttachment.type === 'image'
+				? URL.createObjectURL(draftAttachment.file)
+				: undefined;
+
+			setAttachment({
+				type: draftAttachment.type,
+				file: draftAttachment.file,
+				preview: preview
+			});
+		} else {
+			draftStorage.get(selectedConvo._id).then((stored) => {
+				if (stored) {
+					const preview = stored.type === 'image'
+						? URL.createObjectURL(stored.file)
+						: undefined;
+					setAttachment({
+						type: stored.type,
+						file: stored.file,
+						preview
+					});
+				} else {
+					setAttachment(null);
+				}
+			});
+		}
+
 		setSelectedMentions([]);
 		setMentionOpen(false);
 		setMentionQuery("");
 		setMentionRange(null);
 
-		// Focus and adjust height for draft
 		if (existingDraft && textInputRef.current) {
 			setTimeout(() => {
 				if (textInputRef.current) {

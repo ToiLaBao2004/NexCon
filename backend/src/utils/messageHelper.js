@@ -4,9 +4,9 @@ const resolveLastMessagePreview = (message) => {
     if (message.isRecalled) return 'Tin nhắn đã được thu hồi';
 
     switch (message.type) {
-        case 'image': return 'Đã gửi một ảnh';
+        case 'image': return message.content || 'Đã gửi một ảnh';
         case 'sticker': return 'Đã gửi một nhãn dán';
-        case 'file': return message.fileName || 'Tệp đính kèm';
+        case 'file': return message.content || message.fileName || 'Tệp đính kèm';
         case 'audio': return 'Tin nhắn thoại';
         case 'link': return 'Đã gửi một liên kết';
         case 'system': {

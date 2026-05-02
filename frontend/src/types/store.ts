@@ -12,6 +12,18 @@ import type {
   BulkDeleteRemindersResponse,
 } from "./reminder";
 
+export interface DraftAttachment {
+  type: 'image' | 'file' | 'audio';
+  file: File;
+  preview?: string;
+}
+
+export interface DraftInfo {
+  content: string;
+  type?: MessageType;
+  attachment?: DraftAttachment | null;
+}
+
 export interface SendMessagePayload {
   type: MessageType;
   recipientId?: string;
@@ -84,7 +96,7 @@ export interface ChatState {
   messageLoading: boolean;
   jumpContexts: Record<string, JumpContext | null>;
   replyingTo: Message | null;
-  drafts: Record<string, string>;
+  drafts: Record<string, DraftInfo | null>;
 
   reset: () => void;
 
@@ -147,7 +159,7 @@ export interface ChatState {
   loadOlderInJumpMode: (conversationId: string) => Promise<void>;
   loadNewerInJumpMode: (conversationId: string) => Promise<void>;
   exitJumpMode: (conversationId: string) => Promise<void>;
-  setDraft: (conversationId: string, text: string) => void;
+  setDraft: (conversationId: string, draft: DraftInfo | null) => void;
   clearDraft: (conversationId: string) => void;
 }
 
