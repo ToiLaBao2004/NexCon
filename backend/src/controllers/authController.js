@@ -10,6 +10,12 @@ import { removeSubscription } from '../services/pushNotificationService.js';
 const ACCESS_TOKEN_TTL = '60s';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 
+function parseIp(req) {
+    const raw = req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress || '';
+    if (raw === '::1' || raw.startsWith('::ffff:127.')) return 'localhost';
+    return raw.replace(/^::ffff:/, '');
+}
+
 function parseDeviceName(userAgent = '') {
     if (!userAgent) return 'Unknown Device';
 
@@ -95,7 +101,7 @@ export async function signIn(req, res) {
         }
 
         const userAgent = req.headers['user-agent'] || '';
-        const ip = req.ip || req.socket?.remoteAddress || '';
+        const ip = parseIp(req);
 
         const accessToken = jwt.sign({ userId: user._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
         const refreshToken = crypto.randomBytes(64).toString('hex');
@@ -263,6 +269,8 @@ export async function googleAuthCallback(req, res) {
     try {
         const user = req.user;
         const refreshToken = crypto.randomBytes(64).toString('hex');
+        const userAgent = req.headers['user-agent'] || '';
+        const ip = parseIp(req);
         await Session.create({
             userId: user._id,
             refreshToken: refreshToken,
