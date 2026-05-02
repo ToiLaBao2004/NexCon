@@ -447,6 +447,15 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 	}, [selectedConvo._id]);
 
+	useEffect(() => {
+		if (replyingTo && textInputRef.current) {
+			const timer = setTimeout(() => {
+				textInputRef.current?.focus();
+			}, 100);
+			return () => clearTimeout(timer);
+		}
+	}, [replyingTo]);
+
 	const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
 		const items = Array.from(e.clipboardData?.items || []);
 
