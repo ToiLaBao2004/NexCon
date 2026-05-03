@@ -293,7 +293,7 @@ export async function googleAuthCallback(req, res) {
         const userAgent = req.headers['user-agent'] || '';
         const ip = parseIp(req);
         const deviceName = parseDeviceName(userAgent);
-        await Session.create({
+        const session = await Session.create({
             userId: user._id,
             refreshToken: refreshToken,
             expiresAt: Date.now() + REFRESH_TOKEN_TTL,
