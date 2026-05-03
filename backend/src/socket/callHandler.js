@@ -64,7 +64,7 @@ async function findOrCreateDirectConversation(userId1, userId2) {
     return conversation;
 }
 
-function buildInitialDirectSession({ conversation, caller, receiverId, callType }) {
+function buildInitialDirectSession({ conversation, caller, receiverId, callType, callerSocketId = null }) {
     const callerId = caller._id.toString();
     const receiver = conversation.participants.find(
         (p) => p.userId?._id?.toString() === receiverId.toString()
@@ -81,6 +81,8 @@ function buildInitialDirectSession({ conversation, caller, receiverId, callType 
         roomName: sessionId,
         status: 'calling',
         startedAt: null,
+        callerSocketId,
+        receiverSocketId: null,
         livekitConnected: {
             [callerId]: false,
             [receiverId.toString()]: false,
@@ -191,11 +193,22 @@ async function generateLiveKitToken(roomName, identity, displayName, metadata) {
     return token.toJwt();
 }
 
-export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io, getReceiverSocketId) {
+export function registerCallHandlers(socket, user, activeCalls, io, getReceiverSocketId) {
 
     // Helper emit tới tất cả thiết bị của 1 user
     function emitToUserRoom(userId, event, data) {
         io.to(`user:${userId.toString()}`).emit(event, data);
+    }
+
+    function getParticipantSocketTarget(session, userId) {
+        const normalizedUserId = userId.toString();
+        if (session?.callerId === normalizedUserId && session.callerSocketId) {
+            return session.callerSocketId;
+        }
+        if (session?.receiverId === normalizedUserId && session.receiverSocketId) {
+            return session.receiverSocketId;
+        }
+        return getReceiverSocketId(normalizedUserId);
     }
 
     async function finalizeAndNotifyCall({ toUserId, cancelled = false }) {
@@ -293,7 +306,13 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
                 return;
             }
 
-            const session = buildInitialDirectSession({ conversation, caller: user, receiverId, callType });
+            const session = buildInitialDirectSession({
+                conversation,
+                caller: user,
+                receiverId,
+                callType,
+                callerSocketId: socket.id,
+            });
             activeCalls.set(callerId, session);
 
             // Gửi incoming-call tới TẤT CẢ thiết bị của receiver
@@ -333,11 +352,12 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
         }
 
         activeCall.status = 'connecting';
+        activeCall.receiverSocketId = socket.id;
         markParticipant(activeCall, receiverId, { status: 'accepted', joinedAt: null });
 
-        const callerSocketId = getReceiverSocketId(callerId);
-        if (callerSocketId) {
-            io.to(callerSocketId).emit('accept-call', {
+        const callerTarget = getParticipantSocketTarget(activeCall, callerId);
+        if (callerTarget) {
+            io.to(callerTarget).emit('accept-call', {
                 by: { _id: user._id, displayName: user.displayName },
                 roomName: activeCall.roomName,
             });
@@ -356,13 +376,14 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
         try {
             if (!callerId) return;
 
-            const callerSocketId = getReceiverSocketId(callerId);
-            if (!callerSocketId) return;
-
             const activeCall = activeCalls.get(callerId);
             if (!activeCall) return;
 
             if (activeCall.status !== 'connecting' && activeCall.status !== 'calling') return;
+
+            activeCall.receiverSocketId = socket.id;
+            const callerTarget = getParticipantSocketTarget(activeCall, callerId);
+            if (!callerTarget) return;
 
             activeCall.status = 'connecting';
             markParticipant(activeCall, receiverId, { status: 'accepted' });
@@ -396,7 +417,7 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
             markParticipant(latestCall, receiverId, { status: 'accepted' });
 
             // Token chỉ gửi đúng socket đang active (không broadcast)
-            io.to(callerSocketId).emit('call-answered', {
+            io.to(callerTarget).emit('call-answered', {
                 token: callerToken,
                 roomName: latestCall.roomName,
             });
@@ -416,9 +437,12 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
                     console.error('Error cleaning up failed call-answer:', finalizeError);
                 }
                 socket.emit('call-failed', { reason: 'server-error' });
-                const callerSocketId = getReceiverSocketId(callerId);
-                if (callerSocketId) {
-                    io.to(callerSocketId).emit('call-failed', { reason: 'server-error' });
+                const activeCall = activeCalls.get(callerId);
+                const callerTarget = activeCall
+                    ? getParticipantSocketTarget(activeCall, callerId)
+                    : getReceiverSocketId(callerId);
+                if (callerTarget) {
+                    io.to(callerTarget).emit('call-failed', { reason: 'server-error' });
                 }
             }
         }
@@ -496,17 +520,28 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
     });
 
     socket.on('call-video-toggle', ({ toUserId, isVideoOff }) => {
-        const otherSocketId = getReceiverSocketId(toUserId.toString());
-        if (otherSocketId) {
-            io.to(otherSocketId).emit('call-video-toggle', { isVideoOff });
+        const myId = user._id.toString();
+        const otherId = toUserId.toString();
+        const activeCall = activeCalls.get(myId) || activeCalls.get(otherId);
+        const otherTarget = activeCall
+            ? getParticipantSocketTarget(activeCall, otherId)
+            : getReceiverSocketId(otherId);
+
+        if (otherTarget) {
+            io.to(otherTarget).emit('call-video-toggle', { isVideoOff });
         }
     });
 }
 
-export async function handleCallDisconnect(userId, activeCalls, io, getReceiverSocketId) {
+export async function handleCallDisconnect(userId, socketId, activeCalls, io, getReceiverSocketId) {
     let foundSession = null;
     for (const session of activeCalls.values()) {
-        if (session.callerId === userId || session.receiverId === userId) {
+        const isCallSocket = session.callerSocketId === socketId || session.receiverSocketId === socketId;
+        const isLegacyParticipant = !session.callerSocketId
+            && !session.receiverSocketId
+            && (session.callerId === userId || session.receiverId === userId);
+
+        if (isCallSocket || isLegacyParticipant) {
             foundSession = session;
             break;
         }
@@ -530,7 +565,10 @@ export async function handleCallDisconnect(userId, activeCalls, io, getReceiverS
     await persistFinalizedDirectSession(io, foundSession, overallStatus);
 
     // Notify tất cả thiết bị của bên còn lại
-    io.to(`user:${otherId}`).emit('call-ended');
+    const otherTarget = getReceiverSocketId(otherId);
+    if (otherTarget) {
+        io.to(otherTarget).emit('call-ended');
+    }
 
     activeCalls.delete(foundSession.callerId);
     console.log(`Call auto-ended: ${userId} disconnected`);

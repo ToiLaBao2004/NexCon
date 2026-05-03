@@ -138,7 +138,7 @@ async function checkAutoEnd(conversationId, io) {
     }
 }
 
-function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSocketId) {
+function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
     const userId = user._id.toString();
 
     // START
@@ -219,6 +219,7 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSoc
                 callType,
                 startedAt,
                 participants: participantsMap,
+                participantSockets: new Map([[userId, socket.id]]),
                 ringTimeout,
             };
             activeGroupCalls.set(conversationId, groupCallInfo);
@@ -285,6 +286,7 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSoc
             participant.status = 'joined';
             participant.joinedAt = new Date().toISOString();
             participant.leftAt = null;
+            groupCall.participantSockets?.set(userId, socket.id);
 
             // Send token to this user
             socket.emit('group-call:token', { conversationId, token });
@@ -317,6 +319,7 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSoc
             if (!participant) return;
 
             participant.status = 'declined';
+            groupCall.participantSockets?.delete(userId);
 
             io.to(conversationId).emit('group-call:user-declined', {
                 conversationId,
@@ -341,6 +344,7 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSoc
 
             participant.status = 'left';
             participant.leftAt = new Date().toISOString();
+            groupCall.participantSockets?.delete(userId);
 
             io.to(conversationId).emit('group-call:user-left', {
                 conversationId,
@@ -564,12 +568,16 @@ function registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSoc
 }
 
 // Disconnect handler
-async function handleGroupCallDisconnect(userId, io) {
+async function handleGroupCallDisconnect(userId, socketId, io) {
     for (const [conversationId, groupCall] of activeGroupCalls) {
         const participant = groupCall.participants.get(userId);
-        if (participant && participant.status === 'joined') {
+        const participantSocketId = groupCall.participantSockets?.get(userId);
+        const isActiveCallSocket = participantSocketId ? participantSocketId === socketId : true;
+
+        if (participant && participant.status === 'joined' && isActiveCallSocket) {
             participant.status = 'left';
             participant.leftAt = new Date().toISOString();
+            groupCall.participantSockets?.delete(userId);
 
             io.to(conversationId).emit('group-call:user-left', {
                 conversationId,

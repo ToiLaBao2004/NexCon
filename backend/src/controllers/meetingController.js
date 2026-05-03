@@ -58,18 +58,12 @@ const serializeMeeting = (meeting) => {
 };
 
 const emitToUserById = (targetUserId, event, payload) => {
-    const { io, getReceiverSocketId } = getSocketGateway();
-    if (!io || !getReceiverSocketId || !targetUserId) {
+    const { emitToUser } = getSocketGateway();
+    if (!emitToUser || !targetUserId) {
         return false;
     }
 
-    const socketId = getReceiverSocketId(String(targetUserId));
-    if (!socketId) {
-        return false;
-    }
-
-    io.to(socketId).emit(event, payload);
-    return true;
+    return emitToUser(String(targetUserId), event, payload);
 };
 
 const toWaitingRoomPayload = (users = []) => users.map((userDoc) => ({

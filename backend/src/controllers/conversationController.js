@@ -8,7 +8,12 @@ import {
 	deleteCloudinaryResource,
 	MAX_IMAGE_SIZE,
 } from '../middlewares/uploadMiddleware.js';
-import { io, getReceiverSocketId } from '../socket/index.js';
+import {
+	io,
+	getReceiverSocketId,
+	joinUserSocketsToRoom,
+	leaveUserSocketsFromRoom,
+} from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
 
 const MUTE_DURATION_MS = {
@@ -1120,11 +1125,8 @@ export async function addMembers(req, res) {
 		filteredUserIds.forEach(newMemberId => {
 			const receiverSocketId = getReceiverSocketId(newMemberId.toString());
 			if (receiverSocketId) {
-				const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-				if (receiverSocket) {
-					receiverSocket.join(conversationId);
-				}
-				io.to(receiverSocketId).emit("new-conversation", { conversation });
+				joinUserSocketsToRoom(newMemberId.toString(), conversationId.toString());
+				io.to(receiverSocketId).emit("new-conversation", { conversation: updatedConversation });
 			}
 		});
 
@@ -1283,8 +1285,7 @@ export async function handleApproval(req, res) {
 
 					const receiverSocketId = getReceiverSocketId(userId.toString());
 					if (receiverSocketId) {
-						const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-						if (receiverSocket) receiverSocket.join(conversationId.toString());
+						joinUserSocketsToRoom(userId.toString(), conversationId.toString());
 						io.to(receiverSocketId).emit("new-conversation", { conversation: updatedConversation });
 					}
 				}
@@ -1400,10 +1401,7 @@ export async function removeMember(req, res) {
 
 		const receiverSocketId = getReceiverSocketId(memberId.toString());
 		if (receiverSocketId) {
-			const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-			if (receiverSocket) {
-				receiverSocket.leave(conversationId.toString());
-			}
+			leaveUserSocketsFromRoom(memberId.toString(), conversationId.toString());
 			io.to(receiverSocketId).emit('kicked-from-group', { conversationId });
 		}
 
@@ -1692,8 +1690,7 @@ export async function leaveGroup(req, res) {
 
 		const userSocketId = getReceiverSocketId(userId);
 		if (userSocketId) {
-			const userSocket = io.sockets.sockets.get(userSocketId);
-			if (userSocket) userSocket.leave(conversationId.toString());
+			leaveUserSocketsFromRoom(userId, conversationId.toString());
 			io.to(userSocketId).emit('left-group', { conversationId });
 		}
 
