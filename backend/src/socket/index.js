@@ -91,11 +91,14 @@ io.on("connection", async (socket) => {
     // Join tất cả conversation rooms
     const conversationIds = await getUserConversationsForSocketIO(user._id);
     conversationIds.forEach((id) => {
-        socket.join(id);
+        if (!socket.rooms.has(id)) {
+            socket.join(id);
+        }
     });
 
     // Join conversation theo yêu cầu
     socket.on("join-conversation", async ({ conversationId }) => {
+        if (socket.rooms.has(conversationId)) return;
         const conversation = await Conversation.findById(conversationId);
         if (conversation && conversation.participants.some(p => p.userId.toString() === user._id.toString())) {
             socket.join(conversationId);

@@ -226,7 +226,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("connect_error", async (err) => {
       console.error("Socket connect_error:", err.message);
-      if (err.message.includes("Unauthorized") || err.message.includes("expired token")) {
+      if (
+        err.message.includes("Unauthorized") ||
+        err.message.includes("jwt expired")
+      ) {
         try {
           await useAuthStore.getState().refreshToken();
           const newToken = useAuthStore.getState().accessToken;
