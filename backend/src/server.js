@@ -51,8 +51,12 @@ app.use('/api/meetings', meetingRouter);
 app.use('/api/reminders', reminderRouter);
 
 connectDB().then(() => {
-    startReminderWorker();
-    reloadPendingReminders();
+    try {
+        startReminderWorker();
+        reloadPendingReminders();
+    } catch (err) {
+        console.error('[Server] Không thể khởi tạo Reminder Worker (Redis có thể chưa sẵn sàng):', err.message);
+    }
     server.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
     });

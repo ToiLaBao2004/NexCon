@@ -18,6 +18,18 @@ export const reminderQueueEvents = new QueueEvents(QUEUE_NAME, {
     connection: redisIOClient,
 });
 
+reminderQueue.on('error', (err) => {
+    if (err.message && !err.message.includes('ECONNREFUSED') && !err.message.includes('Connection is closed')) {
+        console.error('[ReminderQueue] Lỗi Queue:', err.message);
+    }
+});
+
+reminderQueueEvents.on('error', (err) => {
+    if (err.message && !err.message.includes('ECONNREFUSED') && !err.message.includes('Connection is closed')) {
+        console.error('[ReminderQueue] Lỗi QueueEvents:', err.message);
+    }
+});
+
 /**
  * Lập lịch Job nhắc hẹn vào BullMQ
  * @param {Object} reminder - Document từ MongoDB

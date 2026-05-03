@@ -15,17 +15,23 @@ function ToolbarBtn({
   children,
   disabled,
 }: {
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   title: string;
   children: React.ReactNode;
   disabled?: boolean;
 }) {
   return (
     <button
-      onClick={onClick}
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onClick(e);
+      }}
+      onPointerDown={(e) => e.stopPropagation()}
       title={title}
       disabled={disabled}
-      className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95"
+      className="flex items-center justify-center w-9 h-9 rounded-full bg-white/10 hover:bg-white/25 text-white transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 pointer-events-auto"
     >
       {children}
     </button>
@@ -126,16 +132,16 @@ export default function ImageViewerModal() {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      className="fixed inset-0 z-[99999] flex items-center justify-center"
       style={{ backdropFilter: "blur(8px)", background: "rgba(0,0,0,0.88)" }}
       onClick={handleOverlayClick}
       ref={overlayRef}
     >
       <div
-        className="absolute top-0 left-0 right-0 flex items-center justify-end px-4 py-3 z-10"
+        className="absolute top-0 left-0 right-0 flex items-center justify-end px-4 py-3 z-50 pointer-events-none"
         style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)" }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 pointer-events-auto">
           <ToolbarBtn onClick={handleZoomOut} title="Thu nhỏ (-)">
             <ZoomOut className="w-4 h-4" />
           </ToolbarBtn>
@@ -151,7 +157,7 @@ export default function ImageViewerModal() {
           <ToolbarBtn onClick={handleDownload} title="Tải xuống" disabled={!resolvedUrl}>
             <Download className="w-4 h-4" />
           </ToolbarBtn>
-          <ToolbarBtn onClick={closeViewer} title="Đóng (Esc)">
+          <ToolbarBtn onClick={() => closeViewer()} title="Đóng (Esc)">
             <X className="w-4.5 h-4.5" />
           </ToolbarBtn>
         </div>

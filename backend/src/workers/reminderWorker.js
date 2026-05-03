@@ -132,6 +132,12 @@ export function startReminderWorker() {
         concurrency: 5, // Xử lý song song tối đa 5 job
     });
 
+    workerInstance.on('error', (err) => {
+        if (err.message && !err.message.includes('ECONNREFUSED') && !err.message.includes('Connection is closed')) {
+            console.error('[ReminderWorker] Lỗi:', err.message);
+        }
+    });
+
     return workerInstance;
 }
 
