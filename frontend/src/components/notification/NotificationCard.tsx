@@ -47,6 +47,7 @@ const FRIENDLY_NOTIFICATION_TITLE_MAP: Record<string, string> = {
     'new friend request': 'Lời mời kết bạn mới',
     'friend request resent': 'Lời mời kết bạn được gửi lại',
     'friend request accepted': 'Lời mời kết bạn đã được chấp nhận',
+    'new-device-login': '⚠️ Đăng nhập thiết bị mới',
 };
 
 const getFriendlyNotificationTitle = (title?: string) => {

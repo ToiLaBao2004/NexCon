@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import Otp from '../models/otpModel.js';
 import validator from 'validator';
 import { removeSubscription } from '../services/pushNotificationService.js';
+import { createNotification } from '../services/notificationServices.js';
 
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
@@ -102,6 +103,7 @@ export async function signIn(req, res) {
 
         const userAgent = req.headers['user-agent'] || '';
         const ip = parseIp(req);
+        const deviceName = parseDeviceName(userAgent);
 
         const refreshToken = crypto.randomBytes(64).toString('hex');
 
@@ -112,7 +114,7 @@ export async function signIn(req, res) {
             deviceInfo: {
                 userAgent,
                 ip,
-                deviceName: parseDeviceName(userAgent)
+                deviceName
             }
         });
 
@@ -124,6 +126,24 @@ export async function signIn(req, res) {
             sameSite: 'none', // backend and frontend are on different domains (if same domain, use 'lax' or 'strict')
             maxAge: REFRESH_TOKEN_TTL
         });
+
+        const existingSessionCount = await Session.countDocuments({
+            userId: user._id,
+            _id: { $ne: session._id }
+        });
+
+        if (existingSessionCount > 0) {
+            await createNotification(
+                user._id,
+                'new-device-login',  // title dùng để localize bên client
+                `Thiết bị ${deviceName} (IP: ${ip}) vừa đăng nhập vào tài khoản của bạn. Nếu không phải bạn, hãy đăng xuất ngay.`,
+                `${process.env.FRONTEND_URL}/settings/sessions`,
+                {
+                    type: 'security',
+                    metadata: { deviceName, ip, sessionId: session._id }
+                }
+            );
+        }
 
         return res.status(200).json({ message: `User ${user.displayName} logged in successfully.`, accessToken: accessToken });
     } catch (error) {
@@ -272,6 +292,7 @@ export async function googleAuthCallback(req, res) {
         const refreshToken = crypto.randomBytes(64).toString('hex');
         const userAgent = req.headers['user-agent'] || '';
         const ip = parseIp(req);
+        const deviceName = parseDeviceName(userAgent);
         await Session.create({
             userId: user._id,
             refreshToken: refreshToken,
@@ -279,9 +300,28 @@ export async function googleAuthCallback(req, res) {
             deviceInfo: {
                 userAgent,
                 ip,
-                deviceName: parseDeviceName(userAgent)
+                deviceName
             }
         });
+
+        const existingSessionCount = await Session.countDocuments({
+            userId: user._id,
+            _id: { $ne: session._id }
+        });
+
+        if (existingSessionCount > 0) {
+            await createNotification(
+                user._id,
+                'new-device-login',  // title dùng để localize bên client
+                `Thiết bị ${deviceName} (IP: ${ip}) vừa đăng nhập vào tài khoản của bạn. Nếu không phải bạn, hãy đăng xuất ngay.`,
+                `${process.env.FRONTEND_URL}/settings/sessions`,
+                {
+                    type: 'security',
+                    metadata: { deviceName, ip, sessionId: session._id }
+                }
+            );
+        }
+
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: true,
