@@ -14,6 +14,7 @@ import useMediaCacheStore from "./useMediaCacheStore";
 import { useReminderStore } from "./useReminderStore";
 import { showReminderToast } from "@/components/reminder/showReminderToast";
 import { useMeetStore } from "./useMeetStore";
+import { flashTabTitle } from "@/utils/tabTitle";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -285,6 +286,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
       if (!isMine && !mutedMessages) {
         void playMessageSound();
+
+        flashTabTitle("💬 Bạn có tin nhắn mới 💬");
       }
 
       if (!isMine && currentConversation?.type === "direct") {
