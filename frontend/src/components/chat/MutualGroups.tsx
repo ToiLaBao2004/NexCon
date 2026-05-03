@@ -33,10 +33,10 @@ function GroupItem({ group, onClick }: GroupItemProps) {
       onClick={onClick}
       className="flex items-center gap-3 w-full px-3 py-2 rounded hover:bg-muted/10 text-left"
     >
-      <div className="shrink-0">
+      <div className="shrink-0 cursor-pointer">
         <GroupChatAvatar participants={group.participants} type="sidebar" groupAvatarUrl={group.group?.avatarUrl} />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 cursor-pointer">
         <div className="font-medium text-sm text-foreground truncate">
           {group.group?.name || "Nhóm"}
         </div>
@@ -90,7 +90,7 @@ export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: Pa
                     onClick={async () => {
                       onOpenChange(false);
                       setActiveConversation(g._id);
-                      try { await fetchMessages(g._id); } catch {}
+                      try { await fetchMessages(g._id); } catch { }
                     }}
                   />
                 ))}
@@ -142,7 +142,7 @@ export function MutualGroupsPopover({
                 group={g}
                 onClick={async () => {
                   setOpen(false);
-                  try { await onSelectConversation(g._id); } catch {}
+                  try { await onSelectConversation(g._id); } catch { }
                 }}
               />
             ))

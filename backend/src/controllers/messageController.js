@@ -539,13 +539,14 @@ export async function recallMessage(req, res) {
 
         if (message.filePublicId) {
             try {
-                const resourceType = message.type === 'audio' ? 'raw' : (message.type === 'file' ? 'raw' : 'image');
+                const resourceType = message.type === 'audio' || message.type === 'file' ? 'raw' : 'image';
                 await deleteCloudinaryResource(message.filePublicId, resourceType, 'authenticated');
             } catch (cloudErr) {
                 console.warn('Cloudinary delete warning:', cloudErr?.message);
             }
         }
 
+        const wasPin = message.isPinned;
         message.isRecalled = true;
         message.filePublicId = undefined;
         if (message.isPinned) {
@@ -554,35 +555,24 @@ export async function recallMessage(req, res) {
         }
         await message.save();
 
-        conversation.participants.forEach((p) => {
-            const socketId = getReceiverSocketId(p.userId._id?.toString() ?? p.userId.toString());
-            if (socketId) {
-                io.to(socketId).emit('recall-message', {
-                    conversationId: message.conversationId.toString(),
-                    messageId: message._id.toString(),
-                    content: 'Tin nhắn này đã được thu hồi',
-                    isRecalled: true,
-                });
-            }
-            if (message.isPinned === false) {
-                const payload = {
-                    conversationId: message.conversationId.toString(),
-                    pinnedMessageId: null,
-                    unpinnedMessageId: message._id.toString(),
-                    isPinned: false,
-                    pinnedAt: null,
-                };
+        const conversationRoom = message.conversationId.toString();
 
-                conversation.participants.forEach((p) => {
-                    const socketId = getReceiverSocketId(
-                        p.userId._id?.toString() ?? p.userId.toString()
-                    );
-                    if (socketId) {
-                        io.to(socketId).emit('pin-message', payload);
-                    }
-                });
-            }
+        io.to(conversationRoom).emit('recall-message', {
+            conversationId: conversationRoom,
+            messageId: message._id.toString(),
+            content: 'Tin nhắn này đã được thu hồi',
+            isRecalled: true,
         });
+
+        if (wasPin) {
+            io.to(conversationRoom).emit('pin-message', {
+                conversationId: conversationRoom,
+                pinnedMessageId: null,
+                unpinnedMessageId: message._id.toString(),
+                isPinned: false,
+                pinnedAt: null,
+            });
+        }
 
         return res.status(200).json({ success: true, message: 'Message recalled successfully.' });
     } catch (error) {
@@ -610,29 +600,23 @@ export async function pinMessage(req, res) {
             avatarUrl: req.user.avatarUrl,
         };
         const actionByName = req.user.displayName || 'Một thành viên';
+        const conversationRoom = conversation._id.toString();
 
-        // Nếu đã ghim thì bỏ ghim luôn
+        // Nếu đã ghim thì bỏ ghim
         if (message.isPinned) {
             message.isPinned = false;
             message.pinnedAt = null;
             await message.save();
 
             const payload = {
-                conversationId: message.conversationId.toString(),
+                conversationId: conversationRoom,
                 pinnedMessageId: null,
                 unpinnedMessageId: message._id.toString(),
                 isPinned: false,
                 pinnedAt: null,
             };
 
-            conversation.participants.forEach((p) => {
-                const socketId = getReceiverSocketId(
-                    p.userId._id?.toString() ?? p.userId.toString()
-                );
-                if (socketId) {
-                    io.to(socketId).emit('pin-message', payload);
-                }
-            });
+            io.to(conversationRoom).emit('pin-message', payload);
 
             const systemMessage = await Message.create({
                 conversationId: conversation._id,
@@ -659,6 +643,7 @@ export async function pinMessage(req, res) {
             });
         }
 
+        // Giới hạn tối đa 3 tin nhắn ghim — bỏ ghim tin cũ nhất nếu vượt
         const pinnedMessages = await Message.find({
             conversationId: conversation._id,
             isPinned: true,
@@ -679,21 +664,14 @@ export async function pinMessage(req, res) {
         await message.save();
 
         const payload = {
-            conversationId: message.conversationId.toString(),
+            conversationId: conversationRoom,
             pinnedMessageId: message._id.toString(),
             unpinnedMessageId,
             isPinned: true,
             pinnedAt: message.pinnedAt,
         };
 
-        conversation.participants.forEach((p) => {
-            const socketId = getReceiverSocketId(
-                p.userId._id?.toString() ?? p.userId.toString()
-            );
-            if (socketId) {
-                io.to(socketId).emit('pin-message', payload);
-            }
-        });
+        io.to(conversationRoom).emit('pin-message', payload);
 
         const systemMessage = await Message.create({
             conversationId: conversation._id,

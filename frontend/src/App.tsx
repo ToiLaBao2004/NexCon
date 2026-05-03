@@ -26,6 +26,7 @@ import GroupCallManager from "./components/call/GroupCallManager";
 import MeetManager from "./components/call/MeetManager";
 import ImageViewerModal from "./components/chat/ImageViewerModal";
 import { usePushNotification } from "./hooks/usePushNotification";
+import SessionsPage from "./pages/SessionsPage"
 
 function App() {
   const initTheme = useThemeStore((state) => state.initTheme);
@@ -151,6 +152,7 @@ function App() {
             <Route path="/reminder" element={<ReminderPage />} />
             <Route path="/reminders" element={<ReminderPage />} />
             <Route path="/notification" element={<NotificationPage />} />
+            <Route path="/settings/sessions" element={<SessionsPage />} />
             <Route path="/" element={<Navigate to="/chat" replace />} />
           </Route>
         </Route>
