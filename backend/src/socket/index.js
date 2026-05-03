@@ -38,12 +38,10 @@ function getReceiverSocketId(userId) {
 }
 
 function emitToUser(userId, event, data) {
-    const socketId = onlineUsers.get(userId.toString());
-    if (!socketId) {
-        return false;
-    }
-
-    io.to(socketId).emit(event, data);
+    const room = `user:${userId.toString()}`;
+    const roomSockets = io.sockets.adapter.rooms.get(room);
+    if (!roomSockets || roomSockets.size === 0) return false;
+    io.to(room).emit(event, data);
     return true;
 }
 
@@ -54,6 +52,8 @@ io.on("connection", async (socket) => {
     const userId = user._id.toString();
 
     console.log(`${user.displayName} connected to socket ${socket.id}`);
+
+    socket.join(`user:${userId}`);
 
     // 1. Vẫn giữ Local Map để phục vụ gửi tin nhắn trực tiếp qua Socket
     onlineUsers.set(userId, socket.id);
