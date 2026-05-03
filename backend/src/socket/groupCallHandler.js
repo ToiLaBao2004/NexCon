@@ -441,6 +441,8 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
     socket.on('group-call:status', ({ conversationId }) => {
         const groupCall = activeGroupCalls.get(conversationId);
         if (groupCall) {
+            const participant = groupCall.participants.get(userId);
+            const activeSocketId = groupCall.participantSockets?.get(userId) || null;
             socket.emit('group-call:status-response', {
                 conversationId,
                 active: true,
@@ -449,6 +451,9 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                 initiatorId: groupCall.initiatorId,
                 participants: participantsArray(groupCall),
                 startedAt: groupCall.startedAt?.toISOString() ?? null,
+                myStatus: participant?.status ?? null,
+                joinedByCurrentUser: participant?.status === 'joined',
+                joinedByCurrentDevice: Boolean(activeSocketId && activeSocketId === socket.id),
             });
         } else {
             socket.emit('group-call:status-response', {

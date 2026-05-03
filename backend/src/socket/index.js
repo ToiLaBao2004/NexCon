@@ -122,15 +122,29 @@ io.on("connection", async (socket) => {
     socket.on("message-delivered", async ({ messageId, conversationId }) => {
         try {
             const userId = user._id.toString();
-            const msg = await Message.findByIdAndUpdate(
-                messageId,
+            const msg = await Message.findOneAndUpdate(
+                {
+                    _id: messageId,
+                    senderId: { $ne: userId },
+                    deliveredTo: { $ne: userId },
+                },
                 { $addToSet: { deliveredTo: userId } },
                 { new: true, select: 'senderId' }
             );
             if (msg) {
+                emitToUser(userId, "message-delivered-sync", {
+                    messageId,
+                    conversationId,
+                    deliveredUserId: userId,
+                });
+
                 const senderSocketId = getReceiverSocketId(msg.senderId.toString());
                 if (senderSocketId) {
-                    io.to(senderSocketId).emit("message-delivered-ack", { messageId, conversationId });
+                    io.to(senderSocketId).emit("message-delivered-ack", {
+                        messageId,
+                        conversationId,
+                        deliveredUserId: userId,
+                    });
                 }
             }
         } catch (err) {

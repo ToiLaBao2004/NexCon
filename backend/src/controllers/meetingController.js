@@ -377,6 +377,8 @@ export async function endMeeting(req, res) {
 
         clearWaitingTimeoutsForRoom(roomName);
 
+        emitToUserById(userId, 'meeting-ended', { roomName });
+
         for (const participant of meeting.participants) {
             emitToUserById(participant.userId?.toString?.(), 'meeting-ended', { roomName });
         }

@@ -488,6 +488,8 @@ export async function markAsSeen(req, res) {
 			userId: userId,
 			lastReadMessageId: latestMessage._id,
 			lastReadAt: now.toISOString(),
+			unreadCount: 0,
+			unreadMentionCount: 0,
 		});
 
 		return res.status(200).json({
@@ -526,7 +528,7 @@ export async function markAsUnread(req, res) {
 		if (receiverSocketId) {
 			io.to(receiverSocketId).emit('conversation-updated', {
 				conversationId: updated._id,
-				conversation: { unreadCounts: updated.unreadCounts }
+				conversation: { _id: updated._id, unreadCounts: updated.unreadCounts }
 			});
 		}
 
@@ -630,12 +632,22 @@ export async function updateConversationMute(req, res) {
 
 		const updatedConversation = await Conversation.findOne(query, { 'participants.$': 1 }).lean();
 		const mute = updatedConversation?.participants?.[0]?.mute || {};
-
-		return res.status(200).json({
+		const payload = {
+			conversationId,
+			userId: userId.toString(),
 			mute: {
 				messages: mute.messages || null,
 				meetings: mute.meetings || null,
 			},
+		};
+
+		const receiverSocketId = getReceiverSocketId(userId.toString());
+		if (receiverSocketId) {
+			io.to(receiverSocketId).emit('conversation-mute-updated', payload);
+		}
+
+		return res.status(200).json({
+			mute: payload.mute,
 		});
 	} catch (error) {
 		console.error('Error updating conversation mute:', error);
@@ -933,6 +945,11 @@ export async function clearConversation(req, res) {
 		participant.clearedAt = Date.now();
 		conversation.markModified('participants');
 		await conversation.save();
+
+		const receiverSocketId = getReceiverSocketId(userId.toString());
+		if (receiverSocketId) {
+			io.to(receiverSocketId).emit('conversation-cleared', { conversationId });
+		}
 
 		return res.status(200).json({ message: 'Conversation cleared successfully.' });
 	} catch (error) {

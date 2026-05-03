@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
 import { emitNewMessage, updateConversationLastMessage, generateSignedUrl, replaceMentionTags } from '../utils/messageHelper.js';
-import { io, getReceiverSocketId, emitToUser } from '../socket/index.js';
+import { io, getReceiverSocketId, emitToUser, joinUserSocketsToRoom } from '../socket/index.js';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
     uploadChatImageFromBuffer,
@@ -94,6 +94,7 @@ export async function sendMessage(req, res) {
         const rawMentions = parseMentionPayload(req.body.mentions);
 
         let conversation = req.conversation;
+        let createdDirectConversation = false;
 
         if (!conversation && req.messageTarget === 'direct') {
             if (!recipientId) {
@@ -106,6 +107,7 @@ export async function sendMessage(req, res) {
                     { userId: recipientId, joinedAt: new Date() },
                 ],
             });
+            createdDirectConversation = true;
         }
 
         if (!conversation) {
@@ -363,6 +365,23 @@ export async function sendMessage(req, res) {
 
         updateConversationLastMessage(conversation, message, senderId);
         await conversation.save();
+
+        if (createdDirectConversation) {
+            const populatedConversation = await Conversation.findById(conversation._id).populate({
+                path: 'participants.userId',
+                select: 'displayName avatarUrl nickname email bio phone status lastSeen',
+            });
+
+            for (const participant of conversation.participants) {
+                const participantId = (participant.userId._id || participant.userId).toString();
+                joinUserSocketsToRoom(participantId, conversation._id.toString());
+                emitToUser(participantId, 'new-conversation', {
+                    conversation: populatedConversation || conversation,
+                });
+            }
+
+            conversation = populatedConversation || conversation;
+        }
 
         const signedUrl = generateSignedUrl(message.filePublicId, message.type);
         emitNewMessage(io, conversation, message, signedUrl);

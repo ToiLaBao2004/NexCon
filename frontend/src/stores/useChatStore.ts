@@ -174,6 +174,7 @@ export const useChatStore = create<ChatState>()(
                                 const msgSenderId = (convo.lastMessage.senderId as any)?._id || convo.lastMessage.senderId;
                                 if (String(msgSenderId) !== String(user._id) && !convo.lastMessage.deliveredTo?.includes(String(user._id))) {
                                     sock.emit('message-delivered', { messageId: convo.lastMessage._id, conversationId: convo._id });
+                                    get().markMessageDelivered(convo.lastMessage._id, convo._id, String(user._id));
                                 }
                             }
                         }
@@ -260,6 +261,9 @@ export const useChatStore = create<ChatState>()(
                                 const msgSenderId = (m.senderId as any)?._id || m.senderId;
                                 if (String(msgSenderId) !== String(user?._id) && !m.deliveredTo?.includes(user?._id ?? '')) {
                                     sock.emit('message-delivered', { messageId: m._id, conversationId: convoId });
+                                    if (user?._id) {
+                                        get().markMessageDelivered(m._id, convoId, String(user._id));
+                                    }
                                 }
                             }
                         }
@@ -900,7 +904,8 @@ export const useChatStore = create<ChatState>()(
                     console.error("Lỗi khi đánh dấu chưa đọc:", error);
                 }
             },
-            markMessageDelivered: (messageId: string, conversationId: string) => {
+            markMessageDelivered: (messageId: string, conversationId: string, deliveredUserId?: string) => {
+                const deliveredMarker = deliveredUserId || "delivered_placeholder";
                 set((state) => {
                     const convoIdx = state.conversations.findIndex(c => c._id === conversationId);
                     if (convoIdx === -1) return state;
@@ -912,7 +917,7 @@ export const useChatStore = create<ChatState>()(
                         const nextLastMsg = {
                             ...convo.lastMessage,
                             isDelivered: true,
-                            deliveredTo: Array.from(new Set([...(convo.lastMessage.deliveredTo || []), "delivered_placeholder"]))
+                            deliveredTo: Array.from(new Set([...(convo.lastMessage.deliveredTo || []), deliveredMarker]))
                         };
 
                         nextConvos[convoIdx] = { ...convo, lastMessage: nextLastMsg };
@@ -926,7 +931,7 @@ export const useChatStore = create<ChatState>()(
                             return {
                                 ...m,
                                 isDelivered: true,
-                                deliveredTo: Array.from(new Set([...(m.deliveredTo || []), "delivered_placeholder"]))
+                                deliveredTo: Array.from(new Set([...(m.deliveredTo || []), deliveredMarker]))
                             };
                         }
                         return m;

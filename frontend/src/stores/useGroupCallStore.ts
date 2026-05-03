@@ -216,7 +216,13 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
   },
 
   handleGroupCallStatusResponse(payload) {
-    if (payload.active) {
+    if (payload.active && payload.joinedByCurrentUser) {
+      set((state) => {
+        const next = { ...state.hasLeftActiveCall };
+        delete next[payload.conversationId];
+        return { hasLeftActiveCall: next };
+      });
+    } else if (payload.active) {
       set((state) => ({
         hasLeftActiveCall: {
           ...state.hasLeftActiveCall,

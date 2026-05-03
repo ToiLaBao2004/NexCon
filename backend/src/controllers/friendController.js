@@ -3,8 +3,27 @@ import User from '../models/userModel.js';
 import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
-import { io, getReceiverSocketId } from "../socket/index.js";
+import { io, getReceiverSocketId, emitToUser } from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
+
+const toFriendItem = (friendship, user) => ({
+    _id: friendship._id,
+    friendId: user._id,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+    createdAt: friendship.createdAt
+});
+
+async function emitSentRequestUpdated(senderId, requestId) {
+    const friendRequest = await FriendRequest.findById(requestId)
+        .populate('to', 'displayName email avatarUrl bio phone');
+
+    if (friendRequest) {
+        emitToUser(senderId.toString(), "friend-request-sent-updated", {
+            friendRequest
+        });
+    }
+}
 
 export async function sendFriendRequest(req, res) {
     try {
@@ -13,7 +32,7 @@ export async function sendFriendRequest(req, res) {
         if (!email) {
             return res.status(400).json({ message: "Email is required." });
         }
-        const receiver = await User.findOne({ email: email.toLowerCase() }).select('_id displayName').lean();
+        const receiver = await User.findOne({ email: email.toLowerCase() }).select('_id displayName email avatarUrl').lean();
         if (!receiver) {
             return res.status(404).json({ message: "User with this email not found." });
         }
@@ -67,6 +86,7 @@ export async function sendFriendRequest(req, res) {
                 `${process.env.FRONTEND_URL}/people?tab=requests`);
             const populatedRequest = await FriendRequest.findById(rejectedRequest._id)
                 .populate('from', 'displayName email avatarUrl');
+            await emitSentRequestUpdated(sender._id, rejectedRequest._id);
             const receiverSocketId = getReceiverSocketId(receiver._id.toString());
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit("new-friend-request", {
@@ -96,9 +116,15 @@ export async function sendFriendRequest(req, res) {
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit("friend-request-accepted", {
                     from: { _id: sender._id, displayName: sender.displayName },
+                    newFriend: toFriendItem(newFriend, sender),
                     message: `${sender.displayName} đã chấp nhận lời mời kết bạn của bạn.`
                 });
             }
+            emitToUser(sender._id.toString(), "friend-request-resolved", {
+                requestId: reverseRequest._id.toString(),
+                action: "accepted",
+                newFriend: toFriendItem(newFriend, receiver)
+            });
             return res.status(201).json({ message: `Bạn và ${receiver.displayName} hiện đã là bạn bè.` });
         }
         const friendRequest = new FriendRequest({
@@ -114,6 +140,7 @@ export async function sendFriendRequest(req, res) {
             `${process.env.FRONTEND_URL}/people?tab=requests`);
         const populatedRequest = await FriendRequest.findById(friendRequest._id)
             .populate('from', 'displayName email avatarUrl bio phone');
+        await emitSentRequestUpdated(sender._id, friendRequest._id);
         const receiverSocketId = getReceiverSocketId(receiver._id.toString());
         if (receiverSocketId) {
             io.to(receiverSocketId).emit("new-friend-request", {
@@ -167,6 +194,18 @@ export async function acceptFriendRequest(req, res) {
                 }
             });
         }
+        emitToUser(receiver._id.toString(), "friend-request-resolved", {
+            requestId,
+            action: "accepted",
+            newFriend: {
+                _id: newFriend._id,
+                friendId: sender._id,
+                displayName: sender.displayName,
+                avatarUrl: sender.avatarUrl,
+                createdAt: newFriend.createdAt
+            }
+        });
+
         return res.status(200).json({
             message: `Bạn đã chấp nhận lời mời kết bạn từ ${sender.displayName}.`,
             newFriend: {
@@ -200,6 +239,10 @@ export async function rejectFriendRequest(req, res) {
         const sender = await User.findById(friendRequest.from);
         friendRequest.status = 'rejected';
         await friendRequest.save();
+        emitToUser(receiver._id.toString(), "friend-request-resolved", {
+            requestId,
+            action: "rejected"
+        });
         const senderSocketId = getReceiverSocketId(sender._id.toString());
         if (senderSocketId) {
             io.to(senderSocketId).emit("friend-request-rejected", {
@@ -231,6 +274,7 @@ export async function resendFriendRequest(req, res) {
         const receiver = await User.findById(friendRequest.to);
         friendRequest.status = 'pending';
         await friendRequest.save();
+        await emitSentRequestUpdated(sender._id, friendRequest._id);
         await createNotification(receiver._id,
             "Friend Request Resent",
             `${sender.displayName} đã gửi lại lời mời kết bạn.`,
@@ -258,6 +302,9 @@ export async function cancelFriendRequest(req, res) {
         }
         const receiverId = friendRequest.to.toString();
         await FriendRequest.deleteOne({ _id: requestId });
+        emitToUser(sender._id.toString(), "friend-request-sent-cancelled", {
+            requestId
+        });
         const receiverSocketId = getReceiverSocketId(receiverId);
         if (receiverSocketId) {
             io.to(receiverSocketId).emit("friend-request-cancelled", {
@@ -314,6 +361,10 @@ export async function unfriendUser(req, res) {
         }
         await Friend.deleteOne({ _id: friendship._id });
 
+        emitToUser(user._id.toString(), "unfriended", {
+            friendId
+        });
+
         const friendSocketId = getReceiverSocketId(friendId);
         if (friendSocketId) {
             io.to(friendSocketId).emit("unfriended", {
@@ -364,6 +415,16 @@ export async function blockUser(req, res) {
         });
         await blockEntry.save();
 
+        emitToUser(user._id.toString(), "user-blocked-self", {
+            blockedUser: {
+                _id: userBlocked._id,
+                displayName: userBlocked.displayName,
+                email: userBlocked.email,
+                avatarUrl: userBlocked.avatarUrl,
+                blockedAt: blockEntry.createdAt
+            }
+        });
+
         const receiverSocketId = getReceiverSocketId(userIdBlocked);
         if (receiverSocketId) {
             io.to(receiverSocketId).emit("user-blocked", {
@@ -400,6 +461,10 @@ export async function unblockUser(req, res) {
             return res.status(400).json({ message: `${userUnblocked.displayName} is not blocked by you.` });
         }
         await BlockUser.deleteOne({ _id: blockEntry._id });
+
+        emitToUser(user._id.toString(), "user-unblocked-self", {
+            userId: userIdUnblocked
+        });
 
         const receiverSocketId = getReceiverSocketId(userIdUnblocked);
         if (receiverSocketId) {

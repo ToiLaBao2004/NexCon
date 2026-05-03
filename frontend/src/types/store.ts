@@ -137,7 +137,7 @@ export interface ChatState {
   leaveGroup: (conversationId: string, silent?: boolean, newAdminId?: string) => Promise<void>;
   forwardMessage: (messageId: string, targetConversationIds: string[]) => Promise<{ forwarded: number; errors: { conversationId: string; reason: string }[] }>;
   muteConversation: (conversationId: string, target: 'messages' | 'meetings' | 'both', duration: '1h' | '8h' | '24h' | 'forever' | 'off') => Promise<void>;
-  markMessageDelivered: (messageId: string, conversationId: string) => void;
+  markMessageDelivered: (messageId: string, conversationId: string, deliveredUserId?: string) => void;
 
 
   // Sidebar
@@ -367,7 +367,13 @@ export interface GroupCallState {
     duration: number;
     endedAt: string;
   }) => void;
-  handleGroupCallStatusResponse: (payload: { conversationId: string; active: boolean }) => void;
+  handleGroupCallStatusResponse: (payload: {
+    conversationId: string;
+    active: boolean;
+    myStatus?: GroupCallParticipantStatus | null;
+    joinedByCurrentUser?: boolean;
+    joinedByCurrentDevice?: boolean;
+  }) => void;
   handleGroupCallError: (payload: { reason: string }) => void;
 
   reset: () => void;
