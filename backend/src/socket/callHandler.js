@@ -316,7 +316,6 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
         }
     });
 
-    // accept-call: B bấm nghe → chỉ gửi token về đúng socket đang active
     socket.on('accept-call', ({ toUserId }) => {
         const callerId = toUserId?.toString();
         const receiverId = user._id.toString();
@@ -325,11 +324,17 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
         const activeCall = activeCalls.get(callerId);
         if (!activeCall) return;
 
+        // Thiết bị khác đã bắt rồi — dismiss thiết bị này
+        if (activeCall.status !== 'calling') {
+            socket.emit('call-answered-on-other-device', {
+                conversationId: activeCall.conversationId,
+            });
+            return;
+        }
+
         activeCall.status = 'connecting';
         markParticipant(activeCall, receiverId, { status: 'accepted', joinedAt: null });
 
-        // Báo caller biết receiver đã accept — tất cả thiết bị caller
-        // nhưng chỉ socket đang active của caller mới handle tiếp
         const callerSocketId = getReceiverSocketId(callerId);
         if (callerSocketId) {
             io.to(callerSocketId).emit('accept-call', {
@@ -338,7 +343,7 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
             });
         }
 
-        // Dismiss incoming-call trên các thiết bị KHÁC của receiver
+        // Dismiss tất cả thiết bị khác của receiver
         socket.to(`user:${receiverId}`).emit('call-answered-on-other-device', {
             conversationId: activeCall.conversationId,
         });
@@ -356,6 +361,8 @@ export function registerCallHandlers(socket, user, activeCalls, onlineUsers, io,
 
             const activeCall = activeCalls.get(callerId);
             if (!activeCall) return;
+
+            if (activeCall.status !== 'connecting' && activeCall.status !== 'calling') return;
 
             activeCall.status = 'connecting';
             markParticipant(activeCall, receiverId, { status: 'accepted' });
