@@ -600,29 +600,23 @@ export async function pinMessage(req, res) {
             avatarUrl: req.user.avatarUrl,
         };
         const actionByName = req.user.displayName || 'Một thành viên';
+        const conversationRoom = conversation._id.toString();
 
-        // Nếu đã ghim thì bỏ ghim luôn
+        // Nếu đã ghim thì bỏ ghim
         if (message.isPinned) {
             message.isPinned = false;
             message.pinnedAt = null;
             await message.save();
 
             const payload = {
-                conversationId: message.conversationId.toString(),
+                conversationId: conversationRoom,
                 pinnedMessageId: null,
                 unpinnedMessageId: message._id.toString(),
                 isPinned: false,
                 pinnedAt: null,
             };
 
-            conversation.participants.forEach((p) => {
-                const socketId = getReceiverSocketId(
-                    p.userId._id?.toString() ?? p.userId.toString()
-                );
-                if (socketId) {
-                    io.to(socketId).emit('pin-message', payload);
-                }
-            });
+            io.to(conversationRoom).emit('pin-message', payload);
 
             const systemMessage = await Message.create({
                 conversationId: conversation._id,
@@ -649,6 +643,7 @@ export async function pinMessage(req, res) {
             });
         }
 
+        // Giới hạn tối đa 3 tin nhắn ghim — bỏ ghim tin cũ nhất nếu vượt
         const pinnedMessages = await Message.find({
             conversationId: conversation._id,
             isPinned: true,
@@ -669,21 +664,14 @@ export async function pinMessage(req, res) {
         await message.save();
 
         const payload = {
-            conversationId: message.conversationId.toString(),
+            conversationId: conversationRoom,
             pinnedMessageId: message._id.toString(),
             unpinnedMessageId,
             isPinned: true,
             pinnedAt: message.pinnedAt,
         };
 
-        conversation.participants.forEach((p) => {
-            const socketId = getReceiverSocketId(
-                p.userId._id?.toString() ?? p.userId.toString()
-            );
-            if (socketId) {
-                io.to(socketId).emit('pin-message', payload);
-            }
-        });
+        io.to(conversationRoom).emit('pin-message', payload);
 
         const systemMessage = await Message.create({
             conversationId: conversation._id,
