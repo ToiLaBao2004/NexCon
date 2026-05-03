@@ -11,7 +11,19 @@ const redisIOClient = new Redis(process.env.REDIS_URL, {
     lazyConnect: true,
 });
 
-redisIOClient.on('connect', () => console.log('[RedisIO] Đã kết nối thành công (Dành cho BullMQ).'));
-redisIOClient.on('error', (err) => console.error('[RedisIO] Lỗi kết nối:', err.message));
+let hasLoggedError = false;
+
+redisIOClient.on('connect', () => {
+    hasLoggedError = false; // Reset sau khi kết nối thành công
+    console.log('[RedisIO] Đã kết nối thành công (Dành cho BullMQ).');
+});
+
+redisIOClient.on('error', (err) => {
+    if (!hasLoggedError) {
+        console.error('[RedisIO] Lỗi kết nối:', err.message);
+        hasLoggedError = true;
+    }
+});
 
 export default redisIOClient;
+
