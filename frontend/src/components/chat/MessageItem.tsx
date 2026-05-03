@@ -1790,7 +1790,7 @@ const MessageItem = ({
 	const isSticker = message.type === "sticker" && !isRecalled;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
-	const hasContent = !!message.content?.trim();
+	const hasContent = message.type === "sticker" ? false : !!message.content?.trim();
 	const isVisualOnly = (isImage || isSticker) && !hasContent && !message.replyTo && !message.metadata?.forwardedFrom;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
