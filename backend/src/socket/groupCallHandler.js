@@ -42,6 +42,18 @@ function participantsArray(groupCall) {
     return Array.from(groupCall.participants.values());
 }
 
+function groupCallDevicePayload(groupCall) {
+    return {
+        conversationId: groupCall.conversationId,
+        callId: groupCall.callId,
+        participants: participantsArray(groupCall),
+    };
+}
+
+function emitToOtherUserDevices(socket, userId, event, payload) {
+    socket.to(`user:${userId.toString()}`).emit(event, payload);
+}
+
 function countJoined(groupCall) {
     let n = 0;
     for (const participant of groupCall.participants.values()) {
@@ -245,7 +257,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
             });
 
             // Emit to rest of group
-            socket.to(conversationId).emit('group-call:incoming', {
+            socket.to(conversationId).except(`user:${userId}`).emit('group-call:incoming', {
                 conversationId,
                 callId,
                 callType,
@@ -274,33 +286,74 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                 return socket.emit('group-call:error', { reason: 'not-a-member' });
             }
 
-            // Generate token
-            const metadata = JSON.stringify({
-                displayName: user.displayName,
-                avatarUrl: user.avatarUrl || null,
-            });
-            const token = await generateToken(conversationId, userId, user.displayName, metadata);
-
-            // Update in-memory
             const participant = groupCall.participants.get(userId);
+            const activeSocketId = groupCall.participantSockets?.get(userId);
+            if (participant.status === 'joined' && activeSocketId && activeSocketId !== socket.id) {
+                socket.emit('group-call:answered-on-other-device', groupCallDevicePayload(groupCall));
+                return;
+            }
+
+            if (!groupCall.participantSockets) {
+                groupCall.participantSockets = new Map();
+            }
+
+            const previousState = {
+                status: participant.status,
+                joinedAt: participant.joinedAt,
+                leftAt: participant.leftAt,
+                socketId: activeSocketId,
+            };
+            const shouldNotifyJoined = participant.status !== 'joined';
+
             participant.status = 'joined';
-            participant.joinedAt = new Date().toISOString();
+            participant.joinedAt = previousState.status === 'joined' && previousState.joinedAt
+                ? previousState.joinedAt
+                : new Date().toISOString();
             participant.leftAt = null;
-            groupCall.participantSockets?.set(userId, socket.id);
+            groupCall.participantSockets.set(userId, socket.id);
+
+            let token;
+            try {
+                const metadata = JSON.stringify({
+                    displayName: user.displayName,
+                    avatarUrl: user.avatarUrl || null,
+                });
+                token = await generateToken(conversationId, userId, user.displayName, metadata);
+            } catch (error) {
+                if (groupCall.participantSockets?.get(userId) === socket.id) {
+                    participant.status = previousState.status;
+                    participant.joinedAt = previousState.joinedAt;
+                    participant.leftAt = previousState.leftAt;
+                    if (previousState.socketId) {
+                        groupCall.participantSockets.set(userId, previousState.socketId);
+                    } else {
+                        groupCall.participantSockets.delete(userId);
+                    }
+                }
+                throw error;
+            }
 
             // Send token to this user
             socket.emit('group-call:token', { conversationId, token });
+            emitToOtherUserDevices(
+                socket,
+                userId,
+                'group-call:answered-on-other-device',
+                groupCallDevicePayload(groupCall)
+            );
 
             // Notify room
-            io.to(conversationId).emit('group-call:user-joined', {
-                conversationId,
-                user: {
-                    _id: userId,
-                    displayName: user.displayName,
-                    avatarUrl: user.avatarUrl || null,
-                },
-                participants: participantsArray(groupCall),
-            });
+            if (shouldNotifyJoined) {
+                io.to(conversationId).emit('group-call:user-joined', {
+                    conversationId,
+                    user: {
+                        _id: userId,
+                        displayName: user.displayName,
+                        avatarUrl: user.avatarUrl || null,
+                    },
+                    participants: participantsArray(groupCall),
+                });
+            }
 
             console.log(`[GroupCall] ${user.displayName} joined group call in ${conversationId}`);
         } catch (error) {
@@ -318,8 +371,26 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
             const participant = groupCall.participants.get(userId);
             if (!participant) return;
 
+            const activeSocketId = groupCall.participantSockets?.get(userId);
+            if (participant.status === 'joined' && activeSocketId && activeSocketId !== socket.id) {
+                socket.emit('group-call:answered-on-other-device', groupCallDevicePayload(groupCall));
+                return;
+            }
+
+            if (participant.status === 'declined') {
+                socket.emit('group-call:declined-on-other-device', groupCallDevicePayload(groupCall));
+                return;
+            }
+
             participant.status = 'declined';
             groupCall.participantSockets?.delete(userId);
+
+            emitToOtherUserDevices(
+                socket,
+                userId,
+                'group-call:declined-on-other-device',
+                groupCallDevicePayload(groupCall)
+            );
 
             io.to(conversationId).emit('group-call:user-declined', {
                 conversationId,
@@ -341,6 +412,12 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
 
             const participant = groupCall.participants.get(userId);
             if (!participant) return;
+
+            const activeSocketId = groupCall.participantSockets?.get(userId);
+            if (participant.status === 'joined' && activeSocketId && activeSocketId !== socket.id) {
+                socket.emit('group-call:answered-on-other-device', groupCallDevicePayload(groupCall));
+                return;
+            }
 
             participant.status = 'left';
             participant.leftAt = new Date().toISOString();

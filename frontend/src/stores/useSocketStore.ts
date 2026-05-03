@@ -685,19 +685,38 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useGroupCallStore.getState().handleGroupCallToken(payload);
     });
 
+    socket.on("group-call:answered-on-other-device", (payload) => {
+      useGroupCallStore.getState().handleGroupCallAnsweredOnOtherDevice(payload);
+    });
+
+    socket.on("group-call:declined-on-other-device", (payload) => {
+      useGroupCallStore.getState().handleGroupCallDeclinedOnOtherDevice(payload);
+    });
+
     socket.on("group-call:user-joined", (payload: {
       conversationId: string;
       participants: GroupCallParticipant[];
       user?: { _id: string; displayName: string; avatarUrl: string | null };
       userId?: string;
     }) => {
-      useGroupCallStore.getState().handleGroupCallUserJoined(payload);
-
-      if (useGroupCallStore.getState().status !== "active") return;
-
       const currentUserId = getCurrentUserId();
       const joinedUserId =
         payload.user?._id?.toString() || payload.userId?.toString() || "";
+      const groupCallState = useGroupCallStore.getState();
+
+      if (
+        joinedUserId &&
+        joinedUserId === currentUserId &&
+        groupCallState.conversationId === payload.conversationId &&
+        groupCallState.status !== "active"
+      ) {
+        groupCallState.handleGroupCallAnsweredOnOtherDevice(payload);
+        return;
+      }
+
+      groupCallState.handleGroupCallUserJoined(payload);
+
+      if (useGroupCallStore.getState().status !== "active") return;
 
       if (joinedUserId && joinedUserId === currentUserId) return;
 
@@ -712,8 +731,31 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       });
     });
 
-    socket.on("group-call:user-declined", (payload) => {
-      useGroupCallStore.getState().handleGroupCallUserDeclined(payload);
+    socket.on("group-call:user-declined", (payload: {
+      conversationId: string;
+      userId?: string | null;
+      participants: GroupCallParticipant[];
+    }) => {
+      const currentUserId = getCurrentUserId();
+      const declinedUserId = payload.userId?.toString?.() || "";
+      const myParticipantStatus = payload.participants.find(
+        (participant) => participant.userId === currentUserId
+      )?.status;
+      const groupCallState = useGroupCallStore.getState();
+
+      if (
+        (
+          declinedUserId === currentUserId ||
+          (!declinedUserId && (myParticipantStatus === "declined" || myParticipantStatus === "no-answer"))
+        ) &&
+        groupCallState.conversationId === payload.conversationId &&
+        groupCallState.status === "incoming"
+      ) {
+        groupCallState.handleGroupCallDeclinedOnOtherDevice(payload);
+        return;
+      }
+
+      groupCallState.handleGroupCallUserDeclined(payload);
     });
 
     socket.on("group-call:user-left", (payload: {

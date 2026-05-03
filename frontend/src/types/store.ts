@@ -351,6 +351,16 @@ export interface GroupCallState {
   }) => void;
   handleGroupCallUserDeclined: (payload: { conversationId: string; participants: GroupCallParticipant[] }) => void;
   handleGroupCallUserLeft: (payload: { conversationId: string; userId: string; participants: GroupCallParticipant[] }) => void;
+  handleGroupCallAnsweredOnOtherDevice: (payload: {
+    conversationId: string;
+    callId?: string;
+    participants?: GroupCallParticipant[];
+  }) => void;
+  handleGroupCallDeclinedOnOtherDevice: (payload: {
+    conversationId: string;
+    callId?: string;
+    participants?: GroupCallParticipant[];
+  }) => void;
   handleGroupCallEnded: (payload: {
     conversationId: string;
     callId: string;
