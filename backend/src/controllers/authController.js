@@ -8,7 +8,7 @@ import validator from 'validator';
 import { removeSubscription } from '../services/pushNotificationService.js';
 import { createNotification } from '../services/notificationServices.js';
 
-const ACCESS_TOKEN_TTL = '30s';
+const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 
 function parseIp(req) {
