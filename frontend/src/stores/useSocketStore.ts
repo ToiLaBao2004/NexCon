@@ -611,6 +611,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useCallStore.getState().handleRemoteAccepted();
     });
 
+    socket.on("call-answered-on-other-device", () => {
+      const callState = useCallStore.getState();
+      if (callState.status === "incoming") {
+        callState.handleCallEnded();
+      }
+    });
+
     socket.on("call-answered", ({ token, roomName }) => {
       useCallStore.getState().handleCallAnswered({ token, roomName });
     });
