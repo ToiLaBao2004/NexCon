@@ -48,7 +48,7 @@ const CallMessageBubble = ({ message, currentUserId, isOwn }: CallMessageBubbleP
     if (overallStatus === "canceled") {
       if (myStatus === "declined") {
         return {
-          label: "Bạn đã từ chối",
+          label: "Đã từ chối",
           color: "text-[#c21807]",
           statusType: "rejected",
         };

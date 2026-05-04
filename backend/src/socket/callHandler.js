@@ -235,10 +235,22 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         let notifyEvent = cancelled ? 'call-cancelled' : 'call-ended';
 
         if (activeCall) {
+            const rejectedByReceiver =
+                cancelled &&
+                activeCall.status === 'calling' &&
+                activeCall.receiverId === myId;
+            if (rejectedByReceiver) {
+                markParticipant(activeCall, myId, { status: 'declined' });
+            }
+
             const overallStatus = activeCall.status === 'in-call' ? 'ended' : 'canceled';
             await persistFinalizedDirectSession(io, activeCall, overallStatus);
             activeCalls.delete(activeCall.callerId);
-            if (overallStatus !== 'ended') notifyEvent = 'call-cancelled';
+            if (rejectedByReceiver) {
+                notifyEvent = 'call-rejected';
+            } else if (overallStatus !== 'ended') {
+                notifyEvent = 'call-cancelled';
+            }
         }
 
         const payload = {

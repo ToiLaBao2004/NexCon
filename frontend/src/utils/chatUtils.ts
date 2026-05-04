@@ -130,12 +130,27 @@ export const getSystemMessageText = (
         case "call": {
             const callTypeLabel = meta.callType === "video" ? "Cuộc gọi video" : "Cuộc gọi thoại";
             const suffix = meta.mode === "group" ? " nhóm" : "";
+            const participants = Array.isArray(meta.participants) ? meta.participants : [];
+            const myParticipant = participants.find((participant: any) => {
+                const participantId = participant?.userId?._id || participant?.userId;
+                return participantId?.toString?.() === currentUserId?.toString();
+            });
+            const otherDeclined = participants.some((participant: any) => {
+                const participantId = participant?.userId?._id || participant?.userId;
+                return participantId?.toString?.() !== currentUserId?.toString() && participant?.status === "declined";
+            });
 
             if (meta.overallStatus === "missed") {
                 return `${callTypeLabel}${suffix} nhỡ`;
             }
 
             if (meta.overallStatus === "canceled") {
+                if (myParticipant?.status === "declined") {
+                    return `${callTypeLabel}${suffix} đã từ chối`;
+                }
+                if (otherDeclined) {
+                    return `${callTypeLabel}${suffix} đã bị từ chối`;
+                }
                 return `${callTypeLabel}${suffix} đã hủy`;
             }
 

@@ -283,6 +283,13 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   // Receiver: B rejects the incoming call
   rejectCall() {
+    const { remoteUser, status } = get();
+    if (status === "incoming" && remoteUser?._id) {
+      emitCallEvent("call-rejected", { toUserId: remoteUser._id });
+      resetToIdle(set, get);
+      return;
+    }
+
     get().handleCancelCall();
   },
 
