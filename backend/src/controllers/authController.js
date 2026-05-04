@@ -7,6 +7,7 @@ import Otp from '../models/otpModel.js';
 import validator from 'validator';
 import { removeSubscription } from '../services/pushNotificationService.js';
 import { createNotification } from '../services/notificationServices.js';
+import { disconnectSessionSockets, disconnectUserSockets } from '../socket/index.js';
 
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
@@ -166,7 +167,11 @@ export async function signOut(req, res) {
             await removeSubscription(pushEndpoint);
         }
 
+        const session = await Session.findOne({ refreshToken }).select('_id');
         await Session.deleteOne({ refreshToken: refreshToken });
+        if (session) {
+            disconnectSessionSockets(session._id, 'signed-out');
+        }
         res.clearCookie('refreshToken', {
             httpOnly: true,
             secure: true,
@@ -190,6 +195,7 @@ export async function signOutAll(req, res) {
             return res.status(401).json({ message: 'Invalid session.' });
         }
         await Session.deleteMany({ userId: session.userId });
+        disconnectUserSockets(session.userId, 'signed-out-all');
         res.clearCookie('refreshToken', { httpOnly: true, secure: true, sameSite: 'none' });
         return res.status(200).json({ message: 'Logged out from all devices successfully.' });
     } catch (error) {
@@ -250,6 +256,7 @@ export async function signOutBySession(req, res) {
         }
 
         await Session.deleteOne({ _id: sessionId });
+        disconnectSessionSockets(sessionId, 'session-removed');
 
         const isDeletingCurrent = targetSession._id.equals(currentSession._id);
         if (isDeletingCurrent) {
@@ -288,9 +295,15 @@ export async function resetNewPassword(req, res) {
         if (newPassword !== confirmNewPassword) {
             return res.status(400).json({ message: 'Passwords do not match.' });
         }
+        const user = await User.findOne({ email: payload.email }).select('_id');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await User.updateOne({ email: payload.email }, { password: hashedPassword });
-        await Session.deleteMany({ userId: (await User.findOne({ email: payload.email }))._id });
+        await User.updateOne({ _id: user._id }, { password: hashedPassword });
+        await Session.deleteMany({ userId: user._id });
+        disconnectUserSockets(user._id, 'password-reset');
         return res.status(200).json({ message: 'Password updated successfully.' });
     } catch (error) {
         console.error('Error during password reset:', error);
