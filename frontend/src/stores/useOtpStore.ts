@@ -48,8 +48,9 @@ export const useOTPStore = create<OTPState>((set) => ({
     try {
       set({ loading: true });
       // call API
-      await otpService.verifyOtpResetPassword(email, otp);
+      const { resetToken } = await otpService.verifyOtpResetPassword(email, otp);
       toast.success('Xác thực mã OTP thành công.');
+      return resetToken;
     } catch (error: any) {
       console.error('Lỗi khi xác thực mã OTP:', error);
       if (error.response?.data?.message) {

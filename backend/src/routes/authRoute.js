@@ -1,7 +1,7 @@
 import express from 'express';
 import {
     signUp, signIn, signOut, signOutAll, verifyValidFieldsSignUp,
-    updateNewPassword, googleAuthCallback, refreshToken, googleSuccess,
+    resetNewPassword, googleAuthCallback, refreshToken, googleSuccess,
     getSessions, signOutBySession
 } from '../controllers/authController.js';
 import passport from '../config/passport.js';
@@ -15,7 +15,7 @@ authRouter.post('/signout', signOut);
 authRouter.post('/signout-all', signOutAll);
 authRouter.get('/sessions', getSessions);
 authRouter.delete('/sessions/:sessionId', signOutBySession);
-authRouter.put('/update-new-password', updateNewPassword)
+authRouter.put('/reset-new-password', resetNewPassword)
 
 authRouter.get(
     '/google',

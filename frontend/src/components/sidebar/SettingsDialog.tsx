@@ -46,7 +46,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const [otpLoading, setOtpLoading] = useState(false);
     const [countdown, setCountdown] = useState(60);
 
-    const { user, updateNewPassword } = useAuthStore();
+    const { user, resetNewPassword } = useAuthStore();
     const { sendOtpResetPassword, verifyOtpResetPassword } = useOTPStore();
 
     useEffect(() => {
@@ -108,7 +108,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
     const onResetSubmit = async (data: ResetPassFormValues) => {
         try {
-            await updateNewPassword(user!.email, data.newPassword, data.confirmNewPassword);
+            await resetNewPassword(user!.email, data.newPassword, data.confirmNewPassword);
             onOpenChange(false);
         } catch (error: any) {
             const backendMsg = error.response?.data?.message || "Cập nhật mật khẩu thất bại.";

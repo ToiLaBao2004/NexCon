@@ -40,13 +40,13 @@ export const authService = {
     return response.data;
   },
 
-  updateNewPassword: async (
-    email: string,
+  resetNewPassword: async (
+    resetToken: string,
     newPassword: string,
     confirmNewPassword: string
   ) => {
-    const response = await api.put('/auth/update-new-password',
-      { email, newPassword, confirmNewPassword },
+    const response = await api.put('/auth/reset-new-password',
+      { resetToken, newPassword, confirmNewPassword },
       { withCredentials: true }
     );
     return response.data;

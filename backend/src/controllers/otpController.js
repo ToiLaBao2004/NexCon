@@ -2,6 +2,7 @@ import Otp from "../models/otpModel.js";
 import { sendOtp } from "../utils/sendEmail.js";
 import crypto from "crypto";
 import User from "../models/userModel.js";
+import jwt from "jsonwebtoken";
 
 function getCooldownMessage(remainingMs) {
     const seconds = Math.ceil(remainingMs / 1000);
@@ -91,7 +92,12 @@ export async function verifyOtpResetPassword(req, res) {
         if (!otpRecord || otpRecord.otp !== otp || otpRecord.expiresAt < Date.now()) {
             return res.status(400).json({ message: 'Invalid or expired OTP.' });
         }
-        return res.status(200).json({ success: true, message: 'OTP verified successfully.' });
+        const resetToken = jwt.sign(
+            { email, purpose: 'reset_password' },
+            process.env.ACCESS_TOKEN_SECRET,
+            { expiresIn: '10m' }
+        );
+        return res.status(200).json({ resetToken })
     } catch (error) {
         console.error('Error during OTP verification for password reset:', error);
         return res.status(500).json({ message: 'Internal server error.' });

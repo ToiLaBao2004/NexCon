@@ -51,14 +51,14 @@ export function OTPForm() {
     setLoading(true);
 
     try {
-      await verifyOtpResetPassword(
+      const resetToken = await verifyOtpResetPassword(
         emailOTPResetPassData.email,
         otp
       );
 
       navigate("/reset-password", {
         state: {
-          emailOTPResetPassData: emailOTPResetPassData
+          resetToken
         }
       });
     } catch (err: any) {

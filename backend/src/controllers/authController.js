@@ -267,11 +267,19 @@ export async function signOutBySession(req, res) {
     }
 }
 
-export async function updateNewPassword(req, res) {
+export async function resetNewPassword(req, res) {
     try {
-        let { email, newPassword, confirmNewPassword } = req.body;
-        email = email?.trim();
-        if (!email || !newPassword || !confirmNewPassword) {
+        const { resetToken, newPassword, confirmNewPassword } = req.body;
+        let payload;
+        try {
+            payload = jwt.verify(resetToken, process.env.ACCESS_TOKEN_SECRET);
+        } catch {
+            return res.status(401).json({ message: 'Invalid or expired reset token.' });
+        }
+        if (payload.purpose !== 'reset_password') {
+            return res.status(401).json({ message: 'Invalid token purpose.' });
+        }
+        if (!newPassword || !confirmNewPassword) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
         if (newPassword.length < 8) {
@@ -281,7 +289,8 @@ export async function updateNewPassword(req, res) {
             return res.status(400).json({ message: 'Passwords do not match.' });
         }
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-        await User.updateOne({ email: email }, { password: hashedPassword });
+        await User.updateOne({ email: payload.email }, { password: hashedPassword });
+        await Session.deleteMany({ userId: (await User.findOne({ email: payload.email }))._id });
         return res.status(200).json({ message: 'Password updated successfully.' });
     } catch (error) {
         console.error('Error during password reset:', error);

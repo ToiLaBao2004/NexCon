@@ -93,10 +93,10 @@ export const useAuthStore = create<AuthState>()(
       }
     },
 
-    updateNewPassword: async (email, newPassword, confirmNewPassword) => {
+    resetNewPassword: async (resetToken, newPassword, confirmNewPassword) => {
       try {
         set({ loading: true });
-        await authService.updateNewPassword(email, newPassword, confirmNewPassword);
+        await authService.resetNewPassword(resetToken, newPassword, confirmNewPassword);
         toast.success('Cập nhật mật khẩu thành công!');
       } catch (error: any) {
         console.error('Lỗi khi cập nhật mật khẩu:', error);

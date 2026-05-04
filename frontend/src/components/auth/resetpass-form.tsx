@@ -9,6 +9,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { useNavigate, useLocation } from "react-router"
 import { useEffect } from "react"
+import { useState } from "react"
+import { Eye, EyeOff } from "lucide-react"
 
 const ResetPassSchema = z.object({
   newPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
@@ -24,24 +26,27 @@ export function ResetPassForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  const { updateNewPassword, user } = useAuthStore();
+  const { resetNewPassword, user } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const emailOTPResetPassData = location.state?.emailOTPResetPassData;
+  const resetToken = location.state?.resetToken;
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm<ResetPassFormValues>({
     resolver: zodResolver(ResetPassSchema),
   });
 
   useEffect(() => {
-    if (!emailOTPResetPassData) {
+    if (!resetToken) {
       navigate(user ? "/" : "/signin");
     }
-  }, [emailOTPResetPassData, navigate, user]);
+  }, [resetToken, navigate, user]);
+
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const onSubmit = async (data: ResetPassFormValues) => {
     const { newPassword, confirmNewPassword } = data;
     try {
-      await updateNewPassword(emailOTPResetPassData.email, newPassword, confirmNewPassword);
+      await resetNewPassword(resetToken, newPassword, confirmNewPassword);
       navigate(user ? "/" : "/signin");
     } catch (error: any) {
       console.error("Update Password failed:", error);
@@ -80,16 +85,24 @@ export function ResetPassForm({
               <Label htmlFor="newPassword" className="block text-sm">
                 Mật khẩu mới
               </Label>
-              <Input
-                id="newPassword"
-                type="password"
-                placeholder="••••••••"
-                {...register("newPassword")}
-              />
+              <div className="relative">
+                <Input
+                  id="newPassword"
+                  type={showNew ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="pr-10"
+                  {...register("newPassword")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {errors.newPassword && (
-                <p className="text-sm text-destructive">
-                  {errors.newPassword.message}
-                </p>
+                <p className="text-sm text-destructive">{errors.newPassword.message}</p>
               )}
             </div>
 
@@ -98,24 +111,32 @@ export function ResetPassForm({
               <Label htmlFor="confirmNewPassword" className="text-sm">
                 Xác nhận mật khẩu mới
               </Label>
-              <Input
-                id="confirmNewPassword"
-                type="password"
-                placeholder="••••••••"
-                {...register("confirmNewPassword")}
-              />
+              <div className="relative">
+                <Input
+                  id="confirmNewPassword"
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="pr-10"
+                  {...register("confirmNewPassword")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm(v => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {errors.confirmNewPassword && (
-                <p className="text-sm text-destructive">
-                  {errors.confirmNewPassword.message}
-                </p>
+                <p className="text-sm text-destructive">{errors.confirmNewPassword.message}</p>
               )}
             </div>
 
             {/* Root error */}
             {errors.root && (
-               <p className="text-sm text-destructive mt-2">
-                 {errors.root.message}
-               </p>
+              <p className="text-sm text-destructive mt-2">
+                {errors.root.message}
+              </p>
             )}
 
             {/* Submit */}
@@ -126,7 +147,7 @@ export function ResetPassForm({
             >
               Xác nhận
             </Button>
-            
+
             <div className="text-center text-sm mt-3">
               Quay lại {" "}
               <a href={user ? "/" : "/signin"} className="underline underline-offset-4 hover:text-primary">

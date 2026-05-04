@@ -39,8 +39,8 @@ export default interface AuthState {
     password: string
   ) => Promise<void>;
 
-  updateNewPassword: (
-    email: string,
+  resetNewPassword: (
+    resetToken: string,
     newPassword: string,
     confirmNewPassword: string
   ) => Promise<void>;
