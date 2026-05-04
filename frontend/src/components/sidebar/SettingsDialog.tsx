@@ -177,7 +177,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto">
+                        <div className="beautiful-scrollbar flex-1 overflow-y-auto">
                             <div className="p-4 sm:p-6 h-full relative">
                                 {activeTab === "notifications" && <NotificationTab />}
                                 {activeTab === "security" && <SecurityTab onForgotPassword={handleForgotPassword} />}

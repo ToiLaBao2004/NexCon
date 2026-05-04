@@ -187,16 +187,11 @@ function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 		if (isPlaying) {
 			audio.pause();
 		} else {
-			// Workaround for Chrome Infinity bug on webm:
-			if (audio.duration === Infinity) {
-				audio.currentTime = 1e101;
-				setTimeout(() => {
-					audio.currentTime = 0;
-					audio.play().catch(console.error);
-				}, 100);
-			} else {
-				audio.play().catch(console.error);
-			}
+			audio.play().then(() => {
+				if (audio.duration === Infinity) {
+					audio.currentTime = 1e101;
+				}
+			}).catch(console.error);
 		}
 	};
 
@@ -2404,8 +2399,8 @@ const MessageItem = ({
 											)}
 											{downloadableBubbleMessages.length > 0 && (
 												<DropdownMenuItem onClick={() => { setShowTouchActions(false); void handleDownloadBubble(); }}>
-														<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
-														Tải xuống
+													<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Tải xuống
 												</DropdownMenuItem>
 											)}
 											{!isDisbanded && (
