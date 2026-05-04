@@ -27,14 +27,14 @@ export const useAuthStore = create<AuthState>()(
       localStorage.clear();
     },
 
-    verifyValidFieldsSignUp: async (email, password) => {
+    verifyValidFieldsSignUp: async (email, password, confirmPassword) => {
       try {
         set({ loading: true });
         localStorage.clear();
         useChatStore.getState().reset();
         useNotificationStore.getState().reset();
         // API Call
-        await authService.verifyValidFieldsSignUp(email, password);
+        await authService.verifyValidFieldsSignUp(email, password, confirmPassword);
       } catch (error: any) {
         console.error('Lỗi khi xác định tính hợp lệ:', error);
         if (error.response?.data?.message) {

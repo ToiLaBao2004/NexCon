@@ -9,12 +9,18 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { useOTPStore } from "@/stores/useOtpStore"
 import { useNavigate } from "react-router"
+import { useState } from "react"
+import { Eye, EyeOff } from "lucide-react"
 
 const signUpSchema = z.object({
   firstname: z.string().min(1, "Tên là bắt buộc"),
   lastname: z.string().min(1, "Họ là bắt buộc"),
   email: z.string().trim().email("Địa chỉ email không hợp lệ"),
   password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
+  confirmPassword: z.string().min(1, "Xác nhận mật khẩu là bắt buộc"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Mật khẩu không khớp",
+  path: ["confirmPassword"],
 })
 
 type SignUpFormValues = z.infer<typeof signUpSchema>
@@ -26,13 +32,17 @@ export function SignupForm({
   const { verifyValidFieldsSignUp } = useAuthStore();
   const { sendOtpCreateUser } = useOTPStore();
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError } = useForm<SignUpFormValues>({
     resolver: zodResolver(signUpSchema),
   });
+
   const onSubmit = async (data: SignUpFormValues) => {
-    const { firstname, lastname, email, password } = data;
+    const { firstname, lastname, email, password, confirmPassword } = data;
     try {
-      await verifyValidFieldsSignUp(email, password);
+      await verifyValidFieldsSignUp(email, password, confirmPassword);
       await sendOtpCreateUser(email);
       navigate("/otp", {
         state: {
@@ -41,7 +51,6 @@ export function SignupForm({
       });
     } catch (error: any) {
       console.error("Sign up failed:", error);
-      // map backend error message to form fields
       const backendMsg = error.response?.data?.message || "Đăng ký thất bại.";
       if (backendMsg.toLowerCase().includes("email")) {
         setError("email", { type: "server", message: backendMsg });
@@ -52,6 +61,7 @@ export function SignupForm({
       }
     }
   }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0 border-border">
@@ -75,7 +85,6 @@ export function SignupForm({
                   Họ
                 </Label>
                 <Input id="lastname" type="text" placeholder="Họ" {...register("lastname")} />
-                {/* todo: error message */}
                 {errors.lastname && <p className="text-sm text-destructive">{errors.lastname.message}</p>}
               </div>
               <div className="space-y-2">
@@ -83,7 +92,6 @@ export function SignupForm({
                   Tên
                 </Label>
                 <Input id="firstname" type="text" placeholder="Tên" {...register("firstname")} />
-                {/* todo: error message */}
                 {errors.firstname && <p className="text-sm text-destructive">{errors.firstname.message}</p>}
               </div>
             </div>
@@ -93,7 +101,6 @@ export function SignupForm({
                 Email
               </Label>
               <Input id="email" type="text" placeholder="nexcon@gmail.com" {...register("email")} />
-              {/* todo: error message */}
               {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
             </div>
             {/* password */}
@@ -101,9 +108,50 @@ export function SignupForm({
               <Label htmlFor="password" className="block text-sm">
                 Mật khẩu
               </Label>
-              <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
-              {/* todo: error message */}
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="pr-10"
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+            </div>
+            {/* confirm password */}
+            <div className="flex flex-col gap-2 mt-3">
+              <Label htmlFor="confirmPassword" className="block text-sm">
+                Xác nhận mật khẩu
+              </Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="pr-10"
+                  {...register("confirmPassword")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                  aria-label={showConfirmPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
             </div>
             {/* submit button */}
             <Button type="submit" className="w-full mt-5" disabled={isSubmitting}>

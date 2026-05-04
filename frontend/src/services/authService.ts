@@ -6,9 +6,10 @@ export const authService = {
   verifyValidFieldsSignUp: async (
     email: string,
     password: string,
+    confirmNewPassword: string
   ) => {
     const response = await api.post('/auth/verify-valid-fields-signup',
-      { email, password },
+      { email, password, confirmNewPassword },
       { withCredentials: true } // to include cookies
     );
     return response.data;

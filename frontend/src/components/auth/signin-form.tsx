@@ -10,6 +10,8 @@ import { FcGoogle } from "react-icons/fc"
 import { useOTPStore } from "@/stores/useOtpStore"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { useNavigate } from "react-router"
+import { Eye, EyeOff } from "lucide-react"
+import { useState } from "react"
 
 const signInSchema = z.object({
   email: z.string().trim().email("Địa chỉ email không hợp lệ"),
@@ -25,9 +27,12 @@ export function SigninForm({
   const { signIn, loginGoogle } = useAuthStore();
   const { sendOtpResetPassword } = useOTPStore();
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
+
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError, watch } = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
   });
+
   const onSubmit = async (data: SignInFormValues) => {
     const { email, password } = data;
     try {
@@ -35,7 +40,6 @@ export function SigninForm({
       navigate("/");
     } catch (error: any) {
       console.error("Sign in failed:", error);
-      // map backend error message to form fields
       const backendMsg = error.response?.data?.message || "Đăng nhập thất bại.";
       if (backendMsg.toLowerCase().includes("email")) {
         setError("email", { type: "server", message: backendMsg });
@@ -46,6 +50,7 @@ export function SigninForm({
       }
     }
   }
+
   const handleForgotPassword = async () => {
     const emailValue = watch("email");
     console.log("Forgot Password clicked, email:", emailValue);
@@ -65,7 +70,6 @@ export function SigninForm({
       });
     } catch (error: any) {
       console.error("Send OTP failed:", error);
-      // map backend error message to form fields
       const backendMsg = error.response?.data?.message || "Gửi mã OTP thất bại.";
       if (backendMsg.toLowerCase().includes("email")) {
         setError("email", { type: "server", message: backendMsg });
@@ -76,9 +80,11 @@ export function SigninForm({
       }
     }
   }
+
   const handleGoogleSignIn = async () => {
     loginGoogle();
   }
+
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card className="overflow-hidden p-0 border-border">
@@ -101,7 +107,6 @@ export function SigninForm({
                 Email
               </Label>
               <Input id="email" type="text" placeholder="nexcon@gmail.com" {...register("email")} />
-              {/* todo: error message */}
               {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
             </div>
             {/* password */}
@@ -114,14 +119,32 @@ export function SigninForm({
                   Quên mật khẩu?
                 </a>
               </div>
-              <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
-              {/* todo: error message */}
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  className="pr-10"
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
             </div>
             {/* submit button */}
             <Button type="submit" className="w-full mt-5 cursor-pointer" disabled={isSubmitting}>
               Đăng nhập
             </Button>
+            {/* global error message */}
+            {errors.root && <p className="text-sm text-destructive mt-2">{errors.root.message}</p>}
             <div className="flex items-center my-4">
               <div className="flex-1 h-px bg-border" />
               <span className="px-2 text-xs text-muted-foreground">Hoặc tiếp tục với</span>

@@ -22,7 +22,8 @@ export default interface AuthState {
 
   verifyValidFieldsSignUp: (
     email: string,
-    password: string
+    password: string,
+    confirmPassword: string
   ) => Promise<void>;
 
   signUp: (

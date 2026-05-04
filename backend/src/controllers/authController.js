@@ -38,10 +38,13 @@ function parseDeviceName(userAgent = '') {
 
 export async function verifyValidFieldsSignUp(req, res) {
     try {
-        let { email, password } = req.body;
+        let { email, password, confirmNewPassword } = req.body;
         email = email?.trim();
-        if (!email || !password) {
+        if (!email || !password || !confirmNewPassword) {
             return res.status(400).json({ message: 'All fields are required.' });
+        }
+        if (password !== confirmNewPassword) {
+            return res.status(400).json({ message: 'Passwords do not match.' });
         }
         const existingEmail = await User.findOne({ email: email })
         if (existingEmail) {
