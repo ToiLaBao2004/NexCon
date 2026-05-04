@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, ZoomIn, ZoomOut, Download, RotateCcw, Forward } from "lucide-react";
+import { X, ZoomIn, ZoomOut, Download, RotateCcw, Forward, Undo2 } from "lucide-react";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
 import SecureImage from "@/components/SecureImage";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { useChatStore } from "@/stores/useChatStore";
 import ForwardMessageModal from "./ForwardMessageModal";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { toast } from "sonner";
 
 function useResolvedUrl(messageId?: string, fallbackSrc?: string): string | null {
   const cache = useMediaCacheStore((s) => s.cache);
@@ -42,22 +45,41 @@ function ToolbarBtn({
 
 export default function ImageViewerModal() {
   const { isOpen, image, closeViewer } = useImageViewerStore();
-  const resolvedUrl = useResolvedUrl(image?.messageId, image?.src);
-  const { messages } = useChatStore();
+  const resolvedUrl = useResolvedUrl(image?.messageId, image?.downloadUrl ?? image?.src);
+  const { messages, conversations, recallMessage, recallMessageLocal } = useChatStore();
+  const { user } = useAuthStore();
 
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [showForwardModal, setShowForwardModal] = useState(false);
+  const [showRecallConfirm, setShowRecallConfirm] = useState(false);
+  const [isRecalling, setIsRecalling] = useState(false);
 
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const viewerMessage = image?.conversationId && image?.messageId
+  const loadedViewerMessage = image?.conversationId && image?.messageId
     ? messages[image.conversationId]?.items.find((item) => item._id === image.messageId)
     : null;
-  const canActOnMessage = Boolean(viewerMessage && !viewerMessage.status && !viewerMessage.isRecalled);
+  const viewerMessage = loadedViewerMessage ?? image?.message ?? null;
+  const viewerConversationId = image?.conversationId ?? viewerMessage?.conversationId;
+  const viewerConversation = viewerConversationId
+    ? conversations.find((item) => item._id === viewerConversationId)
+    : null;
+  const viewerSenderId = viewerMessage
+    ? (typeof viewerMessage.senderId === "object" ? (viewerMessage.senderId as any)._id : viewerMessage.senderId)
+    : null;
+  const isOwnImage = Boolean(user?._id && viewerSenderId?.toString?.() === user._id.toString());
+  const isDisbanded = viewerConversation?.type === "group" && viewerConversation.disbanded === true;
+  const canActOnMessage = Boolean(
+    viewerMessage &&
+    (!viewerMessage.status || viewerMessage.status === "sent") &&
+    !viewerMessage.isRecalled
+  );
+  const canRecallMessage = Boolean(canActOnMessage && isOwnImage && !isDisbanded);
+  const shouldUseSecureImage = Boolean(image?.messageId && !image?.src);
 
   useEffect(() => {
     if (isOpen) {
@@ -65,8 +87,10 @@ export default function ImageViewerModal() {
       setOffset({ x: 0, y: 0 });
       setIsLoaded(false);
       setIsDragging(false);
+      setShowForwardModal(false);
+      setShowRecallConfirm(false);
     }
-  }, [isOpen, image?.messageId, image?.src]);
+  }, [isOpen, image?.messageId, image?.src, image?.downloadUrl]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -136,6 +160,26 @@ export default function ImageViewerModal() {
     }
   };
 
+  const handleRecall = async () => {
+    if (!viewerMessage || isRecalling) return;
+    try {
+      setIsRecalling(true);
+      await recallMessage(viewerMessage._id);
+      if (viewerMessage.conversationId) {
+        recallMessageLocal(viewerMessage.conversationId, viewerMessage._id, {
+          content: "Tin nhắn này đã được thu hồi",
+          isRecalled: true,
+        });
+      }
+      setShowRecallConfirm(false);
+      closeViewer();
+    } catch (error: any) {
+      toast.error(error?.message || "Thu hồi thất bại");
+    } finally {
+      setIsRecalling(false);
+    }
+  };
+
   if (!isOpen || !image) return null;
 
   return (
@@ -193,9 +237,9 @@ export default function ImageViewerModal() {
             maxHeight: "90vh",
           }}
         >
-          {image.messageId ? (
+          {shouldUseSecureImage ? (
             <SecureImage
-              messageId={image.messageId}
+              messageId={image.messageId!}
               alt={image.alt ?? "image"}
               className="max-w-[90vw] max-h-[90vh] rounded-lg object-contain shadow-2xl"
               onLoadCallback={() => setIsLoaded(true)}
@@ -203,7 +247,7 @@ export default function ImageViewerModal() {
           ) : (
             <img
               ref={imgRef}
-              src={image.src}
+              src={resolvedUrl ?? image.src}
               alt={image.alt ?? "image"}
               draggable={false}
               onLoad={() => setIsLoaded(true)}
@@ -226,6 +270,11 @@ export default function ImageViewerModal() {
             <ToolbarBtn onClick={handleDownload} title="Tải xuống" disabled={!resolvedUrl}>
               <Download className="w-4 h-4" />
             </ToolbarBtn>
+            {canRecallMessage && (
+              <ToolbarBtn onClick={() => setShowRecallConfirm(true)} title="Thu hồi">
+                <Undo2 className="w-4 h-4 text-red-200" />
+              </ToolbarBtn>
+            )}
           </div>
         )}
       </div>
@@ -237,6 +286,17 @@ export default function ImageViewerModal() {
           message={viewerMessage}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={showRecallConfirm}
+        onClose={() => setShowRecallConfirm(false)}
+        onConfirm={handleRecall}
+        title="Thu hồi ảnh?"
+        description="Ảnh này sẽ bị xóa khỏi cuộc trò chuyện của bạn và những người khác. Hành động này không thể hoàn tác."
+        confirmText="Thu hồi"
+        variant="destructive"
+        isLoading={isRecalling}
+      />
 
     </div>
   );

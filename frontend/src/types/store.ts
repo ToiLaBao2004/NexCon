@@ -387,6 +387,7 @@ export interface GroupCallState {
 export interface ImageViewerItem {
   messageId?: string;
   conversationId?: string;
+  message?: Message;
   src?: string;
   alt?: string;
   downloadUrl?: string;
