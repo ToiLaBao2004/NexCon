@@ -296,7 +296,7 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
                 )}
               </div>
             ) : (
-              <p className="text-[13px] text-foreground/85 line-clamp-2 leading-relaxed truncate">
+              <p className="text-[13px] text-foreground/85 line-clamp-2 leading-relaxed break-all">
                 {resolvedPreviewText}
               </p>
             )}

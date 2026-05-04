@@ -1,4 +1,4 @@
-import { Image as ImageIcon, CheckCircle2, Link2, FileText, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2 } from "lucide-react";
+import { Image as ImageIcon, CheckCircle2, Link2, FileText, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2, Copy } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { ReactNode, UIEvent } from "react";
 import type { Conversation, Message } from "@/types/chat";
@@ -273,7 +273,16 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     }
   };
 
-  const handleRecallFile = async () => {
+  const handleCopyLink = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Đã sao chép liên kết");
+    } catch {
+      toast.error("Không thể sao chép liên kết");
+    }
+  };
+
+  const handleRecallMedia = async () => {
     if (!recallTarget || isRecalling) return;
     try {
       setIsRecalling(true);
@@ -372,7 +381,15 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   };
 
   const renderLinkRow = (msg: any) => {
+    const linkUrl = normalizeUrl(msg.content || "");
     const title = msg.previewTitle || msg.content || "Liên kết";
+    const canActOnLink = Boolean((!msg.status || msg.status === "sent") && !msg.isRecalled);
+    const canRecallLink = Boolean(
+      canActOnLink &&
+      !conversation.disbanded &&
+      user?._id &&
+      getSenderId(msg) === user._id.toString()
+    );
     let host = "";
     try {
       let u: URL;
@@ -387,32 +404,68 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     }
 
     return (
-      <a
+      <div
         key={msg._id}
-        href={normalizeUrl(msg.content)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-3 py-2 cursor-pointer group hover:bg-muted/10 rounded-lg transition-colors"
+        className="flex items-center gap-2 py-2 rounded-lg transition-colors hover:bg-muted/10 group"
       >
-        <div className="h-10 w-10 rounded-[6px] bg-muted/10 flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
-          {msg.previewImage || getYouTubeThumbnail(msg.content) ? (
-            <img
-              src={msg.previewImage || getYouTubeThumbnail(msg.content) || undefined}
-              alt={title}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            getHostIcon(host) || <Link2 className="h-5 w-5 text-muted-foreground/70" />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium truncate text-foreground group-hover:text-blue-500 transition-colors">{title}</p>
-          <div className="flex justify-between items-center mt-0.5">
-            <p className="text-[13px] text-blue-500 hover:underline cursor-pointer truncate mr-2">{host}</p>
-            <p className="text-[12px] text-muted-foreground/90 whitespace-nowrap">{formatMessageTime(new Date(msg.createdAt))}</p>
+        <button
+          type="button"
+          onClick={() => window.open(linkUrl, "_blank", "noopener,noreferrer")}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <div className="h-10 w-10 rounded-[6px] bg-muted/10 flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
+            {msg.previewImage || getYouTubeThumbnail(msg.content) ? (
+              <img
+                src={msg.previewImage || getYouTubeThumbnail(msg.content) || undefined}
+                alt={title}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              getHostIcon(host) || <Link2 className="h-5 w-5 text-muted-foreground/70" />
+            )}
           </div>
-        </div>
-      </a>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate text-foreground group-hover:text-blue-500 transition-colors">{title}</p>
+            <div className="flex justify-between items-center mt-0.5">
+              <p className="text-[13px] text-blue-500 hover:underline cursor-pointer truncate mr-2">{host}</p>
+              <p className="text-[12px] text-muted-foreground/90 whitespace-nowrap">{formatMessageTime(new Date(msg.createdAt))}</p>
+            </div>
+          </div>
+        </button>
+
+        {canActOnLink && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Thao tác liên kết"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onClick={() => setForwardTarget(msg)}>
+                <Forward className="mr-2 h-4 w-4" strokeWidth={1.7} />
+                Chuyển tiếp
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleCopyLink(linkUrl)}>
+                <Copy className="mr-2 h-4 w-4" strokeWidth={1.7} />
+                Sao chép
+              </DropdownMenuItem>
+              {canRecallLink && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  onClick={() => setRecallTarget(msg)}
+                >
+                  <Undo2 className="mr-2 h-4 w-4" strokeWidth={1.7} />
+                  Thu hồi
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
     );
   };
 
@@ -515,9 +568,11 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
       <ConfirmationModal
         isOpen={Boolean(recallTarget)}
         onClose={() => setRecallTarget(null)}
-        onConfirm={handleRecallFile}
-        title="Thu hồi file?"
-        description="File này sẽ bị xóa khỏi cuộc trò chuyện của bạn và những người khác. Hành động này không thể hoàn tác."
+        onConfirm={handleRecallMedia}
+        title={recallTarget?.type === "link" ? "Thu hồi liên kết?" : "Thu hồi file?"}
+        description={recallTarget?.type === "link"
+          ? "Liên kết này sẽ bị xóa khỏi cuộc trò chuyện của bạn và những người khác. Hành động này không thể hoàn tác."
+          : "File này sẽ bị xóa khỏi cuộc trò chuyện của bạn và những người khác. Hành động này không thể hoàn tác."}
         confirmText="Thu hồi"
         variant="destructive"
         isLoading={isRecalling}
