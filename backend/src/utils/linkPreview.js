@@ -30,6 +30,14 @@ function getMeta($, key, attr = 'property') {
     return $(`meta[${attr}="${key}"]`).attr('content')?.trim() || '';
 }
 
+function getMetaAny($, key) {
+    return firstNonEmpty(
+        getMeta($, key, 'property'),
+        getMeta($, key, 'name'),
+        getMeta($, key, 'itemprop')
+    );
+}
+
 function firstNonEmpty(...values) {
     return values.find((value) => typeof value === 'string' && value.trim())?.trim() || '';
 }
@@ -37,6 +45,59 @@ function firstNonEmpty(...values) {
 function safeHostname(url) {
     try { return new URL(url).hostname; }
     catch { return ''; }
+}
+
+function toAbsoluteUrl(value, baseUrl) {
+    if (!value) return '';
+
+    try {
+        return new URL(value, baseUrl).toString();
+    } catch {
+        return value;
+    }
+}
+
+function collectJsonLdObjects(value, output = []) {
+    if (!value || typeof value !== 'object') return output;
+
+    if (Array.isArray(value)) {
+        value.forEach((item) => collectJsonLdObjects(item, output));
+        return output;
+    }
+
+    output.push(value);
+
+    if (value['@graph']) {
+        collectJsonLdObjects(value['@graph'], output);
+    }
+
+    return output;
+}
+
+function extractJsonLdPreview($) {
+    const scripts = $('script[type="application/ld+json"]').toArray();
+    const objects = [];
+
+    for (const script of scripts) {
+        const raw = $(script).contents().text().trim();
+        if (!raw) continue;
+
+        try {
+            collectJsonLdObjects(JSON.parse(raw), objects);
+        } catch {
+            continue;
+        }
+    }
+
+    const candidate = objects.find((item) => item.name || item.headline || item.description || item.image) || {};
+    const rawImage = Array.isArray(candidate.image) ? candidate.image[0] : candidate.image;
+    const image = typeof rawImage === 'object' ? rawImage?.url : rawImage;
+
+    return {
+        title: firstNonEmpty(candidate.name, candidate.headline),
+        description: firstNonEmpty(candidate.description),
+        image: firstNonEmpty(image),
+    };
 }
 
 function createPreviewSecurityError(message) {
@@ -232,7 +293,15 @@ function createSafeLookup() {
         const cb = typeof options === 'function' ? options : callback;
         try {
             const records = await resolvePublicHostname(hostname);
-            const family = typeof options === 'object' ? options.family : 0;
+            const lookupOptions = typeof options === 'object' ? options : {};
+            const family = lookupOptions.family || 0;
+
+            if (lookupOptions.all) {
+                const selectedRecords = records.filter((record) => !family || record.family === family);
+                cb(null, selectedRecords.length ? selectedRecords : records);
+                return;
+            }
+
             const selectedRecord = records.find((record) => !family || record.family === family) || records[0];
 
             cb(null, selectedRecord.address, selectedRecord.family);
@@ -387,6 +456,20 @@ function logSettledFailure(label, result) {
     );
 }
 
+function getPreviewErrorSummary(error) {
+    if (!error) return 'Unknown error';
+    if (error.response?.status) return `HTTP ${error.response.status}`;
+    if (error.code) return error.code;
+    if (error.message) return error.message;
+    if (Array.isArray(error.errors) && error.errors.length > 0) {
+        return error.errors
+            .map((item) => item?.code || item?.message)
+            .filter(Boolean)
+            .join(', ') || 'Aggregate request error';
+    }
+    return String(error);
+}
+
 async function fetchYouTubePreview(url) {
     const videoId = extractYouTubeVideoId(url);
     const canonicalUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : url;
@@ -466,24 +549,34 @@ async function fetchGenericPreview(url, hostname) {
     });
 
     const $ = cheerio.load(html);
+    const jsonLdPreview = extractJsonLdPreview($);
+    const rawImage = firstNonEmpty(
+        getMetaAny($, 'og:image:secure_url'),
+        getMetaAny($, 'og:image'),
+        getMetaAny($, 'twitter:image'),
+        getMetaAny($, 'image'),
+        jsonLdPreview.image
+    );
 
     return {
         url,
-        title:
-            getMeta($, 'og:title') ||
-            getMeta($, 'twitter:title', 'name') ||
-            $('title').first().text().trim() ||
-            '',
-        description:
-            getMeta($, 'og:description') ||
-            getMeta($, 'twitter:description', 'name') ||
-            getMeta($, 'description', 'name') ||
-            '',
-        image:
-            getMeta($, 'og:image') ||
-            getMeta($, 'twitter:image', 'name') ||
-            '',
-        siteName: getMeta($, 'og:site_name') || '',
+        title: firstNonEmpty(
+            getMetaAny($, 'og:title'),
+            getMetaAny($, 'twitter:title'),
+            getMetaAny($, 'title'),
+            jsonLdPreview.title,
+            $('h1').first().text(),
+            $('title').first().text()
+        ),
+        description: firstNonEmpty(
+            getMetaAny($, 'og:description'),
+            getMetaAny($, 'twitter:description'),
+            getMetaAny($, 'description'),
+            jsonLdPreview.description,
+            $('p').first().text()
+        ),
+        image: toAbsoluteUrl(rawImage, url),
+        siteName: firstNonEmpty(getMetaAny($, 'og:site_name'), hostname),
         hostname,
     };
 }
@@ -506,7 +599,7 @@ export async function fetchLinkPreview(url) {
         try {
             return await fetchGenericPreview(url, hostname);
         } catch (scrapeErr) {
-            console.error('Scrape error:', scrapeErr.message, 'for', url);
+            console.error('Scrape error:', getPreviewErrorSummary(scrapeErr), 'for', url);
             return { url, hostname };
         }
 
