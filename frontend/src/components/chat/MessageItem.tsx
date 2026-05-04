@@ -187,11 +187,16 @@ function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 		if (isPlaying) {
 			audio.pause();
 		} else {
-			audio.play().then(() => {
-				if (audio.duration === Infinity) {
-					audio.currentTime = 1e101;
-				}
-			}).catch(console.error);
+			// Workaround for Chrome Infinity bug on webm:
+			if (audio.duration === Infinity) {
+				audio.currentTime = 1e101;
+				setTimeout(() => {
+					audio.currentTime = 0;
+					audio.play().catch(console.error);
+				}, 100);
+			} else {
+				audio.play().catch(console.error);
+			}
 		}
 	};
 
@@ -1901,7 +1906,8 @@ const MessageItem = ({
 	const isVisualOnly = (isImage || isSticker) && !hasContent && !message.replyTo && !message.metadata?.forwardedFrom;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
-	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
+	const isBlob = message.fileUrl?.startsWith("blob:") ?? false;
+	const downloadUrl = (!isBlob && message.fileUrl) || cachedMediaUrl || "#";
 	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
 	const downloadableBubbleMessages = bubbleMessages.filter((item) =>
 		item.isRecalled !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
@@ -1910,13 +1916,18 @@ const MessageItem = ({
 
 	// Automatically fetch signed URL for files and audio if not cached
 	useEffect(() => {
-		if ((message.type === "file" || message.type === "audio") && message.filePublicId && !message.fileUrl && !cachedMediaUrl) {
+		if (
+			(message.type === "file" || message.type === "audio") &&
+			message.filePublicId &&
+			(!message.fileUrl || isBlob) &&  // fetch nếu là blob hoặc không có url
+			!cachedMediaUrl
+		) {
 			const fetchUrl = async () => {
 				try {
 					const { url } = await chatService.getSignedMediaUrl(message._id);
 					useMediaCacheStore.getState().setUrl(message._id, url);
 				} catch (error) {
-					console.error('Failed to fetch media url for file/audio:', message._id, error);
+					console.error('Failed to fetch media url:', message._id, error);
 				}
 			};
 			fetchUrl();
