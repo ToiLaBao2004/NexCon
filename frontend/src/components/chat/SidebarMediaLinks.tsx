@@ -229,7 +229,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   };
 
   const getFileUrl = async (msg: Message) => {
-    let url = msg.fileUrl || useMediaCacheStore.getState().cache[msg._id];
+    let url = msg.filePublicId ? useMediaCacheStore.getState().getUrl(msg._id) : msg.fileUrl;
     if (!url && msg.filePublicId) {
       const response = await chatService.getSignedMediaUrl(msg._id);
       url = response.url;
@@ -255,7 +255,15 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
       if (!url) return;
 
       try {
-        const response = await fetch(url);
+        let response = await fetch(url);
+        if (!response.ok && msg.filePublicId) {
+          const refreshed = await chatService.getSignedMediaUrl(msg._id);
+          const refreshedUrl = refreshed.url;
+          useMediaCacheStore.getState().setUrl(msg._id, refreshedUrl);
+          response = await fetch(refreshedUrl);
+        }
+        if (!response.ok) throw new Error("Download failed");
+
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
         const anchor = document.createElement("a");

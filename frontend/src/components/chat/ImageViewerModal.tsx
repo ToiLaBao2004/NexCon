@@ -8,10 +8,11 @@ import ForwardMessageModal from "./ForwardMessageModal";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { toast } from "sonner";
+import { chatService } from "@/services/chatService";
 
 function useResolvedUrl(messageId?: string, fallbackSrc?: string): string | null {
-  const cache = useMediaCacheStore((s) => s.cache);
-  if (messageId && cache[messageId]) return cache[messageId];
+  const cachedUrl = useMediaCacheStore((s) => messageId ? s.getUrl(messageId) : null);
+  if (cachedUrl) return cachedUrl;
   return fallbackSrc ?? null;
 }
 function ToolbarBtn({
@@ -46,6 +47,7 @@ function ToolbarBtn({
 export default function ImageViewerModal() {
   const { isOpen, image, closeViewer } = useImageViewerStore();
   const resolvedUrl = useResolvedUrl(image?.messageId, image?.downloadUrl ?? image?.src);
+  const setCachedMediaUrl = useMediaCacheStore((s) => s.setUrl);
   const { messages, conversations, recallMessage, recallMessageLocal } = useChatStore();
   const { user } = useAuthStore();
 
@@ -142,10 +144,24 @@ export default function ImageViewerModal() {
   };
 
   const handleDownload = async () => {
-    const url = resolvedUrl;
+    let url = resolvedUrl;
+    if (!url && image?.messageId) {
+      const response = await chatService.getSignedMediaUrl(image.messageId);
+      url = response.url;
+      setCachedMediaUrl(image.messageId, url);
+    }
     if (!url) return;
+
     try {
-      const res = await fetch(url);
+      let res = await fetch(url);
+      if (!res.ok && image?.messageId) {
+        const response = await chatService.getSignedMediaUrl(image.messageId);
+        url = response.url;
+        setCachedMediaUrl(image.messageId, url);
+        res = await fetch(url);
+      }
+      if (!res.ok) throw new Error("Download failed");
+
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");

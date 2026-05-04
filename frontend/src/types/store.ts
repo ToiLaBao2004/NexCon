@@ -52,8 +52,11 @@ export interface MediaState {
 
 export interface MediaCacheState {
   cache: Record<string, string>;
+  cacheExpiresAt: Record<string, number>;
   setUrl: (messageId: string, url: string) => void;
   clearUrl: (messageId: string) => void;
+  getUrl: (messageId: string) => string | null;
+  isExpired: (messageId: string) => boolean;
 }
 
 export type MediaKind = 'image' | 'file' | 'link';

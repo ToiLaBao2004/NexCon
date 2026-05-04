@@ -588,6 +588,22 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					href={downloadUrl}
 					target="_blank"
 					rel="noopener noreferrer"
+					onClick={async (event) => {
+						if (!message.filePublicId) return;
+						event.preventDefault();
+
+						try {
+							let url = useMediaCacheStore.getState().getUrl(message._id);
+							if (!url) {
+								const response = await chatService.getSignedMediaUrl(message._id);
+								url = response.url;
+								useMediaCacheStore.getState().setUrl(message._id, url);
+							}
+							window.open(url, "_blank", "noopener,noreferrer");
+						} catch {
+							toast.error("KhÃ´ng thá»ƒ má»Ÿ file");
+						}
+					}}
 					className={cn(
 						"flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all group/file",
 						isOwn
@@ -1905,7 +1921,7 @@ const MessageItem = ({
 		: message.type === "sticker" ? false : !!message.content?.trim();
 	const isVisualOnly = (isImage || isSticker) && !hasContent && !message.replyTo && !message.metadata?.forwardedFrom;
 
-	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
+	const cachedMediaUrl = useMediaCacheStore(state => state.getUrl(message._id));
 	const isBlob = message.fileUrl?.startsWith("blob:") ?? false;
 	const downloadUrl = (!isBlob && message.fileUrl) || cachedMediaUrl || "#";
 	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
@@ -2117,7 +2133,7 @@ const MessageItem = ({
 	};
 
 	const downloadMessageFile = async (item: Message) => {
-		let url = item.fileUrl || useMediaCacheStore.getState().cache[item._id];
+		let url = item.filePublicId ? useMediaCacheStore.getState().getUrl(item._id) : item.fileUrl;
 		if (!url && item.filePublicId) {
 			const response = await chatService.getSignedMediaUrl(item._id);
 			url = response.url;
@@ -2126,7 +2142,15 @@ const MessageItem = ({
 		if (!url) return;
 
 		try {
-			const response = await fetch(url);
+			let response = await fetch(url);
+			if (!response.ok && item.filePublicId) {
+				const refreshed = await chatService.getSignedMediaUrl(item._id);
+				url = refreshed.url;
+				useMediaCacheStore.getState().setUrl(item._id, url);
+				response = await fetch(url);
+			}
+			if (!response.ok) throw new Error("Download failed");
+
 			const blob = await response.blob();
 			const blobUrl = URL.createObjectURL(blob);
 			const anchor = document.createElement("a");
