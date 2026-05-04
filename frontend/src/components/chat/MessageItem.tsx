@@ -417,6 +417,15 @@ function ImageBatchGrid({
 	);
 
 	const renderImage = (item: Message) => {
+		if (item.isRecalled) {
+			return (
+				<div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-slate-200/80 text-slate-400 dark:bg-slate-800/70 dark:text-slate-500">
+					<ImageIcon className="size-7" strokeWidth={1.7} />
+					<span className="text-sm font-semibold">Đã thu hồi</span>
+				</div>
+			);
+		}
+
 		if (item.filePublicId) {
 			return (
 				<SecureImage
@@ -449,16 +458,18 @@ function ImageBatchGrid({
 						key={item._id}
 						type="button"
 						className={tileClassName(index)}
-						onClick={() =>
+						disabled={item.isRecalled === true}
+						onClick={() => {
+							if (item.isRecalled) return;
 							useImageViewerStore.getState().openViewer(
 								item.filePublicId
-									? { messageId: item._id, conversationId, alt: item.fileName ?? "image" }
-									: { src: item.fileUrl!, conversationId, alt: item.fileName ?? "image" }
-							)
-						}
+									? { messageId: item._id, conversationId, message: item, alt: item.fileName ?? "image" }
+									: { messageId: item._id, src: item.fileUrl!, conversationId, message: item, alt: item.fileName ?? "image" }
+							);
+						}}
 					>
 						{renderImage(item)}
-						{isOwn && (
+						{isOwn && !item.isRecalled && (
 							<span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-black/55 text-white shadow-sm">
 								{item.status === "sending" ? (
 									<Clock className="size-3 animate-spin" />
@@ -472,7 +483,7 @@ function ImageBatchGrid({
 					</button>
 				))}
 			</div>
-			{items[0]?.content && (
+			{items[0]?.content && !items[0]?.isRecalled && (
 				<p className="text-sm px-1">
 					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
 				</p>
@@ -484,16 +495,16 @@ function ImageBatchGrid({
 function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchItems }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[]; imageBatchItems?: Message[] }) {
 	const type: MessageType = message.type ?? "text";
 
+	if (imageBatchItems && imageBatchItems.length > 1) {
+		return <ImageBatchGrid items={imageBatchItems} isOwn={isOwn} participants={participants} conversationId={message.conversationId} />;
+	}
+
 	if (message.isRecalled) {
 		return (
 			<span className="italic text-muted-foreground">
 				{isOwn ? "Bạn đã thu hồi một tin nhắn" : "Tin nhắn đã được thu hồi"}
 			</span>
 		);
-	}
-
-	if (imageBatchItems && imageBatchItems.length > 1) {
-		return <ImageBatchGrid items={imageBatchItems} isOwn={isOwn} participants={participants} conversationId={message.conversationId} />;
 	}
 
 	if (type === "image" && (message.filePublicId || message.fileUrl)) {
@@ -507,6 +518,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							useImageViewerStore.getState().openViewer({
 								messageId: message._id,
 								conversationId: message.conversationId,
+								message,
 								alt: message.fileName ?? "image",
 							})
 						}
@@ -523,8 +535,10 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						className="p-0 border-0 bg-transparent cursor-zoom-in"
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
+								messageId: message._id,
 								src: message.fileUrl!,
 								conversationId: message.conversationId,
+								message,
 								alt: message.fileName ?? "image",
 							})
 						}
@@ -1877,21 +1891,25 @@ const MessageItem = ({
 	const isOwn = actualSenderId?.toString() === currentUserId?.toString();
 
 	const { onlineUsers } = useSocketStore();
-	const isRecalled = message.isRecalled === true;
+	const isImageBatch = (imageBatchItems?.length ?? 0) > 1;
+	const hasUnrecalledBatchMessage = imageBatchItems?.some((item) => item.isRecalled !== true) ?? false;
+	const isRecalled = message.isRecalled === true && (!isImageBatch || !hasUnrecalledBatchMessage);
 	const isPinned = message.isPinned === true;
-	const isImage = message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled;
+	const isImage = isImageBatch || (message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled);
 	const isLink = message.type === "link" && !isRecalled;
 	const isSticker = message.type === "sticker" && !isRecalled;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
-	const hasContent = message.type === "sticker" ? false : !!message.content?.trim();
+	const hasContent = isImageBatch
+		? Boolean(imageBatchItems?.some((item) => item.isRecalled !== true && item.content?.trim()))
+		: message.type === "sticker" ? false : !!message.content?.trim();
 	const isVisualOnly = (isImage || isSticker) && !hasContent && !message.replyTo && !message.metadata?.forwardedFrom;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
 	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
 	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
 	const downloadableBubbleMessages = bubbleMessages.filter((item) =>
-		(item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
+		item.isRecalled !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
 	);
 	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
 
@@ -2129,7 +2147,7 @@ const MessageItem = ({
 
 	const handleRecall = async () => {
 		try {
-			for (const item of bubbleMessages.filter((entry) => !entry.status || entry.status === "sent")) {
+			for (const item of bubbleMessages.filter((entry) => entry.isRecalled !== true && (!entry.status || entry.status === "sent"))) {
 				await recallMessage(item._id);
 			}
 		}
@@ -2188,7 +2206,7 @@ const MessageItem = ({
 								isOwn && "ms-auto",
 								isVisualOnly ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-1.5 text-sm" : "px-2 py-1.5 text-sm"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
-								isRecalled
+								isRecalled && !isImageBatch
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
 									: isVisualOnly
 										? "bg-transparent border-0 shadow-none"
@@ -2653,7 +2671,7 @@ const MessageItem = ({
 					open={showForwardModal}
 					onOpenChange={(open) => setShowForwardModal(open)}
 					message={message}
-					messages={bubbleMessages.filter((item) => !item.status || item.status === "sent")}
+					messages={bubbleMessages.filter((item) => item.isRecalled !== true && (!item.status || item.status === "sent"))}
 				/>
 			)}
 		</>

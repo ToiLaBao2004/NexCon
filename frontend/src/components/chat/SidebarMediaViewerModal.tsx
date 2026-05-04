@@ -57,6 +57,8 @@ export function SidebarMediaViewerModal({
               onClick={() =>
                 useImageViewerStore.getState().openViewer({
                   messageId: msg._id,
+                  conversationId: msg.conversationId,
+                  message: msg,
                   alt: msg.fileName ?? "image",
                 })
               }
@@ -70,6 +72,9 @@ export function SidebarMediaViewerModal({
               className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30 cursor-zoom-in hover:ring-2 hover:ring-primary/30 transition-all"
               onClick={() =>
                 useImageViewerStore.getState().openViewer({
+                  messageId: msg._id,
+                  conversationId: msg.conversationId,
+                  message: msg,
                   src: msg.fileUrl ?? undefined,
                   alt: msg.fileName ?? "image",
                 })

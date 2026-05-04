@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { Message, Conversation } from "@/types/chat";
+import SecureImage from "@/components/SecureImage";
 import UserAvatar from "./UserAvatar";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { toast } from "sonner";
@@ -128,10 +129,12 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
   const [isSending, setIsSending] = useState(false);
 
   const batchMessages = messages?.length ? messages : [message];
+  const isImageBatch = batchMessages.length > 1 && batchMessages.every((item) => item.type === "image");
+  const isSingleImage = batchMessages.length === 1 && message.type === "image" && (message.filePublicId || message.fileUrl);
   const { text: previewText, Icon: PreviewIcon } = getMessagePreview(message);
-  const resolvedPreviewText = batchMessages.length > 1 && message.type === "image"
+  const resolvedPreviewText = isImageBatch
     ? `${batchMessages.length} hình ảnh`
-    : previewText;
+    : (isSingleImage ? "Hình ảnh" : previewText);
 
   // Filter: exclude disbanded groups, show only accessible conversations
   const filteredConversations = useMemo(() => {
@@ -247,8 +250,24 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
 
         {/* ── Original message preview ── */}
         <div className="mx-5 mt-3.5 flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-muted/40 border border-border/40">
-          <div className="h-7 w-7 rounded-md bg-background border border-border/50 flex items-center justify-center shrink-0 mt-0.5">
-            <PreviewIcon className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="h-7 w-7 rounded-md bg-background border border-border/50 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
+            {isSingleImage ? (
+              message.filePublicId ? (
+                <SecureImage
+                  messageId={message._id}
+                  alt={message.fileName ?? "image"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <img
+                  src={message.fileUrl ?? ""}
+                  alt={message.fileName ?? "image"}
+                  className="h-full w-full object-cover"
+                />
+              )
+            ) : (
+              <PreviewIcon className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-medium text-muted-foreground mb-0.5">Tin nhắn gốc</p>
@@ -259,6 +278,22 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
                   alt="sticker-preview" 
                   className="size-16 object-contain rounded-lg bg-background/50 p-1 border border-border/40" 
                 />
+              </div>
+            ) : isSingleImage ? (
+              <div className="mt-1">
+                {message.filePublicId ? (
+                  <SecureImage
+                    messageId={message._id}
+                    alt={message.fileName ?? "image"}
+                    className="size-16 object-cover rounded-lg border border-border/40"
+                  />
+                ) : (
+                  <img
+                    src={message.fileUrl ?? ""}
+                    alt={message.fileName ?? "image"}
+                    className="size-16 object-cover rounded-lg border border-border/40"
+                  />
+                )}
               </div>
             ) : (
               <p className="text-[13px] text-foreground/85 line-clamp-2 leading-relaxed truncate">
