@@ -8,7 +8,12 @@ import {
 	deleteCloudinaryResource,
 	MAX_IMAGE_SIZE,
 } from '../middlewares/uploadMiddleware.js';
-import { io, getReceiverSocketId } from '../socket/index.js';
+import {
+	io,
+	getReceiverSocketId,
+	joinUserSocketsToRoom,
+	leaveUserSocketsFromRoom,
+} from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
 
 const MUTE_DURATION_MS = {
@@ -483,6 +488,8 @@ export async function markAsSeen(req, res) {
 			userId: userId,
 			lastReadMessageId: latestMessage._id,
 			lastReadAt: now.toISOString(),
+			unreadCount: 0,
+			unreadMentionCount: 0,
 		});
 
 		return res.status(200).json({
@@ -521,7 +528,7 @@ export async function markAsUnread(req, res) {
 		if (receiverSocketId) {
 			io.to(receiverSocketId).emit('conversation-updated', {
 				conversationId: updated._id,
-				conversation: { unreadCounts: updated.unreadCounts }
+				conversation: { _id: updated._id, unreadCounts: updated.unreadCounts }
 			});
 		}
 
@@ -625,12 +632,22 @@ export async function updateConversationMute(req, res) {
 
 		const updatedConversation = await Conversation.findOne(query, { 'participants.$': 1 }).lean();
 		const mute = updatedConversation?.participants?.[0]?.mute || {};
-
-		return res.status(200).json({
+		const payload = {
+			conversationId,
+			userId: userId.toString(),
 			mute: {
 				messages: mute.messages || null,
 				meetings: mute.meetings || null,
 			},
+		};
+
+		const receiverSocketId = getReceiverSocketId(userId.toString());
+		if (receiverSocketId) {
+			io.to(receiverSocketId).emit('conversation-mute-updated', payload);
+		}
+
+		return res.status(200).json({
+			mute: payload.mute,
 		});
 	} catch (error) {
 		console.error('Error updating conversation mute:', error);
@@ -929,6 +946,11 @@ export async function clearConversation(req, res) {
 		conversation.markModified('participants');
 		await conversation.save();
 
+		const receiverSocketId = getReceiverSocketId(userId.toString());
+		if (receiverSocketId) {
+			io.to(receiverSocketId).emit('conversation-cleared', { conversationId });
+		}
+
 		return res.status(200).json({ message: 'Conversation cleared successfully.' });
 	} catch (error) {
 		console.error('Error clearing conversation:', error);
@@ -1120,11 +1142,8 @@ export async function addMembers(req, res) {
 		filteredUserIds.forEach(newMemberId => {
 			const receiverSocketId = getReceiverSocketId(newMemberId.toString());
 			if (receiverSocketId) {
-				const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-				if (receiverSocket) {
-					receiverSocket.join(conversationId);
-				}
-				io.to(receiverSocketId).emit("new-conversation", { conversation });
+				joinUserSocketsToRoom(newMemberId.toString(), conversationId.toString());
+				io.to(receiverSocketId).emit("new-conversation", { conversation: updatedConversation });
 			}
 		});
 
@@ -1283,8 +1302,7 @@ export async function handleApproval(req, res) {
 
 					const receiverSocketId = getReceiverSocketId(userId.toString());
 					if (receiverSocketId) {
-						const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-						if (receiverSocket) receiverSocket.join(conversationId.toString());
+						joinUserSocketsToRoom(userId.toString(), conversationId.toString());
 						io.to(receiverSocketId).emit("new-conversation", { conversation: updatedConversation });
 					}
 				}
@@ -1400,10 +1418,7 @@ export async function removeMember(req, res) {
 
 		const receiverSocketId = getReceiverSocketId(memberId.toString());
 		if (receiverSocketId) {
-			const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-			if (receiverSocket) {
-				receiverSocket.leave(conversationId.toString());
-			}
+			leaveUserSocketsFromRoom(memberId.toString(), conversationId.toString());
 			io.to(receiverSocketId).emit('kicked-from-group', { conversationId });
 		}
 
@@ -1692,8 +1707,7 @@ export async function leaveGroup(req, res) {
 
 		const userSocketId = getReceiverSocketId(userId);
 		if (userSocketId) {
-			const userSocket = io.sockets.sockets.get(userSocketId);
-			if (userSocket) userSocket.leave(conversationId.toString());
+			leaveUserSocketsFromRoom(userId, conversationId.toString());
 			io.to(userSocketId).emit('left-group', { conversationId });
 		}
 

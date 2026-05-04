@@ -99,6 +99,39 @@ const localizeNotificationTitle = (title?: string) => {
   return safeTitle || "NexCon";
 };
 
+const dismissReminderToast = (id?: string | null) => {
+  const reminderId = String(id || "").trim();
+  if (reminderId) {
+    toast.dismiss(`reminder-toast-${reminderId}`);
+  }
+};
+
+const dismissReminderToastIfResolved = (reminder: any) => {
+  const reminderId = reminder?._id?.toString?.() || reminder?._id;
+  const status = String(reminder?.status || "").trim();
+  if (reminderId && status && status !== "triggered") {
+    dismissReminderToast(reminderId);
+  }
+};
+
+const syncNotificationInStore = (notification: any) => {
+  if (!notification?._id) return;
+
+  useNotificationStore.setState((state) => {
+    const notificationId = notification._id.toString();
+    const exists = state.notifications.some((item) => item._id === notificationId);
+    const notifications = exists
+      ? state.notifications.map((item) => item._id === notificationId ? { ...item, ...notification } : item)
+      : [notification, ...state.notifications];
+
+    return {
+      notifications,
+      unreadCount: notifications.filter((item) => !item.isRead).length,
+      pendingReadIds: state.pendingReadIds.filter((id) => id !== notificationId),
+    };
+  });
+};
+
 const playWaitingRoomKnock = () => {
   const knockAudio = new Audio('/sounds/waiting-room-knock.mp3');
   knockAudio.volume = 0.5;
@@ -190,6 +223,19 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       if (currentUserId) {
         const chatState = useChatStore.getState();
         const allConvos = chatState.conversations;
+        const deliveredSyncKeys = new Set<string>();
+        const emitDeliveredOnce = (messageId: string, conversationId: string) => {
+          const key = `${conversationId}:${messageId}`;
+          if (deliveredSyncKeys.has(key)) return;
+
+          deliveredSyncKeys.add(key);
+          socket.emit("message-delivered", {
+            messageId,
+            conversationId,
+          });
+          useChatStore.getState().markMessageDelivered(messageId, conversationId, String(currentUserId));
+        };
+
         for (const convo of allConvos) {
           // 1. Kiểm tra lastMessage
           const lastMsg = convo.lastMessage;
@@ -199,10 +245,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
               String(senderId) !== String(currentUserId) &&
               !lastMsg.deliveredTo?.includes(currentUserId)
             ) {
-              socket.emit("message-delivered", {
-                messageId: lastMsg._id,
-                conversationId: convo._id,
-              });
+              emitDeliveredOnce(lastMsg._id, convo._id);
             }
           }
 
@@ -215,10 +258,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
               String(msgSenderId) !== String(currentUserId) &&
               !msg.deliveredTo?.includes(currentUserId)
             ) {
-              socket.emit("message-delivered", {
-                messageId: msg._id,
-                conversationId: convo._id,
-              });
+              emitDeliveredOnce(msg._id, convo._id);
             }
           }
         }
@@ -295,23 +335,41 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           messageId: message._id,
           conversationId: message.conversationId,
         });
+        if (currentUserId) {
+          useChatStore.getState().markMessageDelivered(
+            message._id,
+            message.conversationId,
+            String(currentUserId),
+          );
+        }
       }
     });
 
-    socket.on("read-message", ({ conversationId, userId, lastReadMessageId, lastReadAt }) => {
+    socket.on("read-message", ({ conversationId, userId, lastReadMessageId, lastReadAt, unreadCount, unreadMentionCount }) => {
+      const currentUserId = useAuthStore.getState().user?._id?.toString() ?? "";
+      const readerId = userId?.toString?.() || userId;
       useChatStore.setState((state) => {
         const targetId = typeof conversationId === 'object' ? conversationId._id : conversationId;
         const updatedConversations = state.conversations.map((c) => {
           if (c._id !== targetId) return c;
           return {
             ...c,
+            unreadCounts: readerId === currentUserId
+              ? {
+                ...c.unreadCounts,
+                [currentUserId]: unreadCount ?? 0,
+              }
+              : c.unreadCounts,
             participants: c.participants.map((p) => {
               const pid = (p.userId?._id || p.userId)?.toString();
-              if (pid !== userId) return p;
+              if (pid !== readerId) return p;
               return {
                 ...p,
                 lastReadMessageId,
                 lastReadAt: lastReadAt || new Date().toISOString(),
+                ...(readerId === currentUserId
+                  ? { unreadMentionCount: unreadMentionCount ?? 0 }
+                  : {}),
               };
             }),
           };
@@ -323,8 +381,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       });
     });
 
-    socket.on("message-delivered-ack", ({ messageId, conversationId }) => {
-      useChatStore.getState().markMessageDelivered(messageId, conversationId);
+    socket.on("message-delivered-ack", ({ messageId, conversationId, deliveredUserId }) => {
+      useChatStore.getState().markMessageDelivered(messageId, conversationId, deliveredUserId);
+    });
+
+    socket.on("message-delivered-sync", ({ messageId, conversationId, deliveredUserId }) => {
+      useChatStore.getState().markMessageDelivered(messageId, conversationId, deliveredUserId);
     });
 
     socket.on("new-friend-request", ({ friendRequest }) => {
@@ -358,6 +420,27 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useFriendStore.getState().removeIncomingRequest(requestId);
     });
 
+    socket.on("friend-request-resolved", ({ requestId, action, newFriend }) => {
+      if (requestId) {
+        useFriendStore.getState().removeIncomingRequest(requestId);
+      }
+      if (action === "accepted" && newFriend) {
+        useFriendStore.getState().addFriend(newFriend);
+      }
+    });
+
+    socket.on("friend-request-sent-updated", ({ friendRequest }) => {
+      if (friendRequest) {
+        useFriendStore.getState().addSentRequest(friendRequest);
+      }
+    });
+
+    socket.on("friend-request-sent-cancelled", ({ requestId }) => {
+      if (requestId) {
+        useFriendStore.getState().removeSentRequest(requestId);
+      }
+    });
+
     socket.on("unfriended", ({ friendId }) => {
       const normalizedFriendId = friendId?.toString?.() || friendId;
       if (normalizedFriendId) {
@@ -375,6 +458,33 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       });
 
       void playNotificationSound();
+    });
+
+    socket.on("notification-updated", ({ notification }) => {
+      syncNotificationInStore(notification);
+    });
+
+    socket.on("notifications-all-read", () => {
+      useNotificationStore.setState((state) => ({
+        notifications: state.notifications.map((notification) => ({ ...notification, isRead: true })),
+        unreadCount: 0,
+        pendingReadIds: [],
+        markAllPending: false,
+      }));
+    });
+
+    socket.on("notification-deleted", ({ id }) => {
+      const notificationId = id?.toString?.() || id;
+      if (!notificationId) return;
+
+      useNotificationStore.setState((state) => {
+        const notifications = state.notifications.filter((notification) => notification._id !== notificationId);
+        return {
+          notifications,
+          unreadCount: notifications.filter((notification) => !notification.isRead).length,
+          pendingReadIds: state.pendingReadIds.filter((pendingId) => pendingId !== notificationId),
+        };
+      });
     });
 
     socket.on("user_mentioned", ({ messageId, conversationId, mentionedBy, preview }) => {
@@ -461,17 +571,20 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("reminder-snoozed", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
+      dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
     });
 
     socket.on("reminder-updated", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
+      dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
     });
 
     socket.on("reminder-deleted", ({ id }) => {
       const reminderId = typeof id === 'string' ? id.trim() : '';
       if (reminderId) {
+        dismissReminderToast(reminderId);
         useReminderStore.getState().removeReminder(reminderId);
       }
       void useReminderStore.getState().fetchUpcomingCount();
@@ -479,11 +592,20 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("reminder-participation-updated", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
+      dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
     });
 
     socket.on("reminders-bulk-deleted", ({ scope }) => {
       if (scope === 'upcoming' || scope === 'past' || scope === 'all') {
+        useReminderStore.getState().reminders
+          .filter((reminder) => {
+            if (reminder.scope !== 'personal') return false;
+            if (scope === 'all') return true;
+            if (scope === 'upcoming') return reminder.status === 'pending' || reminder.status === 'snoozed';
+            return reminder.status === 'triggered' || reminder.status === 'dismissed';
+          })
+          .forEach((reminder) => dismissReminderToast(reminder._id));
         useReminderStore.getState().removeRemindersByScope(scope);
       }
       void useReminderStore.getState().fetchUpcomingCount();
@@ -491,6 +613,9 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("shared-reminder-cancelled", ({ sharedKey }) => {
       if (typeof sharedKey === 'string' && sharedKey.trim()) {
+        useReminderStore.getState().reminders
+          .filter((reminder) => reminder.sharedKey === sharedKey.trim())
+          .forEach((reminder) => dismissReminderToast(reminder._id));
         useReminderStore.getState().removeRemindersBySharedKey(sharedKey);
       }
       void useReminderStore.getState().fetchUpcomingCount();
@@ -501,10 +626,55 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       get().joinConversation(conversation._id);
     });
 
-    socket.on("conversation-updated", ({ conversation }) => {
+    socket.on("conversation-updated", ({ conversation, conversationId }) => {
       if (conversation) {
-        useChatStore.getState().updateConversation(conversation);
+        useChatStore.getState().updateConversation({
+          ...conversation,
+          _id: conversation._id || conversationId,
+        });
       }
+    });
+
+    socket.on("conversation-mute-updated", ({ conversationId, userId, mute }) => {
+      const targetConversationId = conversationId?.toString?.() || conversationId;
+      const targetUserId = userId?.toString?.() || userId;
+      if (!targetConversationId || !targetUserId) return;
+
+      useChatStore.setState((state) => ({
+        conversations: state.conversations.map((conversation) => {
+          if (String(conversation._id) !== String(targetConversationId)) {
+            return conversation;
+          }
+
+          return {
+            ...conversation,
+            participants: conversation.participants.map((participant) => {
+              const participantId = (participant.userId?._id || participant.userId)?.toString();
+              if (participantId !== String(targetUserId)) return participant;
+              return { ...participant, mute };
+            }),
+          };
+        }),
+      }));
+    });
+
+    socket.on("conversation-cleared", ({ conversationId }) => {
+      const targetConversationId = conversationId?.toString?.() || conversationId;
+      if (!targetConversationId) return;
+
+      useChatStore.setState((state) => {
+        const nextMessages = { ...state.messages };
+        delete nextMessages[targetConversationId];
+
+        return {
+          conversations: state.conversations.filter((conversation) => conversation._id !== targetConversationId),
+          activeConversationId:
+            state.activeConversationId === targetConversationId ? null : state.activeConversationId,
+          focusedConversationId:
+            state.focusedConversationId === targetConversationId ? null : state.focusedConversationId,
+          messages: nextMessages,
+        };
+      });
     });
 
     socket.on("members-added", ({ conversation }) => {
@@ -579,6 +749,33 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("user-unblocked", ({ unblockedBy }) => {
       useFriendStore.getState().removeBlockedBy(unblockedBy);
+    });
+
+    socket.on("user-blocked-self", ({ blockedUser }) => {
+      const blockedUserId = blockedUser?._id?.toString?.() || blockedUser?._id;
+      if (!blockedUserId) return;
+
+      useFriendStore.setState((state) => ({
+        blockedUsers: state.blockedUsers.some((item) => String(item._id) === String(blockedUserId))
+          ? state.blockedUsers.map((item) => String(item._id) === String(blockedUserId) ? blockedUser : item)
+          : [...state.blockedUsers, blockedUser],
+        friends: state.friends.filter((friend) => String(friend.friendId) !== String(blockedUserId)),
+        incomingRequests: state.incomingRequests.filter(
+          (request) => String(request.from?._id) !== String(blockedUserId),
+        ),
+        sentRequests: state.sentRequests.filter(
+          (request) => String(request.to?._id) !== String(blockedUserId),
+        ),
+      }));
+    });
+
+    socket.on("user-unblocked-self", ({ userId }) => {
+      const unblockedUserId = userId?.toString?.() || userId;
+      if (!unblockedUserId) return;
+
+      useFriendStore.setState((state) => ({
+        blockedUsers: state.blockedUsers.filter((item) => String(item._id) !== String(unblockedUserId)),
+      }));
     });
 
     socket.on("user-typing", ({ conversationId, userId }) => {
@@ -685,19 +882,38 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useGroupCallStore.getState().handleGroupCallToken(payload);
     });
 
+    socket.on("group-call:answered-on-other-device", (payload) => {
+      useGroupCallStore.getState().handleGroupCallAnsweredOnOtherDevice(payload);
+    });
+
+    socket.on("group-call:declined-on-other-device", (payload) => {
+      useGroupCallStore.getState().handleGroupCallDeclinedOnOtherDevice(payload);
+    });
+
     socket.on("group-call:user-joined", (payload: {
       conversationId: string;
       participants: GroupCallParticipant[];
       user?: { _id: string; displayName: string; avatarUrl: string | null };
       userId?: string;
     }) => {
-      useGroupCallStore.getState().handleGroupCallUserJoined(payload);
-
-      if (useGroupCallStore.getState().status !== "active") return;
-
       const currentUserId = getCurrentUserId();
       const joinedUserId =
         payload.user?._id?.toString() || payload.userId?.toString() || "";
+      const groupCallState = useGroupCallStore.getState();
+
+      if (
+        joinedUserId &&
+        joinedUserId === currentUserId &&
+        groupCallState.conversationId === payload.conversationId &&
+        groupCallState.status !== "active"
+      ) {
+        groupCallState.handleGroupCallAnsweredOnOtherDevice(payload);
+        return;
+      }
+
+      groupCallState.handleGroupCallUserJoined(payload);
+
+      if (useGroupCallStore.getState().status !== "active") return;
 
       if (joinedUserId && joinedUserId === currentUserId) return;
 
@@ -712,8 +928,31 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       });
     });
 
-    socket.on("group-call:user-declined", (payload) => {
-      useGroupCallStore.getState().handleGroupCallUserDeclined(payload);
+    socket.on("group-call:user-declined", (payload: {
+      conversationId: string;
+      userId?: string | null;
+      participants: GroupCallParticipant[];
+    }) => {
+      const currentUserId = getCurrentUserId();
+      const declinedUserId = payload.userId?.toString?.() || "";
+      const myParticipantStatus = payload.participants.find(
+        (participant) => participant.userId === currentUserId
+      )?.status;
+      const groupCallState = useGroupCallStore.getState();
+
+      if (
+        (
+          declinedUserId === currentUserId ||
+          (!declinedUserId && (myParticipantStatus === "declined" || myParticipantStatus === "no-answer"))
+        ) &&
+        groupCallState.conversationId === payload.conversationId &&
+        groupCallState.status === "incoming"
+      ) {
+        groupCallState.handleGroupCallDeclinedOnOtherDevice(payload);
+        return;
+      }
+
+      groupCallState.handleGroupCallUserDeclined(payload);
     });
 
     socket.on("group-call:user-left", (payload: {
@@ -772,23 +1011,33 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         return;
       }
 
-      if (meetState.roomName && String(meetState.roomName) !== targetRoomName) {
+      const currentRoomName = String(meetState.roomName || '').trim();
+      if (!currentRoomName || currentRoomName !== targetRoomName) {
         return;
       }
 
       meetState.joinMeeting(token, targetRoomName, Boolean(isHost));
     });
 
-    socket.on('participant-rejected', ({ reason }) => {
-      useMeetStore.getState().setRejectedReason(reason ?? null);
-      useMeetStore.getState().setCallStatus('rejected');
+    socket.on('participant-rejected', ({ roomName, reason }) => {
+      const meetState = useMeetStore.getState();
+      const targetRoomName = String(roomName || '').trim();
+      const currentRoomName = String(meetState.roomName || '').trim();
+      if (targetRoomName && currentRoomName !== targetRoomName) {
+        return;
+      }
+
+      meetState.setRejectedReason(reason ?? null);
+      meetState.setCallStatus('rejected');
     });
 
     socket.on('meeting-ended', ({ roomName }) => {
       const meetState = useMeetStore.getState();
-      if (meetState.roomName && String(meetState.roomName) === String(roomName)) {
+      const targetRoomName = String(roomName || '').trim().toLowerCase();
+      const currentRoomName = String(meetState.roomName || meetState.currentMeeting?.roomName || '').trim().toLowerCase();
+      if (targetRoomName && currentRoomName === targetRoomName) {
         toast.info('Chủ phòng đã kết thúc cuộc họp.');
-        meetState.leaveMeeting();
+        meetState.handleMeetingEnded();
       }
     });
 

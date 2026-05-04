@@ -135,7 +135,11 @@ export const useFriendStore = create<FriendState>((set) => ({
 	addIncomingRequest: (request) => {
 		set((state) => {
 			const exists = state.incomingRequests.some((r) => r._id === request._id);
-			if (exists) return state;
+			if (exists) {
+				return {
+					incomingRequests: state.incomingRequests.map((r) => r._id === request._id ? request : r)
+				};
+			}
 			return { incomingRequests: [request, ...state.incomingRequests] };
 		});
 	},
@@ -149,7 +153,11 @@ export const useFriendStore = create<FriendState>((set) => ({
 	addSentRequest: (request) => {
 		set((state) => {
 			const exists = state.sentRequests.some((r) => r._id === request._id);
-			if (exists) return state;
+			if (exists) {
+				return {
+					sentRequests: state.sentRequests.map((r) => r._id === request._id ? request : r)
+				};
+			}
 			return { sentRequests: [request, ...state.sentRequests] };
 		});
 	},

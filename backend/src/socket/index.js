@@ -8,7 +8,6 @@ import { registerCallHandlers, handleCallDisconnect } from "./callHandler.js";
 import { registerGroupCallHandlers, handleGroupCallDisconnect } from "./groupCallHandler.js";
 import { configureSocketGateway } from "./socketGateway.js";
 import Message from "../models/messageModel.js";
-import redis, { isRedisReady } from "../config/redis.js";
 
 const app = express();
 
@@ -23,29 +22,66 @@ const io = new Server(server, {
 
 io.use(socketAuthMiddleware);
 
-const onlineUsers = new Map();
-
-// Xóa danh sách online cũ trên Redis khi Server khởi động (đề phòng server sập trước đó)
-if (isRedisReady) {
-    redis.del("online_users").catch(console.error);
-}
+const USER_ROOM_PREFIX = "user:";
 
 // Track active calls: callerId -> direct call session (roomName, participants, status, callType)
 const activeCalls = new Map();
 
+function getUserRoom(userId) {
+    return `${USER_ROOM_PREFIX}${userId.toString()}`;
+}
+
+function getOnlineUserIds() {
+    const onlineUserIds = [];
+    for (const [roomName, sockets] of io.sockets.adapter.rooms) {
+        if (roomName.startsWith(USER_ROOM_PREFIX) && sockets.size > 0) {
+            onlineUserIds.push(roomName.slice(USER_ROOM_PREFIX.length));
+        }
+    }
+    return onlineUserIds;
+}
+
+function isUserOnline(userId) {
+    const roomSockets = io.sockets.adapter.rooms.get(getUserRoom(userId));
+    return Boolean(roomSockets && roomSockets.size > 0);
+}
+
+function emitOnlineUsers() {
+    io.emit("online-users", getOnlineUserIds());
+}
+
 function getReceiverSocketId(userId) {
-    return onlineUsers.get(userId);
+    return isUserOnline(userId) ? getUserRoom(userId) : null;
 }
 
 function emitToUser(userId, event, data) {
-    const room = `user:${userId.toString()}`;
+    const room = getUserRoom(userId);
     const roomSockets = io.sockets.adapter.rooms.get(room);
     if (!roomSockets || roomSockets.size === 0) return false;
     io.to(room).emit(event, data);
     return true;
 }
 
-configureSocketGateway(io, getReceiverSocketId);
+function joinUserSocketsToRoom(userId, roomName) {
+    if (!isUserOnline(userId)) return false;
+    io.in(getUserRoom(userId)).socketsJoin(roomName.toString());
+    return true;
+}
+
+function leaveUserSocketsFromRoom(userId, roomName) {
+    if (!isUserOnline(userId)) return false;
+    io.in(getUserRoom(userId)).socketsLeave(roomName.toString());
+    return true;
+}
+
+configureSocketGateway({
+    io,
+    getReceiverSocketId,
+    emitToUser,
+    isUserOnline,
+    joinUserSocketsToRoom,
+    leaveUserSocketsFromRoom,
+});
 
 io.on("connection", async (socket) => {
     const user = socket.user;
@@ -53,40 +89,8 @@ io.on("connection", async (socket) => {
 
     console.log(`${user.displayName} connected to socket ${socket.id}`);
 
-    socket.join(`user:${userId}`);
-
-    // 1. Vẫn giữ Local Map để phục vụ gửi tin nhắn trực tiếp qua Socket
-    onlineUsers.set(userId, socket.id);
-
-    // 2. Logic Redis: Quản lý trạng thái Online/Offline chuyên nghiệp (Presence System)
-    if (isRedisReady) {
-        try {
-            // Tăng bộ đếm số thiết bị đang kết nối của user này (Multi-device)
-            await redis.incr(`user:connections:${userId}`);
-
-            // Đánh dấu online với TTL 120s
-            await redis.set(`user:online:${userId}`, 'true', { EX: 120 });
-            await redis.sAdd("online_users", userId);
-
-            // Gửi danh sách online mới nhất cho tất cả client
-            const allOnlineUsers = await redis.sMembers("online_users");
-            io.emit("online-users", allOnlineUsers);
-        } catch (err) {
-            console.error("Lỗi cập nhật Redis Presence:", err);
-        }
-    }
-
-    // 3. Heartbeat: Gia hạn (refresh) trạng thái online mỗi 60s
-    // Đảm bảo không bị treo trạng thái online (user đã mất kết nối nhưng hệ thống vẫn hiện online) kể cả khi client tắt trình duyệt hoặc rớt mạng đột ngột
-    const heartbeatInterval = setInterval(async () => {
-        if (!isRedisReady) return;
-        try {
-            await redis.expire(`user:online:${userId}`, 120);
-            await redis.expire(`user:connections:${userId}`, 120);
-        } catch (err) {
-            console.error("Lỗi gia hạn Redis Presence:", err);
-        }
-    }, 60000);
+    socket.join(getUserRoom(userId));
+    emitOnlineUsers();
 
     // Join tất cả conversation rooms
     const conversationIds = await getUserConversationsForSocketIO(user._id);
@@ -118,15 +122,29 @@ io.on("connection", async (socket) => {
     socket.on("message-delivered", async ({ messageId, conversationId }) => {
         try {
             const userId = user._id.toString();
-            const msg = await Message.findByIdAndUpdate(
-                messageId,
+            const msg = await Message.findOneAndUpdate(
+                {
+                    _id: messageId,
+                    senderId: { $ne: userId },
+                    deliveredTo: { $ne: userId },
+                },
                 { $addToSet: { deliveredTo: userId } },
                 { new: true, select: 'senderId' }
             );
             if (msg) {
+                emitToUser(userId, "message-delivered-sync", {
+                    messageId,
+                    conversationId,
+                    deliveredUserId: userId,
+                });
+
                 const senderSocketId = getReceiverSocketId(msg.senderId.toString());
                 if (senderSocketId) {
-                    io.to(senderSocketId).emit("message-delivered-ack", { messageId, conversationId });
+                    io.to(senderSocketId).emit("message-delivered-ack", {
+                        messageId,
+                        conversationId,
+                        deliveredUserId: userId,
+                    });
                 }
             }
         } catch (err) {
@@ -135,49 +153,33 @@ io.on("connection", async (socket) => {
     });
 
     // Call handlers (tách riêng)
-    registerCallHandlers(socket, user, activeCalls, onlineUsers, io, getReceiverSocketId);
+    registerCallHandlers(socket, user, activeCalls, io, getReceiverSocketId);
 
     // Group call handlers
-    registerGroupCallHandlers(socket, user, onlineUsers, io, getReceiverSocketId);
+    registerGroupCallHandlers(socket, user, io, getReceiverSocketId);
 
     // Disconnect
     socket.on("disconnect", async () => {
         const userId = user._id.toString();
-
-        // Ngừng gia hạn heartbeat
-        clearInterval(heartbeatInterval);
+        emitOnlineUsers();
 
         // Xử lý cuộc gọi đang active (lưu DB + thông báo đối phương)
-        await handleCallDisconnect(userId, activeCalls, io, getReceiverSocketId);
+        await handleCallDisconnect(userId, socket.id, activeCalls, io, getReceiverSocketId);
 
         // Xử lý group call đang active
-        await handleGroupCallDisconnect(userId, io);
-
-        // Xóa khỏi Local Map
-        onlineUsers.delete(userId);
-
-        // Cập nhật Redis Presence
-        if (isRedisReady) {
-            try {
-                const connectionsLeft = await redis.decr(`user:connections:${userId}`);
-
-                // Nếu <= 0 nghĩa là user đã đóng TẤT CẢ các tab/thiết bị
-                if (connectionsLeft <= 0) {
-                    await redis.del(`user:connections:${userId}`);
-                    await redis.del(`user:online:${userId}`);
-                    await redis.sRem("online_users", userId);
-
-                    // Báo cho mọi người là user này đã thực sự Offline
-                    const allOnlineUsers = await redis.sMembers("online_users");
-                    io.emit("online-users", allOnlineUsers);
-                }
-            } catch (err) {
-                console.error("Lỗi xóa Redis Presence khi disconnect:", err);
-            }
-        }
+        await handleGroupCallDisconnect(userId, socket.id, io);
 
         console.log(`Socket Disconnected: ${socket.id}`);
     });
 });
 
-export { io, app, server, getReceiverSocketId, emitToUser };
+export {
+    io,
+    app,
+    server,
+    getReceiverSocketId,
+    emitToUser,
+    isUserOnline,
+    joinUserSocketsToRoom,
+    leaveUserSocketsFromRoom,
+};
