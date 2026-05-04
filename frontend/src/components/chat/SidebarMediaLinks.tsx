@@ -1,13 +1,25 @@
-import { Image as ImageIcon, CheckCircle2, Link2, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Image as ImageIcon, CheckCircle2, Link2, FileText, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2 } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { ReactNode, UIEvent } from "react";
-import type { Conversation } from "@/types/chat";
+import type { Conversation, Message } from "@/types/chat";
 import { useChatStore } from "@/stores/useChatStore";
 import { formatBytes, formatMessageTime } from "@/lib/utils";
 import type { MediaKind } from "@/types/store";
 import { SidebarMediaViewerModal } from "./SidebarMediaViewerModal";
 import SecureImage from "../SecureImage";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import ForwardMessageModal from "./ForwardMessageModal";
+import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { chatService } from "@/services/chatService";
+import useMediaCacheStore from "@/stores/useMediaCacheStore";
+import { toast } from "sonner";
 
 const VIEW_ALL_LIMIT: Record<MediaKind, number> = {
   image: 24,
@@ -52,10 +64,16 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   const fetchMedia = useChatStore((s) => s.fetchMedia);
   const fetchMediaPage = useChatStore((s) => s.fetchMediaPage);
   const resetMediaPagination = useChatStore((s) => s.resetMediaPagination);
+  const recallMessage = useChatStore((s) => s.recallMessage);
+  const recallMessageLocal = useChatStore((s) => s.recallMessageLocal);
+  const { user } = useAuthStore();
 
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [activeViewer, setActiveViewer] = useState<MediaKind | null>(null);
   const [viewerKey, setViewerKey] = useState(0);
+  const [forwardTarget, setForwardTarget] = useState<Message | null>(null);
+  const [recallTarget, setRecallTarget] = useState<Message | null>(null);
+  const [isRecalling, setIsRecalling] = useState(false);
 
   const mediaPage = useChatStore((s) =>
     activeViewer ? s.mediaPagination[conversation._id]?.[activeViewer] : undefined
@@ -205,42 +223,151 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   const viewerLoading = mediaPage?.isFetching ?? false;
   const viewerHasMore = mediaPage?.hasMore ?? true;
 
-  const renderFileRow = (msg: any) => {
+  const getSenderId = (msg: Message) => {
+    const sender = msg.senderId as any;
+    return (typeof sender === "object" ? sender?._id : sender)?.toString?.() ?? "";
+  };
+
+  const getFileUrl = async (msg: Message) => {
+    let url = msg.fileUrl || useMediaCacheStore.getState().cache[msg._id];
+    if (!url && msg.filePublicId) {
+      const response = await chatService.getSignedMediaUrl(msg._id);
+      url = response.url;
+      useMediaCacheStore.getState().setUrl(msg._id, url);
+    }
+    return url;
+  };
+
+  const handleOpenFile = async (msg: Message) => {
+    try {
+      const url = await getFileUrl(msg);
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      toast.error("Không thể mở file");
+    }
+  };
+
+  const handleDownloadFile = async (msg: Message) => {
+    try {
+      const url = await getFileUrl(msg);
+      if (!url) return;
+
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = blobUrl;
+        anchor.download = msg.fileName || `file-${msg._id}`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(blobUrl);
+      } catch {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      toast.error("Tải xuống thất bại");
+    }
+  };
+
+  const handleRecallFile = async () => {
+    if (!recallTarget || isRecalling) return;
+    try {
+      setIsRecalling(true);
+      await recallMessage(recallTarget._id);
+      recallMessageLocal(recallTarget.conversationId || conversation._id, recallTarget._id, {
+        content: "Tin nhắn này đã được thu hồi",
+        isRecalled: true,
+      });
+      setRecallTarget(null);
+    } catch (error: any) {
+      toast.error(error?.message || "Thu hồi thất bại");
+    } finally {
+      setIsRecalling(false);
+    }
+  };
+
+  const renderFileRow = (msg: Message) => {
     const name = msg.fileName ?? msg.content ?? "File";
     const size = msg.fileSize ? formatBytes(msg.fileSize) : msg.mimeType || "";
+    const canActOnFile = Boolean((!msg.status || msg.status === "sent") && !msg.isRecalled);
+    const canRecallFile = Boolean(
+      canActOnFile &&
+      !conversation.disbanded &&
+      user?._id &&
+      getSenderId(msg) === user._id.toString()
+    );
 
     return (
-      <a
+      <div
         key={msg._id}
-        href={msg.fileUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex items-center gap-3 py-2 cursor-pointer group hover:bg-muted/10 rounded-lg transition-colors"
-        download={name}
+        className="flex items-center gap-2 py-2 rounded-lg transition-colors hover:bg-muted/10 group"
       >
-        <div className="h-10 w-10 rounded-lg bg-muted/10 text-white flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
-          {(isImageFile(msg) && (msg.filePublicId || msg.fileUrl)) ? (
-            msg.filePublicId ? (
-              <SecureImage messageId={msg._id} alt={name} className="h-full w-full object-cover" />
+        <button
+          type="button"
+          onClick={() => void handleOpenFile(msg)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
+          <div className="h-10 w-10 rounded-lg bg-muted/10 text-white flex items-center justify-center shrink-0 overflow-hidden border border-border/60">
+            {(isImageFile(msg) && (msg.filePublicId || msg.fileUrl)) ? (
+              msg.filePublicId ? (
+                <SecureImage messageId={msg._id} alt={name} className="h-full w-full object-cover" />
+              ) : (
+                <img src={msg.fileUrl!} alt={name} className="h-full w-full object-cover" />
+              )
+            ) : (isVideoFile(msg) && msg.fileUrl) ? (
+              <video src={msg.fileUrl} className="h-full w-full object-cover" muted playsInline preload="metadata" />
             ) : (
-              <img src={msg.fileUrl!} alt={name} className="h-full w-full object-cover" />
-            )
-          ) : (isVideoFile(msg) && msg.fileUrl) ? (
-            <video src={msg.fileUrl} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-          ) : (
-            <FileTypeIcon fileName={msg.fileName} />
-          )}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold truncate text-foreground">{name}</p>
-          <div className="flex justify-between items-center mt-0.5">
-            <p className="text-[13px] text-muted-foreground/90 flex items-center gap-1">
-              {size} <CheckCircle2 className="h-[14px] w-[14px] text-green-500" strokeWidth={2.5} />
-            </p>
-            <p className="text-[12px] text-muted-foreground/90 whitespace-nowrap">{formatMessageTime(new Date(msg.createdAt))}</p>
+              <FileTypeIcon fileName={msg.fileName} />
+            )}
           </div>
-        </div>
-      </a>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold truncate text-foreground">{name}</p>
+            <div className="flex justify-between items-center mt-0.5">
+              <p className="text-[13px] text-muted-foreground/90 flex items-center gap-1">
+                {size} <CheckCircle2 className="h-[14px] w-[14px] text-green-500" strokeWidth={2.5} />
+              </p>
+              <p className="text-[12px] text-muted-foreground/90 whitespace-nowrap">{formatMessageTime(new Date(msg.createdAt))}</p>
+            </div>
+          </div>
+        </button>
+
+        {canActOnFile && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Thao tác file"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem onClick={() => setForwardTarget(msg)}>
+                <Forward className="mr-2 h-4 w-4" strokeWidth={1.7} />
+                Chuyển tiếp
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => void handleDownloadFile(msg)}>
+                <Download className="mr-2 h-4 w-4" strokeWidth={1.7} />
+                Tải xuống
+              </DropdownMenuItem>
+              {canRecallFile && (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                  onClick={() => setRecallTarget(msg)}
+                >
+                  <Undo2 className="mr-2 h-4 w-4" strokeWidth={1.7} />
+                  Thu hồi
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
     );
   };
 
@@ -373,6 +500,27 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         onScroll={onViewerScroll}
         renderFileRow={renderFileRow}
         renderLinkRow={renderLinkRow}
+      />
+
+      {forwardTarget && (
+        <ForwardMessageModal
+          open={Boolean(forwardTarget)}
+          onOpenChange={(open) => {
+            if (!open) setForwardTarget(null);
+          }}
+          message={forwardTarget}
+        />
+      )}
+
+      <ConfirmationModal
+        isOpen={Boolean(recallTarget)}
+        onClose={() => setRecallTarget(null)}
+        onConfirm={handleRecallFile}
+        title="Thu hồi file?"
+        description="File này sẽ bị xóa khỏi cuộc trò chuyện của bạn và những người khác. Hành động này không thể hoàn tác."
+        confirmText="Thu hồi"
+        variant="destructive"
+        isLoading={isRecalling}
       />
     </div>
   );
