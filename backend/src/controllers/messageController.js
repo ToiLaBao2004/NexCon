@@ -45,6 +45,71 @@ const parseMentionPayload = (rawMentions) => {
     return [];
 };
 
+const parseMessageMetadata = (rawMetadata) => {
+    if (!rawMetadata) {
+        return {};
+    }
+
+    if (typeof rawMetadata !== 'string') {
+        return {};
+    }
+
+    try {
+        const parsed = JSON.parse(rawMetadata);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return {};
+        }
+
+        const metadata = {};
+        const clientBatchId = String(parsed.clientBatchId || '').trim();
+        const clientBatchIndex = Number(parsed.clientBatchIndex);
+        const clientBatchSize = Number(parsed.clientBatchSize);
+
+        if (clientBatchId) {
+            metadata.clientBatchId = clientBatchId.slice(0, 120);
+        }
+        if (Number.isInteger(clientBatchIndex) && clientBatchIndex >= 0) {
+            metadata.clientBatchIndex = clientBatchIndex;
+        }
+        if (Number.isInteger(clientBatchSize) && clientBatchSize > 1 && clientBatchSize <= 10) {
+            metadata.clientBatchSize = clientBatchSize;
+        }
+
+        return metadata;
+    } catch {
+        const error = new Error('metadata must be a valid JSON object.');
+        error.statusCode = 400;
+        throw error;
+    }
+};
+
+const parseForwardBatch = (rawBatch) => {
+    if (!rawBatch || typeof rawBatch !== 'object') {
+        return null;
+    }
+
+    const batch = {};
+    const clientBatchId = String(rawBatch.clientBatchId || '').trim();
+    const clientBatchIndex = Number(rawBatch.clientBatchIndex);
+    const clientBatchSize = Number(rawBatch.clientBatchSize);
+
+    if (clientBatchId) {
+        batch.clientBatchId = clientBatchId.slice(0, 120);
+    }
+    if (Number.isInteger(clientBatchIndex) && clientBatchIndex >= 0) {
+        batch.clientBatchIndex = clientBatchIndex;
+    }
+    if (Number.isInteger(clientBatchSize) && clientBatchSize > 1 && clientBatchSize <= 10) {
+        batch.clientBatchSize = clientBatchSize;
+    }
+
+    if (!batch.clientBatchId || !batch.clientBatchSize) {
+        return null;
+    }
+
+    return batch;
+};
+
 const normalizeMentionEntry = (mention) => {
     const userId = String(mention?.userId || '').trim();
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
@@ -86,12 +151,60 @@ const buildValidMentions = (conversation, rawMentions) => {
     return mentions;
 };
 
+const saveConversationForNewMessage = async ({ conversationId, message, senderId, mentions = [] }) => {
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) {
+            const error = new Error('Conversation not found.');
+            error.statusCode = 404;
+            throw error;
+        }
+
+        if (Array.isArray(mentions) && mentions.length > 0) {
+            const mentionedUserIds = new Set(
+                mentions
+                    .map((mention) => mention.userId.toString())
+                    .filter((mentionUserId) => mentionUserId !== senderId.toString())
+            );
+
+            if (mentionedUserIds.size > 0) {
+                conversation.participants.forEach((participant) => {
+                    const participantId = participant.userId.toString();
+                    if (mentionedUserIds.has(participantId)) {
+                        participant.unreadMentionCount = (participant.unreadMentionCount || 0) + 1;
+                    }
+                });
+                conversation.markModified('participants');
+            }
+        }
+
+        updateConversationLastMessage(conversation, message, senderId);
+
+        try {
+            await conversation.save();
+            return conversation;
+        } catch (error) {
+            if (error?.name === 'VersionError' && attempt < maxAttempts) {
+                continue;
+            }
+            throw error;
+        }
+    }
+
+    const error = new Error('Could not update conversation after sending message.');
+    error.statusCode = 409;
+    throw error;
+};
+
 export async function sendMessage(req, res) {
     try {
         const senderId = req.user._id;
         const { type = 'text', recipientId, content, replyTo } = req.body;
         const uploadedFile = req.file;
         const rawMentions = parseMentionPayload(req.body.mentions);
+        const metadata = parseMessageMetadata(req.body.metadata);
 
         let conversation = req.conversation;
         let createdDirectConversation = false;
@@ -126,6 +239,10 @@ export async function sendMessage(req, res) {
             type,
             mentions,
         };
+
+        if (Object.keys(metadata).length > 0) {
+            messageData.metadata = metadata;
+        }
 
         switch (type) {
             case 'text': {
@@ -345,26 +462,12 @@ export async function sendMessage(req, res) {
             });
         }
 
-        if (Array.isArray(mentions) && mentions.length > 0) {
-            const mentionedUserIds = new Set(
-                mentions
-                    .map((mention) => mention.userId.toString())
-                    .filter((mentionUserId) => mentionUserId !== senderId.toString())
-            );
-
-            if (mentionedUserIds.size > 0) {
-                conversation.participants.forEach((participant) => {
-                    const participantId = participant.userId.toString();
-                    if (mentionedUserIds.has(participantId)) {
-                        participant.unreadMentionCount = (participant.unreadMentionCount || 0) + 1;
-                    }
-                });
-                conversation.markModified('participants');
-            }
-        }
-
-        updateConversationLastMessage(conversation, message, senderId);
-        await conversation.save();
+        conversation = await saveConversationForNewMessage({
+            conversationId: conversation._id,
+            message,
+            senderId,
+            mentions,
+        });
 
         if (createdDirectConversation) {
             const populatedConversation = await Conversation.findById(conversation._id).populate({
@@ -954,7 +1057,8 @@ export async function forwardMessage(req, res) {
     try {
         const senderId = req.user._id;
         const { messageId } = req.params;
-        const { targetConversationIds } = req.body;
+        const { targetConversationIds, forwardBatch } = req.body;
+        const forwardBatchMetadata = parseForwardBatch(forwardBatch);
 
         if (!Array.isArray(targetConversationIds) || targetConversationIds.length === 0) {
             return res.status(400).json({ message: 'targetConversationIds is required and must be a non-empty array.' });
@@ -1021,6 +1125,7 @@ export async function forwardMessage(req, res) {
                 const forwardedMetadata = {
                     ...(sourceMetadata.linkPreview ? { linkPreview: sourceMetadata.linkPreview } : {}),
                     forwardedFrom,
+                    ...(forwardBatchMetadata ? forwardBatchMetadata : {}),
                 };
 
                 const msgData = {
@@ -1041,11 +1146,14 @@ export async function forwardMessage(req, res) {
 
                 const newMsg = await Message.create(msgData);
 
-                updateConversationLastMessage(targetConvo, newMsg, senderId);
-                await targetConvo.save();
+                const savedTargetConvo = await saveConversationForNewMessage({
+                    conversationId: targetConvo._id,
+                    message: newMsg,
+                    senderId,
+                });
 
                 const signedUrl = generateSignedUrl(newMsg.filePublicId, newMsg.type);
-                emitNewMessage(io, targetConvo, newMsg, signedUrl);
+                emitNewMessage(io, savedTargetConvo, newMsg, signedUrl);
 
                 results.push({
                     conversationId: targetConvoId,

@@ -116,6 +116,9 @@ export interface ForwardedFrom {
 export interface MessageMetadata {
   linkPreview?: LinkPreview;
   forwardedFrom?: ForwardedFrom;
+  clientBatchId?: string;
+  clientBatchIndex?: number;
+  clientBatchSize?: number;
 
   [key: string]: any;
 }

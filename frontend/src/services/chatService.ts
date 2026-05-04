@@ -64,7 +64,7 @@ export const chatService = {
 		payload: SendMessagePayload,
 		onProgress?: (percent: number) => void,
 	): Promise<{ message: Message; signedUrl?: string }> {
-		const { type, recipientId, conversationId, content, file, replyToMessageId, mentions } = payload;
+		const { type, recipientId, conversationId, content, file, replyToMessageId, mentions, metadata } = payload;
 
 		const formData = new FormData();
 		formData.append('type', type);
@@ -75,6 +75,9 @@ export const chatService = {
 		if (replyToMessageId) formData.append('replyTo', replyToMessageId);
 		if (Array.isArray(mentions) && mentions.length > 0) {
 			formData.append('mentions', JSON.stringify(mentions));
+		}
+		if (metadata && Object.keys(metadata).length > 0) {
+			formData.append('metadata', JSON.stringify(metadata));
 		}
 
 		try {
@@ -291,10 +294,14 @@ export const chatService = {
 
 	async forwardMessage(
 		messageId: string,
-		targetConversationIds: string[]
+		targetConversationIds: string[],
+		forwardBatch?: { clientBatchId?: string | null; clientBatchIndex?: number; clientBatchSize?: number }
 	): Promise<{ forwarded: number; results: any[]; errors: { conversationId: string; reason: string }[] }> {
 		try {
-			const res = await api.post(`/messages/${messageId}/forward`, { targetConversationIds });
+			const res = await api.post(`/messages/${messageId}/forward`, {
+				targetConversationIds,
+				...(forwardBatch ? { forwardBatch } : {}),
+			});
 			return res.data;
 		} catch (error: any) {
 			throw new Error(resolveErrorMessage(error));

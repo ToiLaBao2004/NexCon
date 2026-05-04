@@ -16,6 +16,7 @@ import { draftStorage } from "@/lib/draftStorage";
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
+const MAX_IMAGE_ATTACHMENTS = 10;
 
 
 
@@ -24,6 +25,23 @@ interface Attachment {
 	file: File;
 	preview?: string;
 }
+
+const revokeAttachmentPreview = (attachment?: Attachment | null) => {
+	if (attachment?.preview) {
+		URL.revokeObjectURL(attachment.preview);
+	}
+};
+
+const revokeAttachmentPreviews = (attachments: Attachment[]) => {
+	attachments.forEach(revokeAttachmentPreview);
+};
+
+const createClientBatchId = () => {
+	if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+		return crypto.randomUUID();
+	}
+	return `batch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
 
 interface MentionCandidate {
 	userId: string;
@@ -146,7 +164,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const currentUserId = user?._id ?? "";
 
 	const [value, setValue] = useState("");
-	const [attachment, setAttachment] = useState<Attachment | null>(null);
+	const [attachments, setAttachments] = useState<Attachment[]>([]);
 	const [sending, setSending] = useState(false);
 	const [loadingLocal, setLoadingLocal] = useState(false);
 	const [isRecording, setIsRecording] = useState(false);
@@ -156,6 +174,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 	const [selectedMentions, setSelectedMentions] = useState<MentionCandidate[]>([]);
 	const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const attachmentsRef = useRef<Attachment[]>([]);
 
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const imageInputRef = useRef<HTMLInputElement>(null);
@@ -163,6 +182,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const textInputRef = useRef<HTMLTextAreaElement>(null);
 
 	const participants = selectedConvo.participants;
+	const attachment = attachments[0] ?? null;
 	const mentionCandidates = useMemo(() => {
 		const keyword = mentionQuery.trim().toLowerCase();
 
@@ -189,7 +209,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const isBlockedByOther = otherUserId && blockedBy.includes(otherUserId);
 
 	const resolveType = (text: string): MessageType => {
-		if (attachment) return attachment.type;
+		if (attachments.length > 0) return attachments[0].type;
 		if (text && isUrl(text)) return "link";
 		return "text";
 	};
@@ -197,18 +217,28 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const handleSend = async () => {
 		const trimmed = value.trim();
 		const type = resolveType(trimmed);
+		const currentAttachments = attachments;
 
-		if (type === "text" && !trimmed && !attachment) return;
-		if ((type === "image" || type === "file" || type === "audio") && !attachment?.file) return;
+		if (type === "text" && !trimmed && currentAttachments.length === 0) return;
+		if ((type === "image" || type === "file" || type === "audio") && currentAttachments.length === 0) return;
 
 		const currValue = trimmed;
-		const prevAttachment = attachment;
+		const prevAttachments = currentAttachments;
 		const prevMentions = selectedMentions;
+		const tokenized = buildMentionsFromText(currValue, prevMentions);
+		const withTarget = (payload: Parameters<typeof sendMessage>[0]) => {
+			if (selectedConvo.type === "direct") {
+				payload.recipientId = otherUserId as string;
+			} else {
+				payload.conversationId = selectedConvo._id;
+			}
+			return payload;
+		};
 		setValue("");
 		if (textInputRef.current) {
 			textInputRef.current.style.height = "auto";
 		}
-		setAttachment(null);
+		setAttachments([]);
 		setIsRecording(false);
 		setSelectedMentions([]);
 		setMentionOpen(false);
@@ -220,41 +250,105 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		clearDraft(selectedConvo._id);
 		draftStorage.delete(selectedConvo._id);
 
-		const payload: Parameters<typeof sendMessage>[0] = { type };
-
-		if (selectedConvo.type === "direct") {
-			payload.recipientId = otherUserId as string;
-		} else {
-			payload.conversationId = selectedConvo._id;
-		}
-
-		const tokenized = buildMentionsFromText(currValue, prevMentions);
-		if (tokenized.content) payload.content = tokenized.content;
-		if (attachment?.file) payload.file = attachment.file;
-		if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
-
 		setSending(true);
+		let sentCount = 0;
 
 		try {
-			await sendMessage(payload, (_pct) => {
-			});
+			if (prevAttachments.length > 0) {
+				const imageBatchId = prevAttachments.length > 1 && prevAttachments.every((item) => item.type === "image")
+					? createClientBatchId()
+					: null;
+				const isImageBatch = Boolean(imageBatchId);
+
+				const sendTasks = prevAttachments.map((item, index) => {
+					const payload = withTarget({ type: item.type, file: item.file });
+
+					if (index === 0 || isImageBatch) {
+						if (tokenized.content) payload.content = tokenized.content;
+						if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
+					}
+					if (replyingTo?._id && isImageBatch) {
+						payload.replyToMessageId = replyingTo._id;
+					}
+					if (imageBatchId) {
+						payload.metadata = {
+							clientBatchId: imageBatchId,
+							clientBatchIndex: index,
+							clientBatchSize: prevAttachments.length,
+						};
+					}
+
+					return sendMessage(payload, (_pct) => {
+					});
+				});
+
+				const results = await Promise.allSettled(sendTasks);
+				const isFilteredError = (reason: any) => {
+					const message = String(reason?.message || "").toLowerCase();
+					return message.includes("tiêu chuẩn cộng đồng") || message.includes("vi phạm");
+				};
+				const filteredCount = results.filter((result) =>
+					result.status === "rejected" && isFilteredError(result.reason)
+				).length;
+				const firstUploadError = results.find((result) =>
+					result.status === "rejected" && !isFilteredError(result.reason)
+				);
+
+				if (filteredCount > 0) {
+					toast.warning(`Đã lọc ra ${filteredCount} ảnh không hợp lệ.`);
+				}
+				if (firstUploadError?.status === "rejected") {
+					throw firstUploadError.reason;
+				}
+			} else {
+				const payload = withTarget({ type });
+				if (tokenized.content) payload.content = tokenized.content;
+				if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
+
+				await sendMessage(payload, (_pct) => {
+				});
+			}
+
+			revokeAttachmentPreviews(prevAttachments);
 		} catch (error: any) {
+			if (prevAttachments.length > 1 && prevAttachments.every((item) => item.type === "image")) {
+				revokeAttachmentPreviews(prevAttachments);
+				setValue("");
+				setAttachments([]);
+				setSelectedMentions([]);
+				toast.error(
+					error?.message ?? "Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại!"
+				);
+				return;
+			}
+
 			const isModerationError =
 				error?.response?.data?.moderation ||
 				error?.message?.toLowerCase().includes("tiêu chuẩn cộng đồng");
 
+			const failedAttachmentIndex = prevAttachments.length > 0 ? sentCount : -1;
+			const restoreStart = isModerationError && failedAttachmentIndex >= 0
+				? failedAttachmentIndex + 1
+				: sentCount;
+			const restoredAttachments = prevAttachments.slice(restoreStart);
+			const revokeCount = isModerationError && failedAttachmentIndex >= 0
+				? failedAttachmentIndex + 1
+				: sentCount;
+
+			revokeAttachmentPreviews(prevAttachments.slice(0, revokeCount));
+
 			if (isModerationError) {
 				setValue("");
-				setAttachment(null);
+				setAttachments(restoredAttachments);
 
 				toast.error(
 					error?.response?.data?.message ||
 					"Tin nhắn vi phạm tiêu chuẩn cộng đồng."
 				);
 			} else {
-				setValue(currValue);
-				setAttachment(prevAttachment);
-				setSelectedMentions(prevMentions);
+				setValue(sentCount === 0 ? currValue : "");
+				setAttachments(restoredAttachments);
+				setSelectedMentions(sentCount === 0 ? prevMentions : []);
 
 				toast.error(
 					error?.message ?? "Đã xảy ra lỗi khi gửi tin nhắn. Vui lòng thử lại!"
@@ -363,18 +457,20 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
 
 		draftTimeoutRef.current = setTimeout(() => {
-			if (value.trim() || attachment) {
+			const persistedAttachment = attachments.length === 1 ? attachments[0] : null;
+
+			if (value.trim() || attachments.length > 0) {
 				setDraft(selectedConvo._id, {
 					content: value,
-					type: attachment ? attachment.type : (isUrl(value) ? "link" : "text"),
-					attachment: attachment ? {
-						type: attachment.type,
-						file: attachment.file,
-						preview: attachment.preview
+					type: attachments.length > 0 ? attachments[0].type : (isUrl(value) ? "link" : "text"),
+					attachment: persistedAttachment ? {
+						type: persistedAttachment.type,
+						file: persistedAttachment.file,
+						preview: persistedAttachment.preview
 					} : null
 				});
-				if (attachment) {
-					draftStorage.save(selectedConvo._id, attachment.file, attachment.type);
+				if (persistedAttachment) {
+					draftStorage.save(selectedConvo._id, persistedAttachment.file, persistedAttachment.type);
 				} else {
 					draftStorage.delete(selectedConvo._id);
 				}
@@ -387,21 +483,25 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		return () => {
 			if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
 		};
-	}, [value, attachment, selectedConvo._id, setDraft, clearDraft]);
+	}, [value, attachments, selectedConvo._id, setDraft, clearDraft]);
 
 	useEffect(() => {
-		return () => {
-			if (attachment?.preview) {
-				URL.revokeObjectURL(attachment.preview);
-			}
-		};
-	}, [attachment]);
+		attachmentsRef.current = attachments;
+	}, [attachments]);
+
+	useEffect(() => () => {
+		revokeAttachmentPreviews(attachmentsRef.current);
+	}, []);
 
 	useEffect(() => {
 		const rawDraft = useChatStore.getState().drafts[selectedConvo._id];
 		const existingDraft = typeof rawDraft === "string" ? rawDraft : (rawDraft?.content || "");
 		const draftAttachment = (rawDraft && typeof rawDraft === 'object') ? rawDraft.attachment : null;
 
+		setAttachments((current) => {
+			revokeAttachmentPreviews(current);
+			return [];
+		});
 		setValue(existingDraft);
 
 		if (draftAttachment && draftAttachment.file) {
@@ -409,24 +509,24 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				? URL.createObjectURL(draftAttachment.file)
 				: undefined;
 
-			setAttachment({
+			setAttachments([{
 				type: draftAttachment.type,
 				file: draftAttachment.file,
 				preview: preview
-			});
+			}]);
 		} else {
 			draftStorage.get(selectedConvo._id).then((stored) => {
 				if (stored) {
 					const preview = stored.type === 'image'
 						? URL.createObjectURL(stored.file)
 						: undefined;
-					setAttachment({
+					setAttachments([{
 						type: stored.type,
 						file: stored.file,
 						preview
-					});
+					}]);
 				} else {
-					setAttachment(null);
+					setAttachments([]);
 				}
 			});
 		}
@@ -459,34 +559,86 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
 		const items = Array.from(e.clipboardData?.items || []);
 
-		const imageItem = items.find((item) => item.type.startsWith("image/"));
-		if (!imageItem) return;
+		const imageItems = items.filter((item) => item.type.startsWith("image/"));
+		if (imageItems.length === 0) return;
 
 		e.preventDefault();
 
-		const file = imageItem.getAsFile();
-		if (!file) {
+		const pastedImages = imageItems
+			.map((item, index) => {
+				const file = item.getAsFile();
+				if (!file) return null;
+				const extension = file.type.split("/")[1] || "png";
+				return new File(
+					[file],
+					`pasted-image-${Date.now()}-${index + 1}.${extension}`,
+					{ type: file.type, lastModified: Date.now() }
+				);
+			})
+			.filter((file): file is File => Boolean(file));
+
+		if (pastedImages.length === 0) {
 			toast.error("Không đọc được ảnh từ clipboard.");
 			return;
 		}
 
-		// Nếu đang có attachment cũ thì dọn preview cũ trước
-		if (attachment?.preview) {
-			URL.revokeObjectURL(attachment.preview);
+		attachImages(pastedImages);
+	};
+
+	const buildImageAttachment = (file: File): Attachment => ({
+		type: "image",
+		file,
+		preview: URL.createObjectURL(file),
+	});
+
+	const attachImages = (files: File[]) => {
+		const validFiles: File[] = [];
+		for (const file of files) {
+			if (!file.type.startsWith("image/")) {
+				toast.error("Chỉ hỗ trợ file ảnh (jpg, png, gif, webp...)");
+				continue;
+			}
+			if (file.size > MAX_IMAGE_SIZE) {
+				toast.error(`Ảnh quá lớn - tối đa ${formatBytes(MAX_IMAGE_SIZE)}`);
+				continue;
+			}
+			validFiles.push(file);
 		}
 
-		// Đặt tên file dễ nhìn hơn
-		const extension = file.type.split("/")[1] || "png";
-		const pastedImage = new File(
-			[file],
-			`pasted-image-${Date.now()}.${extension}`,
-			{ type: file.type, lastModified: Date.now() }
-		);
+		if (validFiles.length === 0) return;
 
-		attachImage(pastedImage);
+		const startsNewImageBatch = attachments.some((item) => item.type !== "image");
+		const currentImageCount = startsNewImageBatch ? 0 : attachments.length;
+		const availableSlots = MAX_IMAGE_ATTACHMENTS - currentImageCount;
+
+		if (availableSlots <= 0) {
+			toast.error(`Chỉ có thể gửi tối đa ${MAX_IMAGE_ATTACHMENTS} ảnh một lần.`);
+			return;
+		}
+
+		const nextFiles = validFiles.slice(0, availableSlots);
+		if (validFiles.length > availableSlots) {
+			toast.warning(`Chỉ thêm ${availableSlots} ảnh đầu tiên.`);
+		}
+
+		setLoadingLocal(true);
+		setTimeout(() => {
+			setAttachments((current) => {
+				const shouldReplace = current.some((item) => item.type !== "image");
+				if (shouldReplace) {
+					revokeAttachmentPreviews(current);
+				}
+				const base = shouldReplace ? [] : current;
+				return [...base, ...nextFiles.map(buildImageAttachment)];
+			});
+			setLoadingLocal(false);
+		}, 200);
 	};
 
 	const attachImage = (file: File) => {
+		attachImages([file]);
+		return;
+
 		if (!file.type.startsWith("image/")) {
 			toast.error("Chỉ hỗ trợ file ảnh (jpg, png, gif, webp…)");
 			return;
@@ -497,13 +649,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 
 		// cleanup preview cũ nếu có
-		if (attachment?.preview) {
-			URL.revokeObjectURL(attachment.preview);
-		}
-
 		setLoadingLocal(true);
 		setTimeout(() => {
-			setAttachment({ type: "image", file, preview: URL.createObjectURL(file) });
+			setAttachments((current) => [...current, { type: "image", file, preview: URL.createObjectURL(file) }]);
 			setLoadingLocal(false);
 		}, 400);
 	};
@@ -520,7 +668,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		setLoadingLocal(true);
 		setTimeout(() => {
-			setAttachment({ type: "file", file });
+			setAttachments((current) => {
+				revokeAttachmentPreviews(current);
+				return [{ type: "file", file }];
+			});
 			setLoadingLocal(false);
 		}, 400);
 	};
@@ -530,7 +681,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		setIsRecording(false);
 
 		const currValue = value;
-		const prevAttachment = attachment;
+		const prevAttachments = attachments;
 		const prevMentions = selectedMentions;
 
 		const payload: Parameters<typeof sendMessage>[0] = { type: "audio", file };
@@ -551,7 +702,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 			if (isModerationError) {
 				setValue("");
-				setAttachment(null);
+				setAttachments([]);
 
 				toast.error(
 					error?.response?.data?.message ||
@@ -559,7 +710,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				);
 			} else {
 				setValue(currValue);
-				setAttachment(prevAttachment);
+				setAttachments(prevAttachments);
 				setSelectedMentions(prevMentions);
 
 				toast.error(
@@ -570,7 +721,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			setSending(false);
 			setTimeout(() => textInputRef.current?.focus(), 0);
 		}
-	}, [selectedConvo, otherUserId, sendMessage]);
+	}, [selectedConvo, otherUserId, sendMessage, value, attachments, selectedMentions]);
 
 	const handleStickerSelect = async (url: string) => {
 		const payload: Parameters<typeof sendMessage>[0] = {
@@ -595,9 +746,12 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 	};
 
-	const removeAttachment = () => {
-		if (attachment?.preview) URL.revokeObjectURL(attachment.preview);
-		setAttachment(null);
+	const removeAttachment = (index: number) => {
+		setAttachments((current) => {
+			const removed = current[index];
+			revokeAttachmentPreview(removed);
+			return current.filter((_, itemIndex) => itemIndex !== index);
+		});
 	};
 
 	if (selectedConvo.type === "direct") {
@@ -625,7 +779,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		);
 	}
 
-	const canSend = !sending && (attachment !== null || value.trim().length > 0);
+	const canSend = !sending && (attachments.length > 0 || value.trim().length > 0);
 
 	return (
 		<div className="flex flex-col bg-background border-t border-border/50">
@@ -676,22 +830,32 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 			{loadingLocal && <ProgressBar percent={100} label="Đang tải" />}
 
-			{attachment && (
+			{attachments.length > 0 && (
 				<div className="flex items-center gap-2 px-3 pt-2.5">
-					{attachment.type === "image" && attachment.preview ? (
-						<div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/50 shrink-0">
-							<img src={attachment.preview} alt="preview" className="w-full h-full object-cover" />
-							<button
-								onClick={removeAttachment}
-								className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 hover:bg-black/80 transition-colors"
-							>
-								<X className="size-3 text-white" />
-							</button>
+					{attachments.every((item) => item.type === "image") ? (
+						<div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
+							{attachments.map((item, index) => (
+								<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/50 shrink-0">
+									{item.preview && <img src={item.preview} alt="preview" className="w-full h-full object-cover" />}
+									<button
+										type="button"
+										onClick={() => removeAttachment(index)}
+										className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 hover:bg-black/80 transition-colors"
+									>
+										<X className="size-3 text-white" />
+									</button>
+								</div>
+							))}
+							{attachments.length > 1 && (
+								<span className="text-xs text-muted-foreground shrink-0">
+									{attachments.length}/{MAX_IMAGE_ATTACHMENTS}
+								</span>
+							)}
 						</div>
 					) : attachment.type === "audio" && attachment.preview ? (
 						<div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 text-sm max-w-xs w-full">
 							<audio controls src={attachment.preview} className="h-8 w-48" />
-							<button onClick={removeAttachment} className="ml-1 hover:text-destructive transition-colors shrink-0">
+							<button onClick={() => removeAttachment(0)} className="ml-1 hover:text-destructive transition-colors shrink-0">
 								<X className="size-4" />
 							</button>
 						</div>
@@ -702,7 +866,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 								<span className="truncate font-medium text-foreground">{attachment.file.name}</span>
 								<span className="text-xs text-muted-foreground">{formatBytes(attachment.file.size)}</span>
 							</div>
-							<button onClick={removeAttachment} className="ml-1 hover:text-destructive transition-colors shrink-0">
+							<button onClick={() => removeAttachment(0)} className="ml-1 hover:text-destructive transition-colors shrink-0">
 								<X className="size-4" />
 							</button>
 						</div>
@@ -716,8 +880,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					ref={imageInputRef}
 					type="file"
 					accept="image/*"
+					multiple
 					className="hidden"
-					onChange={(e) => { const f = e.target.files?.[0]; if (f) attachImage(f); e.target.value = ""; }}
+					onChange={(e) => { const files = Array.from(e.target.files ?? []); if (files.length) attachImages(files); e.target.value = ""; }}
 				/>
 				<input
 					ref={fileInputRef}

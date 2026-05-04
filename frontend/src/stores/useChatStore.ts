@@ -501,7 +501,7 @@ export const useChatStore = create<ChatState>()(
                 const finalPayload: SendMessagePayload = {
                     ...payload,
                     conversationId: payload.conversationId ?? (!payload.recipientId ? (activeConversationId ?? undefined) : undefined),
-                    replyToMessageId: replyingTo?._id ?? undefined,
+                    replyToMessageId: payload.replyToMessageId ?? replyingTo?._id ?? undefined,
                 };
 
                 const replyToSnapshot = replyingTo
@@ -524,7 +524,7 @@ export const useChatStore = create<ChatState>()(
                 let tempBlobUrl: string | null = null;
 
                 if (convoId && user) {
-                    tempId = `temp_${Date.now()}`;
+                    tempId = `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
                     if (isFileUpload && payload.file) {
                         tempBlobUrl = URL.createObjectURL(payload.file);
@@ -536,6 +536,7 @@ export const useChatStore = create<ChatState>()(
                         senderId: user._id,
                         type: payload.type,
                         content: payload.content ?? null,
+                        metadata: payload.metadata,
                         fileName: payload.file?.name,
                         fileSize: payload.file?.size,
                         fileUrl: tempBlobUrl,
@@ -641,29 +642,42 @@ export const useChatStore = create<ChatState>()(
                             };
                         });
                     }
+                    if (tempBlobUrl) URL.revokeObjectURL(tempBlobUrl);
 
                     // Clear draft when message is sent successfully
                     if (convoId) {
                         get().clearDraft(convoId);
                     }
-                } catch (error) {
+                } catch (error: any) {
+                    const isModerationError =
+                        payload.type === 'image' &&
+                        (
+                            error?.response?.data?.moderation ||
+                            error?.message?.toLowerCase().includes('tiêu chuẩn cộng đồng') ||
+                            error?.message?.toLowerCase().includes('vi phạm')
+                        );
+
                     if (tempId && convoId) {
                         set((state) => {
                             const prev = state.messages[convoId];
                             if (!prev) return state;
+                            const items = isModerationError
+                                ? prev.items.filter((m) => m._id !== tempId)
+                                : prev.items.map((m) =>
+                                    m._id === tempId ? { ...m, status: 'error' as const } : m
+                                );
                             return {
                                 messages: {
                                     ...state.messages,
                                     [convoId]: {
                                         ...prev,
-                                        items: prev.items.map((m) =>
-                                            m._id === tempId ? { ...m, status: 'error' as const } : m
-                                        ),
+                                        items,
                                     },
                                 },
                             };
                         });
                     }
+                    if (tempBlobUrl) URL.revokeObjectURL(tempBlobUrl);
                     throw error;
                 }
             },
@@ -1675,9 +1689,13 @@ export const useChatStore = create<ChatState>()(
                     throw error;
                 }
             },
-            forwardMessage: async (messageId: string, targetConversationIds: string[]) => {
+            forwardMessage: async (
+                messageId: string,
+                targetConversationIds: string[],
+                forwardBatch?: { clientBatchId?: string | null; clientBatchIndex?: number; clientBatchSize?: number }
+            ) => {
                 try {
-                    const result = await chatService.forwardMessage(messageId, targetConversationIds);
+                    const result = await chatService.forwardMessage(messageId, targetConversationIds, forwardBatch);
                     return { forwarded: result.forwarded, errors: result.errors };
                 } catch (error) {
                     console.error("Lỗi khi chuyển tiếp tin nhắn:", error);

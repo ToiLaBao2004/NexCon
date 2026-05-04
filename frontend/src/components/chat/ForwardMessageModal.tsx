@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,10 +16,18 @@ import UserAvatar from "./UserAvatar";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { toast } from "sonner";
 
+const createClientBatchId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `batch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 interface ForwardMessageModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   message: Message;
+  messages?: Message[];
 }
 
 // ─── Preview helpers ───────────────────────────────────────────────────────────
@@ -110,7 +119,7 @@ function ConversationRow({
 }
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
-const ForwardMessageModal = ({ open, onOpenChange, message }: ForwardMessageModalProps) => {
+const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardMessageModalProps) => {
   const { conversations, forwardMessage } = useChatStore();
   const { user } = useAuthStore();
 
@@ -118,7 +127,11 @@ const ForwardMessageModal = ({ open, onOpenChange, message }: ForwardMessageModa
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSending, setIsSending] = useState(false);
 
+  const batchMessages = messages?.length ? messages : [message];
   const { text: previewText, Icon: PreviewIcon } = getMessagePreview(message);
+  const resolvedPreviewText = batchMessages.length > 1 && message.type === "image"
+    ? `${batchMessages.length} hình ảnh`
+    : previewText;
 
   // Filter: exclude disbanded groups, show only accessible conversations
   const filteredConversations = useMemo(() => {
@@ -161,7 +174,30 @@ const ForwardMessageModal = ({ open, onOpenChange, message }: ForwardMessageModa
     if (selectedIds.size === 0 || isSending) return;
     setIsSending(true);
     try {
-      const result = await forwardMessage(message._id, Array.from(selectedIds));
+      const targets = Array.from(selectedIds);
+      const isImageBatch = batchMessages.length > 1 && batchMessages.every((item) => item.type === "image");
+      const forwardBatchId = isImageBatch ? createClientBatchId() : null;
+      const forwardBatchSize = isImageBatch ? batchMessages.length : 0;
+
+      const results = await Promise.all(
+        batchMessages.map((item, index) =>
+          forwardMessage(
+            item._id,
+            targets,
+            isImageBatch
+              ? {
+                clientBatchId: forwardBatchId,
+                clientBatchIndex: index,
+                clientBatchSize: forwardBatchSize,
+              }
+              : undefined
+          )
+        )
+      );
+      const result = {
+        forwarded: Math.max(...results.map((item) => item.forwarded), 0),
+        errors: results.flatMap((item) => item.errors),
+      };
 
       if (result.forwarded > 0) {
         toast.success(
@@ -189,7 +225,9 @@ const ForwardMessageModal = ({ open, onOpenChange, message }: ForwardMessageModa
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md p-0 gap-0 overflow-hidden rounded-2xl border border-border/60 shadow-2xl">
+      <DialogPortal>
+        <DialogOverlay className="z-[100000]" />
+        <DialogPrimitive.Content className="bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[100001] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 duration-200 outline-none sm:max-w-lg max-w-md p-0 overflow-hidden rounded-2xl border border-border/60 shadow-2xl">
         {/* ── Header ── */}
         <DialogHeader className="px-5 pt-5 pb-4 border-b border-border/50 shrink-0">
           <div className="flex items-center gap-3">
@@ -224,7 +262,7 @@ const ForwardMessageModal = ({ open, onOpenChange, message }: ForwardMessageModa
               </div>
             ) : (
               <p className="text-[13px] text-foreground/85 line-clamp-2 leading-relaxed truncate">
-                {previewText}
+                {resolvedPreviewText}
               </p>
             )}
           </div>
@@ -344,7 +382,8 @@ const ForwardMessageModal = ({ open, onOpenChange, message }: ForwardMessageModa
             </Button>
           </div>
         </div>
-      </DialogContent>
+        </DialogPrimitive.Content>
+      </DialogPortal>
     </Dialog>
   );
 };
