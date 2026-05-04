@@ -176,9 +176,24 @@ io.on("connection", async (socket) => {
     socket.on("message-delivered", async ({ messageId, conversationId }) => {
         try {
             const userId = user._id.toString();
+            if (!messageId || !conversationId) {
+                return;
+            }
+
+            const conversation = await Conversation.findOne({
+                _id: conversationId,
+                'participants.userId': userId,
+            }).select('_id');
+
+            if (!conversation) {
+                console.warn(`Rejected message-delivered from non-member ${userId} for conversation ${conversationId}`);
+                return;
+            }
+
             const msg = await Message.findOneAndUpdate(
                 {
                     _id: messageId,
+                    conversationId: conversation._id,
                     senderId: { $ne: userId },
                     deliveredTo: { $ne: userId },
                 },
