@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, ZoomIn, ZoomOut, Download, RotateCcw } from "lucide-react";
+import { X, ZoomIn, ZoomOut, Download, RotateCcw, Forward } from "lucide-react";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
 import SecureImage from "@/components/SecureImage";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
+import { useChatStore } from "@/stores/useChatStore";
+import ForwardMessageModal from "./ForwardMessageModal";
 
 function useResolvedUrl(messageId?: string, fallbackSrc?: string): string | null {
   const cache = useMediaCacheStore((s) => s.cache);
@@ -41,15 +43,21 @@ function ToolbarBtn({
 export default function ImageViewerModal() {
   const { isOpen, image, closeViewer } = useImageViewerStore();
   const resolvedUrl = useResolvedUrl(image?.messageId, image?.src);
+  const { messages } = useChatStore();
 
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [showForwardModal, setShowForwardModal] = useState(false);
 
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const viewerMessage = image?.conversationId && image?.messageId
+    ? messages[image.conversationId]?.items.find((item) => item._id === image.messageId)
+    : null;
+  const canActOnMessage = Boolean(viewerMessage && !viewerMessage.status && !viewerMessage.isRecalled);
 
   useEffect(() => {
     if (isOpen) {
@@ -154,9 +162,6 @@ export default function ImageViewerModal() {
           <ToolbarBtn onClick={handleReset} title="Đặt lại (0)" disabled={scale === 1 && offset.x === 0 && offset.y === 0}>
             <RotateCcw className="w-4 h-4" />
           </ToolbarBtn>
-          <ToolbarBtn onClick={handleDownload} title="Tải xuống" disabled={!resolvedUrl}>
-            <Download className="w-4 h-4" />
-          </ToolbarBtn>
           <ToolbarBtn onClick={() => closeViewer()} title="Đóng (Esc)">
             <X className="w-4.5 h-4.5" />
           </ToolbarBtn>
@@ -213,7 +218,26 @@ export default function ImageViewerModal() {
         className="absolute bottom-0 left-0 right-0 flex justify-center pb-4 pointer-events-none"
         style={{ background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)" }}
       >
+        {canActOnMessage && (
+          <div className="flex items-center gap-2 rounded-full bg-black/45 px-2.5 py-2 backdrop-blur-md pointer-events-auto">
+            <ToolbarBtn onClick={() => setShowForwardModal(true)} title="Chuyển tiếp">
+              <Forward className="w-4 h-4" />
+            </ToolbarBtn>
+            <ToolbarBtn onClick={handleDownload} title="Tải xuống" disabled={!resolvedUrl}>
+              <Download className="w-4 h-4" />
+            </ToolbarBtn>
+          </div>
+        )}
       </div>
+
+      {viewerMessage && showForwardModal && (
+        <ForwardMessageModal
+          open={showForwardModal}
+          onOpenChange={setShowForwardModal}
+          message={viewerMessage}
+        />
+      )}
+
     </div>
   );
 }

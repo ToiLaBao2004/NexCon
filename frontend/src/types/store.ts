@@ -32,6 +32,7 @@ export interface SendMessagePayload {
   file?: File;
   replyToMessageId?: string;
   mentions?: Mention[];
+  metadata?: Record<string, unknown>;
 }
 
 export type ThemeState = {
@@ -135,7 +136,11 @@ export interface ChatState {
   transferAdminRole: (conversationId: string, memberId: string) => Promise<void>;
   updateAdminLocal: (conversationId: string, newAdminId: string) => void;
   leaveGroup: (conversationId: string, silent?: boolean, newAdminId?: string) => Promise<void>;
-  forwardMessage: (messageId: string, targetConversationIds: string[]) => Promise<{ forwarded: number; errors: { conversationId: string; reason: string }[] }>;
+  forwardMessage: (
+    messageId: string,
+    targetConversationIds: string[],
+    forwardBatch?: { clientBatchId?: string | null; clientBatchIndex?: number; clientBatchSize?: number }
+  ) => Promise<{ forwarded: number; errors: { conversationId: string; reason: string }[] }>;
   muteConversation: (conversationId: string, target: 'messages' | 'meetings' | 'both', duration: '1h' | '8h' | '24h' | 'forever' | 'off') => Promise<void>;
   markMessageDelivered: (messageId: string, conversationId: string, deliveredUserId?: string) => void;
 
@@ -381,6 +386,7 @@ export interface GroupCallState {
 
 export interface ImageViewerItem {
   messageId?: string;
+  conversationId?: string;
   src?: string;
   alt?: string;
   downloadUrl?: string;

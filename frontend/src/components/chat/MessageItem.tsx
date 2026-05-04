@@ -391,10 +391,97 @@ interface MessageItemProps {
 	selectedConvo: Conversation;
 	currentUserId: string;
 	isLastMyMessage?: boolean;
+	imageBatchItems?: Message[];
 	onReply?: (message: Message) => void;
 }
 
-function MessageContent({ message, isOwn, downloadUrl, participants }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[] }) {
+function ImageBatchGrid({
+	items,
+	isOwn,
+	participants,
+	conversationId,
+}: {
+	items: Message[];
+	isOwn: boolean;
+	participants: Participant[];
+	conversationId: string;
+}) {
+	const visibleItems = items.slice(0, 10);
+	const count = visibleItems.length;
+
+	const tileClassName = (index: number) => cn(
+		"relative overflow-hidden bg-muted",
+		count === 1 ? "max-w-[240px] max-h-[300px]" : "h-[118px] w-[118px] sm:h-[132px] sm:w-[132px]",
+		count === 3 && index === 0 && "row-span-2 h-[240px] sm:h-[268px]",
+		count >= 4 && "h-[112px] w-[112px] sm:h-[126px] sm:w-[126px]"
+	);
+
+	const renderImage = (item: Message) => {
+		if (item.filePublicId) {
+			return (
+				<SecureImage
+					messageId={item._id}
+					alt={item.fileName ?? "image"}
+					className="h-full w-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+				/>
+			);
+		}
+
+		return (
+			<img
+				src={item.fileUrl ?? ""}
+				alt={item.fileName ?? "image"}
+				className="h-full w-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+			/>
+		);
+	};
+
+	return (
+		<div className="flex flex-col gap-1.5">
+			<div
+				className={cn(
+					"grid gap-1 overflow-hidden rounded-2xl bg-background/60 dark:bg-black/20",
+					count === 1 ? "grid-cols-1" : "grid-cols-2"
+				)}
+			>
+				{visibleItems.map((item, index) => (
+					<button
+						key={item._id}
+						type="button"
+						className={tileClassName(index)}
+						onClick={() =>
+							useImageViewerStore.getState().openViewer(
+								item.filePublicId
+									? { messageId: item._id, conversationId, alt: item.fileName ?? "image" }
+									: { src: item.fileUrl!, conversationId, alt: item.fileName ?? "image" }
+							)
+						}
+					>
+						{renderImage(item)}
+						{isOwn && (
+							<span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-black/55 text-white shadow-sm">
+								{item.status === "sending" ? (
+									<Clock className="size-3 animate-spin" />
+								) : item.status === "error" ? (
+									<AlertCircle className="size-3 text-red-200" />
+								) : (
+									<Check className="size-3.5" strokeWidth={2.5} />
+								)}
+							</span>
+						)}
+					</button>
+				))}
+			</div>
+			{items[0]?.content && (
+				<p className="text-sm px-1">
+					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
+				</p>
+			)}
+		</div>
+	);
+}
+
+function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchItems }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[]; imageBatchItems?: Message[] }) {
 	const type: MessageType = message.type ?? "text";
 
 	if (message.isRecalled) {
@@ -403,6 +490,10 @@ function MessageContent({ message, isOwn, downloadUrl, participants }: { message
 				{isOwn ? "Bạn đã thu hồi một tin nhắn" : "Tin nhắn đã được thu hồi"}
 			</span>
 		);
+	}
+
+	if (imageBatchItems && imageBatchItems.length > 1) {
+		return <ImageBatchGrid items={imageBatchItems} isOwn={isOwn} participants={participants} conversationId={message.conversationId} />;
 	}
 
 	if (type === "image" && (message.filePublicId || message.fileUrl)) {
@@ -415,6 +506,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants }: { message
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
 								messageId: message._id,
+								conversationId: message.conversationId,
 								alt: message.fileName ?? "image",
 							})
 						}
@@ -432,6 +524,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants }: { message
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
 								src: message.fileUrl!,
+								conversationId: message.conversationId,
 								alt: message.fileName ?? "image",
 							})
 						}
@@ -1746,6 +1839,7 @@ const MessageItem = ({
 	selectedConvo,
 	currentUserId,
 	isLastMyMessage,
+	imageBatchItems,
 	onReply,
 }: MessageItemProps) => {
 	if (message.type === "system") {
@@ -1795,6 +1889,10 @@ const MessageItem = ({
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.cache[message._id]);
 	const downloadUrl = message.fileUrl || cachedMediaUrl || "#";
+	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
+	const downloadableBubbleMessages = bubbleMessages.filter((item) =>
+		(item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
+	);
 	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
 
 	// Automatically fetch signed URL for files and audio if not cached
@@ -1994,8 +2092,47 @@ const MessageItem = ({
 		}
 	};
 
+	const downloadMessageFile = async (item: Message) => {
+		let url = item.fileUrl || useMediaCacheStore.getState().cache[item._id];
+		if (!url && item.filePublicId) {
+			const response = await chatService.getSignedMediaUrl(item._id);
+			url = response.url;
+			useMediaCacheStore.getState().setUrl(item._id, url);
+		}
+		if (!url) return;
+
+		try {
+			const response = await fetch(url);
+			const blob = await response.blob();
+			const blobUrl = URL.createObjectURL(blob);
+			const anchor = document.createElement("a");
+			anchor.href = blobUrl;
+			anchor.download = item.fileName || `${item.type}-${item._id}`;
+			document.body.appendChild(anchor);
+			anchor.click();
+			anchor.remove();
+			URL.revokeObjectURL(blobUrl);
+		} catch {
+			window.open(url, "_blank", "noopener,noreferrer");
+		}
+	};
+
+	const handleDownloadBubble = async () => {
+		try {
+			for (const item of downloadableBubbleMessages) {
+				await downloadMessageFile(item);
+			}
+		} catch {
+			toast.error("Tải xuống thất bại");
+		}
+	};
+
 	const handleRecall = async () => {
-		try { await recallMessage(message._id); }
+		try {
+			for (const item of bubbleMessages.filter((entry) => !entry.status || entry.status === "sent")) {
+				await recallMessage(item._id);
+			}
+		}
 		catch (e: any) { toast.error(e.message || "Thu hồi thất bại"); }
 		finally {
 			setShowConfirmRecall(false);
@@ -2003,7 +2140,7 @@ const MessageItem = ({
 		}
 	};
 
-	const canCreateReminder = !isDisbanded && !isRecalled && (message.type === "text" || message.type === "image");
+	const canCreateReminder = !isDisbanded && !isRecalled && message.type === "text";
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
 	return (
@@ -2077,7 +2214,13 @@ const MessageItem = ({
 							)}
 							<div className="flex flex-col gap-0.5 w-fit">
 								<div className="w-fit">
-									<MessageContent message={message} isOwn={isOwn} downloadUrl={downloadUrl} participants={selectedConvo.participants} />
+									<MessageContent
+										message={message}
+										isOwn={isOwn}
+										downloadUrl={downloadUrl}
+										participants={selectedConvo.participants}
+										imageBatchItems={imageBatchItems}
+									/>
 								</div>
 
 								{!isVisualOnly && (
@@ -2106,7 +2249,7 @@ const MessageItem = ({
 							</div>
 						</Card>
 
-						{isOwn && (
+						{isOwn && !(imageBatchItems && imageBatchItems.length > 1) && (
 							<div className={cn(
 								"flex justify-end mt-0.5 overflow-hidden transition-all duration-300 ease-in-out",
 								message.status === "sending" ? "h-6 opacity-100" : "h-0 opacity-0"
@@ -2241,12 +2384,10 @@ const MessageItem = ({
 													Sao chép
 												</DropdownMenuItem>
 											)}
-											{(message.fileUrl || message.filePublicId) && (
-												<DropdownMenuItem asChild>
-													<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex items-center" onClick={() => setShowTouchActions(false)}>
+											{downloadableBubbleMessages.length > 0 && (
+												<DropdownMenuItem onClick={() => { setShowTouchActions(false); void handleDownloadBubble(); }}>
 														<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
 														Tải xuống
-													</a>
 												</DropdownMenuItem>
 											)}
 											{!isDisbanded && (
@@ -2337,13 +2478,13 @@ const MessageItem = ({
 														</button>
 													)}
 
-													{(message.fileUrl || message.filePublicId) && (
-														<a href={downloadUrl} download={message.fileName ?? true} target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2" onClick={() => setShowTouchActions(false)}>
+													{downloadableBubbleMessages.length > 0 && (
+														<button className="flex flex-col items-center gap-2" onClick={() => { setShowTouchActions(false); void handleDownloadBubble(); }}>
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
 																<Download className="h-5 w-5" strokeWidth={1.5} />
 															</div>
 															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Tải xuống</span>
-														</a>
+														</button>
 													)}
 
 													{!isDisbanded && (
@@ -2512,6 +2653,7 @@ const MessageItem = ({
 					open={showForwardModal}
 					onOpenChange={(open) => setShowForwardModal(open)}
 					message={message}
+					messages={bubbleMessages.filter((item) => !item.status || item.status === "sent")}
 				/>
 			)}
 		</>

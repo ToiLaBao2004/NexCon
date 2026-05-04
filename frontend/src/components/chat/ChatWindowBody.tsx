@@ -9,7 +9,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSocketStore } from "@/stores/useSocketStore";
+import type { Message } from "@/types/chat";
 
+const getImageBatchId = (message: Message) => {
+  if (message.type !== "image") return "";
+  const metadata = message.metadata instanceof Map
+    ? Object.fromEntries(message.metadata)
+    : (message.metadata || {});
+  const batchId = String(metadata.clientBatchId || "").trim();
+  const batchSize = Number(metadata.clientBatchSize || 0);
+  return batchId && batchSize > 1 ? batchId : "";
+};
+
+const getImageBatchIndex = (message: Message) => {
+  const metadata = message.metadata instanceof Map
+    ? Object.fromEntries(message.metadata)
+    : (message.metadata || {});
+  return Number(metadata.clientBatchIndex ?? 0);
+};
 
 const ChatWindowBody: React.FC = () => {
   const {
@@ -73,6 +90,46 @@ const ChatWindowBody: React.FC = () => {
     }
     return null;
   }, [messages, user?._id]);
+
+  const renderedMessages = useMemo(() => {
+    const groups = new Map<string, Message[]>();
+
+    for (const message of messages) {
+      const batchId = getImageBatchId(message);
+      if (!batchId) continue;
+      const items = groups.get(batchId) ?? [];
+      items.push(message);
+      groups.set(batchId, items);
+    }
+
+    for (const items of groups.values()) {
+      items.sort((a, b) => {
+        const aIndex = getImageBatchIndex(a);
+        const bIndex = getImageBatchIndex(b);
+        if (aIndex !== bIndex) return aIndex - bIndex;
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+    }
+
+    const firstByBatchId = new Map<string, string>();
+    for (const [batchId, items] of groups) {
+      if (items[0]?._id) {
+        firstByBatchId.set(batchId, items[0]._id);
+      }
+    }
+
+    return messages
+      .map((message, originalIndex) => {
+        const batchId = getImageBatchId(message);
+        return {
+          message,
+          originalIndex,
+          imageBatchItems: batchId ? (groups.get(batchId) ?? [message]) : undefined,
+          isHiddenBatchChild: batchId ? firstByBatchId.get(batchId) !== message._id : false,
+        };
+      })
+      .filter((item) => !item.isHiddenBatchChild);
+  }, [messages]);
 
   const loadingMoreRef = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
@@ -271,9 +328,9 @@ const ChatWindowBody: React.FC = () => {
           </div>
         )}
 
-        {messages.map((message, index) => {
+        {renderedMessages.map(({ message, originalIndex, imageBatchItems }) => {
           const isCallMessage = message.type === "system" && message.systemType === "call";
-          const isLastMyMsg = message._id === lastMyMessageId;
+          const isLastMyMsg = message._id === lastMyMessageId || !!imageBatchItems?.some((item) => item._id === lastMyMessageId);
 
           if (isCallMessage) {
             return (
@@ -290,16 +347,17 @@ const ChatWindowBody: React.FC = () => {
 
           return (
             <div
-              key={`msg-${message._id ?? index}`}
+              key={`msg-${message._id ?? originalIndex}`}
               id={`message-${message._id}`}
             >
               <MessageItem
                 message={message}
-                index={index}
+                index={originalIndex}
                 messages={messages}
                 selectedConvo={selectedConvo}
                 currentUserId={user?._id ?? ""}
                 isLastMyMessage={isLastMyMsg}
+                imageBatchItems={imageBatchItems}
                 onReply={setReplyingTo}
               />
             </div>
