@@ -128,7 +128,7 @@ const PeoplePage = () => {
 
 	return (
 		<SidebarProvider
-			className={`h-full w-full relative min-h-0 ${isMobile ? "flex flex-col" : "flex"}`}
+			className={`h-full min-h-0! w-full relative ${isMobile ? "flex flex-col" : "flex"}`}
 			style={{ "--sidebar-width": "300px" } as React.CSSProperties}
 		>
 			{!isMobile && (
@@ -159,13 +159,13 @@ const PeoplePage = () => {
 				</Sidebar>
 			)}
 
-			<main className={`flex-1 min-w-0 bg-card rounded-none md:rounded-2xl overflow-hidden shadow-soft border-0 md:border border-border/40 h-full ${isMobile ? "" : "md:ml-2"}`}>
+			<main className={`flex h-full min-h-0 flex-1 min-w-0 flex-col bg-card rounded-none md:rounded-2xl overflow-hidden shadow-soft border-0 md:border border-border/40 ${isMobile ? "" : "md:ml-2"}`}>
 				{showChat ? (
 					<div className="h-full flex-1 min-h-0 flex flex-col">
 						<ChatWindowLayout />
 					</div>
 				) : (
-					<div className={`h-full overflow-y-auto ${isMobile ? "pb-32" : ""}`}>
+					<div className="flex h-full min-h-0 flex-col overflow-hidden">
 						{isMobile && (
 							<div className="sticky top-0 z-20 px-4 pt-4 pb-3 bg-card border-b border-border/40">
 								<h1 className="text-[28px] leading-none font-bold tracking-tight text-primary">NextCon</h1>
@@ -184,9 +184,14 @@ const PeoplePage = () => {
 							</div>
 						</div>
 
-						<div className="flex flex-col">
-							{tab !== 'groups' && <UserSearch className="p-4" onOpenChat={handleOpenChat} />}
+						{tab !== 'groups' && (
+							<UserSearch
+								className="shrink-0 bg-card/95 p-4 backdrop-blur-md"
+								onOpenChat={handleOpenChat}
+							/>
+						)}
 
+						<div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain beautiful-scrollbar ${isMobile ? "pb-32" : ""}`}>
 							<div className="p-4">
 								{tab === 'friends' && (
 									<FriendsTab
