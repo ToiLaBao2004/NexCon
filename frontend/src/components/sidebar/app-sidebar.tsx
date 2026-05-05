@@ -26,12 +26,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     <Sidebar
       {...props}
       className={cn(
-        "bg-card border border-border/40 rounded-2xl shadow-soft overflow-hidden",
+        "bg-card border border-border/50 shadow-none overflow-hidden",
         props.className
       )}
     >
       <SidebarContent
-        className="overflow-hidden"
+        className="overflow-hidden bg-card"
         onClick={() => setFocusedConversation(null)}
       >
         <div className="flex h-full min-h-0 flex-col" onClick={(e) => e.stopPropagation()}>
