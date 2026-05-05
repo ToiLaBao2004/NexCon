@@ -27,6 +27,7 @@ import data from '@emoji-mart/data';
 import ReactionDetailModal from "./ReactionDetailModal";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
 import { useSocketStore } from "@/stores/useSocketStore";
+import { useThemeStore } from "@/stores/useThemeStore";
 import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
 import ReminderFormModal from "@/components/reminder/ReminderFormModal";
 import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder";
@@ -1996,6 +1997,7 @@ const MessageItem = ({
 	const seenUsersForThisMessage = readReceiptsMap[message._id] ?? [];
 
 	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage } = useChatStore();
+	const { isDark } = useThemeStore();
 	const [showConfirmRecall, setShowConfirmRecall] = useState(false);
 	const [showPinOptions, setShowPinOptions] = useState(false);
 	const [showReactionModal, setShowReactionModal] = useState(false);
@@ -2365,7 +2367,7 @@ const MessageItem = ({
 														handleEmojiSelect(emoji);
 														setShowEmojiPicker(false);
 													}}
-													theme="light"
+													theme={isDark ? "dark" : "light"}
 													set="native"
 													autoFocus={false}
 													skinTonePosition="none"
@@ -2601,7 +2603,7 @@ const MessageItem = ({
 															handleEmojiSelect(emoji);
 															setShowTouchActions(false);
 														}}
-														theme="light"
+														theme={isDark ? "dark" : "light"}
 														set="native"
 														autoFocus={false}
 														skinTonePosition="none"

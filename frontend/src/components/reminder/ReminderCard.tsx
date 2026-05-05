@@ -59,8 +59,8 @@ export default function ReminderCard({
   const allowQuickDelete = !showCancel && reminder.scope !== 'shared';
   const showDeleteControl = showCancel || allowQuickDelete;
 
-  const subtleBadgeClass = 'rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors group-hover:bg-muted/80';
-  const scopeBadgeClass = 'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground';
+  const subtleBadgeClass = 'rounded-full bg-muted/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors group-hover:bg-muted';
+  const scopeBadgeClass = 'inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-2.5 py-1 text-[11px] font-medium text-foreground';
 
   const hoverDeleteLabel = reminder.scope === 'shared'
     ? (isDeclineAction ? 'Không tham gia nhắc hẹn này' : 'Hủy nhắc hẹn chung cho tất cả thành viên')
@@ -150,31 +150,31 @@ export default function ReminderCard({
         if (!editable) return;
         onEdit(reminder);
       }}
-      className={`group relative flex h-full w-full flex-col rounded-2xl border border-border/80 bg-card p-5 font-sans shadow-sm transition-all duration-200 hover:border-border hover:shadow-md ${editable ? 'cursor-pointer' : 'cursor-default'} ${faded ? 'opacity-65' : ''} ${highlighted ? 'ring-2 ring-primary/45 border-primary/60 bg-primary/10 shadow-lg shadow-primary/20' : ''}`}
+      className={`group relative flex h-full w-full flex-col rounded-xl border border-border/70 bg-background p-4 font-sans shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-md ${editable ? 'cursor-pointer' : 'cursor-default'} ${faded ? 'opacity-65' : ''} ${highlighted ? 'ring-2 ring-primary/35 border-primary/50 bg-primary/5 shadow-lg shadow-primary/10' : ''}`}
     >
       {/* Top Section */}
       <div className="flex items-start gap-3.5">
-        <div className="w-[84px] shrink-0 overflow-hidden rounded-lg border border-border bg-muted/50">
-          <div className="flex items-center justify-center gap-1 bg-primary px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+        <div className="w-[76px] shrink-0 overflow-hidden rounded-xl border border-border/70 bg-card">
+          <div className="flex items-center justify-center gap-1 bg-primary px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
             <span className="h-1 w-1 rounded-full bg-white/90" />
             {calendarWeekday}
             <span className="h-1 w-1 rounded-full bg-white/90" />
           </div>
           <div className="flex flex-col items-center justify-center py-2.5">
-            <span className="text-[32px] font-semibold leading-none text-foreground">{calendarDay}</span>
-            <span className="mt-1 text-xs font-semibold text-rose-500">Tháng {calendarMonth}</span>
+            <span className="text-[30px] font-semibold leading-none text-foreground">{calendarDay}</span>
+            <span className="mt-1 text-xs font-semibold text-muted-foreground">Tháng {calendarMonth}</span>
           </div>
         </div>
 
         <div className="min-w-0 flex-1 pt-0.5">
-          <h3 className="text-[17px] font-semibold leading-snug tracking-tight text-foreground whitespace-pre-wrap break-words">
+          <h3 className="text-[16px] font-semibold leading-snug tracking-tight text-foreground whitespace-pre-wrap break-words">
             {contentBeforeMeetingUrl}
             {hasInlineMeetingUrl && rawMeetingUrlInContent && (
               (!reminder.meetingRoomName || !rawMeetingUrlInContent.includes(reminder.meetingRoomName)) ? (
                 <a
                   href={meetingUrl || rawMeetingUrlInContent}
                   onClick={(event) => handleMeetingLinkClick(event, meetingUrl || rawMeetingUrlInContent)}
-                  className="font-medium underline text-primary transition-colors hover:text-primary/80 break-all"
+                  className="font-medium underline text-primary underline-offset-2 transition-colors hover:text-primary/80 break-all"
                 >
                   {rawMeetingUrlInContent}
                 </a>
@@ -186,7 +186,7 @@ export default function ReminderCard({
           {/* Meeting Link Box */}
           {reminder.meetingRoomName && (
             <div
-              className="mt-2.5 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"
+              className="mt-3 flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2"
               onClick={(e) => e.stopPropagation()}
             >
               <Video className="h-4 w-4 shrink-0 text-primary" />
@@ -233,13 +233,13 @@ export default function ReminderCard({
               onClick={(event) => {
                 void handleJoinMeeting(event);
               }}
-              className="mt-2 inline-flex h-8 items-center rounded-md border border-primary/35 bg-primary/10 px-3 text-xs font-semibold text-primary animate-pulse transition-colors hover:bg-primary/15"
+              className="mt-2 inline-flex h-8 items-center rounded-lg border border-primary/35 bg-primary/10 px-3 text-xs font-semibold text-primary animate-pulse transition-colors hover:bg-primary/15"
             >
               Tham gia cuộc họp
             </button>
           )}
 
-          <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+          <p className="mt-2 inline-flex flex-wrap items-center gap-1.5 text-sm font-medium text-muted-foreground">
             <Clock3 className={`h-3.5 w-3.5 ${reminder.status === 'snoozed' ? 'text-blue-500' : 'text-muted-foreground'}`} />
             <span>{formatClock(reminder.remindAt)}</span>
             {reminder.status === 'snoozed' && reminder.snoozeUntil && (
@@ -284,7 +284,7 @@ export default function ReminderCard({
               </span>
             )}
             {reminder.createdBy && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted pr-2.5 pl-1 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors group-hover:bg-muted/80">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/70 pr-2.5 pl-1 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors group-hover:bg-muted">
                 <UserAvatar type="seen" name={creatorNameDisplay} avatarUrl={creatorAvatarUrl ?? undefined} className="h-4 w-4" />
                 Tạo bởi: {creatorNameDisplay}
               </span>
@@ -293,15 +293,15 @@ export default function ReminderCard({
         </div>
       </div>
 
-      <div className="mt-auto flex items-center justify-between border-t border-border/60 pt-4">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="mt-auto flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+        <div className="flex flex-wrap items-center gap-2">
           {showRepeat && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   type="button"
                   size="sm"
-                  className="flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-[12px] font-semibold text-white shadow-sm transition-all hover:bg-primary/90"
+                  className="flex h-9 items-center gap-2 rounded-lg bg-primary px-4 text-[12px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                   onClick={(event) => event.stopPropagation()}
                 >
                   <Bell className="h-4 w-4" />
@@ -332,7 +332,7 @@ export default function ReminderCard({
               type="button"
               size="sm"
               variant="outline"
-              className="flex h-9 items-center gap-2 rounded-md border-border bg-background px-4 text-[12px] font-semibold text-foreground transition-all hover:border-border/80 hover:bg-muted/60"
+              className="flex h-9 items-center gap-2 rounded-lg border-border/70 bg-background px-4 text-[12px] font-semibold text-foreground transition-colors hover:bg-muted/60"
               onClick={(event) => {
                 event.stopPropagation();
                 onReuse(reminder);
@@ -348,7 +348,7 @@ export default function ReminderCard({
               type="button"
               size="sm"
               variant="ghost"
-              className="flex h-9 items-center gap-2 rounded-md px-3 text-[12px] font-semibold text-foreground transition-all hover:bg-muted hover:text-foreground"
+              className="flex h-9 items-center gap-2 rounded-lg px-3 text-[12px] font-semibold text-foreground transition-colors hover:bg-muted hover:text-foreground"
               onClick={(event) => {
                 event.stopPropagation();
                 onEdit(reminder);

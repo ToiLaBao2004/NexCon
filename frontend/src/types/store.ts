@@ -270,11 +270,12 @@ export interface CallState {
   handleVideoToggle: (isVideoOff: boolean) => void;
   handleIncomingCall: (from: RemoteUser, callType: CallType, roomName: string, isMutedCall?: boolean) => void;
   handleRemoteAccepted: () => void;
+  handleCallRinging: () => void;
   handleCallAnswered: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallAccepted: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallRejected: () => void;
   handleCallEnded: () => void;
-  handleCallFailed: (reason: 'offline' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'server-error') => void;
+  handleCallFailed: (reason: 'offline' | 'no-answer' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'server-error') => void;
   handleIceCandidate: (_candidate: RTCIceCandidateInit) => Promise<void>;
 }
 

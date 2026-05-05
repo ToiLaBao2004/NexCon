@@ -4,7 +4,7 @@ import express from "express";
 import { socketAuthMiddleware, validateSocketSession } from "../middlewares/socketMiddleware.js";
 import { getUserConversationsForSocketIO } from "../controllers/conversationController.js";
 import Conversation from "../models/conversationModel.js";
-import { registerCallHandlers, handleCallDisconnect } from "./callHandler.js";
+import { registerCallHandlers, handleCallDisconnect, emitPendingDirectCallsForUser } from "./callHandler.js";
 import { registerGroupCallHandlers, handleGroupCallDisconnect } from "./groupCallHandler.js";
 import { configureSocketGateway } from "./socketGateway.js";
 import Message from "../models/messageModel.js";
@@ -226,6 +226,8 @@ io.on("connection", async (socket) => {
 
     // Group call handlers
     registerGroupCallHandlers(socket, user, io, getReceiverSocketId);
+
+    emitPendingDirectCallsForUser(socket, userId, activeCalls, io, getReceiverSocketId);
 
     // Disconnect
     socket.on("disconnect", async () => {

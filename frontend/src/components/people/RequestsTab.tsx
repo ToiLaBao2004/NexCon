@@ -4,6 +4,8 @@ import { Loader2, Check, Send, UserPlus } from "lucide-react";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { useState } from "react";
 
+const sectionTitleClass = "sticky top-0 z-10 -mx-4 mb-3 border-b border-border/40 bg-card/95 px-4 py-2 text-sm font-semibold text-foreground backdrop-blur-md";
+
 export default function RequestsTab({ sentRequests, incomingRequests, processingId, onCancel, onAccept, onReject, onOpenChat }: { sentRequests: any[]; incomingRequests: any[]; processingId: string | null; onCancel: (id: string) => Promise<void>; onAccept: (id: string) => Promise<void>; onReject: (id: string) => Promise<void>; onOpenChat: (user: any) => void; }) {
     const [selectedUser, setSelectedUser] = useState<any | null>(null);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -16,7 +18,7 @@ export default function RequestsTab({ sentRequests, incomingRequests, processing
     return (
         <div className="grid grid-cols-1 gap-6 relative">
             <div>
-                <h4 className="text-sm font-semibold text-foreground mb-3">LỜI MỜI ĐÃ GỬI</h4>
+                <h4 className={sectionTitleClass}>LỜI MỜI ĐÃ GỬI</h4>
                 {sentRequests.length > 0 ? (
                     <div className="space-y-2">
                         {sentRequests.map((r) => (
@@ -46,7 +48,7 @@ export default function RequestsTab({ sentRequests, incomingRequests, processing
             </div>
 
             <div>
-                <h4 className="text-sm font-semibold text-foreground mb-3">LỜI MỜI ĐẾN</h4>
+                <h4 className={sectionTitleClass}>LỜI MỜI ĐẾN</h4>
                 {incomingRequests.length > 0 ? (
                     <div className="space-y-2">
                         {incomingRequests.map((request) => {

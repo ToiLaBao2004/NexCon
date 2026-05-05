@@ -51,19 +51,19 @@ const ChatAppPageContent = ({
         <AppSidebar
           collapsible={isMobile ? "none" : "offcanvas"}
           className={`
-            md:left-20 
+            md:left-[72px]
             top-0 md:top-2 bottom-0 md:bottom-2 
             ${isMobile ? 'h-full w-full' : 'h-[calc(100vh-16px)]'}
-            bg-card/20
-            backdrop-blur
-            border border-border/40
-            rounded-none md:rounded-2xl
+            bg-card
+            border-0 md:border-y md:border-r md:border-l-0 md:border-border/50
+            rounded-none
+            shadow-none
           `}
         />
       )}
 
       {showChatWindow && (
-        <main className="flex-1 min-w-0 bg-card rounded-none md:rounded-2xl overflow-hidden shadow-soft border border-border/40 md:ml-2 h-full flex">
+        <main className="flex-1 min-w-0 bg-card rounded-none md:rounded-l-none md:rounded-r-2xl overflow-hidden shadow-none border-0 md:border-y md:border-r md:border-l-0 md:border-border/50 h-full flex">
           <div className="flex-1 min-w-0 flex flex-col">
             <ChatWindowLayout />
           </div>

@@ -2,10 +2,16 @@ import { create } from "zustand";
 import { useSocketStore } from "./useSocketStore";
 import type { CallState, CallType, RemoteUser } from "@/types/store";
 import { toast } from "sonner";
-import { playRingtone, stopRingtone } from "@/utils/sound";
+import {
+  playCallerRingingRingtone,
+  playCallerWaitingRingtone,
+  playRingtone,
+  stopRingtone,
+} from "@/utils/sound";
 import { Room, RoomEvent, Track } from "livekit-client";
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
+const CALL_NO_ANSWER_FALLBACK_MS = 35_000;
 const LIVEKIT_CONNECT_OPTIONS = {
   autoSubscribe: true,
   maxRetries: 5,
@@ -211,6 +217,7 @@ async function connectLiveKitRoom(
     isMuted: false,
     isVideoOff: callType === "voice",
   });
+  stopRingtone();
 
   return true;
 }
@@ -229,9 +236,13 @@ export const useCallStore = create<CallState>((set, get) => ({
     try {
       timeout = setTimeout(() => {
         if (get().status === "outgoing") {
-          get().handleCancelCall();
+          const remoteUserId = get().remoteUser?._id;
+          if (remoteUserId) {
+            emitCallEvent("call-cancelled", { toUserId: remoteUserId });
+          }
+          get().handleCallFailed("no-answer");
         }
-      }, 30_000);
+      }, CALL_NO_ANSWER_FALLBACK_MS);
 
       set({
         status: "outgoing",
@@ -245,6 +256,7 @@ export const useCallStore = create<CallState>((set, get) => ({
         isVideoOff: callType === "voice",
       });
 
+      void playCallerWaitingRingtone();
       emitCallEvent("call-offer", { toUserId: toUser._id, callType });
       // Refresh sidebar
       const { useChatStore } = await import("./useChatStore");
@@ -333,7 +345,13 @@ export const useCallStore = create<CallState>((set, get) => ({
   // Socket event handlers (called from useSocketStore)
 
   handleIncomingCall(from: RemoteUser, callType: CallType, roomName: string, isMutedCall: boolean = false) {
-    if (get().status !== "idle") {
+    const currentState = get();
+    if (currentState.status === "incoming" && currentState._roomName === roomName) {
+      set({ isMutedCall });
+      return;
+    }
+
+    if (currentState.status !== "idle") {
       emitCallEvent("call-cancelled", { toUserId: from._id });
       return;
     }
@@ -356,6 +374,13 @@ export const useCallStore = create<CallState>((set, get) => ({
   handleRemoteAccepted() {
     if (get().status === "outgoing") {
       set({ isRemoteConnecting: true });
+      void playCallerRingingRingtone();
+    }
+  },
+
+  handleCallRinging() {
+    if (get().status === "outgoing") {
+      void playCallerRingingRingtone();
     }
   },
 
@@ -425,6 +450,7 @@ export const useCallStore = create<CallState>((set, get) => ({
   handleCallFailed(reason) {
     const reasonMap: Record<string, string> = {
       offline: "Người dùng đang offline.",
+      "no-answer": "Người nhận không phản hồi.",
       busy: "Người dùng đang bận.",
       "self-call": "Bạn không thể tự gọi chính mình.",
       blocked: "Không thể gọi do trạng thái chặn.",

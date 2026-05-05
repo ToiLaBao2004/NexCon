@@ -43,20 +43,30 @@ function App() {
   }, [initTheme]);
 
   useEffect(() => {
+    let audioUnlocked = false;
+
     const unlockAudio = async () => {
+      if (audioUnlocked) return;
+
       try {
-        await Promise.all([
+        const results = await Promise.all([
           unlockMessageSound(),
           unlockNotificationSound(),
           unlockRingtone(),
         ]);
+
+        if (results.every(Boolean)) {
+          audioUnlocked = true;
+          window.removeEventListener("pointerdown", unlockAudio);
+          window.removeEventListener("keydown", unlockAudio);
+        }
       } catch (err) {
         console.error("[App] Failed to unlock audio:", err);
       }
     };
 
-    window.addEventListener("pointerdown", unlockAudio, { once: true });
-    window.addEventListener("keydown", unlockAudio, { once: true });
+    window.addEventListener("pointerdown", unlockAudio);
+    window.addEventListener("keydown", unlockAudio);
 
     return () => {
       window.removeEventListener("pointerdown", unlockAudio);

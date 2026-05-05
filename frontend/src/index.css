@@ -232,6 +232,15 @@
   }
 
   /* scrollbar */
+  .beautiful-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(215 20% 45% / 0.25) transparent;
+  }
+
+  .dark .beautiful-scrollbar {
+    scrollbar-color: hsl(215 20% 80% / 0.2) transparent;
+  }
+
   .beautiful-scrollbar::-webkit-scrollbar {
     width: 4px;
 }

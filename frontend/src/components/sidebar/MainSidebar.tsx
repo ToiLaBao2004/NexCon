@@ -85,7 +85,7 @@ const MainSidebar = () => {
     return (
         <aside
             onClick={handleSidebarClick}
-            className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-card border border-border/40 rounded-2xl shadow-soft shrink-0 cursor-default"
+            className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-card border-y border-l border-r border-border/50 rounded-l-2xl rounded-r-none shadow-none shrink-0 cursor-default"
         >
             <TooltipProvider delayDuration={0}>
                 <div
@@ -94,7 +94,7 @@ const MainSidebar = () => {
                 >
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="relative h-12 w-12 rounded-full p-0 hover:bg-primary/20 transition-all group border-primary/30 bg-primary/10 shadow-sm overflow-visible">
+                            <Button variant="outline" className="relative h-12 w-12 rounded-xl p-0 hover:bg-muted/70 transition-all group border-transparent bg-transparent shadow-none overflow-visible">
                                 <Avatar className="h-9 w-9 transition-all rounded-full">
                                     <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
                                     <AvatarFallback className="bg-primary/10 text-primary font-bold cursor-pointer">
@@ -165,13 +165,13 @@ const MainSidebar = () => {
                                 variant="outline"
                                 onClick={() => navigate("/chat")}
                                 className={cn(
-                                    "h-12 w-12 rounded-full transition-all duration-300 border-primary/30 shadow-sm group relative cursor-pointer",
-                                    isPathActive("/chat") ? "bg-primary text-primary-foreground border-primary" : "bg-primary/10 hover:bg-primary/20 hover:text-primary"
+                                    "h-12 w-12 rounded-xl transition-all duration-300 border-transparent shadow-none group relative cursor-pointer",
+                                    isPathActive("/chat") ? "bg-primary text-primary-foreground" : "bg-transparent hover:bg-muted/70 hover:text-primary"
                                 )}
                             >
                                 <MessageSquare className={cn("h-6 w-6 transition-transform duration-300 group-hover:scale-110", isPathActive("/chat") && "text-white")} />
                                 {isPathActive("/chat") && (
-                                    <div className="absolute -left-3 w-1 h-6 bg-primary rounded-r-full top-1/2 -translate-y-1/2" />
+                                    <div className="absolute -left-2 w-1 h-6 bg-primary rounded-r-full top-1/2 -translate-y-1/2" />
                                 )}
                                 {unreadMessagesCount > 0 && (
                                     <span className="absolute -top-1 -right-1 min-w-5 h-5 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold shadow-md border-2 border-card animate-in zoom-in duration-200">
@@ -195,13 +195,13 @@ const MainSidebar = () => {
                                         size="icon"
                                         onClick={() => navigate(item.path)}
                                         className={cn(
-                                            "h-12 w-12 rounded-2xl transition-all duration-300 border-primary/30 shadow-sm group relative cursor-pointer",
-                                            active ? "bg-primary text-primary-foreground border-primary" : "bg-primary/10 hover:bg-primary/20 hover:text-primary"
+                                            "h-12 w-12 rounded-xl transition-all duration-300 border-transparent shadow-none group relative cursor-pointer",
+                                            active ? "bg-primary text-primary-foreground" : "bg-transparent hover:bg-muted/70 hover:text-primary"
                                         )}
                                     >
                                         <item.icon className={cn("h-6 w-6 transition-transform duration-300 group-hover:scale-110", active && "text-white")} />
                                         <div className={cn(
-                                            "absolute -left-3 w-1 bg-primary rounded-r-full transition-all duration-300 top-1/2 -translate-y-1/2",
+                                            "absolute -left-2 w-1 bg-primary rounded-r-full transition-all duration-300 top-1/2 -translate-y-1/2",
                                             active ? "h-6 opacity-100" : "h-0 opacity-0 group-hover:h-6 group-hover:opacity-100"
                                         )} />
                                         {badgeCount > 0 && (

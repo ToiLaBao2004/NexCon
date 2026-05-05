@@ -70,14 +70,14 @@ export default function ReminderCalendarView({
 }: ReminderCalendarViewProps) {
   return (
     <div className="h-full min-h-0">
-      <div className="rounded-md border border-border/60 bg-card/60 shadow-sm overflow-hidden h-full min-h-0 flex flex-col">
-        <div className="relative z-30 px-3 md:px-4 py-3 border-b border-border/50 bg-background flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm">
+        <div className="relative z-30 flex flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-card px-3 py-3 md:px-4">
           <div className="relative flex items-center gap-1.5">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="h-9 rounded-md border-border bg-background px-4 text-base font-bold text-foreground shadow-sm transition-all hover:bg-muted"
+              className="h-9 rounded-lg border-border/70 bg-background px-4 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/60"
               onClick={onJumpCalendarToToday}
             >
               Hôm nay
@@ -86,7 +86,7 @@ export default function ReminderCalendarView({
               type="button"
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
+              className="h-8 w-8 rounded-lg"
               onClick={() => onShiftCalendarWeek(-1)}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -95,7 +95,7 @@ export default function ReminderCalendarView({
               type="button"
               size="icon"
               variant="ghost"
-              className="h-8 w-8"
+              className="h-8 w-8 rounded-lg"
               onClick={() => onShiftCalendarWeek(1)}
             >
               <ChevronRight className="h-4 w-4" />
@@ -107,7 +107,7 @@ export default function ReminderCalendarView({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-8 px-2.5 text-base font-bold text-foreground transition-colors hover:bg-muted/50"
+                  className="h-8 rounded-lg px-2.5 text-base font-semibold text-foreground transition-colors hover:bg-muted/50"
                 >
                   {calendarHeaderLabel}
                   <ChevronDown className={`h-4 w-4 ml-1.5 transition-transform duration-200 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
@@ -117,7 +117,7 @@ export default function ReminderCalendarView({
               <PopoverContent
                 align="start"
                 sideOffset={8}
-                className="z-[400] w-[320px] rounded-md border border-border bg-background p-3 shadow-2xl"
+                className="z-[400] w-[320px] rounded-xl border border-border bg-background p-3 shadow-2xl"
               >
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <p className="font-semibold text-base">{monthPickerTitle}</p>
@@ -126,7 +126,7 @@ export default function ReminderCalendarView({
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8"
+                      className="h-8 w-8 rounded-lg"
                       onClick={onMonthPrev}
                     >
                       <ChevronLeft className="h-4 w-4" />
@@ -135,7 +135,7 @@ export default function ReminderCalendarView({
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8"
+                      className="h-8 w-8 rounded-lg"
                       onClick={onMonthNext}
                     >
                       <ChevronRight className="h-4 w-4" />
@@ -194,7 +194,7 @@ export default function ReminderCalendarView({
             <select
               value={calendarDensity}
               onChange={(event) => onCalendarDensityChange(event.target.value as CalendarDensity)}
-              className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+              className="h-9 rounded-lg border border-input bg-background px-3 text-xs font-medium"
             >
               <option value="workweek">Tuần làm việc</option>
               <option value="week">Cả tuần</option>
@@ -202,7 +202,7 @@ export default function ReminderCalendarView({
           </div>
         </div>
 
-        <div className="relative z-0 flex-1 min-h-0 overflow-auto bg-background/60 overscroll-contain beautiful-scrollbar">
+        <div className="relative z-0 flex-1 min-h-0 overflow-auto bg-background overscroll-contain beautiful-scrollbar">
           <div className="min-w-[760px] md:min-w-[920px]">
             <div
               className="sticky top-0 z-20 grid"
@@ -210,7 +210,7 @@ export default function ReminderCalendarView({
                 gridTemplateColumns: `72px repeat(${calendarDays.length}, minmax(160px, 1fr))`,
               }}
             >
-              <div className="h-16 border-b border-r border-border/40 bg-background/95 backdrop-blur" />
+              <div className="h-16 border-b border-r border-border/40 bg-card/95 backdrop-blur" />
               {calendarDays.map((day) => {
                 const active = day.key === selectedCalendarDayKey;
                 const isToday = day.key === todayKey;
@@ -220,7 +220,7 @@ export default function ReminderCalendarView({
                     key={day.key}
                     type="button"
                     onClick={() => onSelectCalendarDay(day.key)}
-                    className={`relative h-16 border-b border-border/40 text-left px-4 transition-all bg-background/80 hover:bg-muted/30 ${active ? 'after:absolute after:top-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary' : ''}`}
+                    className={`relative h-16 border-b border-border/40 bg-card/95 px-4 text-left transition-colors hover:bg-muted/30 ${active ? 'after:absolute after:top-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary' : ''}`}
                   >
                     <p className={`text-2xl font-normal leading-none ${isToday || active ? 'text-primary' : 'text-muted-foreground'}`}>
                       {new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(day.date)}
@@ -270,7 +270,7 @@ export default function ReminderCalendarView({
                         onSelectCalendarDay(day.key);
                       }
                     }}
-                    className={`relative border-l border-border/40 ${active ? 'bg-primary/5' : 'bg-background/80'}`}
+                    className={`relative border-l border-border/40 ${active ? 'bg-primary/5' : 'bg-background'}`}
                     style={{ height: `${calendarGridHeight}px` }}
                   >
                     {calendarHourTicks.map((_, index) => (
@@ -309,7 +309,7 @@ export default function ReminderCalendarView({
                               onCalendarEventClick(entry, day.key);
                             }
                           }}
-                          className="group pointer-events-auto absolute overflow-hidden rounded-sm border-l-2 border-primary bg-primary/15 px-2 py-1 pr-6 text-left shadow-none transition-colors hover:bg-primary/20"
+                          className="group pointer-events-auto absolute overflow-hidden rounded-md border border-primary/25 border-l-4 border-l-primary bg-primary/10 px-2 py-1 pr-6 text-left shadow-sm transition-colors hover:bg-primary/15"
                           style={{
                             top: `${entry.topPx}px`,
                             left: `calc(${leftOffset}% + 2px)`,
