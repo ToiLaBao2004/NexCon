@@ -8,6 +8,8 @@ import { useChatStore } from "@/stores/useChatStore";
 const CallManager = () => {
   const status = useCallStore((s) => s.status);
   const isMutedCall = useCallStore((s) => s.isMutedCall);
+  const isConnecting = useCallStore((s) => s.isConnecting);
+  const isRemoteConnecting = useCallStore((s) => s.isRemoteConnecting);
   const remoteUser = useCallStore((s) => s.remoteUser);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
   const activeConversation = useChatStore((s) =>
@@ -16,10 +18,23 @@ const CallManager = () => {
 
   const [isMinimized, setIsMinimized] = useState(false);
 
-  // Reset minimize when call ends or becomes active (auto-expand when answered)
+  const isEnteringCall =
+    (status === "incoming" && isConnecting) ||
+    (status === "outgoing" && (isConnecting || isRemoteConnecting));
+
   useEffect(() => {
-    if (status === "idle" || status === "active") setIsMinimized(false);
-  }, [status]);
+    if (status === "idle" || status === "active" || isEnteringCall) setIsMinimized(false);
+  }, [status, isEnteringCall]);
+
+  if (status === "active" || isEnteringCall) {
+    return (
+      <CallModal
+        isMinimized={isMinimized}
+        onMinimize={() => setIsMinimized(true)}
+        onMaximize={() => setIsMinimized(false)}
+      />
+    );
+  }
 
   if (status === "incoming") {
     if (isMutedCall) {
@@ -48,15 +63,6 @@ const CallManager = () => {
         onMaximize={() => setIsMinimized(false)}
       />
     );
-  if (status === "active")
-    return (
-      <CallModal
-        isMinimized={isMinimized}
-        onMinimize={() => setIsMinimized(true)}
-        onMaximize={() => setIsMinimized(false)}
-      />
-    );
-
   return null;
 };
 

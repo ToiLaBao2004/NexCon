@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, Video, VideoOff, Minimize2, Maximize2 } from "lucide-react";
+import { LoaderCircle, Mic, MicOff, PhoneOff, Video, VideoOff, Minimize2, Maximize2 } from "lucide-react";
 import { useCallStore } from "@/stores/useCallStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import UserAvatar from "@/components/chat/UserAvatar";
@@ -17,6 +17,9 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
     remoteUser,
     localStream,
     remoteStream,
+    status,
+    isConnecting,
+    isRemoteConnecting,
     isMuted,
     isVideoOff,
     isRemoteVideoOff,
@@ -31,6 +34,8 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const [elapsed, setElapsed] = useState(0);
   const [hasStarted, setHasStarted] = useState(false);
+  const isJoiningCall = status !== "active" || isConnecting || isRemoteConnecting;
+  const canUseMediaControls = Boolean(localStream);
 
   // Attach local stream (re-run when minimize toggles because DOM elements remount)
   useEffect(() => {
@@ -72,6 +77,8 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
         dragHandlers={dragHandlers}
         remoteUser={remoteUser}
         elapsed={elapsed}
+        isJoiningCall={isJoiningCall}
+        canUseMediaControls={canUseMediaControls}
         isMuted={isMuted}
         isVideoOff={isVideoOff}
         toggleMute={toggleMute}
@@ -100,8 +107,12 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
         <VideoCallLayout
           remoteUser={remoteUser}
           remoteStream={remoteStream}
+          localStream={localStream}
           localVideoRef={localVideoRef}
           remoteVideoRef={remoteVideoRef}
+          isJoiningCall={isJoiningCall}
+          hasStarted={hasStarted}
+          canUseMediaControls={canUseMediaControls}
           isVideoOff={isVideoOff}
           isMuted={isMuted}
           elapsed={elapsed}
@@ -119,8 +130,12 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
 interface VideoCallLayoutProps {
   remoteUser: any;
   remoteStream: MediaStream | null;
+  localStream: MediaStream | null;
   remoteVideoRef: React.RefObject<HTMLVideoElement | null>;
   localVideoRef: React.RefObject<HTMLVideoElement | null>;
+  isJoiningCall: boolean;
+  hasStarted: boolean;
+  canUseMediaControls: boolean;
   isVideoOff: boolean;
   isMuted: boolean;
   elapsed: number;
@@ -134,8 +149,12 @@ interface VideoCallLayoutProps {
 const VideoCallLayout = ({
   remoteUser,
   remoteStream,
+  localStream,
   localVideoRef,
   remoteVideoRef,
+  isJoiningCall,
+  hasStarted,
+  canUseMediaControls,
   isVideoOff,
   isMuted,
   elapsed,
@@ -146,6 +165,7 @@ const VideoCallLayout = ({
   isRemoteVideoOff,
 }: VideoCallLayoutProps) => {
   const showRemoteAvatar = !remoteStream || isRemoteVideoOff;
+  const showLocalVideo = Boolean(localStream && !isVideoOff);
 
   return (
     <>
@@ -177,19 +197,27 @@ const VideoCallLayout = ({
             )}
             <p className="text-sm font-medium text-zinc-300">{remoteUser.displayName}</p>
             {!remoteStream && (
-              <p className="text-xs text-zinc-500 animate-pulse">Đang kết nối...</p>
+              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-400">
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                {isJoiningCall ? "Đang thiết lập cuộc gọi..." : "Đang kết nối..."}
+              </div>
             )}
           </div>
         )}
 
         {/* Timer */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-medium tabular-nums border border-white/10">
-          {formatCallTimer(elapsed)}
+          {hasStarted ? formatCallTimer(elapsed) : (
+            <span className="inline-flex items-center gap-1.5">
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              Đang kết nối
+            </span>
+          )}
         </div>
 
         {/* Local PiP */}
         <div className="absolute bottom-6 right-6 w-40 h-28 rounded-2xl overflow-hidden border border-white/20 shadow-2xl bg-zinc-800">
-          {!isVideoOff ? (
+          {showLocalVideo ? (
             <video
               ref={localVideoRef}
               autoPlay
@@ -222,6 +250,7 @@ const VideoCallLayout = ({
         <ControlButton
           onClick={toggleMute}
           active={isMuted}
+          disabled={!canUseMediaControls}
           label={isMuted ? "Bật mic" : "Tắt mic"}
         >
           {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
@@ -230,6 +259,7 @@ const VideoCallLayout = ({
         <ControlButton
           onClick={toggleVideo!}
           active={isVideoOff}
+          disabled={!canUseMediaControls}
           label={isVideoOff ? "Bật cam" : "Tắt cam"}
         >
           {isVideoOff ? (
@@ -256,18 +286,21 @@ const VideoCallLayout = ({
 function ControlButton({
   onClick,
   active,
+  disabled = false,
   label,
   children,
 }: {
   onClick: () => void;
   active: boolean;
+  disabled?: boolean;
   label: string;
   children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 group"
+      disabled={disabled}
+      className="flex flex-col items-center gap-1.5 group disabled:cursor-not-allowed disabled:opacity-45"
     >
       <div
         className={cn(
@@ -291,6 +324,8 @@ function DraggableCallWidget({
   dragHandlers,
   remoteUser,
   elapsed,
+  isJoiningCall,
+  canUseMediaControls,
   isMuted,
   isVideoOff,
   toggleMute,
@@ -305,6 +340,8 @@ function DraggableCallWidget({
   dragHandlers: DragHandlers;
   remoteUser: { displayName: string; avatarUrl?: string | null };
   elapsed: number;
+  isJoiningCall: boolean;
+  canUseMediaControls: boolean;
   isMuted: boolean;
   isVideoOff: boolean;
   toggleMute: () => void;
@@ -330,7 +367,7 @@ function DraggableCallWidget({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate">{remoteUser.displayName}</p>
           <p className="text-xs text-muted-foreground tabular-nums">
-            {isVideoOff ? "Thoại" : "Video"} · {formatCallTimer(elapsed)}
+            {isVideoOff ? "Thoại" : "Video"} · {isJoiningCall ? "Đang kết nối" : formatCallTimer(elapsed)}
           </p>
         </div>
         <button
@@ -344,8 +381,9 @@ function DraggableCallWidget({
       <div className="flex items-center justify-center gap-4 px-4 pb-3">
         <button
           onClick={toggleMute}
+          disabled={!canUseMediaControls}
           className={cn(
-            "p-2 rounded-full transition-colors",
+            "p-2 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-45",
             isMuted ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900" : "bg-muted text-muted-foreground hover:bg-muted/80",
           )}
         >
@@ -353,8 +391,9 @@ function DraggableCallWidget({
         </button>
         <button
           onClick={toggleVideo}
+          disabled={!canUseMediaControls}
           className={cn(
-            "p-2 rounded-full transition-colors",
+            "p-2 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-45",
             isVideoOff ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900" : "bg-muted text-muted-foreground hover:bg-muted/80",
           )}
         >

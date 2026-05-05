@@ -58,7 +58,7 @@ const IncomingCallModal = ({ isMinimized, onMinimize, onMaximize }: IncomingCall
             onClick={acceptCall}
             disabled={isConnecting}
             className="p-2 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            title={isConnecting ? "Đang vào phòng" : "Chấp nhận"}
+            title={isConnecting ? "Đang kết nối" : "Chấp nhận"}
           >
             {isConnecting ? (
               <LoaderCircle size={16} className="animate-spin" />
@@ -140,7 +140,7 @@ const IncomingCallModal = ({ isMinimized, onMinimize, onMaximize }: IncomingCall
               )}
             </span>
             <span className="text-xs text-muted-foreground">
-              {isConnecting ? "Đang vào phòng..." : "Chấp nhận"}
+              {isConnecting ? "Đang kết nối..." : "Chấp nhận"}
             </span>
           </button>
         </div>
