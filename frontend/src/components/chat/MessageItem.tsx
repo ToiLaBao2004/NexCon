@@ -1914,6 +1914,8 @@ const MessageItem = ({
 	const isPinned = message.isPinned === true;
 	const isImage = isImageBatch || (message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled);
 	const isLink = message.type === "link" && !isRecalled;
+	const linkPreview = isLink ? message.metadata?.linkPreview : null;
+	const hasLinkPreview = Boolean(linkPreview?.title || linkPreview?.image || linkPreview?.description);
 	const isSticker = message.type === "sticker" && !isRecalled;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
@@ -2236,11 +2238,11 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								isVisualOnly ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-1.5 text-sm" : "px-2 py-1.5 text-sm"),
+								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-1.5 text-sm" : "px-2 py-1.5 text-sm"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
 								isRecalled && !isImageBatch
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
-									: isVisualOnly
+									: (isVisualOnly || hasLinkPreview)
 										? "bg-transparent border-0 shadow-none"
 										: isOwn
 											? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
