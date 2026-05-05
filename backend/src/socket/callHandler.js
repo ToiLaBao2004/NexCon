@@ -188,6 +188,13 @@ function buildDirectIncomingPayload(session) {
     };
 }
 
+function buildDirectRingingPayload(session) {
+    return {
+        roomName: session.roomName,
+        conversationId: session.conversationId,
+    };
+}
+
 async function generateLiveKitToken(roomName, identity, displayName, metadata) {
     if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
         throw new Error('LiveKit credentials are missing');
@@ -361,7 +368,15 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
             scheduleDirectCallTimeout(session);
 
             // Gửi incoming-call tới TẤT CẢ thiết bị của receiver
-            emitToUserRoom(receiverId, 'incoming-call', buildDirectIncomingPayload(session));
+            const receiverTarget = getParticipantSocketTarget(session, receiverId);
+            if (receiverTarget) {
+                io.to(receiverTarget).emit('incoming-call', buildDirectIncomingPayload(session));
+
+                const callerTarget = getParticipantSocketTarget(session, callerId);
+                if (callerTarget) {
+                    io.to(callerTarget).emit('call-ringing', buildDirectRingingPayload(session));
+                }
+            }
 
             console.log(`${user.displayName} is calling ${receiverId} [${callType}] | session: ${session.sessionId}`);
 
@@ -572,7 +587,7 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
     });
 }
 
-export function emitPendingDirectCallsForUser(socket, userId, activeCalls) {
+export function emitPendingDirectCallsForUser(socket, userId, activeCalls, io, getReceiverSocketId) {
     const normalizedUserId = userId.toString();
 
     for (const session of activeCalls.values()) {
@@ -580,6 +595,11 @@ export function emitPendingDirectCallsForUser(socket, userId, activeCalls) {
         if (session.status !== 'calling') continue;
 
         socket.emit('incoming-call', buildDirectIncomingPayload(session));
+
+        const callerTarget = session.callerSocketId || getReceiverSocketId?.(session.callerId);
+        if (callerTarget) {
+            io.to(callerTarget).emit('call-ringing', buildDirectRingingPayload(session));
+        }
     }
 }
 

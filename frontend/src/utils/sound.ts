@@ -4,6 +4,15 @@ const unlocked: Record<string, boolean> = {};
 const MESSAGE_PATH = "/sounds/message.mp3";
 const NOTIFICATION_PATH = "/sounds/notification.mp3";
 const RINGTONE_PATH = "/sounds/ringtone.mp3";
+const CALLER_WAITING_RINGTONE_PATH = "/sounds/waiting_ringtone.mp3";
+const CALLER_RINGING_RINGTONE_PATH = "/sounds/incoming_ringtone.mp3";
+const RINGTONE_PATHS = [
+    RINGTONE_PATH,
+    CALLER_WAITING_RINGTONE_PATH,
+    CALLER_RINGING_RINGTONE_PATH,
+];
+
+let activeRingtonePath: string | null = null;
 
 function getAudio(path: string) {
     if (!audios[path]) {
@@ -56,22 +65,46 @@ async function playSound(path: string) {
 
 export const unlockMessageSound = () => unlockSound(MESSAGE_PATH);
 export const unlockNotificationSound = () => unlockSound(NOTIFICATION_PATH);
-export const unlockRingtone = () => unlockSound(RINGTONE_PATH);
+export const unlockRingtone = async () => {
+    const results = await Promise.all(RINGTONE_PATHS.map((path) => unlockSound(path)));
+    return results.every(Boolean);
+};
 
 export const playMessageSound = () => playSound(MESSAGE_PATH);
 export const playNotificationSound = () => playSound(NOTIFICATION_PATH);
 
-export const playRingtone = () => {
-    const el = getAudio(RINGTONE_PATH);
+function stopSound(path: string) {
+    const el = getAudio(path);
+    el.pause();
+    el.currentTime = 0;
+    if (activeRingtonePath === path) {
+        activeRingtonePath = null;
+    }
+}
+
+function playLoopingRingtone(path: string) {
+    if (activeRingtonePath && activeRingtonePath !== path) {
+        stopSound(activeRingtonePath);
+    }
+
+    const el = getAudio(path);
     el.loop = true;
     el.muted = false;
     el.volume = 1.0;
-    return playSound(RINGTONE_PATH);
-};
+
+    activeRingtonePath = path;
+    if (!el.paused) {
+        return Promise.resolve(true);
+    }
+
+    return playSound(path);
+}
+
+export const playRingtone = () => playLoopingRingtone(RINGTONE_PATH);
+export const playCallerWaitingRingtone = () => playLoopingRingtone(CALLER_WAITING_RINGTONE_PATH);
+export const playCallerRingingRingtone = () => playLoopingRingtone(CALLER_RINGING_RINGTONE_PATH);
 
 export const stopRingtone = () => {
     console.log("[Sound] Stopping ringtone");
-    const el = getAudio(RINGTONE_PATH);
-    el.pause();
-    el.currentTime = 0;
+    RINGTONE_PATHS.forEach((path) => stopSound(path));
 };

@@ -814,6 +814,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useCallStore.getState().handleRemoteAccepted();
     });
 
+    socket.on("call-ringing", () => {
+      useCallStore.getState().handleCallRinging();
+    });
+
     socket.on("call-answered-on-other-device", () => {
       const callState = useCallStore.getState();
       if (callState.status === "incoming") {

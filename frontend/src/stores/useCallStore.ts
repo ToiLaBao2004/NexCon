@@ -2,7 +2,12 @@ import { create } from "zustand";
 import { useSocketStore } from "./useSocketStore";
 import type { CallState, CallType, RemoteUser } from "@/types/store";
 import { toast } from "sonner";
-import { playRingtone, stopRingtone } from "@/utils/sound";
+import {
+  playCallerRingingRingtone,
+  playCallerWaitingRingtone,
+  playRingtone,
+  stopRingtone,
+} from "@/utils/sound";
 import { Room, RoomEvent, Track } from "livekit-client";
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
@@ -212,6 +217,7 @@ async function connectLiveKitRoom(
     isMuted: false,
     isVideoOff: callType === "voice",
   });
+  stopRingtone();
 
   return true;
 }
@@ -250,6 +256,7 @@ export const useCallStore = create<CallState>((set, get) => ({
         isVideoOff: callType === "voice",
       });
 
+      void playCallerWaitingRingtone();
       emitCallEvent("call-offer", { toUserId: toUser._id, callType });
       // Refresh sidebar
       const { useChatStore } = await import("./useChatStore");
@@ -367,6 +374,13 @@ export const useCallStore = create<CallState>((set, get) => ({
   handleRemoteAccepted() {
     if (get().status === "outgoing") {
       set({ isRemoteConnecting: true });
+      void playCallerRingingRingtone();
+    }
+  },
+
+  handleCallRinging() {
+    if (get().status === "outgoing") {
+      void playCallerRingingRingtone();
     }
   },
 

@@ -227,7 +227,7 @@ io.on("connection", async (socket) => {
     // Group call handlers
     registerGroupCallHandlers(socket, user, io, getReceiverSocketId);
 
-    emitPendingDirectCallsForUser(socket, userId, activeCalls);
+    emitPendingDirectCallsForUser(socket, userId, activeCalls, io, getReceiverSocketId);
 
     // Disconnect
     socket.on("disconnect", async () => {
