@@ -393,6 +393,10 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
 
         const activeCall = activeCalls.get(callerId);
         if (!activeCall) return;
+        if (activeCall.receiverId !== receiverId) {
+            socket.emit('call-failed', { reason: 'not-call-receiver' });
+            return;
+        }
 
         // Thiết bị khác đã bắt rồi — dismiss thiết bị này
         if (activeCall.status !== 'calling') {
@@ -430,6 +434,10 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
 
             const activeCall = activeCalls.get(callerId);
             if (!activeCall) return;
+            if (activeCall.receiverId !== receiverId) {
+                socket.emit('call-failed', { reason: 'not-call-receiver' });
+                return;
+            }
 
             if (activeCall.status !== 'connecting' && activeCall.status !== 'calling') return;
 
@@ -463,7 +471,7 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
             ]);
 
             const latestCall = activeCalls.get(callerId);
-            if (!latestCall || latestCall.sessionId !== activeCall.sessionId) return;
+            if (!latestCall || latestCall.sessionId !== activeCall.sessionId || latestCall.receiverId !== receiverId) return;
 
             latestCall.status = 'connecting';
             markParticipant(latestCall, callerId, { status: 'accepted' });
