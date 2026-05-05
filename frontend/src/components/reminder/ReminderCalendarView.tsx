@@ -70,7 +70,7 @@ export default function ReminderCalendarView({
 }: ReminderCalendarViewProps) {
   return (
     <div className="h-full min-h-0">
-      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-border/60 bg-background shadow-sm">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
         <div className="relative z-30 flex flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-card px-3 py-3 md:px-4">
           <div className="relative flex items-center gap-1.5">
             <Button
