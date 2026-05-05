@@ -22,6 +22,7 @@ import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOf
 import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import ReactionDetailModal from "./ReactionDetailModal";
@@ -38,6 +39,7 @@ const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewRespon
 
 /* ── Custom audio player for voice messages ─────────────────────────────────── */
 const AUDIO_BAR_COUNT = 32;
+const MAX_VISIBLE_SEEN_AVATARS = 8;
 
 function MentionChip({ children, isOwn }: { children: React.ReactNode; isOwn: boolean }) {
 	return (
@@ -2005,6 +2007,8 @@ const MessageItem = ({
 	}, [selectedConvo.participants, currentUserId, messages]);
 
 	const seenUsersForThisMessage = readReceiptsMap[message._id] ?? [];
+	const visibleSeenUsers = seenUsersForThisMessage.slice(0, MAX_VISIBLE_SEEN_AVATARS);
+	const hiddenSeenUsers = seenUsersForThisMessage.slice(MAX_VISIBLE_SEEN_AVATARS);
 
 	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage } = useChatStore();
 	const { isDark } = useThemeStore();
@@ -2018,6 +2022,7 @@ const MessageItem = ({
 	const [touchActionView, setTouchActionView] = useState<"menu" | "emoji">("menu");
 	const [reminderTargetMessage, setReminderTargetMessage] = useState<{ messageId: string; messagePreview: string } | null>(null);
 	const [showForwardModal, setShowForwardModal] = useState(false);
+	const [showSeenUsersDialog, setShowSeenUsersDialog] = useState(false);
 	const messageRootRef = useRef<HTMLDivElement | null>(null);
 	const longPressTimeoutRef = useRef<number | null>(null);
 
@@ -2633,16 +2638,69 @@ const MessageItem = ({
 
 			{isOwn && (!message.status || message.status === "sent") && (
 				seenUsersForThisMessage.length > 0 ? (
-					<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end">
-						{seenUsersForThisMessage.map((seenUser) => (
-							<UserAvatar
-								key={seenUser._id}
-								type="seen"
-								name={seenUser.displayName}
-								avatarUrl={seenUser.avatarUrl ?? undefined}
-							/>
-						))}
-					</div>
+					isCoarsePointer ? (
+						<div className="mt-0.5 mx-3 flex justify-end">
+							<button
+								type="button"
+								className="flex min-h-7 items-center justify-end -space-x-1 rounded-full px-1.5 py-1 active:bg-muted/70"
+								aria-label={`Xem ${seenUsersForThisMessage.length} người đã xem tin nhắn`}
+								onClick={() => setShowSeenUsersDialog(true)}
+							>
+								{visibleSeenUsers.map((seenUser) => (
+									<span key={seenUser._id} className="relative inline-flex rounded-full ring-2 ring-background">
+										<UserAvatar
+											type="seen"
+											name={seenUser.displayName}
+											avatarUrl={seenUser.avatarUrl ?? undefined}
+										/>
+									</span>
+								))}
+								{hiddenSeenUsers.length > 0 && (
+									<span className="relative inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[9px] font-semibold leading-none text-muted-foreground ring-2 ring-background">
+										+{hiddenSeenUsers.length}
+									</span>
+								)}
+							</button>
+						</div>
+					) : (
+						<TooltipProvider delayDuration={120}>
+							<div className="flex items-center justify-end -space-x-1 mt-0.5 mx-3">
+								{visibleSeenUsers.map((seenUser) => (
+									<Tooltip key={seenUser._id}>
+										<TooltipTrigger asChild>
+											<span className="relative inline-flex rounded-full ring-2 ring-background transition-transform hover:z-10 hover:-translate-y-0.5">
+												<UserAvatar
+													type="seen"
+													name={seenUser.displayName}
+													avatarUrl={seenUser.avatarUrl ?? undefined}
+												/>
+											</span>
+										</TooltipTrigger>
+										<TooltipContent side="top" sideOffset={6}>
+											{seenUser.displayName}
+										</TooltipContent>
+									</Tooltip>
+								))}
+								{hiddenSeenUsers.length > 0 && (
+									<Tooltip>
+										<TooltipTrigger asChild>
+											<span className="relative inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-muted px-1 text-[9px] font-semibold leading-none text-muted-foreground ring-2 ring-background hover:z-10">
+												+{hiddenSeenUsers.length}
+											</span>
+										</TooltipTrigger>
+										<TooltipContent side="top" sideOffset={6} className="max-w-56 text-left">
+											<div className="mb-1 text-[11px] font-semibold text-background/80">Đã xem bởi</div>
+											<div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto pr-1">
+												{seenUsersForThisMessage.map((seenUser) => (
+													<span key={seenUser._id}>{seenUser.displayName}</span>
+												))}
+											</div>
+										</TooltipContent>
+									</Tooltip>
+								)}
+							</div>
+						</TooltipProvider>
+					)
 				) : isLastMyMessage ? (
 					selectedConvo.type === "direct" ? (
 						<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end text-[11px] text-muted-foreground">
@@ -2665,6 +2723,33 @@ const MessageItem = ({
 					)
 				) : null
 			)}
+
+			<Dialog open={showSeenUsersDialog} onOpenChange={setShowSeenUsersDialog}>
+				<DialogContent className="w-[92vw] max-w-sm rounded-2xl border-border/70 bg-background p-0 shadow-2xl">
+					<DialogHeader className="px-5 pt-5 pb-3 text-left">
+						<DialogTitle>Đã xem bởi</DialogTitle>
+						<p className="text-sm text-muted-foreground">
+							{seenUsersForThisMessage.length} người đã xem tin nhắn này
+						</p>
+					</DialogHeader>
+					<div className="max-h-[60vh] overflow-y-auto px-5 pb-5">
+						<div className="flex flex-col gap-2">
+							{seenUsersForThisMessage.map((seenUser) => (
+								<div key={seenUser._id} className="flex items-center gap-3 rounded-xl px-1 py-1.5">
+									<UserAvatar
+										type="chat"
+										name={seenUser.displayName}
+										avatarUrl={seenUser.avatarUrl ?? undefined}
+									/>
+									<span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+										{seenUser.displayName}
+									</span>
+								</div>
+							))}
+						</div>
+					</div>
+				</DialogContent>
+			</Dialog>
 
 			<ConfirmationModal
 				isOpen={showConfirmRecall}
