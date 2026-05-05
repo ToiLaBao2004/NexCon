@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Shield, KeyRound, ChevronRight, ArrowLeft, Monitor, Trash2, LogOut } from "lucide-react";
+import { Shield, KeyRound, ChevronRight, ArrowLeft, Monitor, Trash2, LogOut, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,9 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
     const [view, setView] = useState<"overview" | "change-password" | "sessions">("overview");
     const { changePassword, getSessions, signOutBySession, signOutAll, sessions, sessionsLoading } = useAuthStore();
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const handleSignOutBySession = async (sessionId: string) => {
         setDeletingId(sessionId);
@@ -114,8 +117,8 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                                     variant="ghost"
                                     size="icon"
                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    disabled={deletingId === session.sessionId} // 👈
-                                    onClick={() => handleSignOutBySession(session.sessionId)} // 👈
+                                    disabled={deletingId === session.sessionId}
+                                    onClick={() => handleSignOutBySession(session.sessionId)}
                                 >
                                     {deletingId === session.sessionId
                                         ? <span className="w-4 h-4 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
@@ -146,6 +149,9 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                     <Button variant="ghost" size="icon" onClick={() => {
                         setView("overview");
                         reset();
+                        setShowCurrentPassword(false);
+                        setShowNewPassword(false);
+                        setShowConfirmPassword(false);
                     }}>
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
@@ -155,6 +161,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                 </div>
 
                 <form onSubmit={handleSubmit(onSubmitPassword)} className="space-y-4 max-w-sm ml-2 mt-4">
+                    {/* Mật khẩu hiện tại */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
                             <Label htmlFor="currentPassword">Mật khẩu hiện tại</Label>
@@ -166,38 +173,70 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                                 Quên mật khẩu?
                             </button>
                         </div>
-                        <Input
-                            id="currentPassword"
-                            type="password"
-                            {...register("currentPassword")}
-                            placeholder="••••••••"
-                        />
+                        <div className="relative">
+                            <Input
+                                id="currentPassword"
+                                type={showCurrentPassword ? "text" : "password"}
+                                {...register("currentPassword")}
+                                placeholder="••••••••"
+                                className="pr-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowCurrentPassword(prev => !prev)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
                         {errors.currentPassword && (
                             <p className="text-sm text-destructive">{errors.currentPassword.message}</p>
                         )}
                     </div>
 
+                    {/* Mật khẩu mới */}
                     <div className="space-y-2">
                         <Label htmlFor="newPassword">Mật khẩu mới</Label>
-                        <Input
-                            id="newPassword"
-                            type="password"
-                            {...register("newPassword")}
-                            placeholder="••••••••"
-                        />
+                        <div className="relative">
+                            <Input
+                                id="newPassword"
+                                type={showNewPassword ? "text" : "password"}
+                                {...register("newPassword")}
+                                placeholder="••••••••"
+                                className="pr-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowNewPassword(prev => !prev)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
                         {errors.newPassword && (
                             <p className="text-sm text-destructive">{errors.newPassword.message}</p>
                         )}
                     </div>
 
+                    {/* Xác nhận mật khẩu mới */}
                     <div className="space-y-2">
                         <Label htmlFor="confirmNewPassword">Xác nhận mật khẩu mới</Label>
-                        <Input
-                            id="confirmNewPassword"
-                            type="password"
-                            {...register("confirmNewPassword")}
-                            placeholder="••••••••"
-                        />
+                        <div className="relative">
+                            <Input
+                                id="confirmNewPassword"
+                                type={showConfirmPassword ? "text" : "password"}
+                                {...register("confirmNewPassword")}
+                                placeholder="••••••••"
+                                className="pr-10"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowConfirmPassword(prev => !prev)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            >
+                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                        </div>
                         {errors.confirmNewPassword && (
                             <p className="text-sm text-destructive">{errors.confirmNewPassword.message}</p>
                         )}

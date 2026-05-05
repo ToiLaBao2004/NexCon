@@ -111,10 +111,9 @@ export const useAuthStore = create<AuthState>()(
       }
     },
 
-    changePassword: async (currentPassword, newPassword) => {
+    changePassword: async (currentPassword, newPassword, confirmNewPassword) => {
       try {
-        set({ loading: true });
-        await userService.changePassword({ currentPassword, newPassword });
+        await userService.changePassword({ currentPassword, newPassword, confirmNewPassword });
         toast.success('Đổi mật khẩu thành công!');
       } catch (error: any) {
         console.error('Lỗi khi đổi mật khẩu:', error);
@@ -124,8 +123,6 @@ export const useAuthStore = create<AuthState>()(
           toast.error('Đổi mật khẩu thất bại. Vui lòng thử lại.');
         }
         throw error;
-      } finally {
-        set({ loading: false });
       }
     },
 

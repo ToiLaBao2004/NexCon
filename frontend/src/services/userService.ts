@@ -23,7 +23,7 @@ export const userService = {
         return response.data.user;
     },
 
-    changePassword: async (data: { currentPassword?: string; newPassword?: string }) => {
+    changePassword: async (data: { currentPassword?: string; newPassword?: string; confirmNewPassword?: string }) => {
         const response = await api.put('/users/change-password', data);
         return response.data;
     },

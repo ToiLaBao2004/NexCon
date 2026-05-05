@@ -47,7 +47,8 @@ export default interface AuthState {
 
   changePassword: (
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
+    confirmNewPassword: string
   ) => Promise<void>;
 
   signOut: () => Promise<void>;

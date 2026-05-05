@@ -195,14 +195,18 @@ export async function removeMusic(req, res) {
 export async function changePassword(req, res) {
     try {
         const userId = req.user._id;
-        const { currentPassword, newPassword } = req.body;
+        const { currentPassword, newPassword, confirmNewPassword } = req.body;
 
-        if (!currentPassword || !newPassword) {
+        if (!currentPassword || !newPassword || !confirmNewPassword) {
             return res.status(400).json({ message: 'Vui lòng nhập đầy đủ mật khẩu cũ và mới' });
         }
 
         if (newPassword.length < 8) {
             return res.status(400).json({ message: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
+        }
+
+        if (newPassword !== confirmNewPassword) {
+            return res.status(400).json({ message: 'Mật khẩu mới và xác nhận mật khẩu không khớp' });
         }
 
         const user = await User.findById(userId);
