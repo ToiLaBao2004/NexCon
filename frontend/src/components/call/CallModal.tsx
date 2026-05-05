@@ -92,12 +92,12 @@ const CallModal = ({ isMinimized, onMinimize, onMaximize }: CallModalProps) => {
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-zinc-950 text-white flex flex-col transition-all duration-500 w-[854px] h-[480px] max-w-[95vw] max-h-[80vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/80 backdrop-blur-md animate-in fade-in duration-300 dark:bg-black/80">
+      <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-card text-card-foreground shadow-2xl flex flex-col transition-all duration-500 w-[854px] h-[480px] max-w-[95vw] max-h-[80vh] dark:border-white/10 dark:bg-zinc-950 dark:text-white">
         {/* Minimize button */}
         <button
           onClick={onMinimize}
-          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur-sm text-white text-xs font-medium transition-colors"
+          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-lg border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur-sm transition-colors hover:bg-muted dark:border-white/10 dark:bg-black/60 dark:text-white dark:hover:bg-black/80"
           title="Thu nhỏ"
         >
           <Minimize2 size={14} />
@@ -169,7 +169,7 @@ const VideoCallLayout = ({
 
   return (
     <>
-      <div className="flex-1 min-h-0 bg-zinc-900 relative overflow-hidden">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/35 dark:bg-zinc-900">
         {/* Remote video */}
         <video
           ref={remoteVideoRef}
@@ -195,9 +195,9 @@ const VideoCallLayout = ({
                 {remoteUser.displayName.charAt(0).toUpperCase()}
               </div>
             )}
-            <p className="text-sm font-medium text-zinc-300">{remoteUser.displayName}</p>
+            <p className="text-sm font-medium text-foreground dark:text-zinc-300">{remoteUser.displayName}</p>
             {!remoteStream && (
-              <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-400">
+              <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
                 <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
                 {isJoiningCall ? "Đang thiết lập cuộc gọi..." : "Đang kết nối..."}
               </div>
@@ -206,7 +206,7 @@ const VideoCallLayout = ({
         )}
 
         {/* Timer */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-medium tabular-nums border border-white/10">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm backdrop-blur-md tabular-nums dark:border-white/10 dark:bg-black/40 dark:text-white">
           {hasStarted ? formatCallTimer(elapsed) : (
             <span className="inline-flex items-center gap-1.5">
               <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
@@ -216,7 +216,7 @@ const VideoCallLayout = ({
         </div>
 
         {/* Local PiP */}
-        <div className="absolute bottom-6 right-6 w-40 h-28 rounded-2xl overflow-hidden border border-white/20 shadow-2xl bg-zinc-800">
+        <div className="absolute bottom-6 right-6 h-28 w-40 overflow-hidden rounded-2xl border border-border/70 bg-background shadow-2xl dark:border-white/20 dark:bg-zinc-800">
           {showLocalVideo ? (
             <video
               ref={localVideoRef}
@@ -226,7 +226,7 @@ const VideoCallLayout = ({
               className="w-full h-full object-cover scale-x-[-1]"
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 bg-zinc-800">
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-muted/60 dark:bg-zinc-800">
               {localUser?.avatarUrl ? (
                 <img
                   src={localUser.avatarUrl}
@@ -246,7 +246,7 @@ const VideoCallLayout = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-center gap-6 py-5 bg-zinc-950/50 backdrop-blur-xl border-t border-white/5">
+      <div className="flex items-center justify-center gap-6 border-t border-border/60 bg-card/95 py-5 backdrop-blur-xl dark:border-white/5 dark:bg-zinc-950/50">
         <ControlButton
           onClick={toggleMute}
           active={isMuted}
@@ -276,7 +276,7 @@ const VideoCallLayout = ({
           <div className="p-3.5 rounded-full bg-destructive text-destructive-foreground shadow-lg shadow-destructive/20 group-hover:bg-destructive/90 group-active:scale-95 transition-all">
             <PhoneOff className="h-6 w-6" />
           </div>
-          <span className="text-[10px] text-zinc-500 font-medium">Kết thúc</span>
+          <span className="text-[10px] font-medium text-muted-foreground dark:text-zinc-500">Kết thúc</span>
         </button>
       </div>
     </>
@@ -306,13 +306,13 @@ function ControlButton({
         className={cn(
           "p-3 rounded-full transition-all duration-200 group-active:scale-90 shadow-sm",
           active
-            ? "bg-zinc-100 text-zinc-950"
-            : "bg-zinc-800 text-zinc-200 hover:bg-zinc-700",
+            ? "bg-foreground text-background dark:bg-zinc-100 dark:text-zinc-950"
+            : "bg-muted text-foreground hover:bg-muted/80 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700",
         )}
       >
         {children}
       </div>
-      <span className="text-[10px] text-zinc-500 font-medium">{label}</span>
+      <span className="text-[10px] font-medium text-muted-foreground dark:text-zinc-500">{label}</span>
     </button>
   );
 }
