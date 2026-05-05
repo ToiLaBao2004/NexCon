@@ -12,7 +12,7 @@ interface OutgoingCallModalProps {
 const OutgoingCallModal = ({ isMinimized, onMinimize, onMaximize }: OutgoingCallModalProps) => {
   const { remoteUser, callType, endCall, isRemoteConnecting } = useCallStore();
   const { ref: dragRef, style: dragStyle, dragHandlers } = useDraggable({ placement: "top-center" });
-  const statusText = isRemoteConnecting ? "Đang vào phòng chờ..." : "Đang gọi";
+  const statusText = isRemoteConnecting ? "Đang kết nối..." : "Đang gọi";
 
   if (!remoteUser) return null;
 

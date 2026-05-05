@@ -393,6 +393,10 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
 
         const activeCall = activeCalls.get(callerId);
         if (!activeCall) return;
+        if (activeCall.receiverId !== receiverId) {
+            socket.emit('call-failed', { reason: 'not-call-receiver' });
+            return;
+        }
 
         // Thiết bị khác đã bắt rồi — dismiss thiết bị này
         if (activeCall.status !== 'calling') {
@@ -430,12 +434,14 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
 
             const activeCall = activeCalls.get(callerId);
             if (!activeCall) return;
+            if (activeCall.receiverId !== receiverId) {
+                socket.emit('call-failed', { reason: 'not-call-receiver' });
+                return;
+            }
 
             if (activeCall.status !== 'connecting' && activeCall.status !== 'calling') return;
 
             activeCall.receiverSocketId = socket.id;
-            const callerTarget = getParticipantSocketTarget(activeCall, callerId);
-            if (!callerTarget) return;
 
             clearDirectCallRingTimeout(activeCall);
             activeCall.status = 'connecting';
@@ -463,17 +469,20 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
             ]);
 
             const latestCall = activeCalls.get(callerId);
-            if (!latestCall || latestCall.sessionId !== activeCall.sessionId) return;
+            if (!latestCall || latestCall.sessionId !== activeCall.sessionId || latestCall.receiverId !== receiverId) return;
 
             latestCall.status = 'connecting';
             markParticipant(latestCall, callerId, { status: 'accepted' });
             markParticipant(latestCall, receiverId, { status: 'accepted' });
 
             // Token chỉ gửi đúng socket đang active (không broadcast)
-            io.to(callerTarget).emit('call-answered', {
-                token: callerToken,
-                roomName: latestCall.roomName,
-            });
+            const callerTarget = getParticipantSocketTarget(latestCall, callerId);
+            if (callerTarget) {
+                io.to(callerTarget).emit('call-answered', {
+                    token: callerToken,
+                    roomName: latestCall.roomName,
+                });
+            }
             socket.emit('call-accepted', {
                 token: receiverToken,
                 roomName: latestCall.roomName,

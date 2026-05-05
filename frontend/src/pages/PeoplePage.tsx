@@ -129,12 +129,12 @@ const PeoplePage = () => {
 	return (
 		<SidebarProvider
 			className={`h-full min-h-0! w-full relative ${isMobile ? "flex flex-col" : "flex"}`}
-			style={{ "--sidebar-width": "300px" } as React.CSSProperties}
+			style={{ "--sidebar-width": "300px", "--sidebar": "var(--card)" } as React.CSSProperties}
 		>
 			{!isMobile && (
 				<Sidebar
 					collapsible="offcanvas"
-					className="md:left-20 top-0 md:top-2 bottom-0 md:bottom-2 h-full md:h-[calc(100vh-16px)] bg-card/60 backdrop-blur border border-border/40 rounded-none md:rounded-2xl overflow-hidden"
+					className="md:left-20 top-0 md:top-2 bottom-0 md:bottom-2 h-full md:h-[calc(100vh-16px)] bg-card border border-border/40 rounded-none md:rounded-2xl overflow-hidden"
 				>
 					<div className="space-y-2 p-4">
 						{PEOPLE_TABS.map((item) => {
@@ -172,7 +172,7 @@ const PeoplePage = () => {
 							</div>
 						)}
 
-						<div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm md:sticky md:top-0 md:z-20 shrink-0">
+						<div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm md:sticky md:top-0 md:z-50 shrink-0">
 							<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
 								{header.icon}
 							</div>
