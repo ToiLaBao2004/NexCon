@@ -442,8 +442,6 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
             if (activeCall.status !== 'connecting' && activeCall.status !== 'calling') return;
 
             activeCall.receiverSocketId = socket.id;
-            const callerTarget = getParticipantSocketTarget(activeCall, callerId);
-            if (!callerTarget) return;
 
             clearDirectCallRingTimeout(activeCall);
             activeCall.status = 'connecting';
@@ -478,10 +476,13 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
             markParticipant(latestCall, receiverId, { status: 'accepted' });
 
             // Token chỉ gửi đúng socket đang active (không broadcast)
-            io.to(callerTarget).emit('call-answered', {
-                token: callerToken,
-                roomName: latestCall.roomName,
-            });
+            const callerTarget = getParticipantSocketTarget(latestCall, callerId);
+            if (callerTarget) {
+                io.to(callerTarget).emit('call-answered', {
+                    token: callerToken,
+                    roomName: latestCall.roomName,
+                });
+            }
             socket.emit('call-accepted', {
                 token: receiverToken,
                 roomName: latestCall.roomName,
