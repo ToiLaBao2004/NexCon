@@ -129,12 +129,12 @@ const PeoplePage = () => {
 	return (
 		<SidebarProvider
 			className={`h-full min-h-0! w-full relative ${isMobile ? "flex flex-col" : "flex"}`}
-			style={{ "--sidebar-width": "300px" } as React.CSSProperties}
+			style={{ "--sidebar-width": "300px", "--sidebar": "var(--card)" } as React.CSSProperties}
 		>
 			{!isMobile && (
 				<Sidebar
 					collapsible="offcanvas"
-					className="md:left-20 top-0 md:top-2 bottom-0 md:bottom-2 h-full md:h-[calc(100vh-16px)] bg-card/60 backdrop-blur border border-border/40 rounded-none md:rounded-2xl overflow-hidden"
+					className="md:left-20 top-0 md:top-2 bottom-0 md:bottom-2 h-full md:h-[calc(100vh-16px)] bg-card border border-border/40 rounded-none md:rounded-2xl overflow-hidden"
 				>
 					<div className="space-y-2 p-4">
 						{PEOPLE_TABS.map((item) => {
