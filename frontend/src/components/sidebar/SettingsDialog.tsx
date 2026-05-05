@@ -19,7 +19,7 @@ import { useOTPStore } from "@/stores/useOtpStore";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Bell, Shield } from "lucide-react";
+import { Bell, Shield, Eye, EyeOff } from "lucide-react";
 
 const resetPassSchema = z.object({
     newPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
@@ -45,9 +45,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const [otpError, setOtpError] = useState<string | null>(null);
     const [otpLoading, setOtpLoading] = useState(false);
     const [countdown, setCountdown] = useState(60);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
     const { user, resetNewPassword } = useAuthStore();
     const { sendOtpResetPassword, verifyOtpResetPassword } = useOTPStore();
+
+    const [resetToken, setResetToken] = useState<string>("");
 
     useEffect(() => {
         if (forgotPassStep !== "otp" || countdown <= 0) return;
@@ -86,7 +90,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         setOtpError(null);
         setOtpLoading(true);
         try {
-            await verifyOtpResetPassword(user!.email, otp);
+            const resetToken = await verifyOtpResetPassword(user!.email, otp);
+            setResetToken(resetToken);
             setForgotPassStep("reset");
         } catch (err: any) {
             setOtpError(err.response?.data?.message || "Mã OTP không hợp lệ.");
@@ -108,7 +113,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
     const onResetSubmit = async (data: ResetPassFormValues) => {
         try {
-            await resetNewPassword(user!.email, data.newPassword, data.confirmNewPassword);
+            await resetNewPassword(resetToken, data.newPassword, data.confirmNewPassword);
             onOpenChange(false);
         } catch (error: any) {
             const backendMsg = error.response?.data?.message || "Cập nhật mật khẩu thất bại.";
@@ -128,6 +133,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 setOtpError(null);
                 setOtp("");
                 resetResetForm();
+                setShowNewPassword(false);
+                setShowConfirmPassword(false);
             }, 500);
             return () => clearTimeout(timer);
         }
@@ -140,8 +147,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className={cn(
-                "gap-0 border-border/40 w-screen h-[100dvh] max-w-none rounded-none border-0 top-0 left-0 translate-x-0 translate-y-0 overflow-y-auto sm:h-auto sm:rounded-lg sm:border sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]",
-                forgotPassStep === "none" ? "p-0 sm:max-w-[700px]" : "p-4 sm:max-w-md sm:p-6"
+                "gap-0 border-border/40 w-screen h-[100dvh] max-w-none rounded-none border-0 top-0 left-0 translate-x-0 translate-y-0 sm:h-auto sm:rounded-lg sm:border sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]",
+                forgotPassStep === "none"
+                    ? "p-0 sm:max-w-[700px] overflow-y-auto"
+                    : "p-4 sm:max-w-md sm:p-6 overflow-hidden"
             )}>
                 <DialogHeader className="sr-only">
                     <DialogTitle>Cai dat</DialogTitle>
@@ -227,24 +236,46 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         <form onSubmit={handleSubmitReset(onResetSubmit)} className="space-y-4">
                             <div className="space-y-2">
                                 <Label htmlFor="resetNewPassword">Mật khẩu mới</Label>
-                                <Input
-                                    id="resetNewPassword"
-                                    type="password"
-                                    {...registerReset("newPassword")}
-                                    placeholder="••••••••"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="resetNewPassword"
+                                        type={showNewPassword ? "text" : "password"}
+                                        {...registerReset("newPassword")}
+                                        placeholder="••••••••"
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewPassword((prev) => !prev)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                        tabIndex={-1}
+                                    >
+                                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
                                 {errorsReset.newPassword && (
                                     <p className="text-sm text-destructive">{errorsReset.newPassword.message}</p>
                                 )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="resetConfirmNewPassword">Xác nhận mật khẩu mới</Label>
-                                <Input
-                                    id="resetConfirmNewPassword"
-                                    type="password"
-                                    {...registerReset("confirmNewPassword")}
-                                    placeholder="••••••••"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="resetConfirmNewPassword"
+                                        type={showConfirmPassword ? "text" : "password"}
+                                        {...registerReset("confirmNewPassword")}
+                                        placeholder="••••••••"
+                                        className="pr-10"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                        tabIndex={-1}
+                                    >
+                                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
                                 {errorsReset.confirmNewPassword && (
                                     <p className="text-sm text-destructive">{errorsReset.confirmNewPassword.message}</p>
                                 )}

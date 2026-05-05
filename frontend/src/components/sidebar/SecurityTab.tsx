@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { SessionInfo } from "@/types/authState";
+import { cn } from "@/lib/utils";
 
 const changePasswordSchema = z.object({
     currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
@@ -26,7 +27,8 @@ interface SecurityTabProps {
 
 export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
     const [view, setView] = useState<"overview" | "change-password" | "sessions">("overview");
-    const { changePassword, getSessions, signOutBySession, signOutAll, sessions, sessionsLoading } = useAuthStore();
+    const { changePassword, getSessions, signOutBySession, signOutAll, sessions, sessionsLoading, user } = useAuthStore();
+    const isGoogleUser = !!user?.googleId;
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
@@ -265,14 +267,29 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
             </div>
             <div className="space-y-4">
                 <div
-                    className="flex items-center justify-between p-4 border border-border/50 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors group"
-                    onClick={() => setView("change-password")}
+                    className={cn(
+                        "flex items-center justify-between p-4 border border-border/50 rounded-lg transition-colors group",
+                        isGoogleUser
+                            ? "opacity-50 cursor-not-allowed"
+                            : "cursor-pointer hover:bg-muted/50"
+                    )}
+                    onClick={() => !isGoogleUser && setView("change-password")}
                 >
                     <div className="flex items-center gap-4">
-                        <div className="p-2.5 bg-primary/10 rounded-full text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                        <div className={cn(
+                            "p-2.5 rounded-full transition-colors",
+                            isGoogleUser
+                                ? "bg-muted text-muted-foreground"
+                                : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
+                        )}>
                             <KeyRound className="w-5 h-5" />
                         </div>
-                        <p className="font-medium">Đổi mật khẩu</p>
+                        <div>
+                            <p className="font-medium">Đổi mật khẩu</p>
+                            {isGoogleUser && (
+                                <p className="text-xs text-muted-foreground">Tài khoản Google không dùng mật khẩu</p>
+                            )}
+                        </div>
                     </div>
                     <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
                 </div>

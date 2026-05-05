@@ -302,8 +302,16 @@ export async function resetNewPassword(req, res) {
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         await User.updateOne({ _id: user._id }, { password: hashedPassword });
-        await Session.deleteMany({ userId: user._id });
-        disconnectUserSockets(user._id, 'password-reset');
+        const currentRefreshToken = req.cookies?.refreshToken;
+
+        if (currentRefreshToken) {
+            await Session.deleteMany({
+                userId: user._id,
+                refreshToken: { $ne: currentRefreshToken }
+            });
+        } else {
+            await Session.deleteMany({ userId: user._id });
+        }
         return res.status(200).json({ message: 'Password updated successfully.' });
     } catch (error) {
         console.error('Error during password reset:', error);
