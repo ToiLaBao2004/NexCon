@@ -31,19 +31,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       )}
     >
       <SidebarContent
-        className="beautiful-scrollbar overflow-x-hidden"
+        className="overflow-hidden"
         onClick={() => setFocusedConversation(null)}
       >
-        <div onClick={(e) => e.stopPropagation()}>
+        <div className="flex h-full min-h-0 flex-col" onClick={(e) => e.stopPropagation()}>
           {isMobile && (
-            <div className="sticky top-0 z-20 px-4 pt-4 pb-3 bg-card border-b border-border/40">
+            <div className="shrink-0 px-4 pt-4 pb-3 bg-card border-b border-border/40">
               <h1 className="text-[28px] leading-none font-bold tracking-tight text-primary">NextCon</h1>
             </div>
           )}
 
           <AddFriendModal />
 
-          <SidebarGroup>
+          <SidebarGroup className="flex min-h-0 flex-1 flex-col">
             <SidebarGroupLabel asChild>
               <div className="uppercase flex items-center justify-between">
                 <span>cuộc trò chuyện</span>
@@ -56,7 +56,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </button>
               </div>
             </SidebarGroupLabel>
-            <SidebarGroupContent>
+            <SidebarGroupContent className="min-h-0 flex-1">
               <ConversationMixedList />
             </SidebarGroupContent>
           </SidebarGroup>
