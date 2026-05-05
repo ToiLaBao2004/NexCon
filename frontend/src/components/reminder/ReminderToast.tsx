@@ -127,37 +127,35 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
   };
 
   return (
-    <div className="relative w-[calc(100vw-1rem)] rounded-2xl border border-border/80 bg-card p-4 text-foreground shadow-sm animate-in slide-in-from-right-4 fade-in duration-300 sm:w-[380px]">
+    <div className="relative w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border/80 bg-popover/95 p-4 font-sans text-popover-foreground shadow-[0_18px_45px_-26px_hsl(var(--foreground)/0.45)] backdrop-blur-xl antialiased animate-in slide-in-from-right-4 fade-in duration-300 sm:w-[408px]">
+      <div className="absolute inset-x-0 top-0 h-1 bg-primary/85" />
 
-      {/* Close Button */}
       <button
         type="button"
         onClick={handleCloseToast}
         aria-label="Đóng"
-        className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground/60 transition-all hover:bg-muted hover:text-foreground"
+        className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
-        <X className="h-3 w-3" strokeWidth={2.5} />
+        <X className="h-3.5 w-3.5" strokeWidth={2.25} />
       </button>
 
-      <div className="flex gap-3.5">
-        {/* Icon */}
-        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-600/25 dark:shadow-cyan-900/35">
-          <Bell className="h-5 w-5 animate-ring" />
+      <div className="flex gap-3.5 pt-1">
+        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary shadow-sm">
+          <Bell className="h-5 w-5" strokeWidth={2.15} />
         </div>
 
-        {/* Content */}
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="min-w-0 flex-1 pr-7">
+          <p className="text-[12px] font-semibold leading-none text-primary">
             Nhắc hẹn
           </p>
-          
-          <p className="mt-1 whitespace-pre-wrap break-words text-[15px] font-semibold leading-snug tracking-tight text-foreground">
+
+          <p className="mt-2 whitespace-pre-wrap break-words text-[15px] font-semibold leading-6 text-foreground">
             {meetingUrlParts.before}
             {meetingUrlParts.url && (
               <a
                 href={meetingUrl || meetingUrlParts.url}
                 onClick={(event) => handleMeetingLinkNavigate(event, meetingUrl ?? meetingUrlParts.url ?? '')}
-                className="break-all font-medium text-primary underline transition-colors hover:text-primary/80"
+                className="break-all font-medium text-primary underline-offset-2 transition-colors hover:text-primary/80 hover:underline"
               >
                 {meetingUrlParts.url}
               </a>
@@ -169,19 +167,18 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
             <a
               href={meetingUrl}
               onClick={(event) => handleMeetingLinkNavigate(event, meetingUrl)}
-              className="mt-1 block break-all text-xs font-medium text-primary underline transition-colors hover:text-primary/80"
+              className="mt-1.5 block break-all text-[13px] font-medium text-primary underline-offset-2 transition-colors hover:text-primary/80 hover:underline"
             >
               {meetingUrl}
             </a>
           )}
 
-          {/* Meta */}
-          <div className="mt-2 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-            <CalendarClock className="h-3.5 w-3.5" />
+          <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-muted-foreground">
+            <CalendarClock className="h-4 w-4 text-primary/80" strokeWidth={2} />
             <span>{formatReminderTime(reminder.remindAt)}</span>
             {reminder.source?.type === 'message' && (
               <>
-                <span className="mx-1 h-1 w-1 rounded-full bg-muted-foreground/40" />
+                <span className="h-1 w-1 rounded-full bg-muted-foreground/35" />
                 <span>Từ tin nhắn</span>
               </>
             )}
@@ -200,7 +197,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
                 void handleJoinMeeting();
               }}
               disabled={joiningMeeting}
-              className="mt-2 inline-flex h-8 items-center rounded-md border border-primary/35 bg-primary/10 px-3 text-xs font-semibold text-primary animate-pulse transition-colors hover:bg-primary/15 disabled:animate-none disabled:opacity-60"
+              className="mt-3 inline-flex h-8 items-center rounded-md border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
             >
               {joiningMeeting ? 'Đang vào phòng...' : 'Tham gia cuộc họp'}
             </button>
@@ -212,18 +209,18 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
       <div ref={snoozeAreaRef}>
         <div className={`grid transition-all duration-200 ${showSnoozeOptions ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
           <div className="overflow-hidden">
-            <div className="rounded-xl border border-border/60 bg-muted/50 p-2.5">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="rounded-lg border border-border/70 bg-muted/40 p-3">
+              <p className="mb-2 text-[12px] font-semibold text-muted-foreground">
                 Nhắc lại sau
               </p>
-              <div className="grid grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-4 gap-2">
                 {[5, 10, 30, 60].map((minutes) => (
                   <button
                     key={minutes}
                     type="button"
                     disabled={loadingAction !== null}
                     onClick={() => void handleSnooze(minutes as 5 | 10 | 30 | 60)}
-                    className="rounded-md border border-border bg-background py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+                    className="h-8 rounded-md border border-border bg-background text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
                   >
                     {minutes < 60 ? `${minutes}p` : '1h'}
                   </button>
@@ -233,16 +230,14 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
           </div>
         </div>
 
-        {/* Divider */}
-        <div className="my-3 border-t border-border/60" />
+        <div className="my-3.5 border-t border-border/70" />
 
-        {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={handleView}
             disabled={loadingAction !== null}
-            className="flex h-9 items-center justify-center rounded-md bg-primary text-[12px] font-semibold text-white shadow-sm transition-all hover:bg-primary/90 disabled:opacity-50"
+            className="flex h-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             Xem
           </button>
@@ -252,7 +247,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
             disabled={loadingAction !== null}
             onClick={() => setShowSnoozeOptions((prev) => !prev)}
             className={cn(
-              "flex h-9 items-center justify-center rounded-md border text-[12px] font-semibold transition-all disabled:opacity-50",
+              "flex h-10 items-center justify-center rounded-lg border text-sm font-semibold transition-colors disabled:opacity-50",
               showSnoozeOptions
                 ? "border-primary/30 bg-primary/10 text-primary"
                 : "border-border bg-background text-foreground hover:bg-muted/60"
