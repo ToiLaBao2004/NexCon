@@ -509,12 +509,18 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 	}
 
 	if (type === "image" && (message.filePublicId || message.fileUrl)) {
+		const errorBadge = isOwn && message.status === "error" ? (
+			<span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-black/55 text-white shadow-sm">
+				<AlertCircle className="size-3 text-red-200" />
+			</span>
+		) : null;
+
 		return (
 			<div className="flex flex-col gap-1.5">
 				{message.filePublicId ? (
 					<button
 						type="button"
-						className="p-0 border-0 bg-transparent cursor-zoom-in"
+						className="relative p-0 border-0 bg-transparent cursor-zoom-in"
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
 								messageId: message._id,
@@ -529,11 +535,12 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							alt={message.fileName ?? "image"}
 							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
 						/>
+						{errorBadge}
 					</button>
 				) : (
 					<button
 						type="button"
-						className="p-0 border-0 bg-transparent cursor-zoom-in"
+						className="relative p-0 border-0 bg-transparent cursor-zoom-in"
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
 								messageId: message._id,
@@ -549,6 +556,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							alt={message.fileName ?? "image"}
 							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
 						/>
+						{errorBadge}
 					</button>
 				)}
 				{message.content && <p className="text-sm px-1">{renderMentionedText(message.content, message.mentions, isOwn, participants)}</p>}

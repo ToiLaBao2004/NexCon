@@ -661,11 +661,9 @@ export const useChatStore = create<ChatState>()(
                         set((state) => {
                             const prev = state.messages[convoId];
                             if (!prev) return state;
-                            const items = isModerationError
-                                ? prev.items.filter((m) => m._id !== tempId)
-                                : prev.items.map((m) =>
-                                    m._id === tempId ? { ...m, status: 'error' as const } : m
-                                );
+                            const items = prev.items.map((m) =>
+                                m._id === tempId ? { ...m, status: 'error' as const } : m
+                            );
                             return {
                                 messages: {
                                     ...state.messages,
@@ -676,6 +674,9 @@ export const useChatStore = create<ChatState>()(
                                 },
                             };
                         });
+                    }
+                    if (tempBlobUrl && isModerationError) {
+                        tempBlobUrl = null;
                     }
                     if (tempBlobUrl) URL.revokeObjectURL(tempBlobUrl);
                     throw error;
