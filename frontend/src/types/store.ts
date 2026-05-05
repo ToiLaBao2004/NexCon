@@ -274,7 +274,7 @@ export interface CallState {
   handleCallAccepted: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallRejected: () => void;
   handleCallEnded: () => void;
-  handleCallFailed: (reason: 'offline' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'server-error') => void;
+  handleCallFailed: (reason: 'offline' | 'no-answer' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'server-error') => void;
   handleIceCandidate: (_candidate: RTCIceCandidateInit) => Promise<void>;
 }
 

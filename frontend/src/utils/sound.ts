@@ -1,6 +1,10 @@
 const audios: Record<string, HTMLAudioElement> = {};
 const unlocked: Record<string, boolean> = {};
 
+const MESSAGE_PATH = "/sounds/message.mp3";
+const NOTIFICATION_PATH = "/sounds/notification.mp3";
+const RINGTONE_PATH = "/sounds/ringtone.mp3";
+
 function getAudio(path: string) {
     if (!audios[path]) {
         const el = new Audio(path);
@@ -12,18 +16,18 @@ function getAudio(path: string) {
 }
 
 async function unlockSound(path: string) {
-    const el = getAudio(path);
-
     if (unlocked[path]) return true;
 
+    const el = new Audio(path);
+    el.preload = "auto";
+    el.muted = true;
+
     try {
-        el.muted = true;
-        el.currentTime = 0;
         await el.play();
         el.pause();
         el.currentTime = 0;
-        el.muted = false;
         unlocked[path] = true;
+        getAudio(path).load();
         return true;
     } catch (err) {
         console.error(`[Sound] unlockSound failed for ${path}:`, err);
@@ -41,6 +45,7 @@ async function playSound(path: string) {
     try {
         el.pause();
         el.currentTime = 0;
+        el.muted = false;
         await el.play();
         return true;
     } catch (err: any) {
@@ -49,24 +54,24 @@ async function playSound(path: string) {
     }
 }
 
-export const unlockMessageSound = () => unlockSound("/sounds/message.mp3");
-export const unlockNotificationSound = () => unlockSound("/sounds/notification.mp3");
-export const unlockRingtone = () => unlockSound("/sounds/ringtone.mp3");
+export const unlockMessageSound = () => unlockSound(MESSAGE_PATH);
+export const unlockNotificationSound = () => unlockSound(NOTIFICATION_PATH);
+export const unlockRingtone = () => unlockSound(RINGTONE_PATH);
 
-export const playMessageSound = () => playSound("/sounds/message.mp3");
-export const playNotificationSound = () => playSound("/sounds/notification.mp3");
+export const playMessageSound = () => playSound(MESSAGE_PATH);
+export const playNotificationSound = () => playSound(NOTIFICATION_PATH);
 
 export const playRingtone = () => {
-    const el = getAudio("/sounds/ringtone.mp3");
+    const el = getAudio(RINGTONE_PATH);
     el.loop = true;
     el.muted = false;
     el.volume = 1.0;
-    return playSound("/sounds/ringtone.mp3");
+    return playSound(RINGTONE_PATH);
 };
 
 export const stopRingtone = () => {
-    console.log(`[Sound] Stopping ringtone`);
-    const el = getAudio("/sounds/ringtone.mp3");
+    console.log("[Sound] Stopping ringtone");
+    const el = getAudio(RINGTONE_PATH);
     el.pause();
     el.currentTime = 0;
 };
