@@ -61,7 +61,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
 
     const onSubmitPassword = async (data: ChangePasswordFormValues) => {
         try {
-            await changePassword(data.currentPassword, data.newPassword);
+            await changePassword(data.currentPassword, data.newPassword, data.confirmNewPassword);
             reset();
             setView("overview");
         } catch (error: any) {

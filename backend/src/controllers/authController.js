@@ -311,6 +311,7 @@ export async function resetNewPassword(req, res) {
             });
         } else {
             await Session.deleteMany({ userId: user._id });
+            disconnectUserSockets(user._id, 'password-reset');
         }
         return res.status(200).json({ message: 'Password updated successfully.' });
     } catch (error) {
