@@ -1,7 +1,7 @@
 import { Server } from "socket.io";
 import http from "http";
 import express from "express";
-import { socketAuthMiddleware } from "../middlewares/socketMiddleware.js";
+import { socketAuthMiddleware, validateSocketSession } from "../middlewares/socketMiddleware.js";
 import { getUserConversationsForSocketIO } from "../controllers/conversationController.js";
 import Conversation from "../models/conversationModel.js";
 import { registerCallHandlers, handleCallDisconnect } from "./callHandler.js";
@@ -23,12 +23,17 @@ const io = new Server(server, {
 io.use(socketAuthMiddleware);
 
 const USER_ROOM_PREFIX = "user:";
+const SESSION_ROOM_PREFIX = "session:";
 
 // Track active calls: callerId -> direct call session (roomName, participants, status, callType)
 const activeCalls = new Map();
 
 function getUserRoom(userId) {
     return `${USER_ROOM_PREFIX}${userId.toString()}`;
+}
+
+function getSessionRoom(sessionId) {
+    return `${SESSION_ROOM_PREFIX}${sessionId.toString()}`;
 }
 
 function getOnlineUserIds() {
@@ -74,6 +79,33 @@ function leaveUserSocketsFromRoom(userId, roomName) {
     return true;
 }
 
+function disconnectSocketRoom(roomName, reason = "session-revoked") {
+    const roomSockets = io.sockets.adapter.rooms.get(roomName);
+    if (!roomSockets || roomSockets.size === 0) return 0;
+
+    let disconnectedCount = 0;
+    for (const socketId of Array.from(roomSockets)) {
+        const targetSocket = io.sockets.sockets.get(socketId);
+        if (!targetSocket) continue;
+
+        targetSocket.emit("session-revoked", { reason });
+        targetSocket.disconnect(true);
+        disconnectedCount += 1;
+    }
+
+    return disconnectedCount;
+}
+
+function disconnectSessionSockets(sessionId, reason = "session-revoked") {
+    if (!sessionId) return 0;
+    return disconnectSocketRoom(getSessionRoom(sessionId), reason);
+}
+
+function disconnectUserSockets(userId, reason = "session-revoked") {
+    if (!userId) return 0;
+    return disconnectSocketRoom(getUserRoom(userId), reason);
+}
+
 configureSocketGateway({
     io,
     getReceiverSocketId,
@@ -86,11 +118,33 @@ configureSocketGateway({
 io.on("connection", async (socket) => {
     const user = socket.user;
     const userId = user._id.toString();
+    const sessionId = socket.sessionId?.toString();
 
     console.log(`${user.displayName} connected to socket ${socket.id}`);
 
     socket.join(getUserRoom(userId));
+    if (sessionId) {
+        socket.join(getSessionRoom(sessionId));
+    }
     emitOnlineUsers();
+
+    socket.use(async (_packet, next) => {
+        try {
+            const isSessionValid = await validateSocketSession(socket);
+            if (!isSessionValid) {
+                socket.emit("session-revoked", { reason: "session-expired-or-revoked" });
+                socket.disconnect(true);
+                return next(new Error("Unauthorized - Session expired or revoked"));
+            }
+
+            return next();
+        } catch (error) {
+            console.error("Error validating socket session:", error);
+            socket.emit("session-revoked", { reason: "session-validation-failed" });
+            socket.disconnect(true);
+            return next(new Error("Unauthorized - Session validation failed"));
+        }
+    });
 
     // Join tất cả conversation rooms
     const conversationIds = await getUserConversationsForSocketIO(user._id);
@@ -122,9 +176,24 @@ io.on("connection", async (socket) => {
     socket.on("message-delivered", async ({ messageId, conversationId }) => {
         try {
             const userId = user._id.toString();
+            if (!messageId || !conversationId) {
+                return;
+            }
+
+            const conversation = await Conversation.findOne({
+                _id: conversationId,
+                'participants.userId': userId,
+            }).select('_id');
+
+            if (!conversation) {
+                console.warn(`Rejected message-delivered from non-member ${userId} for conversation ${conversationId}`);
+                return;
+            }
+
             const msg = await Message.findOneAndUpdate(
                 {
                     _id: messageId,
+                    conversationId: conversation._id,
                     senderId: { $ne: userId },
                     deliveredTo: { $ne: userId },
                 },
@@ -182,4 +251,6 @@ export {
     isUserOnline,
     joinUserSocketsToRoom,
     leaveUserSocketsFromRoom,
+    disconnectSessionSockets,
+    disconnectUserSockets,
 };

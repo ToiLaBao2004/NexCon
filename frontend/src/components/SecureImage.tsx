@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { chatService } from '@/services/chatService';
 import useMediaCacheStore from '@/stores/useMediaCacheStore';
 
@@ -10,34 +10,119 @@ interface SecureImageProps {
 }
 
 export default function SecureImage({ messageId, alt, className, onLoadCallback }: SecureImageProps) {
-    const { cache, setUrl } = useMediaCacheStore();
+    const setUrl = useMediaCacheStore((state) => state.setUrl);
+    const clearUrl = useMediaCacheStore((state) => state.clearUrl);
     const [src, setSrc] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const hasRetriedAfterLoadError = useRef(false);
+    const isFetchingRef = useRef(false);
+    const objectUrlRef = useRef<string | null>(null);
+
+    const createObjectUrlFromUrl = useCallback(async (url: string) => {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to load media: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        return URL.createObjectURL(blob);
+    }, []);
+
+    const applyObjectUrl = useCallback((objectUrl: string) => {
+        if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+        }
+        objectUrlRef.current = objectUrl;
+        setSrc(objectUrl);
+    }, []);
 
     const fetchUrl = useCallback(async () => {
+        if (isFetchingRef.current) return;
+
         try {
+            isFetchingRef.current = true;
             setIsLoading(true);
             const { url } = await chatService.getSignedMediaUrl(messageId);
+            const objectUrl = await createObjectUrlFromUrl(url);
+            applyObjectUrl(objectUrl);
             setUrl(messageId, url);
-            setSrc(url);
         } catch (error) {
             console.error('Failed to fetch media url for message:', messageId, error);
+            clearUrl(messageId);
             setSrc(null);
         } finally {
+            isFetchingRef.current = false;
             setIsLoading(false);
         }
-    }, [messageId, setUrl]);
-
-    const cachedUrl = cache[messageId];
+    }, [applyObjectUrl, clearUrl, createObjectUrlFromUrl, messageId, setUrl]);
 
     useEffect(() => {
-        if (cachedUrl) {
-            setSrc(cachedUrl);
-            setIsLoading(false);
-        } else {
-            fetchUrl();
-        }
-    }, [messageId, cachedUrl, fetchUrl]);
+        hasRetriedAfterLoadError.current = false;
+        isFetchingRef.current = false;
+    }, [messageId]);
+
+    useEffect(() => {
+        let isCancelled = false;
+
+        const loadImage = async () => {
+            if (isFetchingRef.current) return;
+
+            try {
+                isFetchingRef.current = true;
+                setIsLoading(true);
+
+                const cachedUrl = useMediaCacheStore.getState().getUrl(messageId);
+                if (cachedUrl) {
+                    try {
+                        const objectUrl = await createObjectUrlFromUrl(cachedUrl);
+                        if (isCancelled) {
+                            URL.revokeObjectURL(objectUrl);
+                            return;
+                        }
+                        applyObjectUrl(objectUrl);
+                        setIsLoading(false);
+                        return;
+                    } catch {
+                        clearUrl(messageId);
+                    }
+                }
+
+                const { url } = await chatService.getSignedMediaUrl(messageId);
+                const objectUrl = await createObjectUrlFromUrl(url);
+                if (isCancelled) {
+                    URL.revokeObjectURL(objectUrl);
+                    return;
+                }
+                applyObjectUrl(objectUrl);
+                setUrl(messageId, url);
+            } catch (error) {
+                if (!isCancelled) {
+                    console.error('Failed to load media for message:', messageId, error);
+                    clearUrl(messageId);
+                    setSrc(null);
+                }
+            } finally {
+                if (!isCancelled) {
+                    setIsLoading(false);
+                }
+                isFetchingRef.current = false;
+            }
+        };
+
+        loadImage();
+        return () => {
+            isCancelled = true;
+        };
+    }, [applyObjectUrl, clearUrl, createObjectUrlFromUrl, messageId, setUrl]);
+
+    useEffect(() => {
+        return () => {
+            if (objectUrlRef.current) {
+                URL.revokeObjectURL(objectUrlRef.current);
+                objectUrlRef.current = null;
+            }
+        };
+    }, [messageId]);
 
     if (isLoading) {
         return (
@@ -64,10 +149,19 @@ export default function SecureImage({ messageId, alt, className, onLoadCallback 
             src={src}
             alt={alt || "Media"}
             className={className}
-            onLoad={onLoadCallback}
+            onLoad={() => {
+                hasRetriedAfterLoadError.current = false;
+                onLoadCallback?.();
+            }}
             onError={() => {
-                setSrc(null);
-                setIsLoading(false);
+                if (hasRetriedAfterLoadError.current) {
+                    setSrc(null);
+                    setIsLoading(false);
+                    return;
+                }
+
+                hasRetriedAfterLoadError.current = true;
+                fetchUrl();
             }}
             loading="lazy"
         />

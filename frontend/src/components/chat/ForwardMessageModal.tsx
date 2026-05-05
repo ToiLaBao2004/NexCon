@@ -251,23 +251,7 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
         {/* ── Original message preview ── */}
         <div className="mx-5 mt-3.5 flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-muted/40 border border-border/40">
           <div className="h-7 w-7 rounded-md bg-background border border-border/50 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
-            {isSingleImage ? (
-              message.filePublicId ? (
-                <SecureImage
-                  messageId={message._id}
-                  alt={message.fileName ?? "image"}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <img
-                  src={message.fileUrl ?? ""}
-                  alt={message.fileName ?? "image"}
-                  className="h-full w-full object-cover"
-                />
-              )
-            ) : (
-              <PreviewIcon className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
+            <PreviewIcon className="h-3.5 w-3.5 text-muted-foreground" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[11px] font-medium text-muted-foreground mb-0.5">Tin nhắn gốc</p>
