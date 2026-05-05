@@ -333,6 +333,10 @@ const ReminderPage = () => {
         () => filteredReminders.filter((item) => item.scope === 'personal').length,
         [filteredReminders]
     );
+    const visibleSharedReminderCount = useMemo(
+        () => filteredReminders.filter((item) => item.scope === 'shared').length,
+        [filteredReminders]
+    );
 
     const hasUpcomingData = groupedUpcoming.length > 0;
     const isAllTabStatusUnselected = activeTab === 'all' && selectedStatuses.length === 0;
@@ -795,8 +799,8 @@ const ReminderPage = () => {
     }, []);
 
     const upcomingEmpty = (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-16 w-16 rounded-md bg-primary/10 flex items-center justify-center mb-4">
+        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-background/70 px-6 py-16 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-primary/10">
                 <AlarmClock className="h-8 w-8 text-primary" />
             </div>
             <h3 className="font-semibold text-base">Chưa có nhắc nhở sắp tới</h3>
@@ -805,8 +809,8 @@ const ReminderPage = () => {
     );
 
     const pastEmpty = (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-16 w-16 rounded-md bg-muted/60 flex items-center justify-center mb-4">
+        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-background/70 px-6 py-16 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-muted/60">
                 <History className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="font-semibold text-base">Chưa có lịch sử nhắc nhở</h3>
@@ -815,8 +819,8 @@ const ReminderPage = () => {
     );
 
     const allEmpty = (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="h-16 w-16 rounded-md bg-muted/60 flex items-center justify-center mb-4">
+        <div className="flex min-h-[320px] flex-col items-center justify-center rounded-xl border border-dashed border-border/70 bg-background/70 px-6 py-16 text-center">
+            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-muted/60">
                 <ListFilter className="h-8 w-8 text-muted-foreground" />
             </div>
             <h3 className="font-semibold text-base">Không có nhắc nhở phù hợp</h3>
@@ -846,15 +850,26 @@ const ReminderPage = () => {
     const monthPickerTitle = useMemo(() => formatMonthYearLabel(monthPickerMonth), [monthPickerMonth]);
 
     return (
-        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border border-border/60 bg-background md:rounded-2xl">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 bg-card/80 px-4 py-4 backdrop-blur-sm md:px-6">
-                <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
+        <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-background md:rounded-l-none md:rounded-r-2xl md:border-y md:border-r md:border-l-0 md:border-border/50">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border/50 bg-card px-4 py-4 md:px-7 md:py-5">
+                <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
                         <CalendarDays className="h-5 w-5" />
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight text-foreground">Nhắc hẹn</h1>
-                        <p className="text-xs text-muted-foreground">Quản lý các việc cần nhớ của bạn</p>
+                    <div className="min-w-0">
+                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Nhắc hẹn</h1>
+                        <p className="mt-0.5 text-sm text-muted-foreground">Quản lý các việc cần nhớ của bạn</p>
+                    </div>
+                    <div className="hidden items-center gap-2 pl-2 lg:flex">
+                        <span className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                            {filteredReminders.length} hiển thị
+                        </span>
+                        <span className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                            {visiblePersonalReminderCount} riêng
+                        </span>
+                        <span className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+                            {visibleSharedReminderCount} chung
+                        </span>
                     </div>
                 </div>
 
@@ -864,46 +879,46 @@ const ReminderPage = () => {
                         setCreatePrefillData(undefined);
                         setShowCreateModal(true);
                     }}
-                    size="icon"
-                    variant="outline"
+                    size="sm"
                     title="Tạo nhắc nhở mới"
-                    className="h-10 w-10 rounded-lg border border-border bg-background text-foreground shadow-sm transition-all hover:bg-muted/60 hover:border-border/80"
+                    className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
                 >
-                    <Plus className="h-6 w-6 stroke-2 text-foreground" />
+                    <Plus className="mr-2 h-4 w-4" />
+                    Tạo nhắc hẹn
                 </Button>
             </div>
 
-            <div className="border-b border-border/60 bg-card/80 px-4 pb-3 pt-3 md:px-6">
+            <div className="border-b border-border/50 bg-card px-4 pb-4 pt-3 md:px-7">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-center lg:gap-3">
-                        <div className="inline-flex w-full items-center rounded-lg bg-muted p-1 sm:w-auto">
+                        <div className="inline-flex w-full items-center rounded-lg border border-border/60 bg-muted/40 p-1 sm:w-auto">
                             <button
                                 type="button"
-                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'all' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'all' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                                 onClick={() => setActiveTab('all')}
                             >
                                 Tất cả
                             </button>
                             <button
                                 type="button"
-                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'upcoming' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'upcoming' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                                 onClick={() => setActiveTab('upcoming')}
                             >
                                 Sắp tới
                             </button>
                             <button
                                 type="button"
-                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'past' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
+                                className={`h-8 rounded-md px-4 text-sm transition-colors ${activeTab === 'past' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                                 onClick={() => setActiveTab('past')}
                             >
                                 Đã qua
                             </button>
                         </div>
 
-                        <div className="inline-flex w-full items-center rounded-lg bg-muted p-1 sm:w-auto">
+                        <div className="inline-flex w-full items-center rounded-lg border border-border/60 bg-muted/40 p-1 sm:w-auto">
                             <button
                                 type="button"
-                                className={`flex h-8 items-center rounded-md px-4 text-sm transition-colors ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
+                                className={`flex h-8 items-center rounded-md px-4 text-sm transition-colors ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                                 onClick={() => setViewMode('list')}
                             >
                                 <LayoutList className={`mr-2 h-4 w-4 transition-colors ${viewMode === 'list' ? 'text-foreground' : 'text-muted-foreground'}`} />
@@ -911,7 +926,7 @@ const ReminderPage = () => {
                             </button>
                             <button
                                 type="button"
-                                className={`flex h-8 items-center rounded-md px-4 text-sm transition-colors ${viewMode === 'calendar' ? 'bg-background text-foreground shadow-sm font-normal' : 'text-muted-foreground hover:text-foreground hover:bg-transparent'}`}
+                                className={`flex h-8 items-center rounded-md px-4 text-sm transition-colors ${viewMode === 'calendar' ? 'bg-background text-foreground shadow-sm font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'}`}
                                 onClick={() => setViewMode('calendar')}
                             >
                                 <CalendarRange className={`mr-2 h-4 w-4 transition-colors ${viewMode === 'calendar' ? 'text-foreground' : 'text-muted-foreground'}`} />
@@ -925,7 +940,7 @@ const ReminderPage = () => {
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-10 rounded-lg border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:border-border/80 hover:bg-muted/60"
+                                className="h-10 rounded-lg border-border/70 bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/60"
                                 onClick={() => setIsFilterSheetOpen(true)}
                             >
                                 <SlidersHorizontal className="mr-1.5 h-4 w-4" />
@@ -935,7 +950,7 @@ const ReminderPage = () => {
                     </div>
                 </div>
 
-                <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border/60 bg-card/70 p-3 md:flex-row md:flex-wrap md:items-center">
+                <div className="mt-3 flex flex-col gap-3 rounded-xl border border-border/60 bg-background/70 p-3 shadow-sm md:flex-row md:flex-wrap md:items-center">
                     {isAllTabStatusUnselected && activeTab === 'all' && (
                         <div className="flex w-full items-center justify-between gap-2 rounded-lg border border-amber-300/70 bg-amber-50/80 px-3 py-2 text-xs text-amber-700">
                             <span>Chưa chọn trạng thái nào, hệ thống đang hiển thị tất cả trạng thái.</span>
@@ -955,7 +970,7 @@ const ReminderPage = () => {
                             value={searchReminderName}
                             onChange={(event) => setSearchReminderName(event.target.value)}
                             placeholder="Tìm theo tên nhắc hẹn"
-                            className="h-10 w-full rounded-lg border-border bg-background pl-9 text-sm placeholder:text-muted-foreground placeholder:italic transition-colors hover:border-border/80 focus-visible:ring-0 md:w-[240px]"
+                            className="h-10 w-full rounded-lg border-border/70 bg-background pl-9 text-sm placeholder:text-muted-foreground placeholder:italic transition-colors hover:border-border focus-visible:ring-1 focus-visible:ring-primary/25 md:w-[260px]"
                         />
                     </div>
 
@@ -967,7 +982,7 @@ const ReminderPage = () => {
                                     type="date"
                                     value={fromDate}
                                     onChange={(event) => setFromDate(event.target.value)}
-                                    className="h-10 w-full rounded-lg border-border bg-background text-sm transition-colors hover:border-border/80 sm:w-[168px]"
+                                    className="h-10 w-full rounded-lg border-border/70 bg-background text-sm transition-colors hover:border-border sm:w-[168px]"
                                 />
                                 <span className="text-sm font-normal text-foreground">đến</span>
                                 <Input
@@ -975,12 +990,12 @@ const ReminderPage = () => {
                                     value={toDate}
                                     min={fromDate || undefined}
                                     onChange={(event) => setToDate(event.target.value)}
-                                    className="h-10 w-full rounded-lg border-border bg-background text-sm transition-colors hover:border-border/80 sm:w-[168px]"
+                                    className="h-10 w-full rounded-lg border-border/70 bg-background text-sm transition-colors hover:border-border sm:w-[168px]"
                                 />
                             </div>
 
                             <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
-                                <label className="inline-flex h-10 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-normal text-foreground transition-colors hover:border-border/80 sm:w-auto">
+                                <label className="inline-flex h-10 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-border/70 bg-background px-4 text-sm font-medium text-foreground transition-colors hover:border-border hover:bg-muted/30 sm:w-auto">
                                     <input
                                         type="checkbox"
                                         className="h-4 w-4 rounded border-input accent-primary"
@@ -989,7 +1004,7 @@ const ReminderPage = () => {
                                     />
                                     Nhắc hẹn riêng
                                 </label>
-                                <label className="inline-flex h-10 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-normal text-foreground transition-colors hover:border-border/80 sm:w-auto">
+                                <label className="inline-flex h-10 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-border/70 bg-background px-4 text-sm font-medium text-foreground transition-colors hover:border-border hover:bg-muted/30 sm:w-auto">
                                     <input
                                         type="checkbox"
                                         className="h-4 w-4 rounded border-input accent-primary"
@@ -1004,13 +1019,13 @@ const ReminderPage = () => {
                 </div>
             </div>
 
-            <div className={`flex-1 min-h-0 bg-muted/20 p-4 md:p-8 ${viewMode === 'calendar' ? 'overflow-hidden' : 'overflow-y-auto beautiful-scrollbar'}`}>
+            <div className={`flex-1 min-h-0 bg-muted/20 p-4 md:p-6 ${viewMode === 'calendar' ? 'overflow-hidden' : 'overflow-y-auto beautiful-scrollbar'}`}>
                 {viewMode === 'list' && (
-                    <div className="mb-3 flex justify-end">
+                    <div className="mb-4 flex justify-end">
                         <Button
                             size="icon"
                             variant="outline"
-                            className="h-9 w-9 rounded-lg border-border bg-background text-foreground transition-colors hover:border-border/80 hover:bg-muted/60"
+                            className="h-9 w-9 rounded-lg border-border/70 bg-background text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-500"
                             disabled={isLoading || !includePersonalReminders || visiblePersonalReminderCount === 0}
                             onClick={() => setDeleteScope(activeTab)}
                             title="Xóa tất cả"
@@ -1062,7 +1077,7 @@ const ReminderPage = () => {
                         upcomingEmpty
                     ) : (
                         <div className="space-y-4 md:space-y-6">
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                                 {filteredReminders.map((item) => (
                                     <ReminderCard
                                         key={item._id}
@@ -1086,7 +1101,7 @@ const ReminderPage = () => {
                     filteredReminders.length === 0 ? (
                         pastEmpty
                     ) : (
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                             {filteredReminders.map((item) => (
                                 <ReminderCard
                                     key={item._id}
@@ -1107,7 +1122,7 @@ const ReminderPage = () => {
                 ) : filteredReminders.length === 0 ? (
                     allEmpty
                 ) : (
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                         {filteredReminders.map((item) => (
                             <ReminderCard
                                 key={item._id}

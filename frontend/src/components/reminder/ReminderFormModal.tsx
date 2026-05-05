@@ -244,13 +244,13 @@ export default function ReminderFormModal({
       <DialogContent
         showCloseButton={!isMobile}
         className={cn(
-          'gap-0 p-0 overflow-hidden border-border/40 flex flex-col',
+          'gap-0 overflow-hidden border-border/50 p-0 shadow-2xl flex flex-col',
           isMobile
             ? 'w-screen h-svh max-w-none rounded-none top-0 left-0 translate-x-0 translate-y-0'
-            : 'max-w-[540px] max-h-[86vh]'
+            : 'max-w-[560px] max-h-[86vh] rounded-xl'
         )}
       >
-        <DialogHeader className="border-b border-border/40 bg-card/80 px-6 py-4">
+        <DialogHeader className="border-b border-border/50 bg-card px-6 py-5">
           <DialogTitle className="text-xl font-semibold text-foreground">
             {mode === 'create'
               ? 'Tạo nhắc nhở mới'
@@ -258,7 +258,7 @@ export default function ReminderFormModal({
                 ? 'Tùy chỉnh thông báo cá nhân'
                 : 'Chỉnh sửa nhắc nhở'}
           </DialogTitle>
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
             {isNotifyOnlyEdit
               ? 'Bạn chỉ thay đổi kênh thông báo cho tài khoản của mình, không ảnh hưởng thành viên khác.'
               : 'Đặt thời gian phù hợp để không bỏ lỡ công việc quan trọng.'}
@@ -266,16 +266,16 @@ export default function ReminderFormModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
-          <div className="px-4 py-3 space-y-3 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-background to-muted/10">
+          <div className="flex-1 min-h-0 space-y-4 overflow-y-auto bg-muted/20 px-4 py-4">
             {!isNotifyOnlyEdit && (
               <>
-                <div className="space-y-1.5 rounded-md border border-border/40 bg-card/70 p-2.5">
+                <div className="space-y-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm">
                   <Label htmlFor="reminder-content">Nội dung</Label>
                   <Textarea id="reminder-content" maxLength={1200} rows={3} {...register('content')} />
                   {errors.content && <p className="text-sm text-destructive">{errors.content.message}</p>}
                 </div>
 
-                <div className="space-y-1.5 rounded-md border border-border/40 bg-card/70 p-2.5">
+                <div className="space-y-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm">
                   <Label htmlFor="reminder-datetime" className="inline-flex items-center gap-1.5">
                     <CalendarClock className="h-3.5 w-3.5" />
                     Thời gian nhắc
@@ -284,14 +284,14 @@ export default function ReminderFormModal({
                   {errors.remindAt && <p className="text-sm text-destructive">{errors.remindAt.message}</p>}
                 </div>
 
-                <div className="space-y-1.5 rounded-md border border-border/40 bg-card/70 p-2.5">
+                <div className="space-y-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm">
                   <Label htmlFor="reminder-repeat" className="inline-flex items-center gap-1.5">
                     <Repeat2 className="h-3.5 w-3.5" />
                     Lặp lại
                   </Label>
                   <select
                     id="reminder-repeat"
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
                     {...register('repeatRule')}
                   >
                     <option value="none">Không lặp</option>
@@ -303,7 +303,7 @@ export default function ReminderFormModal({
               </>
             )}
 
-            <div className="space-y-1.5 rounded-md border border-border/40 bg-card/70 p-2.5">
+            <div className="space-y-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm">
               <Label>Kênh thông báo</Label>
               <div className="grid grid-cols-1 gap-2">
                 {CHANNEL_OPTIONS.map((option) => {
@@ -314,7 +314,7 @@ export default function ReminderFormModal({
                       type="button"
                       onClick={() => toggleChannel(option.value)}
                       className={cn(
-                        'rounded-md border px-3 py-2 text-left transition-colors',
+                        'rounded-lg border px-3 py-2.5 text-left transition-colors',
                         active
                           ? 'border-primary/40 bg-primary/10'
                           : 'border-border/60 bg-background hover:bg-muted/40'
@@ -336,11 +336,11 @@ export default function ReminderFormModal({
             )}
           </div>
 
-          <DialogFooter className="px-4 py-3 border-t border-border/40 bg-card/30 flex-row justify-end gap-2 shrink-0">
-            <Button type="button" variant="outline" className="rounded-md font-semibold" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
+          <DialogFooter className="flex-row justify-end gap-2 border-t border-border/50 bg-card px-4 py-4 shrink-0">
+            <Button type="button" variant="outline" className="rounded-lg font-semibold" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
               Hủy bỏ
             </Button>
-            <Button type="submit" className="rounded-md bg-primary text-white hover:bg-primary/90 font-semibold px-6" disabled={isSubmitting}>
+            <Button type="submit" className="rounded-lg bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
               {isSubmitting
                 ? 'Đang lưu...'
                 : mode === 'create'
