@@ -30,9 +30,15 @@ const CallManager = () => {
             (p.userId?._id || p.userId)?.toString() ===
             remoteUser?._id?.toString()
         );
-      if (!isViewing) return null;
+      if (!isViewing && !isMinimized) return null;
     }
-    return <IncomingCallModal />;
+    return (
+      <IncomingCallModal
+        isMinimized={isMinimized}
+        onMinimize={() => setIsMinimized(true)}
+        onMaximize={() => setIsMinimized(false)}
+      />
+    );
   }
   if (status === "outgoing")
     return (
