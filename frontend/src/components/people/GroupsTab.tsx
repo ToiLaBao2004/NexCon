@@ -28,7 +28,7 @@ export default function GroupsTab() {
 
     return (
         <div className="space-y-4">
-            <div className="sticky top-0 z-20 -mx-4 -mt-4 space-y-4 border-b border-border/40 bg-card/95 px-4 pb-4 pt-4 backdrop-blur-md">
+            <div className="sticky top-0 z-40 -mx-4 -mt-4 space-y-4 border-b border-border/40 bg-card/95 px-4 pb-4 pt-4 backdrop-blur-md">
             <div className="relative p-1">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
                     <Search className="h-4 w-4 text-muted-foreground" />
