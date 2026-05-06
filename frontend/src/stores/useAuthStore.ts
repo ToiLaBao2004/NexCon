@@ -6,6 +6,7 @@ import { userService } from '@/services/userService';
 import { persist } from 'zustand/middleware';
 import { useChatStore } from './useChatStore';
 import { useNotificationStore } from './useNotificationStore';
+import { useFriendStore } from './useFriendStore';
 import { unsubscribePushOnLogout } from '@/hooks/usePushNotification';
 
 export const useAuthStore = create<AuthState>()(
@@ -24,6 +25,7 @@ export const useAuthStore = create<AuthState>()(
       set({ accessToken: null, user: null, loading: false });
       useChatStore.getState().reset();
       useNotificationStore.getState().reset();
+      useFriendStore.getState().reset();
       localStorage.clear();
     },
 
@@ -33,6 +35,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.clear();
         useChatStore.getState().reset();
         useNotificationStore.getState().reset();
+        useFriendStore.getState().reset();
         // API Call
         await authService.verifyValidFieldsSignUp(email, password, confirmPassword);
       } catch (error: any) {
@@ -73,6 +76,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.clear();
         useChatStore.getState().reset();
         useNotificationStore.getState().reset();
+        useFriendStore.getState().reset();
         // API Call
         const { accessToken } = await authService.signIn(email, password);
         get().setAccessToken(accessToken);

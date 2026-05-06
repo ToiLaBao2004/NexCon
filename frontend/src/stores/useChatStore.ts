@@ -40,6 +40,7 @@ export const useChatStore = create<ChatState>()(
     persist(
         (set, get) => ({
             conversations: [],
+            conversationsFetched: false,
             messages: {},
             media: {},
             mediaPagination: {},
@@ -147,6 +148,7 @@ export const useChatStore = create<ChatState>()(
             reset: () => {
                 set({
                     conversations: [],
+                    conversationsFetched: false,
                     messages: {},
                     media: {},
                     mediaPagination: {},
@@ -161,7 +163,7 @@ export const useChatStore = create<ChatState>()(
             },
             fetchConversations: async (force = false) => {
                 try {
-                    if (!force && get().conversations.length > 0) {
+                    if (!force && get().conversationsFetched) {
                         return;
                     }
 
@@ -184,7 +186,7 @@ export const useChatStore = create<ChatState>()(
                         }
                     }
 
-                    set({ conversations: sortConversations(conversations as any), convoLoading: false });
+                    set({ conversations: sortConversations(conversations as any), conversationsFetched: true, convoLoading: false });
                 } catch (error) {
                     console.error("Lỗi khi tải danh sách cuộc trò chuyện:", error);
                     set({ convoLoading: false });

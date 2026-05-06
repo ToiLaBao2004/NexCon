@@ -6,6 +6,7 @@ import type { Notification, NotificationState } from '@/types/store';
 export const useNotificationStore = create<NotificationState>((set, get) => ({
     notifications: [],
     loading: false,
+    notificationsFetched: false,
     unreadCount: 0,
     pendingReadIds: [],
     markAllPending: false,
@@ -14,18 +15,23 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         set({
             notifications: [],
             loading: false,
+            notificationsFetched: false,
             unreadCount: 0,
             pendingReadIds: [],
             markAllPending: false,
         });
     },
 
-    fetchNotifications: async () => {
+    fetchNotifications: async (force = false) => {
         try {
+            if (!force && get().notificationsFetched) {
+                return;
+            }
+
             set({ loading: true });
             const notifications = await notificationService.getNotifications();
             const unreadCount = notifications.filter((n: Notification) => !n.isRead).length;
-            set({ notifications, unreadCount, pendingReadIds: [], markAllPending: false });
+            set({ notifications, notificationsFetched: true, unreadCount, pendingReadIds: [], markAllPending: false });
         } catch (error: any) {
             console.error('Lỗi khi tải thông báo:', error);
             toast.error('Không thể lấy thông báo');
@@ -101,7 +107,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         } catch (error: any) {
             console.error('Lỗi khi đánh dấu tất cả là đã đọc:', error);
             toast.error('Không thể đánh dấu tất cả thông báo là đã đọc');
-            await get().fetchNotifications();
+            await get().fetchNotifications(true);
         } finally {
             set((state) => ({
                 markAllPending: false,

@@ -3,37 +3,69 @@ import { toast } from 'sonner';
 import { friendService } from '@/services/friendService';
 import type { FriendState } from '@/types/store';
 
-export const useFriendStore = create<FriendState>((set) => ({
+export const useFriendStore = create<FriendState>((set, get) => ({
 	loading: false,
 	sendingRequest: false,
 	friends: [],
+	friendsFetched: false,
 	incomingRequests: [],
+	incomingRequestsFetched: false,
 	sentRequests: [],
+	sentRequestsFetched: false,
 	blockedUsers: [],
+	blockedUsersFetched: false,
 	blockedBy: [],
 
-	fetchFriends: async () => {
+	reset: () => {
+		set({
+			loading: false,
+			sendingRequest: false,
+			friends: [],
+			friendsFetched: false,
+			incomingRequests: [],
+			incomingRequestsFetched: false,
+			sentRequests: [],
+			sentRequestsFetched: false,
+			blockedUsers: [],
+			blockedUsersFetched: false,
+			blockedBy: [],
+		});
+	},
+
+	fetchFriends: async (force = false) => {
 		try {
+			if (!force && get().friendsFetched) {
+				return;
+			}
+
 			const data = await friendService.fetchFriends();
-			set({ friends: data.listedFriends || [] });
+			set({ friends: data.listedFriends || [], friendsFetched: true });
 		} catch (error) {
 			console.error('Lỗi khi tải danh sách bạn bè:', error);
 		}
 	},
 
-	fetchIncomingRequests: async () => {
+	fetchIncomingRequests: async (force = false) => {
 		try {
+			if (!force && get().incomingRequestsFetched) {
+				return;
+			}
+
 			const data = await friendService.fetchIncomingRequests();
-			set({ incomingRequests: data.friendRequests || [] });
+			set({ incomingRequests: data.friendRequests || [], incomingRequestsFetched: true });
 		} catch (error) {
 			console.error('Lỗi khi tải lời mời kết bạn đến:', error);
 		}
 	},
 
-	fetchSentRequests: async () => {
+	fetchSentRequests: async (force = false) => {
 		try {
+			if (!force && get().sentRequestsFetched) {
+				return;
+			}
+
 			const data = await friendService.fetchSentRequests();
-			set({ sentRequests: data.friendRequests || [] });
+			set({ sentRequests: data.friendRequests || [], sentRequestsFetched: true });
 		} catch (error) {
 			console.error('Lỗi khi tải lời mời kết bạn đi:', error);
 		}
@@ -201,10 +233,14 @@ export const useFriendStore = create<FriendState>((set) => ({
 		}
 	},
 
-	fetchBlockedList: async () => {
+	fetchBlockedList: async (force = false) => {
 		try {
+			if (!force && get().blockedUsersFetched) {
+				return;
+			}
+
 			const data = await friendService.fetchBlockedList();
-			set({ blockedUsers: data.blockedUsers || [] });
+			set({ blockedUsers: data.blockedUsers || [], blockedUsersFetched: true });
 		} catch (error) {
 			console.error('Lỗi khi tải danh sách chặn:', error);
 		}

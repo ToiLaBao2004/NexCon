@@ -20,6 +20,7 @@ import { useSocketStore } from "./stores/useSocketStore";
 import { useFriendStore } from "./stores/useFriendStore";
 import { useNotificationStore } from "./stores/useNotificationStore";
 import { useChatStore } from "./stores/useChatStore";
+import { useReminderStore } from "./stores/useReminderStore";
 import { unlockMessageSound, unlockNotificationSound, unlockRingtone } from "./utils/sound";
 import CallManager from "./components/call/CallManager";
 import GroupCallManager from "./components/call/GroupCallManager";
@@ -79,12 +80,10 @@ function App() {
   useEffect(() => {
     if (isAuth) {
       connectSocket();
-      useFriendStore.getState().fetchIncomingRequests();
       useFriendStore.getState().fetchFriends();
-      useFriendStore.getState().fetchSentRequests();
-      useFriendStore.getState().fetchBlockedList();
       useNotificationStore.getState().fetchNotifications();
       useChatStore.getState().fetchConversations();
+      useReminderStore.getState().fetchUpcomingCount();
     } else {
       disconnectSocket();
     }
