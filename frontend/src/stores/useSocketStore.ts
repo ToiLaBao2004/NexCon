@@ -561,24 +561,28 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     socket.on("reminder-triggered", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
       showReminderToast(reminder);
     });
 
     socket.on("reminder-created", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminder-snoozed", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminder-updated", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminder-deleted", ({ id }) => {
@@ -588,12 +592,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useReminderStore.getState().removeReminder(reminderId);
       }
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminder-participation-updated", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminders-bulk-deleted", ({ scope }) => {
@@ -609,6 +615,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useReminderStore.getState().removeRemindersByScope(scope);
       }
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("shared-reminder-cancelled", ({ sharedKey }) => {
@@ -619,6 +626,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useReminderStore.getState().removeRemindersBySharedKey(sharedKey);
       }
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("new-conversation", ({ conversation }) => {

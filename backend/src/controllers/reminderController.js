@@ -559,7 +559,7 @@ export async function scheduleMeeting(req, res) {
 export async function getReminders(req, res) {
     try {
         const userId = req.user._id;
-        const { status, sourceType, from, to, sharedKey, conversationId, sort = 'remindAt_asc', cursor, limit = 10 } = req.query;
+        const { status, sourceType, from, to, sharedKey, conversationId, sort = 'remindAt_asc', cursor, limit } = req.query;
 
         const query = { userId };
 
@@ -624,14 +624,15 @@ export async function getReminders(req, res) {
             query.scope = 'shared';
         }
 
-        const pageSize = Math.min(Math.max(Number(limit) || 10, 1), 10);
+        const hasLimit = limit !== undefined && limit !== null && String(limit).trim() !== '';
+        const pageSize = hasLimit ? Math.min(Math.max(Number(limit) || 10, 1), 10) : null;
 
         const sortBy = String(sort || 'remindAt_asc').trim().toLowerCase();
         const sortConfig = REMINDER_SORT_OPTIONS[sortBy] || REMINDER_SORT_OPTIONS.remindat_asc;
         const { field: sortField, direction: sortDirection } = sortConfig;
         const compareOperator = sortDirection === 1 ? '$gt' : '$lt';
 
-        if (cursor) {
+        if (cursor && pageSize) {
             const decodedCursor = decodeReminderCursor(cursor);
             if (!decodedCursor) {
                 return res.status(400).json({ message: 'Invalid cursor.' });
@@ -655,10 +656,21 @@ export async function getReminders(req, res) {
             _id: sortDirection,
         };
 
-        const reminders = await Reminder.find(query)
-            .sort(sortOption)
-            .limit(pageSize + 1)
-            .lean();
+        const remindersQuery = Reminder.find(query).sort(sortOption).lean();
+
+        if (pageSize) {
+            remindersQuery.limit(pageSize + 1);
+        }
+
+        const reminders = await remindersQuery;
+
+        if (!pageSize) {
+            return res.status(200).json({
+                reminders: reminders.map((item) => normalizeReminderOutput(item)),
+                hasMore: false,
+                nextCursor: null,
+            });
+        }
 
         const hasMore = reminders.length > pageSize;
         const data = hasMore ? reminders.slice(0, pageSize) : reminders;

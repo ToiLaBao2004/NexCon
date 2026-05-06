@@ -3,7 +3,6 @@ import {
     AlarmClock,
     CalendarRange,
     CalendarDays,
-    Clock3,
     History,
     LayoutList,
     ListFilter,
@@ -67,11 +66,9 @@ const ReminderPage = () => {
     const [searchParams] = useSearchParams();
     const {
         reminders,
-        hasMore,
         isLoading,
-        isLoadingMore,
+        lastFetchParams,
         fetchReminders,
-        fetchMoreReminders,
         fetchUpcomingCount,
         snoozeReminderAsync,
         updateSharedReminderParticipationAsync,
@@ -112,7 +109,6 @@ const ReminderPage = () => {
     const [includePersonalReminders, setIncludePersonalReminders] = useState(true);
     const [includeSharedReminders, setIncludeSharedReminders] = useState(true);
 
-    const loadMoreRef = useRef<HTMLDivElement | null>(null);
     const deepLinkRef = useRef('');
     const reminderCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const fetchedFocusReminderRef = useRef<string | null>(null);
@@ -166,7 +162,6 @@ const ReminderPage = () => {
                 status: 'pending,snoozed',
                 ...sharedFilters,
                 sort: 'remindAt_asc',
-                limit: 10,
             };
         }
 
@@ -175,7 +170,6 @@ const ReminderPage = () => {
                 status: 'triggered,dismissed',
                 ...sharedFilters,
                 sort: 'remindAt_asc',
-                limit: 10,
             };
         }
 
@@ -187,53 +181,17 @@ const ReminderPage = () => {
             status,
             ...sharedFilters,
             sort: 'remindAt_desc',
-            limit: 10,
         };
     }, [activeTab, selectedStatuses, fromDate, toDate, focusSharedKey]);
 
-    useEffect(() => {
-        void fetchReminders(currentQueryParams);
-    }, [fetchReminders, currentQueryParams]);
-
-    const shouldLoadMore = viewMode === 'list';
+    const queryKey = useMemo(() => JSON.stringify(currentQueryParams), [currentQueryParams]);
+    const lastQueryKey = useMemo(() => JSON.stringify(lastFetchParams ?? null), [lastFetchParams]);
 
     useEffect(() => {
-        if (!shouldLoadMore || !hasMore) return;
-        const sentinel = loadMoreRef.current;
-        if (!sentinel) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                if (entries[0].isIntersecting) {
-                    void fetchMoreReminders(currentQueryParams);
-                }
-            },
-            { threshold: 0.2 }
-        );
-
-        observer.observe(sentinel);
-        return () => observer.disconnect();
-    }, [shouldLoadMore, hasMore, fetchMoreReminders, currentQueryParams]);
-
-    useEffect(() => {
-        if (!focusReminderId || !highlightedReminderId) return;
-        if (activeTab !== 'past' && activeTab !== 'all') return;
-
-        const hasFocusedItem = reminders.some((item) => item._id === focusReminderId);
-        if (!hasFocusedItem && hasMore && !isLoading && !isLoadingMore) {
-            void fetchMoreReminders(currentQueryParams);
+        if (reminders.length === 0 || queryKey !== lastQueryKey) {
+            void fetchReminders(currentQueryParams);
         }
-    }, [
-        activeTab,
-        currentQueryParams,
-        fetchMoreReminders,
-        focusReminderId,
-        hasMore,
-        highlightedReminderId,
-        isLoading,
-        isLoadingMore,
-        reminders,
-    ]);
+    }, [fetchReminders, currentQueryParams, reminders.length, queryKey, lastQueryKey]);
 
     useEffect(() => {
         if (!focusReminderId || !highlightedReminderId) return;
@@ -1200,11 +1158,6 @@ const ReminderPage = () => {
                     </div>
                 )}
 
-                {viewMode === 'list' && reminders.length > 0 && (
-                    <div ref={loadMoreRef} className="h-8 mt-2 flex items-center justify-center">
-                        {isLoadingMore && <Clock3 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                    </div>
-                )}
             </div>
 
             <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>

@@ -410,12 +410,14 @@ export interface ReminderState {
   removedReminderIds: string[];
   hasMore: boolean;
   nextCursor: string | null;
+  lastFetchParams: GetRemindersParams | null;
   isLoading: boolean;
   isLoadingMore: boolean;
   upcomingCount: number;
   fetchUpcomingCount: () => Promise<void>;
   fetchReminders: (params?: GetRemindersParams) => Promise<void>;
   fetchMoreReminders: (params?: GetRemindersParams) => Promise<void>;
+  refreshReminders: () => Promise<void>;
   createReminderAsync: (
     payload: CreateReminderPayload,
     options?: { syncStore?: boolean; refreshSummary?: boolean }
