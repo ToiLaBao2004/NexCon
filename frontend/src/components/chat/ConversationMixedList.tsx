@@ -24,8 +24,10 @@ const ConversationMixedList = () => {
   }, []);
 
   useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+    if (conversations.length === 0) {
+      fetchConversations();
+    }
+  }, [conversations.length, fetchConversations]);
 
   if (!conversations) return null;
 

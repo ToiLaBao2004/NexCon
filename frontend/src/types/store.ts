@@ -108,7 +108,7 @@ export interface ChatState {
   setFocusedConversation: (id: string | null) => void;
   setReplyingTo: (message: Message | null) => void;
   clearConversationCache: (keepConversationIds: string[]) => void;
-  fetchConversations: () => Promise<void>;
+  fetchConversations: (force?: boolean) => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
   toggleConversationPin: (conversationId: string) => Promise<void>;
   sendMessage: (payload: SendMessagePayload, onProgress?: (pct: number) => void) => Promise<void>;

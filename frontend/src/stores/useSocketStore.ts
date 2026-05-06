@@ -689,24 +689,21 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       if (conversation) {
         // Update the conversation with the fully-populated version from backend
         useChatStore.getState().updateConversation(conversation);
-      } else {
-        // Fallback: refetch all if no payload
-        useChatStore.getState().fetchConversations();
       }
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("member-removed", ({ conversation }) => {
       if (conversation) {
         useChatStore.getState().updateConversation(conversation);
-      } else {
-        useChatStore.getState().fetchConversations();
       }
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("kicked-from-group", ({ conversationId }) => {
       const chatState = useChatStore.getState();
       const activeConvoId = chatState.activeConversationId;
-      chatState.fetchConversations();
+      chatState.fetchConversations(true);
       if (activeConvoId === conversationId) {
         toast.error("Bạn đã bị đưa ra khỏi nhóm.");
         chatState.setActiveConversation(null);
@@ -722,7 +719,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             content,
             isRecalled,
           });
-        useChatStore.getState().fetchConversations();
+        useChatStore.getState().fetchConversations(true);
       },
     );
 
@@ -795,7 +792,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     const refreshConversations = () => {
-      useChatStore.getState().fetchConversations();
+      useChatStore.getState().fetchConversations(true);
     };
 
 
@@ -815,7 +812,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const isMutedCall = isMuted(myParticipant?.mute, "meetings");
 
       useCallStore.getState().handleIncomingCall(from, callType, roomName, isMutedCall);
-      useChatStore.getState().fetchConversations();
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("accept-call", () => {
@@ -1080,14 +1077,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     socket.on("member-left", ({ conversation }) => {
       if (conversation) {
         useChatStore.getState().updateConversation(conversation);
-      } else {
-        useChatStore.getState().fetchConversations();
       }
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("left-group", ({ conversationId }) => {
       const chatState = useChatStore.getState();
-      chatState.fetchConversations();
+      chatState.fetchConversations(true);
       if (chatState.activeConversationId === conversationId) {
         chatState.setActiveConversation(null);
       }
