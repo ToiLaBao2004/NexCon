@@ -391,6 +391,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("new-friend-request", ({ friendRequest }) => {
       useFriendStore.getState().addIncomingRequest(friendRequest);
+      useFriendStore.getState().fetchIncomingRequests(true);
       toast.info(
         `${friendRequest.from.displayName} đã gửi cho bạn một lời mời kết bạn!`,
         {
@@ -403,7 +404,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       if (newFriend) {
         useFriendStore.getState().addFriend(newFriend);
       }
-      useFriendStore.getState().fetchSentRequests();
+      useFriendStore.getState().fetchFriends(true);
+      useFriendStore.getState().fetchSentRequests(true);
       toast.success(
         message || `${from.displayName} đã chấp nhận lời mời kết bạn của bạn!`,
         {
@@ -413,11 +415,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     socket.on("friend-request-rejected", () => {
-      useFriendStore.getState().fetchSentRequests();
+      useFriendStore.getState().fetchSentRequests(true);
     });
 
     socket.on("friend-request-cancelled", ({ requestId }) => {
       useFriendStore.getState().removeIncomingRequest(requestId);
+      useFriendStore.getState().fetchIncomingRequests(true);
     });
 
     socket.on("friend-request-resolved", ({ requestId, action, newFriend }) => {
@@ -426,19 +429,23 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       }
       if (action === "accepted" && newFriend) {
         useFriendStore.getState().addFriend(newFriend);
+        useFriendStore.getState().fetchFriends(true);
       }
+      useFriendStore.getState().fetchIncomingRequests(true);
     });
 
     socket.on("friend-request-sent-updated", ({ friendRequest }) => {
       if (friendRequest) {
         useFriendStore.getState().addSentRequest(friendRequest);
       }
+      useFriendStore.getState().fetchSentRequests(true);
     });
 
     socket.on("friend-request-sent-cancelled", ({ requestId }) => {
       if (requestId) {
         useFriendStore.getState().removeSentRequest(requestId);
       }
+      useFriendStore.getState().fetchSentRequests(true);
     });
 
     socket.on("unfriended", ({ friendId }) => {
@@ -446,10 +453,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       if (normalizedFriendId) {
         useFriendStore.getState().removeFriend(normalizedFriendId);
       }
+      useFriendStore.getState().fetchFriends(true);
     });
 
     socket.on("new-notification", ({ notification }) => {
       useNotificationStore.getState().addNotification(notification);
+      useNotificationStore.getState().fetchNotifications(true);
 
       showBrowserNotification({
         title: localizeNotificationTitle(notification.title),
@@ -462,6 +471,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("notification-updated", ({ notification }) => {
       syncNotificationInStore(notification);
+      useNotificationStore.getState().fetchNotifications(true);
     });
 
     socket.on("notifications-all-read", () => {
@@ -471,6 +481,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         pendingReadIds: [],
         markAllPending: false,
       }));
+      useNotificationStore.getState().fetchNotifications(true);
     });
 
     socket.on("notification-deleted", ({ id }) => {
@@ -485,6 +496,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           pendingReadIds: state.pendingReadIds.filter((pendingId) => pendingId !== notificationId),
         };
       });
+      useNotificationStore.getState().fetchNotifications(true);
     });
 
     socket.on("user_mentioned", ({ messageId, conversationId, mentionedBy, preview }) => {
@@ -561,24 +573,28 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     socket.on("reminder-triggered", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
       showReminderToast(reminder);
     });
 
     socket.on("reminder-created", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminder-snoozed", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminder-updated", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminder-deleted", ({ id }) => {
@@ -588,12 +604,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useReminderStore.getState().removeReminder(reminderId);
       }
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminder-participation-updated", ({ reminder }) => {
       useReminderStore.getState().updateReminderInStore(reminder);
       dismissReminderToastIfResolved(reminder);
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("reminders-bulk-deleted", ({ scope }) => {
@@ -609,6 +627,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useReminderStore.getState().removeRemindersByScope(scope);
       }
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("shared-reminder-cancelled", ({ sharedKey }) => {
@@ -619,11 +638,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useReminderStore.getState().removeRemindersBySharedKey(sharedKey);
       }
       void useReminderStore.getState().fetchUpcomingCount();
+      void useReminderStore.getState().refreshReminders();
     });
 
     socket.on("new-conversation", ({ conversation }) => {
       useChatStore.getState().updateConversation(conversation);
       get().joinConversation(conversation._id);
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("conversation-updated", ({ conversation, conversationId }) => {
@@ -633,6 +654,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           _id: conversation._id || conversationId,
         });
       }
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("conversation-mute-updated", ({ conversationId, userId, mute }) => {
@@ -681,24 +703,21 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       if (conversation) {
         // Update the conversation with the fully-populated version from backend
         useChatStore.getState().updateConversation(conversation);
-      } else {
-        // Fallback: refetch all if no payload
-        useChatStore.getState().fetchConversations();
       }
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("member-removed", ({ conversation }) => {
       if (conversation) {
         useChatStore.getState().updateConversation(conversation);
-      } else {
-        useChatStore.getState().fetchConversations();
       }
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("kicked-from-group", ({ conversationId }) => {
       const chatState = useChatStore.getState();
       const activeConvoId = chatState.activeConversationId;
-      chatState.fetchConversations();
+      chatState.fetchConversations(true);
       if (activeConvoId === conversationId) {
         toast.error("Bạn đã bị đưa ra khỏi nhóm.");
         chatState.setActiveConversation(null);
@@ -714,7 +733,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             content,
             isRecalled,
           });
-        useChatStore.getState().fetchConversations();
+        useChatStore.getState().fetchConversations(true);
       },
     );
 
@@ -745,6 +764,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       if (!blockerId) return;
       useFriendStore.getState().addBlockedBy(blockerId);
       useFriendStore.getState().removeFriend(blockerId);
+      useFriendStore.getState().fetchFriends(true);
     });
 
     socket.on("user-unblocked", ({ unblockedBy }) => {
@@ -767,6 +787,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           (request) => String(request.to?._id) !== String(blockedUserId),
         ),
       }));
+      useFriendStore.getState().fetchFriends(true);
+      useFriendStore.getState().fetchBlockedList(true);
     });
 
     socket.on("user-unblocked-self", ({ userId }) => {
@@ -776,6 +798,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useFriendStore.setState((state) => ({
         blockedUsers: state.blockedUsers.filter((item) => String(item._id) !== String(unblockedUserId)),
       }));
+      useFriendStore.getState().fetchBlockedList(true);
     });
 
     socket.on("user-typing", ({ conversationId, userId }) => {
@@ -787,7 +810,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     const refreshConversations = () => {
-      useChatStore.getState().fetchConversations();
+      useChatStore.getState().fetchConversations(true);
     };
 
 
@@ -807,7 +830,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const isMutedCall = isMuted(myParticipant?.mute, "meetings");
 
       useCallStore.getState().handleIncomingCall(from, callType, roomName, isMutedCall);
-      useChatStore.getState().fetchConversations();
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("accept-call", () => {
@@ -1059,6 +1082,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("group-disbanded", ({ conversationId }) => {
       useChatStore.getState().markGroupAsDisbanded(conversationId);
+      useChatStore.getState().fetchConversations(true);
       const activeConvo = useChatStore.getState().activeConversationId;
       if (activeConvo === conversationId) {
         toast.warning("Nhóm này đã bị giải tán.");
@@ -1067,19 +1091,19 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("admin-transferred", ({ conversationId, newAdminId }) => {
       useChatStore.getState().updateAdminLocal(conversationId, newAdminId);
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("member-left", ({ conversation }) => {
       if (conversation) {
         useChatStore.getState().updateConversation(conversation);
-      } else {
-        useChatStore.getState().fetchConversations();
       }
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("left-group", ({ conversationId }) => {
       const chatState = useChatStore.getState();
-      chatState.fetchConversations();
+      chatState.fetchConversations(true);
       if (chatState.activeConversationId === conversationId) {
         chatState.setActiveConversation(null);
       }

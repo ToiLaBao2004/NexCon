@@ -86,6 +86,7 @@ export interface JumpContext {
 export interface ChatState {
 
   conversations: Conversation[];
+  conversationsFetched: boolean;
   messages: Record<string, {
     items: Message[],
     hasMore: boolean,
@@ -108,7 +109,7 @@ export interface ChatState {
   setFocusedConversation: (id: string | null) => void;
   setReplyingTo: (message: Message | null) => void;
   clearConversationCache: (keepConversationIds: string[]) => void;
-  fetchConversations: () => Promise<void>;
+  fetchConversations: (force?: boolean) => Promise<void>;
   fetchMessages: (conversationId?: string) => Promise<void>;
   toggleConversationPin: (conversationId: string) => Promise<void>;
   sendMessage: (payload: SendMessagePayload, onProgress?: (pct: number) => void) => Promise<void>;
@@ -188,11 +189,14 @@ export interface FriendState {
   loading: boolean;
   sendingRequest: boolean;
   friends: FriendItem[];
+  friendsFetched: boolean;
   incomingRequests: FriendRequest[];
+  incomingRequestsFetched: boolean;
   sentRequests: SentFriendRequest[];
-  fetchFriends: () => Promise<void>;
-  fetchIncomingRequests: () => Promise<void>;
-  fetchSentRequests: () => Promise<void>;
+  sentRequestsFetched: boolean;
+  fetchFriends: (force?: boolean) => Promise<void>;
+  fetchIncomingRequests: (force?: boolean) => Promise<void>;
+  fetchSentRequests: (force?: boolean) => Promise<void>;
   setNickName: (friendId: string, nickName: string) => Promise<void>;
   sendFriendRequest: (email: string, message?: string) => Promise<void>;
   cancelFriendRequest: (requestId: string) => Promise<void>;
@@ -206,12 +210,14 @@ export interface FriendState {
   removeFriend: (friendId: string) => void;
   unfriendUser: (friendId: string) => Promise<void>;
   blockedUsers: any[];
+  blockedUsersFetched: boolean;
   blockedBy: string[];
-  fetchBlockedList: () => Promise<void>;
+  fetchBlockedList: (force?: boolean) => Promise<void>;
   blockUser: (userId: string) => Promise<void>;
   unblockUser: (userId: string) => Promise<void>;
   addBlockedBy: (userId: string) => void;
   removeBlockedBy: (userId: string) => void;
+  reset: () => void;
 }
 
 export interface Notification {
@@ -282,10 +288,11 @@ export interface CallState {
 export interface NotificationState {
   notifications: Notification[];
   loading: boolean;
+  notificationsFetched: boolean;
   unreadCount: number;
   pendingReadIds: string[];
   markAllPending: boolean;
-  fetchNotifications: () => Promise<void>;
+  fetchNotifications: (force?: boolean) => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   addNotification: (notification: Notification) => void;
@@ -410,12 +417,14 @@ export interface ReminderState {
   removedReminderIds: string[];
   hasMore: boolean;
   nextCursor: string | null;
+  lastFetchParams: GetRemindersParams | null;
   isLoading: boolean;
   isLoadingMore: boolean;
   upcomingCount: number;
   fetchUpcomingCount: () => Promise<void>;
   fetchReminders: (params?: GetRemindersParams) => Promise<void>;
   fetchMoreReminders: (params?: GetRemindersParams) => Promise<void>;
+  refreshReminders: () => Promise<void>;
   createReminderAsync: (
     payload: CreateReminderPayload,
     options?: { syncStore?: boolean; refreshSummary?: boolean }

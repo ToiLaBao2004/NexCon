@@ -2,7 +2,7 @@ import { chatService } from '@/services/chatService';
 import { toast } from 'sonner';
 import type { ChatState, DraftInfo, SendMessagePayload } from '@/types/store';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
 import useMediaCacheStore from './useMediaCacheStore';
 import type { Reminder } from '@/types/reminder';
@@ -40,6 +40,7 @@ export const useChatStore = create<ChatState>()(
     persist(
         (set, get) => ({
             conversations: [],
+            conversationsFetched: false,
             messages: {},
             media: {},
             mediaPagination: {},
@@ -147,6 +148,7 @@ export const useChatStore = create<ChatState>()(
             reset: () => {
                 set({
                     conversations: [],
+                    conversationsFetched: false,
                     messages: {},
                     media: {},
                     mediaPagination: {},
@@ -159,8 +161,12 @@ export const useChatStore = create<ChatState>()(
                     drafts: {},
                 });
             },
-            fetchConversations: async () => {
+            fetchConversations: async (force = false) => {
                 try {
+                    if (!force && get().conversationsFetched) {
+                        return;
+                    }
+
                     set({ convoLoading: true });
                     const { conversations } = await chatService.fetchConversations();
 
@@ -180,7 +186,7 @@ export const useChatStore = create<ChatState>()(
                         }
                     }
 
-                    set({ conversations: sortConversations(conversations as any), convoLoading: false });
+                    set({ conversations: sortConversations(conversations as any), conversationsFetched: true, convoLoading: false });
                 } catch (error) {
                     console.error("Lỗi khi tải danh sách cuộc trò chuyện:", error);
                     set({ convoLoading: false });
@@ -819,7 +825,7 @@ export const useChatStore = create<ChatState>()(
                 const exists = conversations.some((c) => c._id === conversation._id);
 
                 if (!exists) {
-                    fetchConversations();
+                    fetchConversations(true);
                 } else {
                     set((state) => {
                         const existingConv = state.conversations.find((c) => c._id === conversation._id);
@@ -998,7 +1004,7 @@ export const useChatStore = create<ChatState>()(
                     }
                 } catch (error) {
                     console.error('Lỗi khi ghim hội thoại:', error);
-                    await get().fetchConversations();
+                    await get().fetchConversations(true);
                     throw error;
                 }
             },
@@ -1020,7 +1026,7 @@ export const useChatStore = create<ChatState>()(
                         return;
                     }
 
-                    await get().fetchConversations();
+                    await get().fetchConversations(true);
                 } catch (error) {
                     console.error("Lỗi khi cập nhật ảnh nhóm:", error);
                     throw error;
@@ -1092,7 +1098,7 @@ export const useChatStore = create<ChatState>()(
                         } else {
                             const res = await chatService.createConversation('direct', [userId]);
                             const conv = res.conversation || res;
-                            await fetchConversations();
+                            await fetchConversations(true);
                             targetId = conv?._id || conv;
                         }
                     }
@@ -1112,7 +1118,7 @@ export const useChatStore = create<ChatState>()(
                 try {
                     const res = await chatService.createConversation('group', members, name);
                     const conv = res.conversation || res;
-                    await fetchConversations();
+                    await fetchConversations(true);
                     if (conv?._id) {
                         setActiveConversation(conv._id);
                         await fetchMessages(conv._id).catch(() => { });
@@ -1742,6 +1748,7 @@ export const useChatStore = create<ChatState>()(
 
         {
             name: "chat-storage",
+            storage: createJSONStorage(() => sessionStorage),
             partialize: (state) => ({
                 conversations: state.conversations,
                 drafts: Object.fromEntries(

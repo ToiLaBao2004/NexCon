@@ -13,6 +13,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
   removedReminderIds: [],
   hasMore: false,
   nextCursor: null,
+  lastFetchParams: null,
   isLoading: false,
   isLoadingMore: false,
   upcomingCount: 0,
@@ -47,6 +48,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
         reminders,
         hasMore,
         nextCursor,
+        lastFetchParams: params ?? null,
       });
     } catch (error) {
       console.error('Lỗi khi tải reminders:', error);
@@ -54,12 +56,18 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
         reminders: [],
         hasMore: false,
         nextCursor: null,
+        lastFetchParams: params ?? null,
       });
     } finally {
       if (currentSequence === reminderFetchSequence) {
         set({ isLoading: false });
       }
     }
+  },
+
+  refreshReminders: async () => {
+    const params = get().lastFetchParams ?? undefined;
+    await get().fetchReminders(params);
   },
 
   fetchMoreReminders: async (params) => {
