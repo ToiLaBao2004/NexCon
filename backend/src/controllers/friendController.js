@@ -5,6 +5,7 @@ import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
 import { io, getReceiverSocketId, emitToUser } from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
+import { checkFieldFormat } from "../utils/fieldFormat.js";
 
 const toFriendItem = (friendship, user) => ({
     _id: friendship._id,
@@ -13,6 +14,28 @@ const toFriendItem = (friendship, user) => ({
     avatarUrl: user.avatarUrl,
     createdAt: friendship.createdAt
 });
+
+const MAX_FRIENDS = 500;
+const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
+const MAX_PENDING_SENT_REQUESTS = 100;
+const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX_PENDING_SENT_REQUESTS} lời mời kết bạn đang chờ xử lý.`;
+
+async function hasReachedFriendLimit(userId) {
+    const count = await Friend.countDocuments({
+        $or: [{ userA: userId }, { userB: userId }]
+    });
+    return count >= MAX_FRIENDS;
+}
+
+async function checkFriendLimit(...userIds) {
+    const results = await Promise.all(userIds.map(hasReachedFriendLimit));
+    return results.some(Boolean);
+}
+
+async function hasReachedPendingRequestLimit(userId) {
+    const count = await FriendRequest.countDocuments({ from: userId, status: 'pending' });
+    return count >= MAX_PENDING_SENT_REQUESTS;
+}
 
 async function emitSentRequestUpdated(senderId, requestId) {
     const friendRequest = await FriendRequest.findById(requestId)
@@ -63,6 +86,9 @@ export async function sendFriendRequest(req, res) {
         if (alreadyFriends) {
             return res.status(400).json({ message: 'You are already friends with this user.' });
         }
+        if (await checkFriendLimit(sender._id, receiver._id)) {
+            return res.status(400).json({ message: FRIEND_LIMIT_MESSAGE });
+        }
         const existingRequest = await FriendRequest.findOne({
             from: sender._id,
             to: receiver._id,
@@ -70,6 +96,9 @@ export async function sendFriendRequest(req, res) {
         });
         if (existingRequest) {
             return res.status(400).json({ message: 'You already sent a friend request to this user.' });
+        }
+        if (await hasReachedPendingRequestLimit(sender._id)) {
+            return res.status(400).json({ message: PENDING_REQUEST_LIMIT_MESSAGE });
         }
         const rejectedRequest = await FriendRequest.findOne({
             from: sender._id,
@@ -169,6 +198,9 @@ export async function acceptFriendRequest(req, res) {
             return res.status(400).json({ message: 'This friend request is no longer pending.' });
         }
         const sender = await User.findById(friendRequest.from);
+        if (await checkFriendLimit(receiver._id, sender._id)) {
+            return res.status(400).json({ message: FRIEND_LIMIT_MESSAGE });
+        }
         const newFriend = new Friend({
             userA: receiver._id,
             userB: sender._id
@@ -270,6 +302,9 @@ export async function resendFriendRequest(req, res) {
         }
         if (friendRequest.status !== 'rejected') {
             return res.status(400).json({ message: 'This friend request is no longer rejected.' });
+        }
+        if (await hasReachedPendingRequestLimit(sender._id)) {
+            return res.status(400).json({ message: PENDING_REQUEST_LIMIT_MESSAGE });
         }
         const receiver = await User.findById(friendRequest.to);
         friendRequest.status = 'pending';
@@ -557,6 +592,10 @@ export async function setFriendNickname(req, res) {
         const user = req.user;
         const { friendId } = req.params;
         const { nickname } = req.body;
+        const nicknameError = checkFieldFormat('nickname', nickname);
+        if (nicknameError) {
+            return res.status(400).json({ message: nicknameError });
+        }
         const friend = await User.findById(friendId);
         if (!friend) {
             return res.status(404).json({ message: 'User not found.' });
@@ -580,9 +619,9 @@ export async function setFriendNickname(req, res) {
             return res.status(200).json({ message: `Nickname for ${friend.displayName} has been removed.` });
         }
         if (friendship.userA.toString() === user._id.toString()) {
-            friendship.nicknameB = nickname ? nickname.trim().slice(0, 50) : undefined;
+            friendship.nicknameB = nickname ? nickname.trim() : undefined;
         } else {
-            friendship.nicknameA = nickname ? nickname.trim().slice(0, 50) : undefined;
+            friendship.nicknameA = nickname ? nickname.trim() : undefined;
         }
         await friendship.save();
         return res.status(200).json({ message: `Nickname for ${friend.displayName} has been updated.` });

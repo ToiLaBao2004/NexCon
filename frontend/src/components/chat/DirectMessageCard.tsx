@@ -34,6 +34,8 @@ import { UserActionDropdown } from "../shared/UserActionDropdown";
 import { useEffect, useMemo, useState } from "react";
 import { ConfirmationModal } from "../shared/ConfirmationModal";
 import { getSystemMessageText } from '@/utils/chatUtils';
+import { FIELD_LIMITS, checkFieldFormat } from '@/lib/fieldFormat';
+import { toast } from "sonner";
 
 const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
 
@@ -115,6 +117,11 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   const onSubmitNickname = async () => {
     const value = nickname;
+    const nicknameError = checkFieldFormat("nickname", value);
+    if (nicknameError) {
+      toast.error(nicknameError);
+      return;
+    }
 
     if (value === currentNickname) {
       setOpenRename(false);
@@ -281,6 +288,9 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
               if (e.key === "Enter" && !loading) onSubmitNickname()
             }}
           />
+          <div className="text-right text-xs text-muted-foreground">
+            {nickname.trim().length}/{FIELD_LIMITS.nickname}
+          </div>
 
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>

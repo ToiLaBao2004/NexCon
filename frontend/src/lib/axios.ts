@@ -38,11 +38,7 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
-        // Session bị xóa → logout thẳng, không refresh
-        if (error.response?.status === 403) {
-            useAuthStore.getState().clearState();
-            return Promise.reject(error);
-        }
+
 
         // Token hết hạn → thử refresh
         if (error.response?.status === 401 && !originalRequest._retry) {

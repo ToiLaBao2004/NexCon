@@ -199,8 +199,8 @@ const PeoplePage = () => {
 							/>
 						)}
 
-						<div className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain beautiful-scrollbar ${isMobile ? "pb-32" : ""}`}>
-							<div className="p-4">
+						<div className={`flex-1 min-h-0 overflow-x-hidden overscroll-contain ${tab === "requests" ? "overflow-hidden" : "overflow-y-auto beautiful-scrollbar"} ${isMobile ? "pb-28" : ""}`}>
+							<div className={`${tab === "requests" ? "h-full min-h-0 p-3 md:p-4" : "h-full min-h-0 p-4"}`}>
 								{tab === 'friends' && (
 									<FriendsTab
 										friends={friends}

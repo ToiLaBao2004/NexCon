@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Camera, Loader2 } from "lucide-react";
 import EditMusicProfile from "@/components/ui/editmusicprofile";
+import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 
 interface ProfileEditDialogProps {
     open: boolean;
@@ -65,6 +66,13 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     };
 
     const handleSave = async () => {
+        const displayNameError = checkFieldFormat("displayName", formData.displayName);
+        const phoneError = checkFieldFormat("phone", formData.phone);
+        if (displayNameError || phoneError) {
+            toast.error(displayNameError || phoneError);
+            return;
+        }
+
         try {
             setLoading(true);
             await updateProfile(formData);
@@ -145,7 +153,12 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
 
                         {/* Tên hiển thị */}
                         <div className="grid gap-1.5">
-                            <Label htmlFor="displayName">Tên hiển thị</Label>
+                            <Label htmlFor="displayName" className="flex justify-between">
+                                <span>Tên hiển thị</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {formData.displayName.trim().length}/{FIELD_LIMITS.displayName}
+                                </span>
+                            </Label>
                             <Input
                                 id="displayName"
                                 value={formData.displayName}
@@ -157,7 +170,12 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
 
                         {/* Số điện thoại */}
                         <div className="grid gap-1.5">
-                            <Label htmlFor="phone">Số điện thoại</Label>
+                            <Label htmlFor="phone" className="flex justify-between">
+                                <span>Số điện thoại</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {formData.phone.trim().length}/{FIELD_LIMITS.phone}
+                                </span>
+                            </Label>
                             <Input
                                 id="phone"
                                 type="tel"

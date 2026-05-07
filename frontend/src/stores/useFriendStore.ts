@@ -2,6 +2,12 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { friendService } from '@/services/friendService';
 import type { FriendState } from '@/types/store';
+import { checkFieldFormat } from '@/lib/fieldFormat';
+
+const MAX_FRIENDS = 500;
+const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
+const MAX_PENDING_SENT_REQUESTS = 100;
+const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX_PENDING_SENT_REQUESTS} lời mời kết bạn đang chờ xử lý.`;
 
 export const useFriendStore = create<FriendState>((set, get) => ({
 	loading: false,
@@ -72,6 +78,12 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	setNickName: async (friendId: string, nickName: string) => {
+		const nicknameError = checkFieldFormat('nickname', nickName);
+		if (nicknameError) {
+			toast.error(nicknameError);
+			return;
+		}
+
 		try {
 			set({ loading: true });
 			await friendService.setNickName(friendId, nickName);
@@ -88,6 +100,15 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	sendFriendRequest: async (email: string, message?: string) => {
+		if (get().friends.length >= MAX_FRIENDS) {
+			toast.error(FRIEND_LIMIT_MESSAGE);
+			return;
+		}
+		if (get().sentRequests.length >= MAX_PENDING_SENT_REQUESTS) {
+			toast.error(PENDING_REQUEST_LIMIT_MESSAGE);
+			return;
+		}
+
 		try {
 			set({ sendingRequest: true });
 			const data = await friendService.sendFriendRequest(email, message);
@@ -127,6 +148,11 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	acceptFriendRequest: async (requestId: string) => {
+		if (get().friends.length >= MAX_FRIENDS) {
+			toast.error(FRIEND_LIMIT_MESSAGE);
+			return;
+		}
+
 		try {
 			set({ loading: true });
 			const data = await friendService.acceptFriendRequest(requestId);

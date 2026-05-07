@@ -2,6 +2,7 @@ import User from '../models/userModel.js';
 import { upLoadImageFromBuffer, deleteImage } from '../middlewares/uploadMiddleware.js';
 import bcrypt from 'bcrypt';
 import { searchSpotifyTracks } from '../services/spotifyService.js';
+import { checkFieldFormat } from '../utils/fieldFormat.js';
 
 export async function getCurrentUser(req, res) {
     try {
@@ -47,23 +48,25 @@ export async function updateProfile(req, res) {
     try {
         const userId = req.user._id;
         const { displayName, bio, phone } = req.body;
+        const displayNameError = checkFieldFormat('displayName', displayName);
+        const phoneError = checkFieldFormat('phone', phone);
 
         // Validation
-        if (bio && bio.length > 150) {
-            return res.status(400).json({ message: 'Tiểu sử không được quá 150 ký tự' });
+        if (displayNameError || phoneError) {
+            return res.status(400).json({ message: displayNameError || phoneError });
         }
 
-        if (phone && !/^\d*$/.test(phone)) {
-            return res.status(400).json({ message: 'Số điện thoại chỉ được chứa chữ số' });
+        if (bio && bio.length > 150) {
+            return res.status(400).json({ message: 'Tiểu sử không được quá 150 ký tự' });
         }
 
         const updatedUser = await User.findByIdAndUpdate(
             userId,
             {
                 $set: {
-                    displayName,
+                    displayName: displayName?.trim(),
                     bio,
-                    phone
+                    phone: phone?.trim()
                 }
             },
             { new: true, runValidators: true }

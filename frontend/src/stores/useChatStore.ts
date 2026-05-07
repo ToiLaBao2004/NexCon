@@ -7,6 +7,8 @@ import { useAuthStore } from './useAuthStore';
 import useMediaCacheStore from './useMediaCacheStore';
 import type { Reminder } from '@/types/reminder';
 
+const MAX_PINNED_CONVERSATIONS = 5;
+
 const getReminderContent = (reminder: Reminder): string => {
     const content = String(reminder.content || '').trim();
     if (content) return content;
@@ -987,6 +989,14 @@ export const useChatStore = create<ChatState>()(
                 const nextIsPinned = !(existing?.isPinned === true);
                 const optimisticPinnedAt = nextIsPinned ? new Date().toISOString() : null;
 
+                if (nextIsPinned) {
+                    const pinnedCount = get().conversations.filter((c) => c.isPinned === true).length;
+                    if (pinnedCount >= MAX_PINNED_CONVERSATIONS) {
+                        toast.error(`Bạn chỉ có thể ghim tối đa ${MAX_PINNED_CONVERSATIONS} cuộc hội thoại.`);
+                        return;
+                    }
+                }
+
                 set((state) => ({
                     conversations: sortConversations(
                         state.conversations.map((c) =>
@@ -1004,6 +1014,7 @@ export const useChatStore = create<ChatState>()(
                     }
                 } catch (error) {
                     console.error('Lỗi khi ghim hội thoại:', error);
+                    toast.error((error as any)?.response?.data?.message || 'Không thể cập nhật trạng thái ghim hội thoại.');
                     await get().fetchConversations(true);
                     throw error;
                 }

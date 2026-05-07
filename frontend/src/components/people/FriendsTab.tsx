@@ -65,11 +65,11 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                         const isProcessing = processingId === friend.friendId;
 
                         return (
-                            <div key={friend._id} className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-card border border-border/40 hover:border-primary/30 hover:shadow-md transition-all duration-300 group">
+                            <div key={friend._id} className="group flex min-h-[68px] items-center gap-3 rounded-lg border border-transparent bg-transparent p-3 transition-colors hover:bg-muted/60">
                                 <div className="relative cursor-pointer" onClick={() => handleOpenProfile(friend)}>
-                                    <Avatar className="h-12 w-12 shrink-0 border-2 border-transparent group-hover:border-primary/20 transition-all">
+                                    <Avatar className="h-11 w-11 shrink-0">
                                         <AvatarImage src={friend.avatarUrl} />
-                                        <AvatarFallback className="text-base font-bold bg-primary/10 text-primary">
+                                        <AvatarFallback className="bg-primary/10 text-base font-bold text-primary">
                                             {friend.displayName.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
@@ -77,10 +77,10 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                                 </div>
 
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProfile(friend)}>
-                                    <p className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors">
+                                    <p className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">
                                         {friend.nickname || friend.displayName}
                                     </p>
-                                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                                         <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
                                         {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
                                     </p>
@@ -100,12 +100,12 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                     })}
                 </div>
             ) : (
-                <div className="flex-1 h-64 flex flex-col items-center justify-center py-10 bg-card/10 rounded-3xl border border-dashed border-border/60">
-                    <div className="h-20 w-20 rounded-3xl bg-muted/30 flex items-center justify-center mb-5 ring-8 ring-muted/10">
-                        <UserX className="h-10 w-10 text-muted-foreground/40" />
+                <div className="flex h-64 flex-col items-center justify-center rounded-3xl border-2 border-dashed border-border/40 bg-muted/20 p-8 text-center text-muted-foreground">
+                    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/30">
+                        <UserX className="h-8 w-8 text-muted-foreground opacity-50" />
                     </div>
-                    <h3 className="text-lg font-bold text-foreground/80 mb-2">Chưa có bạn bè</h3>
-                    <p className="text-sm text-muted-foreground/60 text-center max-w-xs px-4">
+                    <h3 className="mb-1 text-lg font-semibold text-foreground">Chưa có bạn bè</h3>
+                    <p className="max-w-xs text-sm">
                         Tìm kiếm và gửi lời mời kết bạn để cùng nhau trò chuyện và chia sẻ khoảnh khắc.
                     </p>
                 </div>

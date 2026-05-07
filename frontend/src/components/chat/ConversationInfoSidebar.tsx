@@ -55,6 +55,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 
 interface ConversationInfoSidebarProps {
   conversation: Conversation;
@@ -144,6 +145,11 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   // Handlers
   const handleSubmitNickname = async () => {
     const val = nicknameValue;
+    const nicknameError = checkFieldFormat("nickname", val);
+    if (nicknameError) {
+      toast.error(nicknameError);
+      return;
+    }
     if (val === currentNickname) {
       setOpenNickname(false);
       return;
@@ -321,6 +327,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 if (e.key === "Enter" && !nicknameLoading) handleSubmitNickname();
               }}
             />
+            <div className="text-right text-xs text-muted-foreground">
+              {nicknameValue.trim().length}/{FIELD_LIMITS.nickname}
+            </div>
             <DialogFooter className="gap-2">
               <Button
                 variant="outline"
