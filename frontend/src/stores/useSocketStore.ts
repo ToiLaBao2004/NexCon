@@ -833,12 +833,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useChatStore.getState().fetchConversations(true);
     });
 
-    socket.on("accept-call", () => {
-      useCallStore.getState().handleRemoteAccepted();
+    socket.on("accept-call", (payload) => {
+      useCallStore.getState().handleRemoteAccepted(payload);
     });
 
-    socket.on("call-ringing", () => {
-      useCallStore.getState().handleCallRinging();
+    socket.on("call-ringing", (payload) => {
+      useCallStore.getState().handleCallRinging(payload);
     });
 
     socket.on("call-answered-on-other-device", (payload) => {
@@ -855,6 +855,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useCallStore.setState({
           pendingIncomingQueue: callState.pendingIncomingQueue.filter((pending) => pending.roomName !== payload.roomName),
         });
+        return;
+      }
+      if (
+        callState.status === "incoming" &&
+        callState.isConnecting &&
+        payload?.roomName &&
+        callState._roomName === payload.roomName
+      ) {
         return;
       }
       if (callState.status === "incoming") {

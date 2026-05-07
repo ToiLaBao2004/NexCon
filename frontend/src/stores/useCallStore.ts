@@ -22,6 +22,10 @@ const LIVEKIT_CONNECT_OPTIONS = {
 function emitCallEvent(event: string, payload?: object) {
   useSocketStore.getState().socket?.emit(event, payload);
 }
+
+function buildDirectCallPayload(toUserId: string, roomName?: string | null) {
+  return roomName ? { toUserId, roomName } : { toUserId };
+}
 // Trạng thái rảnh. Dùng để reset store về ban đầu sau khi kết thúc cuộc gọi.
 const IDLE_STATE = {
   status: "idle" as const,
@@ -165,7 +169,7 @@ function findPendingIncomingCall(state: CallState, roomName: string) {
 function rejectPendingIncomingCalls(pendingCalls: PendingIncomingCall[]) {
   pendingCalls.forEach((pending) => {
     if (pending.from._id) {
-      emitCallEvent("call-rejected", { toUserId: pending.from._id });
+      emitCallEvent("call-rejected", buildDirectCallPayload(pending.from._id, pending.roomName));
     }
   });
 }
@@ -247,10 +251,30 @@ function clearCurrentCallBeforeAcceptingPending(
         : state.status === "incoming"
           ? "call-rejected"
           : "call-cancelled";
-    emitCallEvent(eventName, { toUserId: state.remoteUser._id });
+    emitCallEvent(eventName, buildDirectCallPayload(state.remoteUser._id, state._roomName));
   }
 
   cleanup(get);
+}
+
+async function ensureMediaPermission(callType: CallType) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    toast.error("Trình duyệt không hỗ trợ truy cập micro/camera.");
+    return false;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: callType === "video",
+    });
+    stream.getTracks().forEach((track) => track.stop());
+    return true;
+  } catch (error) {
+    console.error("Media permission failed:", error);
+    toast.error("Vui lòng cấp quyền micro/camera cho trình duyệt rồi thử lại.");
+    return false;
+  }
 }
 
 async function leaveGroupCallForSwitch() {
@@ -298,7 +322,7 @@ async function connectLiveKitRoom(
     const remoteUserId = get().remoteUser?._id;
     if (!remoteUserId) return;
 
-    emitCallEvent("call-connected", { toUserId: remoteUserId });
+    emitCallEvent("call-connected", buildDirectCallPayload(remoteUserId, roomName));
     hasSignaledConnected = true;
   };
 
@@ -366,7 +390,7 @@ async function connectLiveKitRoom(
 
   room.on(RoomEvent.Disconnected, () => {
     const state = get();
-    if (state.status !== "idle" && !isCancelled()) {
+    if (state.status !== "idle" && !state.isConnecting && !isCancelled()) {
       state.handleCancelCall();
       toast.error("Kết nối bị gián đoạn.");
     }
@@ -430,14 +454,18 @@ export const useCallStore = create<CallState>((set, get) => ({
       return;
     }
 
+    const hasPermission = await ensureMediaPermission(callType);
+    if (!hasPermission || get().status !== "idle") return;
+
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
     try {
       timeout = setTimeout(() => {
         if (get().status === "outgoing") {
-          const remoteUserId = get().remoteUser?._id;
+          const { remoteUser: currentRemoteUser, _roomName } = get();
+          const remoteUserId = currentRemoteUser?._id;
           if (remoteUserId) {
-            emitCallEvent("call-cancelled", { toUserId: remoteUserId });
+            emitCallEvent("call-cancelled", buildDirectCallPayload(remoteUserId, _roomName));
           }
           get().handleCallFailed("no-answer");
         }
@@ -471,14 +499,32 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   // Receiver: B accepts the incoming call
   async acceptCall() {
-    const { remoteUser, isConnecting } = get();
-    if (!remoteUser || isConnecting) return;
+    const { remoteUser, isConnecting, callType, _roomName } = get();
+    if (!remoteUser || isConnecting || !callType) return;
 
-    rejectPendingIncomingCalls(getPendingIncomingCalls(get()));
+    set({ isConnecting: true });
+    const hasPermission = await ensureMediaPermission(callType);
+    const latest = get();
+    if (!hasPermission) {
+      if (latest.status === "incoming" && latest._roomName === _roomName) {
+        set({ isConnecting: false });
+      }
+      return;
+    }
+
+    if (
+      latest.status !== "incoming" ||
+      latest.remoteUser?._id !== remoteUser._id ||
+      latest._roomName !== _roomName
+    ) {
+      return;
+    }
+
+    rejectPendingIncomingCalls(getPendingIncomingCalls(latest));
     await leaveGroupCallForSwitch();
     set({ pendingIncomingCall: null, pendingIncomingQueue: [], isConnecting: true });
-    emitCallEvent("accept-call", { toUserId: remoteUser._id });
-    emitCallEvent("call-answer", { toUserId: remoteUser._id });
+    emitCallEvent("accept-call", buildDirectCallPayload(remoteUser._id, _roomName));
+    emitCallEvent("call-answer", buildDirectCallPayload(remoteUser._id, _roomName));
     stopRingtone();
   },
 
@@ -494,11 +540,18 @@ export const useCallStore = create<CallState>((set, get) => ({
     const pending = findPendingIncomingCall(current, roomName);
     if (!pending || get().isConnecting) return;
 
-    const pendingCallsToReject = getPendingIncomingCalls(current).filter(
+    const hasPermission = await ensureMediaPermission(pending.callType);
+    if (!hasPermission) return;
+
+    const latest = get();
+    const latestPending = findPendingIncomingCall(latest, roomName);
+    if (!latestPending || !samePendingCall(latestPending, pending) || latest.isConnecting) return;
+
+    const pendingCallsToReject = getPendingIncomingCalls(latest).filter(
       (item) => !samePendingCall(item, pending),
     );
 
-    if (current.status !== "idle") {
+    if (latest.status !== "idle") {
       clearCurrentCallBeforeAcceptingPending(get);
     }
     await leaveGroupCallForSwitch();
@@ -513,7 +566,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       _roomName: pending.roomName,
       _token: null,
       _callTimeout: null,
-      _joinAttemptId: current._joinAttemptId + 1,
+      _joinAttemptId: latest._joinAttemptId + 1,
       pendingIncomingCall: null,
       pendingIncomingQueue: [],
       isConnecting: true,
@@ -525,18 +578,18 @@ export const useCallStore = create<CallState>((set, get) => ({
     });
 
     rejectPendingIncomingCalls(pendingCallsToReject);
-    emitCallEvent("accept-call", { toUserId: pending.from._id });
-    emitCallEvent("call-answer", { toUserId: pending.from._id });
+    emitCallEvent("accept-call", buildDirectCallPayload(pending.from._id, pending.roomName));
+    emitCallEvent("call-answer", buildDirectCallPayload(pending.from._id, pending.roomName));
     stopRingtone();
   },
 
   handleCancelCall() {
-    const { remoteUser, status } = get();
+    const { remoteUser, status, _roomName } = get();
     if (status === "idle") return;
 
     if (remoteUser?._id) {
       const eventName = status === "active" ? "leave-call" : "call-cancelled";
-      emitCallEvent(eventName, { toUserId: remoteUser._id });
+      emitCallEvent(eventName, buildDirectCallPayload(remoteUser._id, _roomName));
     }
 
     resetToIdle(set, get);
@@ -544,9 +597,9 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   // Receiver: B rejects the incoming call
   rejectCall() {
-    const { remoteUser, status } = get();
+    const { remoteUser, status, _roomName } = get();
     if (status === "incoming" && remoteUser?._id) {
-      emitCallEvent("call-rejected", { toUserId: remoteUser._id });
+      emitCallEvent("call-rejected", buildDirectCallPayload(remoteUser._id, _roomName));
       resetToIdle(set, get);
       return;
     }
@@ -566,7 +619,7 @@ export const useCallStore = create<CallState>((set, get) => ({
     const pending = findPendingIncomingCall(current, roomName);
     if (!pending) return;
 
-    emitCallEvent("call-rejected", { toUserId: pending.from._id });
+    emitCallEvent("call-rejected", buildDirectCallPayload(pending.from._id, pending.roomName));
     setPendingIncomingCalls(
       set,
       getPendingIncomingCalls(current).filter((item) => !samePendingCall(item, pending)),
@@ -648,21 +701,32 @@ export const useCallStore = create<CallState>((set, get) => ({
     }
   },
 
-  handleRemoteAccepted() {
-    if (get().status === "outgoing") {
-      set({ isRemoteConnecting: true });
+  handleRemoteAccepted(payload) {
+    const state = get();
+    if (state.status === "outgoing" && payloadMatchesCurrentCall(state, payload)) {
+      if (state._callTimeout) clearTimeout(state._callTimeout);
+      set({
+        isRemoteConnecting: true,
+        _roomName: payload?.roomName ?? state._roomName,
+        _callTimeout: null,
+      });
       void playCallerRingingRingtone();
     }
   },
 
-  handleCallRinging() {
-    if (get().status === "outgoing") {
+  handleCallRinging(payload) {
+    const state = get();
+    if (state.status === "outgoing" && payloadMatchesCurrentCall(state, payload)) {
+      set({ _roomName: payload?.roomName ?? state._roomName });
       void playCallerRingingRingtone();
     }
   },
 
   async handleCallAnswered({ token, roomName }) {
-    const { _callTimeout, callType } = get();
+    const state = get();
+    const { _callTimeout, callType } = state;
+    if (state.status !== "outgoing") return;
+    if (state._roomName && state._roomName !== roomName) return;
     if (!callType) return;
 
     if (_callTimeout) {
@@ -671,7 +735,7 @@ export const useCallStore = create<CallState>((set, get) => ({
     }
 
     const attemptId = get()._joinAttemptId + 1;
-    set({ _joinAttemptId: attemptId, isConnecting: true, isRemoteConnecting: true });
+    set({ _joinAttemptId: attemptId, _roomName: roomName, isConnecting: true, isRemoteConnecting: true });
 
     try {
       const connected = await connectLiveKitRoom(
@@ -692,11 +756,14 @@ export const useCallStore = create<CallState>((set, get) => ({
   },
 
   async handleCallAccepted({ token, roomName }) {
-    const { callType } = get();
+    const state = get();
+    const { callType } = state;
+    if (state.status !== "incoming") return;
+    if (state._roomName && state._roomName !== roomName) return;
     if (!callType) return;
 
     const attemptId = get()._joinAttemptId + 1;
-    set({ _joinAttemptId: attemptId, isConnecting: true });
+    set({ _joinAttemptId: attemptId, _roomName: roomName, isConnecting: true });
 
     try {
       const connected = await connectLiveKitRoom(

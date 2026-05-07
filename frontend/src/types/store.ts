@@ -300,8 +300,8 @@ export interface CallState {
   toggleVideo: () => void;
   handleVideoToggle: (isVideoOff: boolean) => void;
   handleIncomingCall: (from: RemoteUser, callType: CallType, roomName: string, isMutedCall?: boolean) => void;
-  handleRemoteAccepted: () => void;
-  handleCallRinging: () => void;
+  handleRemoteAccepted: (payload?: DirectCallEventPayload) => void;
+  handleCallRinging: (payload?: DirectCallEventPayload) => void;
   handleCallAnswered: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallAccepted: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallRejected: (payload?: DirectCallEventPayload) => void;
