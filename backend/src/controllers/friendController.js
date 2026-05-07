@@ -14,6 +14,21 @@ const toFriendItem = (friendship, user) => ({
     createdAt: friendship.createdAt
 });
 
+const MAX_FRIENDS = 500;
+const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
+
+async function hasReachedFriendLimit(userId) {
+    const count = await Friend.countDocuments({
+        $or: [{ userA: userId }, { userB: userId }]
+    });
+    return count >= MAX_FRIENDS;
+}
+
+async function checkFriendLimit(...userIds) {
+    const results = await Promise.all(userIds.map(hasReachedFriendLimit));
+    return results.some(Boolean);
+}
+
 async function emitSentRequestUpdated(senderId, requestId) {
     const friendRequest = await FriendRequest.findById(requestId)
         .populate('to', 'displayName email avatarUrl bio phone');
@@ -62,6 +77,9 @@ export async function sendFriendRequest(req, res) {
         });
         if (alreadyFriends) {
             return res.status(400).json({ message: 'You are already friends with this user.' });
+        }
+        if (await checkFriendLimit(sender._id, receiver._id)) {
+            return res.status(400).json({ message: FRIEND_LIMIT_MESSAGE });
         }
         const existingRequest = await FriendRequest.findOne({
             from: sender._id,
@@ -169,6 +187,9 @@ export async function acceptFriendRequest(req, res) {
             return res.status(400).json({ message: 'This friend request is no longer pending.' });
         }
         const sender = await User.findById(friendRequest.from);
+        if (await checkFriendLimit(receiver._id, sender._id)) {
+            return res.status(400).json({ message: FRIEND_LIMIT_MESSAGE });
+        }
         const newFriend = new Friend({
             userA: receiver._id,
             userB: sender._id

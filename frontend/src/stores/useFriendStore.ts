@@ -3,6 +3,9 @@ import { toast } from 'sonner';
 import { friendService } from '@/services/friendService';
 import type { FriendState } from '@/types/store';
 
+const MAX_FRIENDS = 500;
+const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
+
 export const useFriendStore = create<FriendState>((set, get) => ({
 	loading: false,
 	sendingRequest: false,
@@ -88,6 +91,11 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	sendFriendRequest: async (email: string, message?: string) => {
+		if (get().friends.length >= MAX_FRIENDS) {
+			toast.error(FRIEND_LIMIT_MESSAGE);
+			return;
+		}
+
 		try {
 			set({ sendingRequest: true });
 			const data = await friendService.sendFriendRequest(email, message);
@@ -127,6 +135,11 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	acceptFriendRequest: async (requestId: string) => {
+		if (get().friends.length >= MAX_FRIENDS) {
+			toast.error(FRIEND_LIMIT_MESSAGE);
+			return;
+		}
+
 		try {
 			set({ loading: true });
 			const data = await friendService.acceptFriendRequest(requestId);
