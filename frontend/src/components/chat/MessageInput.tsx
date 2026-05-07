@@ -17,6 +17,7 @@ import { draftStorage } from "@/lib/draftStorage";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_IMAGE_ATTACHMENTS = 10;
+const MAX_TEXT_MESSAGE_LENGTH = 1000;
 
 
 
@@ -226,6 +227,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const prevAttachments = currentAttachments;
 		const prevMentions = selectedMentions;
 		const tokenized = buildMentionsFromText(currValue, prevMentions);
+		if (type === "text" && tokenized.content.length > MAX_TEXT_MESSAGE_LENGTH) {
+			toast.error(`Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
+			return;
+		}
 		const withTarget = (payload: Parameters<typeof sendMessage>[0]) => {
 			if (selectedConvo.type === "direct") {
 				payload.recipientId = otherUserId as string;
@@ -942,6 +947,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							onChange={handleInputChange}
 							onPaste={handlePaste}
 							onFocus={() => markAsSeen()}
+							maxLength={MAX_TEXT_MESSAGE_LENGTH}
 							rows={1}
 							placeholder={
 								attachment

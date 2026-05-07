@@ -22,6 +22,8 @@ import { sendPushToUser } from '../services/pushNotificationService.js';
 import { transcribeAudioFromBuffer } from '../services/audio/transcribeAudio.js';
 import { moderateImageMessage } from '../services/moderation/imageModerationService.js';
 
+const MAX_TEXT_MESSAGE_LENGTH = 1000;
+
 const parseMentionPayload = (rawMentions) => {
     if (Array.isArray(rawMentions)) {
         return rawMentions;
@@ -251,6 +253,9 @@ export async function sendMessage(req, res) {
                 }
 
                 const trimmedContent = content.trim();
+                if (trimmedContent.length > MAX_TEXT_MESSAGE_LENGTH) {
+                    return res.status(400).json({ message: `Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.` });
+                }
 
                 const moderationResult = await moderateTextMessage(trimmedContent);
 
