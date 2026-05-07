@@ -23,6 +23,9 @@ interface NewGroupModalProps {
   initialSelected?: string[];
 }
 
+const MAX_GROUP_MEMBERS = 100;
+const MAX_SELECTED_FRIENDS = MAX_GROUP_MEMBERS - 1;
+
 const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps) => {
   const [groupName, setGroupName] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -53,6 +56,11 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
   // Handle friend selection
 
   const toggleFriendSelection = (friendId: string) => {
+    if (!selectedFriends.includes(friendId) && selectedFriends.length >= MAX_SELECTED_FRIENDS) {
+      toast.error(`Nhóm chỉ có thể chứa tối đa ${MAX_GROUP_MEMBERS} thành viên.`);
+      return;
+    }
+
     setSelectedFriends(prev =>
       prev.includes(friendId)
         ? prev.filter(id => id !== friendId)
@@ -63,7 +71,7 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
   // when opened with initial selected members, preload them
   useEffect(() => {
     if (isOpen) {
-      setSelectedFriends(initialSelected ?? []);
+      setSelectedFriends((initialSelected ?? []).slice(0, MAX_SELECTED_FRIENDS));
     }
   }, [isOpen, initialSelected]);
 
@@ -75,6 +83,11 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
 
     if (selectedFriends.length === 0) {
       toast.error('Vui lòng chọn ít nhất một người bạn');
+      return;
+    }
+
+    if (selectedFriends.length > MAX_SELECTED_FRIENDS) {
+      toast.error(`Nhóm chỉ có thể chứa tối đa ${MAX_GROUP_MEMBERS} thành viên.`);
       return;
     }
 
@@ -199,7 +212,7 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
           </Button>
           <Button
             onClick={handleCreateGroup}
-            disabled={creating || !groupName.trim() || selectedFriends.length === 0}
+            disabled={creating || !groupName.trim() || selectedFriends.length === 0 || selectedFriends.length > MAX_SELECTED_FRIENDS}
             className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md transition-all active:scale-95"
           >
             {creating ? 'Đang tạo...' : 'Tạo nhóm'}

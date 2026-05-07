@@ -1,6 +1,7 @@
 import Friend from '../models/friendModel.js';
 
 const pair = (a, b) => (a < b ? [a, b] : [b, a]);
+const MAX_GROUP_MEMBERS = 100;
 
 export async function checkFriendship(req, res, next) {
     try {
@@ -10,6 +11,9 @@ export async function checkFriendship(req, res, next) {
 
         if (!recipientId && memberIds.length === 0) {
             return res.status(400).json({ message: 'Recipient ID or Member ID is required.' });
+        }
+        if (!recipientId && memberIds.length > MAX_GROUP_MEMBERS - 1) {
+            return res.status(400).json({ message: `Nhóm chỉ có thể chứa tối đa ${MAX_GROUP_MEMBERS} thành viên.` });
         }
         if (recipientId) {
             const [userA, userB] = pair(senderId, recipientId);

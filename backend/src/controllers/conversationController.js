@@ -21,6 +21,8 @@ const MUTE_DURATION_MS = {
 	'8h': 8 * 60 * 60 * 1000,
 	'24h': 24 * 60 * 60 * 1000,
 };
+const MAX_GROUP_MEMBERS = 100;
+
 export async function createConversation(req, res) {
 	try {
 		const { type, name, memberIds } = req.body;
@@ -46,6 +48,9 @@ export async function createConversation(req, res) {
 			}
 		}
 		if (type === 'group') {
+			if (memberIds.length + 1 > MAX_GROUP_MEMBERS) {
+				return res.status(400).json({ message: `Nhóm chỉ có thể chứa tối đa ${MAX_GROUP_MEMBERS} thành viên.` });
+			}
 			const members = await User.find({ _id: { $in: memberIds } }).select('displayName avatarUrl');
 			const participants = members.map(m => ({
 				userId: m._id,
