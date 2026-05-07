@@ -147,6 +147,8 @@ reminderSchema.pre('validate', function syncLegacyContent(next) {
 });
 
 reminderSchema.index({ userId: 1, remindAt: 1, status: 1 });
+reminderSchema.index({ createdBy: 1, status: 1 });
+reminderSchema.index({ conversationId: 1, status: 1, sharedKey: 1 });
 reminderSchema.index(
     { sharedKey: 1, userId: 1 },
     {

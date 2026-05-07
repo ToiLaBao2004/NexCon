@@ -83,7 +83,11 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
       closeAll();
     } catch (error) {
       console.error('Create reminder quick failed:', error);
-      toast.error(isSharedMode ? 'Không thể tạo nhắc hẹn chung lúc này' : 'Không thể tạo nhắc hẹn cá nhân lúc này');
+      const maybeError = error as { response?: { data?: { message?: string } } };
+      toast.error(
+        maybeError?.response?.data?.message
+        || (isSharedMode ? 'Không thể tạo nhắc hẹn chung lúc này' : 'Không thể tạo nhắc hẹn cá nhân lúc này')
+      );
     } finally {
       setIsSubmitting(false);
     }
