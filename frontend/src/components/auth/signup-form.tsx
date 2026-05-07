@@ -11,6 +11,7 @@ import { useOTPStore } from "@/stores/useOtpStore"
 import { useNavigate } from "react-router"
 import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
+import { checkFieldFormat } from "@/lib/fieldFormat"
 
 const signUpSchema = z.object({
   firstname: z.string().min(1, "Tên là bắt buộc"),
@@ -41,6 +42,12 @@ export function SignupForm({
 
   const onSubmit = async (data: SignUpFormValues) => {
     const { firstname, lastname, email, password, confirmPassword } = data;
+    const displayNameError = checkFieldFormat("displayName", `${firstname} ${lastname}`);
+    if (displayNameError) {
+      setError("root", { type: "manual", message: displayNameError });
+      return;
+    }
+
     try {
       await verifyValidFieldsSignUp(email, password, confirmPassword);
       await sendOtpCreateUser(email);

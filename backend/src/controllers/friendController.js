@@ -5,6 +5,7 @@ import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
 import { io, getReceiverSocketId, emitToUser } from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
+import { checkFieldFormat } from "../utils/fieldFormat.js";
 
 const toFriendItem = (friendship, user) => ({
     _id: friendship._id,
@@ -591,6 +592,10 @@ export async function setFriendNickname(req, res) {
         const user = req.user;
         const { friendId } = req.params;
         const { nickname } = req.body;
+        const nicknameError = checkFieldFormat('nickname', nickname);
+        if (nicknameError) {
+            return res.status(400).json({ message: nicknameError });
+        }
         const friend = await User.findById(friendId);
         if (!friend) {
             return res.status(404).json({ message: 'User not found.' });
@@ -614,9 +619,9 @@ export async function setFriendNickname(req, res) {
             return res.status(200).json({ message: `Nickname for ${friend.displayName} has been removed.` });
         }
         if (friendship.userA.toString() === user._id.toString()) {
-            friendship.nicknameB = nickname ? nickname.trim().slice(0, 50) : undefined;
+            friendship.nicknameB = nickname ? nickname.trim() : undefined;
         } else {
-            friendship.nicknameA = nickname ? nickname.trim().slice(0, 50) : undefined;
+            friendship.nicknameA = nickname ? nickname.trim() : undefined;
         }
         await friendship.save();
         return res.status(200).json({ message: `Nickname for ${friend.displayName} has been updated.` });

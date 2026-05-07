@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { toast } from 'sonner';
 import { friendService } from '@/services/friendService';
 import type { FriendState } from '@/types/store';
+import { checkFieldFormat } from '@/lib/fieldFormat';
 
 const MAX_FRIENDS = 500;
 const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
@@ -77,6 +78,12 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	setNickName: async (friendId: string, nickName: string) => {
+		const nicknameError = checkFieldFormat('nickname', nickName);
+		if (nicknameError) {
+			toast.error(nicknameError);
+			return;
+		}
+
 		try {
 			set({ loading: true });
 			await friendService.setNickName(friendId, nickName);

@@ -8,6 +8,7 @@ import validator from 'validator';
 import { removeSubscription } from '../services/pushNotificationService.js';
 import { createNotification } from '../services/notificationServices.js';
 import { disconnectSessionSockets, disconnectUserSockets } from '../socket/index.js';
+import { checkFieldFormat } from '../utils/fieldFormat.js';
 
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
@@ -71,6 +72,11 @@ export async function signUp(req, res) {
         if (!email || !password || !firstname || !lastname) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
+        const displayName = `${firstname} ${lastname}`.trim();
+        const displayNameError = checkFieldFormat('displayName', displayName);
+        if (displayNameError) {
+            return res.status(400).json({ message: displayNameError });
+        }
         const otpRecord = await Otp.findOne({ email: email, type: 'verification' }).sort({ createdAt: -1 });
         if (!otpRecord || otpRecord.otp !== otp || otpRecord.expiresAt < Date.now()) {
             return res.status(400).json({ message: 'Invalid or expired OTP.' });
@@ -79,7 +85,7 @@ export async function signUp(req, res) {
         const newUser = new User({
             email: email,
             password: hashedPassword,
-            displayName: `${firstname} ${lastname}`
+            displayName
         });
         await newUser.save();
         return res.status(201).json({ message: 'User registered successfully.' });
