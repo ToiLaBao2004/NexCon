@@ -565,7 +565,31 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const items = Array.from(e.clipboardData?.items || []);
 
 		const imageItems = items.filter((item) => item.type.startsWith("image/"));
-		if (imageItems.length === 0) return;
+		if (imageItems.length === 0) {
+			const pastedText = e.clipboardData.getData("text");
+			if (!pastedText) return;
+
+			const textarea = e.currentTarget;
+			const start = textarea.selectionStart ?? value.length;
+			const end = textarea.selectionEnd ?? value.length;
+			const nextValue = `${value.slice(0, start)}${pastedText}${value.slice(end)}`;
+
+			if (nextValue.length <= MAX_TEXT_MESSAGE_LENGTH) return;
+
+			e.preventDefault();
+			const available = MAX_TEXT_MESSAGE_LENGTH - (value.length - (end - start));
+			const insertedText = pastedText.slice(0, Math.max(0, available));
+			const truncatedValue = `${value.slice(0, start)}${insertedText}${value.slice(end)}`;
+			setValue(truncatedValue);
+			textarea.style.height = "auto";
+			textarea.style.height = `${textarea.scrollHeight}px`;
+			requestAnimationFrame(() => {
+				const nextCursor = start + insertedText.length;
+				textarea.setSelectionRange(nextCursor, nextCursor);
+			});
+			toast.warning(`Không thể gửi văn bản quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
+			return;
+		}
 
 		e.preventDefault();
 
@@ -785,6 +809,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}
 
 	const canSend = !sending && (attachments.length > 0 || value.trim().length > 0);
+	const showTextLimit = value.length >= MAX_TEXT_MESSAGE_LENGTH - 100;
 
 	return (
 		<div className="flex flex-col bg-background border-t border-border/50">
@@ -957,7 +982,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/50 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
 							disabled={sending}
 						/>
-
 						{mentionOpen && (
 							<div className="absolute left-0 bottom-full mb-2 z-40 w-60 max-w-full border border-border/60 bg-popover shadow-lg overflow-hidden rounded-sm">
 								{mentionCandidates.length > 0 ? (
@@ -1015,6 +1039,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					</Button>
 				)}
 			</div>
+			{showTextLimit && !isRecording && (
+				<div className="px-3 pb-1 text-right text-[11px] text-muted-foreground">
+					{value.length}/{MAX_TEXT_MESSAGE_LENGTH}
+				</div>
+			)}
 		</div>
 	);
 };
