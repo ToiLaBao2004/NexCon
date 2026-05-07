@@ -16,6 +16,8 @@ const toFriendItem = (friendship, user) => ({
 
 const MAX_FRIENDS = 500;
 const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
+const MAX_PENDING_SENT_REQUESTS = 100;
+const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX_PENDING_SENT_REQUESTS} lời mời kết bạn đang chờ xử lý.`;
 
 async function hasReachedFriendLimit(userId) {
     const count = await Friend.countDocuments({
@@ -27,6 +29,11 @@ async function hasReachedFriendLimit(userId) {
 async function checkFriendLimit(...userIds) {
     const results = await Promise.all(userIds.map(hasReachedFriendLimit));
     return results.some(Boolean);
+}
+
+async function hasReachedPendingRequestLimit(userId) {
+    const count = await FriendRequest.countDocuments({ from: userId, status: 'pending' });
+    return count >= MAX_PENDING_SENT_REQUESTS;
 }
 
 async function emitSentRequestUpdated(senderId, requestId) {
@@ -88,6 +95,9 @@ export async function sendFriendRequest(req, res) {
         });
         if (existingRequest) {
             return res.status(400).json({ message: 'You already sent a friend request to this user.' });
+        }
+        if (await hasReachedPendingRequestLimit(sender._id)) {
+            return res.status(400).json({ message: PENDING_REQUEST_LIMIT_MESSAGE });
         }
         const rejectedRequest = await FriendRequest.findOne({
             from: sender._id,
@@ -291,6 +301,9 @@ export async function resendFriendRequest(req, res) {
         }
         if (friendRequest.status !== 'rejected') {
             return res.status(400).json({ message: 'This friend request is no longer rejected.' });
+        }
+        if (await hasReachedPendingRequestLimit(sender._id)) {
+            return res.status(400).json({ message: PENDING_REQUEST_LIMIT_MESSAGE });
         }
         const receiver = await User.findById(friendRequest.to);
         friendRequest.status = 'pending';
