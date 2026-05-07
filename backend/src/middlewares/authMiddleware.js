@@ -16,7 +16,7 @@ export async function authMiddleware(req, res, next) {
         }
         const session = await Session.findById(payload.sessionId);
         if (!session || session.expiresAt < Date.now()) {
-            return res.status(403).json({ message: 'Session expired or not found.' });
+            return res.status(401).json({ message: 'Session expired or not found.' });
         }
         req.user = user;
         next();

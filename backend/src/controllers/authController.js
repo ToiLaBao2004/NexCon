@@ -403,7 +403,7 @@ export async function refreshToken(req, res) {
         }
         const session = await Session.findOne({ refreshToken: token });
         if (!session || session.expiresAt < Date.now()) {
-            return res.status(403).json({ message: 'Invalid or expired refresh token.' });
+            return res.status(401).json({ message: 'Invalid or expired refresh token.' });
         }
         const accessToken = jwt.sign({ userId: session.userId, sessionId: session._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
         return res.status(200).json({ accessToken: accessToken });
