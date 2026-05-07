@@ -581,10 +581,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			const insertedText = pastedText.slice(0, Math.max(0, available));
 			const truncatedValue = `${value.slice(0, start)}${insertedText}${value.slice(end)}`;
 			setValue(truncatedValue);
-			textarea.style.height = "auto";
-			textarea.style.height = `${textarea.scrollHeight}px`;
 			requestAnimationFrame(() => {
 				const nextCursor = start + insertedText.length;
+				textarea.style.height = "auto";
+				textarea.style.height = `${textarea.scrollHeight}px`;
 				textarea.setSelectionRange(nextCursor, nextCursor);
 			});
 			toast.warning(`Không thể gửi văn bản quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
