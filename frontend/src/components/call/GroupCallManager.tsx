@@ -7,18 +7,33 @@ const GroupCallManager = () => {
   const status = useGroupCallStore((s) => s.status);
   const isMutedCall = useGroupCallStore((s) => s.isMutedCall);
   const conversationId = useGroupCallStore((s) => s.conversationId);
+  const pendingIncomingCall = useGroupCallStore((s) => s.pendingIncomingCall);
   const activeConversationId = useChatStore((s) => s.activeConversationId);
+  const pendingIncomingModal = pendingIncomingCall &&
+    (!pendingIncomingCall.isMutedCall || activeConversationId === pendingIncomingCall.conversationId) ? (
+    <IncomingGroupCallModal pendingCall={pendingIncomingCall} />
+  ) : null;
 
   if (status === "incoming") {
     if (isMutedCall && activeConversationId !== conversationId) {
-      return null;
+      return pendingIncomingModal;
     }
-    return <IncomingGroupCallModal />;
+    return (
+      <>
+        <IncomingGroupCallModal />
+        {pendingIncomingModal}
+      </>
+    );
   }
   if (status === "outgoing" || status === "joining" || status === "active")
-    return <GroupCallScreen />;
+    return (
+      <>
+        <GroupCallScreen />
+        {pendingIncomingModal}
+      </>
+    );
 
-  return null;
+  return pendingIncomingModal;
 };
 
 export default GroupCallManager;

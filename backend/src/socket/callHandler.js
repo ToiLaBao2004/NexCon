@@ -3,12 +3,117 @@ import BlockUser from '../models/blockUserModel.js';
 import Conversation from '../models/conversationModel.js';
 import { AccessToken } from 'livekit-server-sdk';
 import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
+import { hasUserActiveGroupCall } from './groupCallHandler.js';
 
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
 const DIRECT_CALL_RING_TIMEOUT_MS = 30_000;
+const DIRECT_CALL_OFFER_RATE_LIMIT_MS = 1_000;
+const directCallOfferLocks = new Set();
+const lastDirectCallOfferAt = new Map();
 
 const sortPair = (a, b) => (a < b ? [a, b] : [b, a]);
+const getDirectCallKey = (userId1, userId2) => {
+    const [userA, userB] = sortPair(userId1.toString(), userId2.toString());
+    return `${userA}:${userB}`;
+};
+
+function isDirectCallBetween(session, userId1, userId2) {
+    if (!session) return false;
+    const expectedKey = getDirectCallKey(userId1, userId2);
+    if (session.callKey === expectedKey) return true;
+
+    const participantIds = [session.callerId, session.receiverId].map((id) => id?.toString?.() || String(id));
+    return participantIds.includes(userId1.toString())
+        && participantIds.includes(userId2.toString());
+}
+
+function findDirectCallBetween(activeCalls, userId1, userId2) {
+    const callKey = getDirectCallKey(userId1, userId2);
+    return activeCalls.get(callKey)
+        || [...activeCalls.values()].find((session) => isDirectCallBetween(session, userId1, userId2))
+        || null;
+}
+
+function isDirectCallParticipant(session, userId) {
+    if (!session || !userId) return false;
+    const normalizedUserId = userId.toString();
+    return session.callerId === normalizedUserId || session.receiverId === normalizedUserId;
+}
+
+function findDirectCallForParticipants(activeCalls, { userId, otherUserId = null, roomName = null }) {
+    const normalizedRoomName = roomName ? roomName.toString() : null;
+    const normalizedUserId = userId ? userId.toString() : null;
+    const normalizedOtherUserId = otherUserId ? otherUserId.toString() : null;
+
+    if (normalizedRoomName) {
+        const byRoomName = [...activeCalls.values()].find(
+            (session) => session.roomName === normalizedRoomName || session.sessionId === normalizedRoomName
+        ) || null;
+        if (!byRoomName) return null;
+        if (normalizedUserId && !isDirectCallParticipant(byRoomName, normalizedUserId)) return null;
+        if (normalizedOtherUserId && !isDirectCallParticipant(byRoomName, normalizedOtherUserId)) return null;
+        return byRoomName;
+    }
+
+    if (normalizedUserId && normalizedOtherUserId) {
+        return findDirectCallBetween(activeCalls, normalizedUserId, normalizedOtherUserId);
+    }
+
+    if (normalizedUserId) {
+        return [...activeCalls.values()].find(
+            (session) => isDirectCallParticipant(session, normalizedUserId)
+        ) || null;
+    }
+
+    return null;
+}
+
+function findStoredDirectCall(activeCalls, session) {
+    if (!session) return null;
+    return activeCalls.get(session.callKey)
+        || activeCalls.get(getDirectCallKey(session.callerId, session.receiverId))
+        || activeCalls.get(session.callerId)
+        || null;
+}
+
+function setDirectCall(activeCalls, session) {
+    activeCalls.set(session.callKey || getDirectCallKey(session.callerId, session.receiverId), session);
+}
+
+function deleteDirectCall(activeCalls, session) {
+    if (!session) return;
+    activeCalls.delete(session.callKey || getDirectCallKey(session.callerId, session.receiverId));
+    activeCalls.delete(session.callerId);
+}
+
+function hasUserDirectCall(activeCalls, userId) {
+    const normalizedUserId = userId.toString();
+    return [...activeCalls.values()].some(
+        (session) => session.callerId === normalizedUserId || session.receiverId === normalizedUserId
+    );
+}
+
+function reserveDirectCallOffer(userId) {
+    const normalizedUserId = userId.toString();
+    if (directCallOfferLocks.has(normalizedUserId)) {
+        return 'already-in-call';
+    }
+
+    const now = Date.now();
+    const lastOfferAt = lastDirectCallOfferAt.get(normalizedUserId) || 0;
+    if (now - lastOfferAt < DIRECT_CALL_OFFER_RATE_LIMIT_MS) {
+        return 'rate-limited';
+    }
+
+    directCallOfferLocks.add(normalizedUserId);
+    lastDirectCallOfferAt.set(normalizedUserId, now);
+    return null;
+}
+
+function releaseDirectCallOffer(userId) {
+    directCallOfferLocks.delete(userId.toString());
+}
 
 function buildSessionId(prefix = 'dm-call') {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -75,6 +180,7 @@ function buildInitialDirectSession({ conversation, caller, receiverId, callType,
 
     return {
         sessionId,
+        callKey: getDirectCallKey(callerId, receiverId.toString()),
         callerId,
         receiverId: receiverId.toString(),
         conversationId: conversation._id.toString(),
@@ -170,11 +276,6 @@ async function persistFinalizedDirectSession(io, session, overallStatus) {
     });
 }
 
-async function persistMissedDirectCall(io, { conversation, caller, receiverId, callType }) {
-    const session = buildInitialDirectSession({ conversation, caller, receiverId, callType });
-    await persistFinalizedDirectSession(io, session, 'missed');
-}
-
 function buildDirectIncomingPayload(session) {
     return {
         from: {
@@ -192,6 +293,8 @@ function buildDirectRingingPayload(session) {
     return {
         roomName: session.roomName,
         conversationId: session.conversationId,
+        callerId: session.callerId,
+        receiverId: session.receiverId,
     };
 }
 
@@ -237,7 +340,7 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         clearDirectCallRingTimeout(session);
         session.ringTimeout = setTimeout(async () => {
             try {
-                const latestCall = activeCalls.get(session.callerId);
+                const latestCall = findStoredDirectCall(activeCalls, session);
                 if (!latestCall || latestCall.sessionId !== session.sessionId) return;
                 if (latestCall.status !== 'calling') return;
 
@@ -245,12 +348,18 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
                 markParticipant(latestCall, latestCall.receiverId, { status: 'no-answer' });
                 await persistFinalizedDirectSession(io, latestCall, 'missed');
                 const callerTarget = getParticipantSocketTarget(latestCall, latestCall.callerId);
-                activeCalls.delete(latestCall.callerId);
+                deleteDirectCall(activeCalls, latestCall);
 
                 if (callerTarget) {
                     io.to(callerTarget).emit('call-failed', { reason: 'no-answer' });
                 }
-                emitToUserRoom(latestCall.receiverId, 'call-cancelled', { reason: 'no-answer' });
+                emitToUserRoom(latestCall.receiverId, 'call-cancelled', {
+                    reason: 'no-answer',
+                    roomName: latestCall.roomName,
+                    conversationId: latestCall.conversationId,
+                    callerId: latestCall.callerId,
+                    receiverId: latestCall.receiverId,
+                });
 
                 console.log(`Call no-answer between ${latestCall.callerId} and ${latestCall.receiverId}`);
             } catch (error) {
@@ -259,22 +368,15 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         }, DIRECT_CALL_RING_TIMEOUT_MS);
     }
 
-    async function finalizeAndNotifyCall({ toUserId, cancelled = false }) {
+    async function finalizeAndNotifyCall({ toUserId, roomName = null, cancelled = false }) {
         const myId = user._id.toString();
         const otherIdFromPayload = toUserId ? toUserId.toString() : null;
 
-        let activeCall = null;
-        if (otherIdFromPayload) {
-            activeCall = activeCalls.get(myId) || activeCalls.get(otherIdFromPayload);
-        } else {
-            activeCall = activeCalls.get(myId);
-        }
-
-        if (!activeCall) {
-            activeCall = [...activeCalls.values()].find(
-                (call) => call.callerId === myId || call.receiverId === myId
-            ) || null;
-        }
+        const activeCall = findDirectCallForParticipants(activeCalls, {
+            userId: myId,
+            otherUserId: otherIdFromPayload,
+            roomName,
+        });
 
         const resolvedOtherId = activeCall
             ? (activeCall.callerId === myId ? activeCall.receiverId : activeCall.callerId)
@@ -294,7 +396,7 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
 
             const overallStatus = activeCall.status === 'in-call' ? 'ended' : 'canceled';
             await persistFinalizedDirectSession(io, activeCall, overallStatus);
-            activeCalls.delete(activeCall.callerId);
+            deleteDirectCall(activeCalls, activeCall);
             if (rejectedByReceiver) {
                 notifyEvent = 'call-rejected';
             } else if (overallStatus !== 'ended') {
@@ -305,6 +407,14 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         const payload = {
             by: { _id: user._id, displayName: user.displayName }
         };
+        if (activeCall) {
+            Object.assign(payload, {
+                roomName: activeCall.roomName,
+                conversationId: activeCall.conversationId,
+                callerId: activeCall.callerId,
+                receiverId: activeCall.receiverId,
+            });
+        }
 
         // Emit tới tất cả thiết bị của cả 2 bên
         if (resolvedOtherId) emitToUserRoom(resolvedOtherId, notifyEvent, payload);
@@ -313,9 +423,47 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         console.log(`Call ${notifyEvent} between ${myId} and ${resolvedOtherId || 'unknown'}`);
     }
 
+    async function rejectOtherRingingCallsForReceiver(acceptedCall) {
+        const receiverId = acceptedCall.receiverId;
+        const sessionsToReject = [...activeCalls.values()].filter(
+            (session) =>
+                session.sessionId !== acceptedCall.sessionId &&
+                session.receiverId === receiverId &&
+                session.status === 'calling'
+        );
+
+        for (const session of sessionsToReject) {
+            clearDirectCallRingTimeout(session);
+            markParticipant(session, receiverId, { status: 'declined' });
+            deleteDirectCall(activeCalls, session);
+
+            const payload = {
+                by: { _id: user._id, displayName: user.displayName },
+                roomName: session.roomName,
+                conversationId: session.conversationId,
+                callerId: session.callerId,
+                receiverId: session.receiverId,
+            };
+
+            emitToUserRoom(session.callerId, 'call-rejected', payload);
+            emitToUserRoom(receiverId, 'call-rejected', payload);
+
+            try {
+                await persistFinalizedDirectSession(io, session, 'canceled');
+            } catch (error) {
+                console.error('Error rejecting parallel incoming call:', error);
+            }
+        }
+    }
+
     socket.on('call-offer', async ({ toUserId, callType }) => {
         const callerId = user._id.toString();
         const receiverId = toUserId.toString();
+        const reservationError = reserveDirectCallOffer(callerId);
+        if (reservationError) {
+            socket.emit('call-failed', { reason: reservationError });
+            return;
+        }
 
         try {
             if (callerId === receiverId) {
@@ -338,22 +486,16 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
                 return;
             }
 
-            const conversation = await findOrCreateDirectConversation(callerId, receiverId);
-
-            const isReceiverBusy = [...activeCalls.values()].some(
-                (call) => call.receiverId === receiverId || call.callerId === receiverId
-            );
-            if (isReceiverBusy) {
-                await persistMissedDirectCall(io, { conversation, caller: user, receiverId, callType });
-                socket.emit('call-failed', { reason: 'busy' });
+            if (hasUserDirectCall(activeCalls, callerId) || hasUserActiveGroupCall(callerId)) {
+                socket.emit('call-failed', { reason: 'already-in-call' });
                 return;
             }
 
-            const isCallerBusy = [...activeCalls.values()].some(
-                (call) => call.callerId === callerId || call.receiverId === callerId
-            );
-            if (isCallerBusy) {
-                socket.emit('call-failed', { reason: 'already-in-call' });
+            const conversation = await findOrCreateDirectConversation(callerId, receiverId);
+
+            const existingDirectCall = findDirectCallBetween(activeCalls, callerId, receiverId);
+            if (existingDirectCall) {
+                socket.emit('call-failed', { reason: 'already-active' });
                 return;
             }
 
@@ -364,7 +506,7 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
                 callType,
                 callerSocketId: socket.id,
             });
-            activeCalls.set(callerId, session);
+            setDirectCall(activeCalls, session);
             scheduleDirectCallTimeout(session);
 
             // Gửi incoming-call tới TẤT CẢ thiết bị của receiver
@@ -383,15 +525,21 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         } catch (error) {
             console.error('Error in call-offer:', error);
             socket.emit('call-failed', { reason: 'server-error' });
+        } finally {
+            releaseDirectCallOffer(callerId);
         }
     });
 
-    socket.on('accept-call', ({ toUserId }) => {
+    socket.on('accept-call', async ({ toUserId, roomName }) => {
         const callerId = toUserId?.toString();
         const receiverId = user._id.toString();
         if (!callerId) return;
 
-        const activeCall = activeCalls.get(callerId);
+        const activeCall = findDirectCallForParticipants(activeCalls, {
+            userId: receiverId,
+            otherUserId: callerId,
+            roomName,
+        });
         if (!activeCall) return;
         if (activeCall.receiverId !== receiverId) {
             socket.emit('call-failed', { reason: 'not-call-receiver' });
@@ -402,6 +550,9 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         if (activeCall.status !== 'calling') {
             socket.emit('call-answered-on-other-device', {
                 conversationId: activeCall.conversationId,
+                roomName: activeCall.roomName,
+                callerId: activeCall.callerId,
+                receiverId: activeCall.receiverId,
             });
             return;
         }
@@ -410,29 +561,40 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         activeCall.status = 'connecting';
         activeCall.receiverSocketId = socket.id;
         markParticipant(activeCall, receiverId, { status: 'accepted', joinedAt: null });
+        await rejectOtherRingingCallsForReceiver(activeCall);
 
         const callerTarget = getParticipantSocketTarget(activeCall, callerId);
         if (callerTarget) {
             io.to(callerTarget).emit('accept-call', {
                 by: { _id: user._id, displayName: user.displayName },
                 roomName: activeCall.roomName,
+                conversationId: activeCall.conversationId,
+                callerId: activeCall.callerId,
+                receiverId: activeCall.receiverId,
             });
         }
 
         // Dismiss tất cả thiết bị khác của receiver
         socket.to(`user:${receiverId}`).emit('call-answered-on-other-device', {
             conversationId: activeCall.conversationId,
+            roomName: activeCall.roomName,
+            callerId: activeCall.callerId,
+            receiverId: activeCall.receiverId,
         });
     });
 
-    socket.on('call-answer', async ({ toUserId }) => {
+    socket.on('call-answer', async ({ toUserId, roomName }) => {
         const callerId = toUserId?.toString();
         const receiverId = user._id.toString();
 
         try {
             if (!callerId) return;
 
-            const activeCall = activeCalls.get(callerId);
+            const activeCall = findDirectCallForParticipants(activeCalls, {
+                userId: receiverId,
+                otherUserId: callerId,
+                roomName,
+            });
             if (!activeCall) return;
             if (activeCall.receiverId !== receiverId) {
                 socket.emit('call-failed', { reason: 'not-call-receiver' });
@@ -446,6 +608,7 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
             clearDirectCallRingTimeout(activeCall);
             activeCall.status = 'connecting';
             markParticipant(activeCall, receiverId, { status: 'accepted' });
+            await rejectOtherRingingCallsForReceiver(activeCall);
 
             const [callerToken, receiverToken] = await Promise.all([
                 generateLiveKitToken(
@@ -468,7 +631,7 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
                 )
             ]);
 
-            const latestCall = activeCalls.get(callerId);
+            const latestCall = findStoredDirectCall(activeCalls, activeCall);
             if (!latestCall || latestCall.sessionId !== activeCall.sessionId || latestCall.receiverId !== receiverId) return;
 
             latestCall.status = 'connecting';
@@ -494,12 +657,12 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
             console.error('Error in call-answer:', error);
             if (callerId) {
                 try {
-                    await finalizeAndNotifyCall({ toUserId: callerId, cancelled: true });
+                    await finalizeAndNotifyCall({ toUserId: callerId, roomName, cancelled: true });
                 } catch (finalizeError) {
                     console.error('Error cleaning up failed call-answer:', finalizeError);
                 }
                 socket.emit('call-failed', { reason: 'server-error' });
-                const activeCall = activeCalls.get(callerId);
+                const activeCall = findDirectCallBetween(activeCalls, callerId, receiverId);
                 const callerTarget = activeCall
                     ? getParticipantSocketTarget(activeCall, callerId)
                     : getReceiverSocketId(callerId);
@@ -510,12 +673,16 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         }
     });
 
-    socket.on('call-connected', ({ toUserId }) => {
+    socket.on('call-connected', ({ toUserId, roomName }) => {
         const myId = user._id.toString();
         const otherId = toUserId?.toString();
         if (!otherId) return;
 
-        const activeCall = activeCalls.get(myId) || activeCalls.get(otherId);
+        const activeCall = findDirectCallForParticipants(activeCalls, {
+            userId: myId,
+            otherUserId: otherId,
+            roomName,
+        });
         if (!activeCall) return;
 
         const isParticipant = activeCall.callerId === myId || activeCall.receiverId === myId;
@@ -532,20 +699,31 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         }
     });
 
-    socket.on('call-rejected', async ({ toUserId }) => {
-        const callerId = toUserId.toString();
+    socket.on('call-rejected', async ({ toUserId, roomName }) => {
+        const callerId = toUserId?.toString();
         const rejecterId = user._id.toString();
+        if (!callerId) return;
 
         try {
-            const activeCall = activeCalls.get(callerId);
+            const activeCall = findDirectCallForParticipants(activeCalls, {
+                userId: rejecterId,
+                otherUserId: callerId,
+                roomName,
+            });
             if (activeCall) {
                 clearDirectCallRingTimeout(activeCall);
                 markParticipant(activeCall, rejecterId, { status: 'declined' });
                 await persistFinalizedDirectSession(io, activeCall, 'canceled');
-                activeCalls.delete(callerId);
+                deleteDirectCall(activeCalls, activeCall);
             }
 
-            const payload = { by: { _id: user._id, displayName: user.displayName } };
+            const payload = {
+                by: { _id: user._id, displayName: user.displayName },
+                roomName: activeCall?.roomName,
+                conversationId: activeCall?.conversationId,
+                callerId,
+                receiverId: rejecterId,
+            };
 
             // Notify tất cả thiết bị của cả 2 bên để dismiss UI
             emitToUserRoom(callerId, 'call-rejected', payload);
@@ -558,25 +736,25 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         }
     });
 
-    socket.on('call-ended', async ({ toUserId }) => {
+    socket.on('call-ended', async ({ toUserId, roomName }) => {
         try {
-            await finalizeAndNotifyCall({ toUserId, cancelled: false });
+            await finalizeAndNotifyCall({ toUserId, roomName, cancelled: false });
         } catch (error) {
             console.error('Error in call-ended:', error);
         }
     });
 
-    socket.on('leave-call', async ({ toUserId }) => {
+    socket.on('leave-call', async ({ toUserId, roomName }) => {
         try {
-            await finalizeAndNotifyCall({ toUserId, cancelled: false });
+            await finalizeAndNotifyCall({ toUserId, roomName, cancelled: false });
         } catch (error) {
             console.error('Error in leave-call:', error);
         }
     });
 
-    socket.on('call-cancelled', async ({ toUserId }) => {
+    socket.on('call-cancelled', async ({ toUserId, roomName }) => {
         try {
-            await finalizeAndNotifyCall({ toUserId, cancelled: true });
+            await finalizeAndNotifyCall({ toUserId, roomName, cancelled: true });
         } catch (error) {
             console.error('Error in call-cancelled:', error);
         }
@@ -585,7 +763,7 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
     socket.on('call-video-toggle', ({ toUserId, isVideoOff }) => {
         const myId = user._id.toString();
         const otherId = toUserId.toString();
-        const activeCall = activeCalls.get(myId) || activeCalls.get(otherId);
+        const activeCall = findDirectCallBetween(activeCalls, myId, otherId);
         const otherTarget = activeCall
             ? getParticipantSocketTarget(activeCall, otherId)
             : getReceiverSocketId(otherId);
@@ -620,43 +798,56 @@ function clearDirectCallRingTimeout(session) {
 }
 
 export async function handleCallDisconnect(userId, socketId, activeCalls, io, getReceiverSocketId) {
-    let foundSession = null;
+    const normalizedUserId = userId.toString();
+    const sessionsToEnd = [];
+    const seenSessionIds = new Set();
     for (const session of activeCalls.values()) {
         const isCallSocket = session.callerSocketId === socketId || session.receiverSocketId === socketId;
         const isLegacyParticipant = !session.callerSocketId
             && !session.receiverSocketId
-            && (session.callerId === userId || session.receiverId === userId);
+            && (session.callerId === normalizedUserId || session.receiverId === normalizedUserId);
 
         if (isCallSocket || isLegacyParticipant) {
-            foundSession = session;
-            break;
+            const sessionKey = session.sessionId || session.callKey || `${session.callerId}:${session.receiverId}`;
+            if (!seenSessionIds.has(sessionKey)) {
+                seenSessionIds.add(sessionKey);
+                sessionsToEnd.push(session);
+            }
         }
     }
 
-    if (!foundSession) return;
+    if (sessionsToEnd.length === 0) return;
 
-    const otherId = foundSession.callerId === userId
-        ? foundSession.receiverId
-        : foundSession.callerId;
+    for (const foundSession of sessionsToEnd) {
+        const otherId = foundSession.callerId === normalizedUserId
+            ? foundSession.receiverId
+            : foundSession.callerId;
 
-    const disconnectedParticipant = foundSession.participants.find(
-        (p) => p.userId._id.toString() === userId.toString()
-    );
-    if (disconnectedParticipant && disconnectedParticipant.status === 'accepted') {
-        disconnectedParticipant.status = 'left';
-        disconnectedParticipant.leftAt = toIsoOrNull(new Date());
+        const disconnectedParticipant = foundSession.participants.find(
+            (p) => p.userId._id.toString() === normalizedUserId
+        );
+        if (disconnectedParticipant && disconnectedParticipant.status === 'accepted') {
+            disconnectedParticipant.status = 'left';
+            disconnectedParticipant.leftAt = toIsoOrNull(new Date());
+        }
+
+        const overallStatus = foundSession.status === 'in-call' ? 'ended' : 'missed';
+        clearDirectCallRingTimeout(foundSession);
+        await persistFinalizedDirectSession(io, foundSession, overallStatus);
+
+        // Notify all devices of the remaining participant.
+        const otherTarget = getReceiverSocketId(otherId);
+        if (otherTarget) {
+            io.to(otherTarget).emit('call-ended', {
+                by: { _id: normalizedUserId },
+                roomName: foundSession.roomName,
+                conversationId: foundSession.conversationId,
+                callerId: foundSession.callerId,
+                receiverId: foundSession.receiverId,
+            });
+        }
+
+        deleteDirectCall(activeCalls, foundSession);
     }
-
-    const overallStatus = foundSession.status === 'in-call' ? 'ended' : 'missed';
-    clearDirectCallRingTimeout(foundSession);
-    await persistFinalizedDirectSession(io, foundSession, overallStatus);
-
-    // Notify tất cả thiết bị của bên còn lại
-    const otherTarget = getReceiverSocketId(otherId);
-    if (otherTarget) {
-        io.to(otherTarget).emit('call-ended');
-    }
-
-    activeCalls.delete(foundSession.callerId);
-    console.log(`Call auto-ended: ${userId} disconnected`);
+    console.log(`Direct calls auto-ended: ${normalizedUserId} disconnected`);
 }

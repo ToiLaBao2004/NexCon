@@ -13,9 +13,12 @@ import {
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
+const GROUP_CALL_START_RATE_LIMIT_MS = 1_000;
 
 // conversationId -> GroupCallInfo
 const activeGroupCalls = new Map();
+const groupCallStartLocks = new Set();
+const lastGroupCallStartAt = new Map();
 
 function buildSessionId(prefix = 'group-call') {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -60,6 +63,53 @@ function countJoined(groupCall) {
         if (participant.status === 'joined') n++;
     }
     return n;
+}
+
+function normalizeUserId(value) {
+    return value?.toString?.() || String(value);
+}
+
+function hasUserDirectCall(activeCalls, userId) {
+    const normalizedUserId = normalizeUserId(userId);
+    for (const session of activeCalls?.values?.() || []) {
+        if (session.callerId === normalizedUserId || session.receiverId === normalizedUserId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function reserveGroupCallStart(userId) {
+    const normalizedUserId = normalizeUserId(userId);
+    if (groupCallStartLocks.has(normalizedUserId)) {
+        return 'already-in-call';
+    }
+
+    const now = Date.now();
+    const lastStartedAt = lastGroupCallStartAt.get(normalizedUserId) || 0;
+    if (now - lastStartedAt < GROUP_CALL_START_RATE_LIMIT_MS) {
+        return 'rate-limited';
+    }
+
+    groupCallStartLocks.add(normalizedUserId);
+    lastGroupCallStartAt.set(normalizedUserId, now);
+    return null;
+}
+
+function releaseGroupCallStart(userId) {
+    groupCallStartLocks.delete(normalizeUserId(userId));
+}
+
+function hasUserActiveGroupCall(userId) {
+    const normalizedUserId = normalizeUserId(userId);
+    for (const groupCall of activeGroupCalls.values()) {
+        const participant = groupCall.participants?.get(normalizedUserId);
+        if (!participant) continue;
+        if (participant.status === 'joined') {
+            return true;
+        }
+    }
+    return false;
 }
 
 function toFinalParticipantStatus(participant, endedAtIso) {
@@ -150,11 +200,16 @@ async function checkAutoEnd(conversationId, io) {
     }
 }
 
-function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
+function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, activeCalls = new Map()) {
     const userId = user._id.toString();
 
     // START
     socket.on('group-call:start', async ({ conversationId, callType }) => {
+        const reservationError = reserveGroupCallStart(userId);
+        if (reservationError) {
+            return socket.emit('group-call:error', { reason: reservationError });
+        }
+
         try {
             // Validate conversation
             const conversation = await Conversation.findById(conversationId)
@@ -177,7 +232,10 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                 return socket.emit('group-call:error', { reason: 'already-active' });
             }
 
-            const startedAt = new Date();
+            if (hasUserDirectCall(activeCalls, userId) || hasUserActiveGroupCall(userId)) {
+                return socket.emit('group-call:error', { reason: 'already-in-call' });
+            }
+
             const callId = buildSessionId('group-call');
 
             // Build in-memory participants map
@@ -189,7 +247,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                     displayName: participant.userId.displayName,
                     avatarUrl: participant.userId.avatarUrl || null,
                     status: pid === userId ? 'joined' : 'ringing',
-                    joinedAt: pid === userId ? startedAt.toISOString() : null,
+                    joinedAt: pid === userId ? new Date().toISOString() : null,
                     leftAt: null,
                 });
             }
@@ -229,7 +287,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                 initiatorId: userId,
                 initiator: initiatorInfo,
                 callType,
-                startedAt,
+                startedAt: null,
                 participants: participantsMap,
                 participantSockets: new Map([[userId, socket.id]]),
                 ringTimeout,
@@ -270,6 +328,8 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
         } catch (error) {
             console.error('[GroupCall] start error:', error);
             socket.emit('group-call:error', { reason: 'server-error' });
+        } finally {
+            releaseGroupCallStart(userId);
         }
     });
 
@@ -311,6 +371,10 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                 : new Date().toISOString();
             participant.leftAt = null;
             groupCall.participantSockets.set(userId, socket.id);
+
+            if (!groupCall.startedAt && userId !== groupCall.initiatorId) {
+                groupCall.startedAt = new Date();
+            }
 
             let token;
             try {
@@ -672,4 +736,4 @@ async function handleGroupCallDisconnect(userId, socketId, io) {
     }
 }
 
-export { registerGroupCallHandlers, handleGroupCallDisconnect };
+export { registerGroupCallHandlers, handleGroupCallDisconnect, hasUserActiveGroupCall };

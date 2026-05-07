@@ -41,6 +41,8 @@ const buildHttpError = (statusCode, message) => {
 };
 
 const MAX_SNOOZE_COUNT = 20;
+const MAX_PENDING_REMINDERS_PER_CONVERSATION = 3;
+const MAX_PENDING_REMINDERS_PER_CREATOR = 10;
 const EDITABLE_REMINDER_STATUSES = ['pending', 'snoozed'];
 const REMIND_AT_MIN_LEAD_TIME_MS = 10 * 1000;
 
@@ -48,6 +50,51 @@ const REMINDER_SORT_OPTIONS = {
     remindat_asc: { field: 'remindAt', direction: 1 },
     remindat_desc: { field: 'remindAt', direction: -1 },
     createdat_desc: { field: 'createdAt', direction: -1 },
+};
+
+const toObjectId = (value) => {
+    if (value instanceof mongoose.Types.ObjectId) return value;
+    return new mongoose.Types.ObjectId(String(value));
+};
+
+const countUniquePendingReminders = async (match, session = null) => {
+    const query = Reminder.aggregate([
+        { $match: match },
+        { $group: { _id: { $ifNull: ['$sharedKey', '$_id'] } } },
+        { $count: 'count' },
+    ]);
+
+    if (session) query.session(session);
+
+    const [result] = await query;
+    return result?.count || 0;
+};
+
+const ensureCreatorPendingReminderLimit = async (userId, session = null) => {
+    const ownerId = toObjectId(userId);
+    const count = await countUniquePendingReminders({
+        status: 'pending',
+        $or: [
+            { createdBy: ownerId },
+            { scope: 'personal', userId: ownerId, createdBy: { $exists: false } },
+        ],
+    }, session);
+
+    if (count >= MAX_PENDING_REMINDERS_PER_CREATOR) {
+        throw buildHttpError(400, `Bạn chỉ có thể tạo tối đa ${MAX_PENDING_REMINDERS_PER_CREATOR} nhắc hẹn đang hoạt động!`);
+    }
+};
+
+const ensureConversationPendingReminderLimit = async (conversationId, session = null) => {
+    const count = await countUniquePendingReminders({
+        conversationId: toObjectId(conversationId),
+        scope: 'shared',
+        status: 'pending',
+    }, session);
+
+    if (count >= MAX_PENDING_REMINDERS_PER_CONVERSATION) {
+        throw buildHttpError(400, `Mỗi đoạn hội thoại chỉ có thể có tối đa ${MAX_PENDING_REMINDERS_PER_CONVERSATION} nhắc hẹn đang hoạt động.`);
+    }
 };
 
 const emitSharedReminderEventToParticipants = async (sharedKey, eventName) => {
@@ -160,8 +207,11 @@ export async function createReminder(req, res) {
             return res.status(400).json({ message: sourceError });
         }
 
+        await ensureCreatorPendingReminderLimit(userId);
+
         const payload = {
             userId,
+            createdBy: userId,
             content: normalizedContent,
             remindAt: remindAtDate,
         };
@@ -190,6 +240,9 @@ export async function createReminder(req, res) {
 
         return res.status(201).json({ reminder: normalizedReminder });
     } catch (error) {
+        if (error?.statusCode) {
+            return res.status(error.statusCode).json({ message: error.message });
+        }
         console.error('Create reminder error:', error);
         return res.status(500).json({ message: 'Internal server error.' });
     }
@@ -278,6 +331,9 @@ export async function createSharedReminderFromMessage(req, res) {
             if (!messageDoc || toObjectIdString(messageDoc.conversationId) !== toObjectIdString(conversation._id)) {
                 throw buildHttpError(400, 'Tin nhắn nguồn không thuộc cuộc trò chuyện.');
             }
+
+            await ensureCreatorPendingReminderLimit(userId, session);
+            await ensureConversationPendingReminderLimit(conversation._id, session);
 
             const sharedKey = crypto.randomBytes(24).toString('hex');
             const payload = participantIds.map((participantId) => ({
@@ -441,18 +497,7 @@ export async function scheduleMeeting(req, res) {
             return res.status(500).json({ message: 'Không thể tạo mã phòng họp, vui lòng thử lại.' });
         }
 
-        // 2. Create the meeting record (always active upon creation)
-        const meeting = await Meeting.create({
-            roomName,
-            hostId: userId,
-            conversationId,
-            requireApproval: true,
-            status: 'active',
-            scheduledAt: remindAtDate,
-            participants: [],
-        });
-
-        // 3. Build shared reminder for all participants
+        // 2. Build shared reminder for all participants
         const conversation = await Conversation.findById(conversationId);
         if (!conversation) {
             return res.status(404).json({ message: 'Cuộc trò chuyện không tồn tại.' });
@@ -471,6 +516,20 @@ export async function scheduleMeeting(req, res) {
         if (!participantIds.includes(userIdStr)) {
             return res.status(403).json({ message: 'Bạn không thuộc cuộc trò chuyện này.' });
         }
+
+        await ensureCreatorPendingReminderLimit(userId);
+        await ensureConversationPendingReminderLimit(conversation._id);
+
+        // 3. Create the meeting record (always active upon creation)
+        const meeting = await Meeting.create({
+            roomName,
+            hostId: userId,
+            conversationId,
+            requireApproval: true,
+            status: 'active',
+            scheduledAt: remindAtDate,
+            participants: [],
+        });
 
         const sharedKey = crypto.randomBytes(24).toString('hex');
         const reminderPayload = participantIds.map((participantId) => ({
@@ -551,6 +610,9 @@ export async function scheduleMeeting(req, res) {
             participantCount: participantIds.length,
         });
     } catch (error) {
+        if (error?.statusCode) {
+            return res.status(error.statusCode).json({ message: error.message });
+        }
         console.error('Schedule meeting error:', error);
         return res.status(500).json({ message: 'Không thể lên lịch cuộc họp.' });
     }
