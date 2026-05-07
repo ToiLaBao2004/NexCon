@@ -587,7 +587,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				textarea.style.height = `${textarea.scrollHeight}px`;
 				textarea.setSelectionRange(nextCursor, nextCursor);
 			});
-			toast.warning(`Không thể gửi văn bản quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
+			toast.warning(`Tin nhắn quá dài, đã thu gọn xuống còn ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
 			return;
 		}
 
