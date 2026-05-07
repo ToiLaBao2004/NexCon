@@ -841,10 +841,24 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useCallStore.getState().handleCallRinging();
     });
 
-    socket.on("call-answered-on-other-device", () => {
+    socket.on("call-answered-on-other-device", (payload) => {
       const callState = useCallStore.getState();
+      if (callState.pendingIncomingCall && payload?.roomName === callState.pendingIncomingCall.roomName) {
+        const [nextPending, ...remainingQueue] = callState.pendingIncomingQueue;
+        useCallStore.setState({
+          pendingIncomingCall: nextPending ?? null,
+          pendingIncomingQueue: remainingQueue,
+        });
+        return;
+      }
+      if (payload?.roomName && callState.pendingIncomingQueue.some((pending) => pending.roomName === payload.roomName)) {
+        useCallStore.setState({
+          pendingIncomingQueue: callState.pendingIncomingQueue.filter((pending) => pending.roomName !== payload.roomName),
+        });
+        return;
+      }
       if (callState.status === "incoming") {
-        callState.handleCallEnded();
+        callState.handleCallEnded(payload);
       }
     });
 
@@ -856,8 +870,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useCallStore.getState().handleCallAccepted({ token, roomName });
     });
 
-    socket.on("call-rejected", () => {
-      useCallStore.getState().handleCallRejected();
+    socket.on("call-rejected", (payload) => {
+      useCallStore.getState().handleCallRejected(payload);
       refreshConversations();
     });
 
@@ -872,12 +886,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         });
       }
 
-      useCallStore.getState().handleCallEnded();
+      useCallStore.getState().handleCallEnded(payload);
       refreshConversations();
     });
 
-    socket.on("call-cancelled", () => {
-      useCallStore.getState().handleCallEnded();
+    socket.on("call-cancelled", (payload) => {
+      useCallStore.getState().handleCallEnded(payload);
       refreshConversations();
     });
 
@@ -938,6 +952,15 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         return;
       }
 
+      if (
+        joinedUserId &&
+        joinedUserId === currentUserId &&
+        groupCallState.pendingIncomingCall?.conversationId === payload.conversationId
+      ) {
+        groupCallState.handleGroupCallAnsweredOnOtherDevice(payload);
+        return;
+      }
+
       groupCallState.handleGroupCallUserJoined(payload);
 
       if (useGroupCallStore.getState().status !== "active") return;
@@ -974,6 +997,17 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         ) &&
         groupCallState.conversationId === payload.conversationId &&
         groupCallState.status === "incoming"
+      ) {
+        groupCallState.handleGroupCallDeclinedOnOtherDevice(payload);
+        return;
+      }
+
+      if (
+        (
+          declinedUserId === currentUserId ||
+          (!declinedUserId && (myParticipantStatus === "declined" || myParticipantStatus === "no-answer"))
+        ) &&
+        groupCallState.pendingIncomingCall?.conversationId === payload.conversationId
       ) {
         groupCallState.handleGroupCallDeclinedOnOtherDevice(payload);
         return;

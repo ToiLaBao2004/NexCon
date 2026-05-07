@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMeetStore } from '@/stores/useMeetStore';
-import { useGroupCallStore } from '@/stores/useGroupCallStore';
 import PreviewScreen from '@/components/call/PreviewScreen';
 import WaitingScreen from '@/components/call/WaitingScreen';
 import ReminderFormModal from '@/components/reminder/ReminderFormModal';
 import type { CreateReminderPayload } from '@/types/reminder';
 import { buildMeetingUrl, extractMeetingCode } from '@/utils/meetingLink';
 import { toast } from 'sonner';
+import { meetingService } from '@/services/meetingService';
 
 type Mode = 'select' | 'create' | 'join';
 
@@ -86,10 +86,6 @@ const MeetPage = () => {
             const code = parseMeetingInput(codeParam);
             if (code) {
                 const executeAutoJoin = async () => {
-                    if (useGroupCallStore.getState().status !== 'idle') {
-                        setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tham gia cuộc họp.');
-                        return;
-                    }
                     setLoading(true);
                     setError('');
                     try {
@@ -161,15 +157,12 @@ const MeetPage = () => {
 
 
     const handleStart = async () => {
-        if (useGroupCallStore.getState().status !== 'idle') {
-            setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tạo cuộc họp.');
-            return;
-        }
-
         setLoading(true);
         setError('');
         try {
-            const meeting = await createMeeting({ requireApproval: true });
+            const meeting = isInMeeting
+                ? (await meetingService.create({ requireApproval: true })).meeting
+                : await createMeeting({ requireApproval: true });
             setCreatedRoomName(meeting.roomName);
         } catch (err) {
             setError(getApiErrorMessage(err, 'Không thể tạo cuộc họp'));
@@ -180,12 +173,12 @@ const MeetPage = () => {
 
     const handleJoin = async () => {
         if (!joinCode.trim()) return;
-        if (useGroupCallStore.getState().status !== 'idle') {
-            setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tham gia cuộc họp.');
-            return;
-        }
         const code = parseMeetingInput(joinCode);
         if (!code) return;
+        if (isInMeeting) {
+            window.open(buildMeetingUrl(code), '_blank', 'noopener,noreferrer');
+            return;
+        }
         setLoading(true);
         setError('');
         try {
@@ -217,11 +210,6 @@ const MeetPage = () => {
 
     const handleRequestJoin = async ({ cameraEnabled, micEnabled }: { cameraEnabled: boolean; micEnabled: boolean }) => {
         if (!previewData) return;
-        if (useGroupCallStore.getState().status !== 'idle') {
-            setError('Bạn đang trong cuộc gọi nhóm. Hãy kết thúc trước khi tham gia cuộc họp.');
-            return;
-        }
-
         setJoinPreferences({
             cameraEnabled,
             micEnabled,
@@ -285,6 +273,105 @@ const MeetPage = () => {
                             >
                                 Quay lại cuộc họp
                             </button>
+
+                            {mode === 'select' && (
+                                <>
+                                    <button
+                                        onClick={handleOpenCreate}
+                                        className="h-11 rounded-xl border border-border bg-background px-6 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                                    >
+                                        Tạo cuộc họp mới
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setCreatedRoomName('');
+                                            setPreviewData(null);
+                                            setError('');
+                                            setMode('join');
+                                        }}
+                                        className="h-11 rounded-xl border border-border bg-background px-6 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+                                    >
+                                        Tham gia bằng liên kết
+                                    </button>
+                                </>
+                            )}
+
+                            {mode === 'create' && (
+                                <div className="rounded-xl border border-border bg-muted/40 p-3 text-left">
+                                    <p className="text-sm font-medium text-foreground">Cuộc họp mới</p>
+                                    {createdRoomName ? (
+                                        <>
+                                            <p className="mt-2 truncate rounded-lg bg-background px-3 py-2 font-mono text-xs text-muted-foreground">
+                                                {meetingLink}
+                                            </p>
+                                            <div className="mt-3 flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(meetingLink);
+                                                        toast.success('Đã sao chép link');
+                                                    }}
+                                                    className="h-9 flex-1 rounded-lg bg-primary text-sm font-semibold text-white"
+                                                >
+                                                    Sao chép link
+                                                </button>
+                                                <button
+                                                    onClick={() => window.open(meetingLink, '_blank', 'noopener,noreferrer')}
+                                                    className="h-9 flex-1 rounded-lg border border-border bg-background text-sm font-semibold text-foreground"
+                                                >
+                                                    Mở tab mới
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            {loading || isLoadingMeeting ? 'Đang tạo...' : 'Chưa tạo được phòng.'}
+                                        </p>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            setMode('select');
+                                            setError('');
+                                        }}
+                                        className="mt-3 text-sm font-medium text-primary"
+                                    >
+                                        Quay lại
+                                    </button>
+                                </div>
+                            )}
+
+                            {mode === 'join' && (
+                                <div className="rounded-xl border border-border bg-muted/40 p-3 text-left">
+                                    <label className="text-sm font-medium text-foreground">Liên kết cuộc họp</label>
+                                    <input
+                                        type="text"
+                                        value={joinCode}
+                                        onChange={e => setJoinCode(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleJoin()}
+                                        placeholder="Dán đường dẫn hoặc mã phòng"
+                                        className="mt-2 h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/40"
+                                    />
+                                    <button
+                                        disabled={!joinCode.trim()}
+                                        onClick={handleJoin}
+                                        className="mt-3 h-9 w-full rounded-lg bg-primary text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        Mở trong tab mới
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setMode('select');
+                                            setError('');
+                                        }}
+                                        className="mt-3 text-sm font-medium text-primary"
+                                    >
+                                        Quay lại
+                                    </button>
+                                </div>
+                            )}
+
+                            {error && (
+                                <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+                            )}
                         </div>
                     </div>
                 </div>

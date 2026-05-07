@@ -86,7 +86,11 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
         : otherUser?.userId?.displayName) || "Moji"
       : chat.group?.name;
 
-  const canCall = chat.type === "direct" && otherUser && callStatus === "idle";
+  const canCall =
+    chat.type === "direct" &&
+    otherUser &&
+    callStatus === "idle" &&
+    groupCallStatus === "idle";
 
   const handleVoiceCall = () => {
     if (!canCall || !otherUser) return;
@@ -234,7 +238,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                   variant="ghost"
                   size="icon"
                   className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
-                  disabled={groupCallStatus !== "idle" || chat.disbanded === true}
+                  disabled={groupCallStatus !== "idle" || callStatus !== "idle" || chat.disbanded === true}
                   title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi nhóm"}
                   onClick={() => startGroupCall(chat._id, "video")}
                 >

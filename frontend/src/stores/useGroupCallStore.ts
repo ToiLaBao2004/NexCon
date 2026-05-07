@@ -1,10 +1,9 @@
 import { create } from "zustand";
 import { useSocketStore } from "./useSocketStore";
-import { useCallStore } from "./useCallStore";
 import { useChatStore } from "./useChatStore";
 import { playRingtone, stopRingtone } from "@/utils/sound";
 import { toast } from "sonner";
-import type { GroupCallState } from "@/types/store";
+import type { GroupCallState, PendingIncomingGroupCall } from "@/types/store";
 
 const IDLE_STATE = {
   status: "idle" as const,
@@ -15,25 +14,81 @@ const IDLE_STATE = {
   initiator: null,
   groupName: null,
   participants: [],
+  pendingIncomingCall: null,
 };
+
+function toPendingIncomingGroupCall(
+  payload: Omit<PendingIncomingGroupCall, "isMutedCall">,
+  isMutedCall: boolean,
+): PendingIncomingGroupCall {
+  return { ...payload, isMutedCall };
+}
+
+async function leaveDirectCallForSwitch() {
+  const { useCallStore } = await import("./useCallStore");
+  const callState = useCallStore.getState();
+  if (callState.status === "idle") return;
+
+  if (callState.status === "incoming") {
+    callState.rejectCall();
+  } else {
+    callState.handleCancelCall();
+  }
+}
 
 export const useGroupCallStore = create<GroupCallState>((set, get) => ({
   ...IDLE_STATE,
   hasLeftActiveCall: {},
 
-  startGroupCall(conversationId, callType) {
+  async startGroupCall(conversationId, callType) {
     const socket = useSocketStore.getState().socket;
     if (!socket || get().status !== "idle") return;
+    const { useCallStore } = await import("./useCallStore");
+    if (useCallStore.getState().status !== "idle") {
+      toast.error("Bạn đang trong một cuộc gọi khác.");
+      return;
+    }
     set({ status: "outgoing", conversationId, callType });
     socket.emit("group-call:start", { conversationId, callType });
   },
 
-  joinGroupCall(conversationId) {
+  async joinGroupCall(conversationId) {
     const socket = useSocketStore.getState().socket;
     if (!socket) return;
+    await leaveDirectCallForSwitch();
     stopRingtone();
     set({ status: "joining", conversationId });
     socket.emit("group-call:join", { conversationId });
+  },
+
+  async joinPendingGroupCall() {
+    const socket = useSocketStore.getState().socket;
+    const pending = get().pendingIncomingCall;
+    if (!socket || !pending) return;
+
+    const current = get();
+    if (current.conversationId && current.conversationId !== pending.conversationId) {
+      socket.emit(
+        current.status === "incoming" ? "group-call:decline" : "group-call:leave",
+        { conversationId: current.conversationId },
+      );
+    }
+
+    await leaveDirectCallForSwitch();
+    stopRingtone();
+    set({
+      ...IDLE_STATE,
+      status: "joining",
+      conversationId: pending.conversationId,
+      callId: pending.callId,
+      callType: pending.callType,
+      initiator: pending.initiator,
+      groupName: pending.groupName,
+      participants: pending.participants,
+      pendingIncomingCall: null,
+      hasLeftActiveCall: current.hasLeftActiveCall,
+    });
+    socket.emit("group-call:join", { conversationId: pending.conversationId });
   },
 
   declineGroupCall(conversationId) {
@@ -103,8 +158,17 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
 
   handleGroupCallIncoming(payload, isMutedCall: boolean = false) {
     const current = get().status;
-    const p2pStatus = useCallStore.getState().status;
-    if (current !== "idle" || p2pStatus !== "idle") return;
+    if (current !== "idle") {
+      if (get().conversationId !== payload.conversationId) {
+        set({
+          pendingIncomingCall: toPendingIncomingGroupCall(payload, isMutedCall),
+        });
+        if (!isMutedCall) {
+          playRingtone();
+        }
+      }
+      return;
+    }
 
     if (!isMutedCall) {
       playRingtone();
@@ -155,12 +219,29 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
     }
   },
 
+  declinePendingGroupCall() {
+    const socket = useSocketStore.getState().socket;
+    const pending = get().pendingIncomingCall;
+    if (!socket || !pending) return;
+
+    stopRingtone();
+    socket.emit("group-call:decline", { conversationId: pending.conversationId });
+    set({ pendingIncomingCall: null });
+  },
+
   handleGroupCallAnsweredOnOtherDevice(payload) {
     stopRingtone();
 
     set((state) => {
       const next = { ...state.hasLeftActiveCall };
       delete next[payload.conversationId];
+
+      if (state.pendingIncomingCall?.conversationId === payload.conversationId) {
+        return {
+          pendingIncomingCall: null,
+          hasLeftActiveCall: next,
+        };
+      }
 
       if (state.conversationId === payload.conversationId && state.status !== "active") {
         return {
@@ -182,6 +263,13 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
         [payload.conversationId]: true,
       };
 
+      if (state.pendingIncomingCall?.conversationId === payload.conversationId) {
+        return {
+          pendingIncomingCall: null,
+          hasLeftActiveCall: next,
+        };
+      }
+
       if (state.conversationId === payload.conversationId && state.status !== "active") {
         return {
           ...IDLE_STATE,
@@ -199,6 +287,13 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
     set((state) => {
       const next = { ...state.hasLeftActiveCall };
       delete next[payload.conversationId];
+
+      if (state.pendingIncomingCall?.conversationId === payload.conversationId) {
+        return {
+          pendingIncomingCall: null,
+          hasLeftActiveCall: next,
+        };
+      }
 
       if (
         state.conversationId === payload.conversationId ||
@@ -239,7 +334,16 @@ export const useGroupCallStore = create<GroupCallState>((set, get) => ({
   },
 
   handleGroupCallError(payload) {
-    toast.error(`Lỗi cuộc gọi nhóm: ${payload.reason}`);
+    const reasonMap: Record<string, string> = {
+      "already-active": "Nhóm này đang có cuộc gọi.",
+      "already-in-call": "Bạn đang trong một cuộc gọi khác.",
+      "rate-limited": "Bạn thao tác quá nhanh, vui lòng thử lại sau.",
+      "not-a-group": "Không tìm thấy nhóm.",
+      "not-a-member": "Bạn không còn là thành viên nhóm.",
+      "group-disbanded": "Nhóm đã bị giải tán.",
+      "server-error": "Lỗi hệ thống. Vui lòng thử lại.",
+    };
+    toast.error(`Lỗi cuộc gọi nhóm: ${reasonMap[payload.reason] ?? payload.reason}`);
     const s = get().status;
     if (s === "outgoing" || s === "joining") {
       set({ ...IDLE_STATE });

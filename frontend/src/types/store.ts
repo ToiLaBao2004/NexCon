@@ -249,6 +249,25 @@ export interface RemoteUser {
   avatarUrl?: string | null;
 }
 
+export interface PendingIncomingCall {
+  from: RemoteUser;
+  callType: CallType;
+  roomName: string;
+  isMutedCall?: boolean;
+}
+
+export interface DirectCallEventPayload {
+  by?: {
+    _id?: string;
+    displayName?: string;
+  };
+  roomName?: string;
+  conversationId?: string;
+  callerId?: string;
+  receiverId?: string;
+  reason?: string;
+}
+
 export interface CallState {
   status: CallStatus;
   callType: CallType | null;
@@ -261,6 +280,8 @@ export interface CallState {
   isVideoOff: boolean;
   isRemoteVideoOff: boolean;
   isMutedCall?: boolean;
+  pendingIncomingCall: PendingIncomingCall | null;
+  pendingIncomingQueue: PendingIncomingCall[];
   _livekitRoom: Room | null;
   _roomName: string | null;
   _token: string | null;
@@ -268,7 +289,11 @@ export interface CallState {
   _callTimeout: ReturnType<typeof setTimeout> | null;
   startCall: (toUser: RemoteUser, callType: CallType) => Promise<void>;
   acceptCall: () => Promise<void>;
+  acceptPendingIncomingCall: () => Promise<void>;
+  acceptQueuedIncomingCall: (roomName: string) => Promise<void>;
   rejectCall: () => void;
+  rejectPendingIncomingCall: () => void;
+  rejectQueuedIncomingCall: (roomName: string) => void;
   endCall: () => void;
   handleCancelCall: () => void;
   toggleMute: () => void;
@@ -279,9 +304,9 @@ export interface CallState {
   handleCallRinging: () => void;
   handleCallAnswered: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallAccepted: (payload: { token: string; roomName: string }) => Promise<void>;
-  handleCallRejected: () => void;
-  handleCallEnded: () => void;
-  handleCallFailed: (reason: 'offline' | 'no-answer' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'server-error') => void;
+  handleCallRejected: (payload?: DirectCallEventPayload) => void;
+  handleCallEnded: (payload?: DirectCallEventPayload) => void;
+  handleCallFailed: (reason: 'offline' | 'no-answer' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'already-active' | 'rate-limited' | 'server-error') => void;
   handleIceCandidate: (_candidate: RTCIceCandidateInit) => Promise<void>;
 }
 
@@ -318,6 +343,16 @@ export interface GroupCallParticipant {
 
 export type GroupCallStatus = "idle" | "outgoing" | "incoming" | "joining" | "active";
 
+export interface PendingIncomingGroupCall {
+  conversationId: string;
+  callId: string;
+  callType: "voice" | "video";
+  initiator: { _id: string; displayName: string; avatarUrl: string | null };
+  groupName: string;
+  participants: GroupCallParticipant[];
+  isMutedCall?: boolean;
+}
+
 export interface GroupCallState {
   status: GroupCallStatus;
   conversationId: string | null;
@@ -325,6 +360,7 @@ export interface GroupCallState {
   callType: "voice" | "video" | null;
   token: string | null;
   isMutedCall?: boolean;
+  pendingIncomingCall: PendingIncomingGroupCall | null;
   initiator: {
     _id: string;
     displayName: string;
@@ -336,7 +372,9 @@ export interface GroupCallState {
 
   startGroupCall: (conversationId: string, callType: "voice" | "video") => void;
   joinGroupCall: (conversationId: string) => void;
+  joinPendingGroupCall: () => void;
   declineGroupCall: (conversationId: string) => void;
+  declinePendingGroupCall: () => void;
   leaveGroupCall: () => void;
   rejoinGroupCall: (conversationId: string) => void;
   checkGroupCallStatus: (conversationId: string) => void;

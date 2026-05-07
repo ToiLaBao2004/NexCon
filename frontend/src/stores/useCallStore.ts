@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { useSocketStore } from "./useSocketStore";
-import type { CallState, CallType, RemoteUser } from "@/types/store";
+import type { CallState, CallType, DirectCallEventPayload, PendingIncomingCall, RemoteUser } from "@/types/store";
 import { toast } from "sonner";
 import {
   playCallerRingingRingtone,
@@ -39,6 +39,9 @@ const IDLE_STATE = {
   isMuted: false,
   isVideoOff: false,
   isRemoteVideoOff: false,
+  isMutedCall: false,
+  pendingIncomingCall: null,
+  pendingIncomingQueue: [],
 };
 
 function cleanup(get: () => CallState) {
@@ -56,19 +59,210 @@ function teardownRoom(room: Room) {
   room.disconnect(true);
 }
 
+function getPendingIncomingCalls(state: CallState) {
+  return [
+    ...(state.pendingIncomingCall ? [state.pendingIncomingCall] : []),
+    ...state.pendingIncomingQueue,
+  ];
+}
+
 function resetToIdle(
   set: (partial: Partial<CallState>) => void,
   get: () => CallState,
 ) {
-  const nextJoinAttemptId = get()._joinAttemptId + 1;
+  const state = get();
+  const nextJoinAttemptId = state._joinAttemptId + 1;
+  const [nextIncomingCall, ...remainingIncomingCalls] = getPendingIncomingCalls(state);
   cleanup(get);
   stopRingtone();
+
+  if (nextIncomingCall) {
+    const [pendingIncomingCall, ...pendingIncomingQueue] = remainingIncomingCalls;
+    set({
+      ...IDLE_STATE,
+      status: "incoming",
+      callType: nextIncomingCall.callType,
+      remoteUser: nextIncomingCall.from,
+      _roomName: nextIncomingCall.roomName,
+      _joinAttemptId: nextJoinAttemptId,
+      isMutedCall: nextIncomingCall.isMutedCall,
+      isVideoOff: nextIncomingCall.callType === "voice",
+      pendingIncomingCall: pendingIncomingCall ?? null,
+      pendingIncomingQueue,
+    });
+
+    if (!nextIncomingCall.isMutedCall) {
+      void playRingtone();
+    }
+    return;
+  }
+
   set({ ...IDLE_STATE, _joinAttemptId: nextJoinAttemptId });
 }
 
 function isJoinAttemptCancelled(get: () => CallState, attemptId: number) {
   const state = get();
   return state._joinAttemptId !== attemptId || state.status === "idle";
+}
+
+function samePendingIncomingCall(
+  pending: PendingIncomingCall | null,
+  from: RemoteUser,
+  roomName: string,
+) {
+  return Boolean(
+    pending &&
+    pending.roomName === roomName &&
+    pending.from._id?.toString() === from._id?.toString(),
+  );
+}
+
+function samePendingCall(a: PendingIncomingCall, b: PendingIncomingCall) {
+  return a.roomName === b.roomName && a.from._id?.toString() === b.from._id?.toString();
+}
+
+function enqueuePendingIncomingCall(
+  set: (partial: Partial<CallState>) => void,
+  get: () => CallState,
+  incoming: PendingIncomingCall,
+) {
+  const state = get();
+  if (!state.pendingIncomingCall) {
+    set({ pendingIncomingCall: incoming });
+    return;
+  }
+
+  if (samePendingCall(state.pendingIncomingCall, incoming)) {
+    set({ pendingIncomingCall: incoming });
+    return;
+  }
+
+  const pendingIncomingQueue = [...state.pendingIncomingQueue];
+  const existingIndex = pendingIncomingQueue.findIndex((item) => samePendingCall(item, incoming));
+  if (existingIndex >= 0) {
+    pendingIncomingQueue[existingIndex] = incoming;
+  } else {
+    pendingIncomingQueue.push(incoming);
+  }
+  set({ pendingIncomingQueue });
+}
+
+function setPendingIncomingCalls(
+  set: (partial: Partial<CallState>) => void,
+  pendingCalls: PendingIncomingCall[],
+) {
+  const [pendingIncomingCall, ...pendingIncomingQueue] = pendingCalls;
+  set({
+    pendingIncomingCall: pendingIncomingCall ?? null,
+    pendingIncomingQueue,
+  });
+}
+
+function findPendingIncomingCall(state: CallState, roomName: string) {
+  return getPendingIncomingCalls(state).find((pending) => pending.roomName === roomName) ?? null;
+}
+
+function rejectPendingIncomingCalls(pendingCalls: PendingIncomingCall[]) {
+  pendingCalls.forEach((pending) => {
+    if (pending.from._id) {
+      emitCallEvent("call-rejected", { toUserId: pending.from._id });
+    }
+  });
+}
+
+function shouldKeepRingtoneAfterPendingChange(state: CallState) {
+  if (state.status === "incoming" && !state.isMutedCall) return true;
+  return getPendingIncomingCalls(state).some((pending) => !pending.isMutedCall);
+}
+
+function maybeStopRingtoneAfterPendingChange(get: () => CallState) {
+  if (!shouldKeepRingtoneAfterPendingChange(get())) {
+    stopRingtone();
+  }
+}
+
+function clearPendingIncomingCallByPayload(
+  set: (partial: Partial<CallState>) => void,
+  get: () => CallState,
+  payload?: DirectCallEventPayload,
+) {
+  const state = get();
+  const matchesPayload = (pending: PendingIncomingCall) => payloadMatchesPendingCall(pending, payload);
+  const pendingIncomingQueue = state.pendingIncomingQueue.filter((pending) => !matchesPayload(pending));
+
+  if (state.pendingIncomingCall && matchesPayload(state.pendingIncomingCall)) {
+    const [nextPending, ...remainingQueue] = pendingIncomingQueue;
+    set({
+      pendingIncomingCall: nextPending ?? null,
+      pendingIncomingQueue: remainingQueue,
+    });
+    return;
+  }
+
+  set({ pendingIncomingQueue });
+}
+
+function payloadMatchesCurrentCall(state: CallState, payload?: DirectCallEventPayload) {
+  if (!payload) return true;
+  if (payload.roomName && state._roomName) {
+    return String(payload.roomName) === String(state._roomName);
+  }
+
+  const remoteId = state.remoteUser?._id?.toString();
+  if (!remoteId) return true;
+
+  const participantIds = [payload.callerId, payload.receiverId]
+    .filter(Boolean)
+    .map((id) => String(id));
+  if (participantIds.length > 0) {
+    return participantIds.includes(remoteId);
+  }
+
+  const byId = payload.by?._id?.toString();
+  return !byId || byId === remoteId;
+}
+
+function payloadMatchesPendingCall(pending: PendingIncomingCall | null, payload?: DirectCallEventPayload) {
+  if (!pending || !payload) return false;
+  if (payload.roomName) {
+    return String(payload.roomName) === String(pending.roomName);
+  }
+
+  const fromId = pending.from._id?.toString();
+  return [payload.callerId, payload.receiverId, payload.by?._id]
+    .filter(Boolean)
+    .map((id) => String(id))
+    .includes(fromId);
+}
+
+function clearCurrentCallBeforeAcceptingPending(
+  get: () => CallState,
+) {
+  const state = get();
+
+  if (state.remoteUser?._id && state.status !== "idle") {
+    const eventName =
+      state.status === "active"
+        ? "leave-call"
+        : state.status === "incoming"
+          ? "call-rejected"
+          : "call-cancelled";
+    emitCallEvent(eventName, { toUserId: state.remoteUser._id });
+  }
+
+  cleanup(get);
+}
+
+async function leaveGroupCallForSwitch() {
+  const { useGroupCallStore } = await import("./useGroupCallStore");
+  const groupCallState = useGroupCallStore.getState();
+  if (groupCallState.status === "idle" || !groupCallState.conversationId) return;
+
+  if (groupCallState.status === "incoming") {
+    groupCallState.declineGroupCall(groupCallState.conversationId);
+  } else {
+    groupCallState.leaveGroupCall();
+  }
 }
 
 function buildLocalMediaStream(room: Room) {
@@ -230,6 +424,11 @@ export const useCallStore = create<CallState>((set, get) => ({
   // Initiator: A starts a call
   async startCall(toUser: RemoteUser, callType: CallType) {
     if (get().status !== "idle") return;
+    const { useGroupCallStore } = await import("./useGroupCallStore");
+    if (useGroupCallStore.getState().status !== "idle") {
+      toast.error("Bạn đang trong một cuộc gọi khác.");
+      return;
+    }
 
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -275,9 +474,59 @@ export const useCallStore = create<CallState>((set, get) => ({
     const { remoteUser, isConnecting } = get();
     if (!remoteUser || isConnecting) return;
 
-    set({ isConnecting: true });
+    rejectPendingIncomingCalls(getPendingIncomingCalls(get()));
+    await leaveGroupCallForSwitch();
+    set({ pendingIncomingCall: null, pendingIncomingQueue: [], isConnecting: true });
     emitCallEvent("accept-call", { toUserId: remoteUser._id });
     emitCallEvent("call-answer", { toUserId: remoteUser._id });
+    stopRingtone();
+  },
+
+  async acceptPendingIncomingCall() {
+    const pending = get().pendingIncomingCall;
+    if (!pending) return;
+
+    await get().acceptQueuedIncomingCall(pending.roomName);
+  },
+
+  async acceptQueuedIncomingCall(roomName: string) {
+    const current = get();
+    const pending = findPendingIncomingCall(current, roomName);
+    if (!pending || get().isConnecting) return;
+
+    const pendingCallsToReject = getPendingIncomingCalls(current).filter(
+      (item) => !samePendingCall(item, pending),
+    );
+
+    if (current.status !== "idle") {
+      clearCurrentCallBeforeAcceptingPending(get);
+    }
+    await leaveGroupCallForSwitch();
+
+    set({
+      status: "incoming",
+      callType: pending.callType,
+      remoteUser: pending.from,
+      localStream: null,
+      remoteStream: null,
+      _livekitRoom: null,
+      _roomName: pending.roomName,
+      _token: null,
+      _callTimeout: null,
+      _joinAttemptId: current._joinAttemptId + 1,
+      pendingIncomingCall: null,
+      pendingIncomingQueue: [],
+      isConnecting: true,
+      isRemoteConnecting: false,
+      isMutedCall: pending.isMutedCall,
+      isMuted: false,
+      isVideoOff: pending.callType === "voice",
+      isRemoteVideoOff: false,
+    });
+
+    rejectPendingIncomingCalls(pendingCallsToReject);
+    emitCallEvent("accept-call", { toUserId: pending.from._id });
+    emitCallEvent("call-answer", { toUserId: pending.from._id });
     stopRingtone();
   },
 
@@ -303,6 +552,26 @@ export const useCallStore = create<CallState>((set, get) => ({
     }
 
     get().handleCancelCall();
+  },
+
+  rejectPendingIncomingCall() {
+    const pending = get().pendingIncomingCall;
+    if (!pending) return;
+
+    get().rejectQueuedIncomingCall(pending.roomName);
+  },
+
+  rejectQueuedIncomingCall(roomName: string) {
+    const current = get();
+    const pending = findPendingIncomingCall(current, roomName);
+    if (!pending) return;
+
+    emitCallEvent("call-rejected", { toUserId: pending.from._id });
+    setPendingIncomingCalls(
+      set,
+      getPendingIncomingCalls(current).filter((item) => !samePendingCall(item, pending)),
+    );
+    maybeStopRingtoneAfterPendingChange(get);
   },
 
   endCall() {
@@ -351,8 +620,16 @@ export const useCallStore = create<CallState>((set, get) => ({
       return;
     }
 
+    if (samePendingIncomingCall(currentState.pendingIncomingCall, from, roomName)) {
+      enqueuePendingIncomingCall(set, get, { from, callType, roomName, isMutedCall });
+      return;
+    }
+
     if (currentState.status !== "idle") {
-      emitCallEvent("call-cancelled", { toUserId: from._id });
+      enqueuePendingIncomingCall(set, get, { from, callType, roomName, isMutedCall });
+      if (!isMutedCall) {
+        void playRingtone();
+      }
       return;
     }
     set({
@@ -439,11 +716,31 @@ export const useCallStore = create<CallState>((set, get) => ({
     }
   },
 
-  handleCallRejected() {
+  handleCallRejected(payload) {
+    if (
+      payloadMatchesPendingCall(get().pendingIncomingCall, payload) ||
+      get().pendingIncomingQueue.some((pending) => payloadMatchesPendingCall(pending, payload))
+    ) {
+      clearPendingIncomingCallByPayload(set, get, payload);
+      maybeStopRingtoneAfterPendingChange(get);
+      return;
+    }
+
+    if (!payloadMatchesCurrentCall(get(), payload)) return;
     resetToIdle(set, get);
   },
 
-  handleCallEnded() {
+  handleCallEnded(payload) {
+    if (
+      payloadMatchesPendingCall(get().pendingIncomingCall, payload) ||
+      get().pendingIncomingQueue.some((pending) => payloadMatchesPendingCall(pending, payload))
+    ) {
+      clearPendingIncomingCallByPayload(set, get, payload);
+      maybeStopRingtoneAfterPendingChange(get);
+      return;
+    }
+
+    if (!payloadMatchesCurrentCall(get(), payload)) return;
     resetToIdle(set, get);
   },
 
@@ -456,6 +753,8 @@ export const useCallStore = create<CallState>((set, get) => ({
       blocked: "Không thể gọi do trạng thái chặn.",
       "not-friends": "Hai bạn chưa là bạn bè.",
       "already-in-call": "Bạn đang ở trong một cuộc gọi khác.",
+      "already-active": "Cuộc gọi giữa hai bạn đang diễn ra.",
+      "rate-limited": "Bạn thao tác quá nhanh, vui lòng thử lại sau.",
       "server-error": "Lỗi hệ thống. Vui lòng thử lại.",
     };
     const msg = reasonMap[reason] ?? "Không thể thực hiện cuộc gọi.";

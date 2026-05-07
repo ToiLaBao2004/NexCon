@@ -25,7 +25,7 @@ io.use(socketAuthMiddleware);
 const USER_ROOM_PREFIX = "user:";
 const SESSION_ROOM_PREFIX = "session:";
 
-// Track active calls: callerId -> direct call session (roomName, participants, status, callType)
+// Track active direct calls by sorted user pair.
 const activeCalls = new Map();
 
 function getUserRoom(userId) {
@@ -225,7 +225,7 @@ io.on("connection", async (socket) => {
     registerCallHandlers(socket, user, activeCalls, io, getReceiverSocketId);
 
     // Group call handlers
-    registerGroupCallHandlers(socket, user, io, getReceiverSocketId);
+    registerGroupCallHandlers(socket, user, io, getReceiverSocketId, activeCalls);
 
     emitPendingDirectCallsForUser(socket, userId, activeCalls, io, getReceiverSocketId);
 
