@@ -22,6 +22,7 @@ const MUTE_DURATION_MS = {
 	'24h': 24 * 60 * 60 * 1000,
 };
 const MAX_GROUP_MEMBERS = 100;
+const MAX_PINNED_CONVERSATIONS = 5;
 
 export async function createConversation(req, res) {
 	try {
@@ -567,6 +568,23 @@ export async function toggleConversationPin(req, res) {
 		}
 
 		const wasPinned = !!participant.pinnedAt;
+		if (!wasPinned) {
+			const pinnedCount = await Conversation.countDocuments({
+				participants: {
+					$elemMatch: {
+						userId,
+						pinnedAt: { $ne: null },
+					},
+				},
+			});
+
+			if (pinnedCount >= MAX_PINNED_CONVERSATIONS) {
+				return res.status(400).json({
+					message: `Bạn chỉ có thể ghim tối đa ${MAX_PINNED_CONVERSATIONS} cuộc hội thoại.`,
+				});
+			}
+		}
+
 		participant.pinnedAt = wasPinned ? null : new Date();
 		conversation.markModified('participants');
 		await conversation.save();
