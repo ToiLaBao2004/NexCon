@@ -177,7 +177,6 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                 return socket.emit('group-call:error', { reason: 'already-active' });
             }
 
-            const startedAt = new Date();
             const callId = buildSessionId('group-call');
 
             // Build in-memory participants map
@@ -189,7 +188,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                     displayName: participant.userId.displayName,
                     avatarUrl: participant.userId.avatarUrl || null,
                     status: pid === userId ? 'joined' : 'ringing',
-                    joinedAt: pid === userId ? startedAt.toISOString() : null,
+                    joinedAt: pid === userId ? new Date().toISOString() : null,
                     leftAt: null,
                 });
             }
@@ -229,7 +228,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                 initiatorId: userId,
                 initiator: initiatorInfo,
                 callType,
-                startedAt,
+                startedAt: null,
                 participants: participantsMap,
                 participantSockets: new Map([[userId, socket.id]]),
                 ringTimeout,
@@ -311,6 +310,10 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
                 : new Date().toISOString();
             participant.leftAt = null;
             groupCall.participantSockets.set(userId, socket.id);
+
+            if (!groupCall.startedAt && userId !== groupCall.initiatorId) {
+                groupCall.startedAt = new Date();
+            }
 
             let token;
             try {
