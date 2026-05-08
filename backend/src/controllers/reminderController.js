@@ -686,8 +686,7 @@ export async function getReminders(req, res) {
             query.scope = 'shared';
         }
 
-        const hasLimit = limit !== undefined && limit !== null && String(limit).trim() !== '';
-        const pageSize = hasLimit ? Math.min(Math.max(Number(limit) || 10, 1), 10) : null;
+        const pageSize = limit ? Math.min(Math.max(Number(limit) || 50, 1), 100) : 50;
 
         const sortBy = String(sort || 'remindAt_asc').trim().toLowerCase();
         const sortConfig = REMINDER_SORT_OPTIONS[sortBy] || REMINDER_SORT_OPTIONS.remindat_asc;

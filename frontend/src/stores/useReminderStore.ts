@@ -33,6 +33,7 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
   },
 
   fetchReminders: async (params) => {
+    if (get().isLoading) return;
     const currentSequence = ++reminderFetchSequence;
 
     set({
