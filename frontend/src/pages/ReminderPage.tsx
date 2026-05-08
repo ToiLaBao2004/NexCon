@@ -194,10 +194,10 @@ const ReminderPage = () => {
 
     useEffect(() => {
         if (isLoading) return;
-        if (reminders.length === 0 || queryKey !== lastQueryKey) {
+        if (queryKey !== lastQueryKey) {
             void fetchReminders(currentQueryParams);
         }
-    }, [fetchReminders, currentQueryParams, reminders.length, queryKey, lastQueryKey, isLoading]);
+    }, [fetchReminders, currentQueryParams, queryKey, lastQueryKey, isLoading]);
 
     useEffect(() => {
         if (!focusReminderId || !highlightedReminderId) return;
