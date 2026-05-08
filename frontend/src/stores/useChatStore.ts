@@ -38,6 +38,17 @@ const sortConversations = (conversations: any[]) => {
     });
 };
 
+const CONVERSATION_PAGE_LIMIT = 50;
+
+const mergeConversations = (current: any[], incoming: any[]) => {
+    const byId = new Map<string, any>();
+    [...current, ...incoming].forEach((conversation) => {
+        if (!conversation?._id) return;
+        byId.set(conversation._id, { ...(byId.get(conversation._id) || {}), ...conversation });
+    });
+    return sortConversations(Array.from(byId.values()));
+};
+
 export const useChatStore = create<ChatState>()(
     persist(
         (set, get) => ({
@@ -53,6 +64,13 @@ export const useChatStore = create<ChatState>()(
             jumpContexts: {},
             replyingTo: null,
             drafts: {},
+            conversationsHasMore: true,
+            conversationsNextCursor: null,
+            groupConversations: [],
+            groupsFetched: false,
+            groupsLoading: false,
+            groupsHasMore: true,
+            groupsNextCursor: null,
 
             activeSidebar: null,
             searchResults: {
@@ -151,6 +169,13 @@ export const useChatStore = create<ChatState>()(
                 set({
                     conversations: [],
                     conversationsFetched: false,
+                    conversationsHasMore: true,
+                    conversationsNextCursor: null,
+                    groupConversations: [],
+                    groupsFetched: false,
+                    groupsLoading: false,
+                    groupsHasMore: true,
+                    groupsNextCursor: null,
                     messages: {},
                     media: {},
                     mediaPagination: {},
@@ -164,13 +189,12 @@ export const useChatStore = create<ChatState>()(
                 });
             },
             fetchConversations: async (force = false) => {
+                if (get().convoLoading) return;
                 try {
-                    if (!force && get().conversationsFetched) {
-                        return;
-                    }
+                    if (!force && get().conversationsFetched) return;
 
                     set({ convoLoading: true });
-                    const { conversations } = await chatService.fetchConversations();
+                    const { conversations, hasMore, nextCursor } = await chatService.fetchConversations({ limit: CONVERSATION_PAGE_LIMIT });
 
                     // Emit message-delivered cho lastMessage của các cuộc hội thoại 1-1
                     const { useSocketStore } = await import('./useSocketStore');
@@ -188,10 +212,83 @@ export const useChatStore = create<ChatState>()(
                         }
                     }
 
-                    set({ conversations: sortConversations(conversations as any), conversationsFetched: true, convoLoading: false });
+                    set({
+                        conversations: sortConversations(conversations as any),
+                        conversationsFetched: true,
+                        conversationsHasMore: hasMore ?? false,
+                        conversationsNextCursor: nextCursor ?? null,
+                        convoLoading: false,
+                    });
                 } catch (error) {
-                    console.error("Lỗi khi tải danh sách cuộc trò chuyện:", error);
+                    console.error('Lỗi khi tải danh sách cuộc trò chuyện:', error);
                     set({ convoLoading: false });
+                }
+            },
+            fetchMoreConversations: async () => {
+                const { convoLoading, conversationsHasMore, conversationsNextCursor } = get();
+                if (convoLoading || !conversationsHasMore || !conversationsNextCursor) return;
+                try {
+                    set({ convoLoading: true });
+                    const { conversations, hasMore, nextCursor } = await chatService.fetchConversations({
+                        cursor: conversationsNextCursor,
+                        limit: CONVERSATION_PAGE_LIMIT,
+                    });
+                    set((state) => ({
+                        conversations: mergeConversations(state.conversations, conversations as any),
+                        conversationsHasMore: hasMore ?? false,
+                        conversationsNextCursor: nextCursor ?? null,
+                        convoLoading: false,
+                    }));
+                } catch (error) {
+                    console.error('Lỗi khi tải thêm cuộc trò chuyện:', error);
+                    set({ convoLoading: false });
+                }
+            },
+            fetchGroups: async (force = false) => {
+                if (get().groupsLoading) return;
+                try {
+                    if (!force && get().groupsFetched) return;
+                    set({ groupsLoading: true });
+                    const { groups, hasMore, nextCursor } = await chatService.fetchGroups({ limit: CONVERSATION_PAGE_LIMIT });
+                    set({
+                        groupConversations: sortConversations(groups as any),
+                        groupsFetched: true,
+                        groupsHasMore: hasMore ?? false,
+                        groupsNextCursor: nextCursor ?? null,
+                        groupsLoading: false,
+                    });
+                } catch (error) {
+                    console.error('Lỗi khi tải danh sách nhóm:', error);
+                    set({ groupsLoading: false });
+                }
+            },
+            fetchMoreGroups: async () => {
+                const { groupsLoading, groupsHasMore, groupsNextCursor } = get();
+                if (groupsLoading || !groupsHasMore || !groupsNextCursor) return;
+                try {
+                    set({ groupsLoading: true });
+                    const { groups, hasMore, nextCursor } = await chatService.fetchGroups({
+                        cursor: groupsNextCursor,
+                        limit: CONVERSATION_PAGE_LIMIT,
+                    });
+                    set((state) => ({
+                        groupConversations: mergeConversations(state.groupConversations, groups as any),
+                        groupsHasMore: hasMore ?? false,
+                        groupsNextCursor: nextCursor ?? null,
+                        groupsLoading: false,
+                    }));
+                } catch (error) {
+                    console.error('Lỗi khi tải thêm nhóm:', error);
+                    set({ groupsLoading: false });
+                }
+            },
+            searchGroups: async (query: string) => {
+                try {
+                    const { groups } = await chatService.fetchGroups({ search: query, limit: 50 });
+                    return groups as any[];
+                } catch (error) {
+                    console.error('Lỗi khi tìm kiếm nhóm:', error);
+                    return [];
                 }
             },
             fetchMessages: async (conversationId?: string) => {

@@ -99,6 +99,14 @@ export async function createConversation(req, res) {
 export async function getConversations(req, res) {
 	try {
 		const myId = req.user._id.toString();
+		const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+		const cursor = req.query.cursor;
+
+		const matchQuery = { "participants.userId": myId };
+		if (cursor) {
+			const d = new Date(cursor);
+			if (!isNaN(d.getTime())) matchQuery.updatedAt = { $lt: d };
+		}
 
 		const visibleMessageFilter = {
 			$or: [
@@ -108,11 +116,20 @@ export async function getConversations(req, res) {
 			],
 		};
 
-		let conversations = await Conversation.find({ "participants.userId": myId })
-			.sort({ "lastMessage.createdAt": -1, updatedAt: -1 })
+		let rawConversations = await Conversation.find(matchQuery)
+			.sort({ updatedAt: -1 })
+			.limit(limit + 1)
 			.populate("participants.userId", "displayName avatarUrl email bio phone")
 			.populate("lastMessage.senderId", "displayName avatarUrl")
 			.lean();
+
+		const hasMore = rawConversations.length > limit;
+		if (hasMore) rawConversations.pop();
+		const nextCursor = hasMore && rawConversations.length > 0
+			? rawConversations[rawConversations.length - 1].updatedAt
+			: null;
+
+		let conversations = rawConversations;
 
 		conversations = await Promise.all(conversations.map(async (conversation) => {
 			const lastMetadata = conversation.lastMessage?.metadata instanceof Map
@@ -252,28 +269,76 @@ export async function getConversations(req, res) {
 			};
 		});
 
-		formatted.sort((a, b) => {
-			if (a.isPinned !== b.isPinned) {
-				return a.isPinned ? -1 : 1;
-			}
-
-			if (a.isPinned && b.isPinned) {
-				const pinnedA = new Date(a.pinnedAt || 0).getTime();
-				const pinnedB = new Date(b.pinnedAt || 0).getTime();
-				if (pinnedA !== pinnedB) {
-					return pinnedB - pinnedA;
-				}
-			}
-
-			const dateA = new Date(a.lastMessage?.createdAt || a.updatedAt || 0).getTime();
-			const dateB = new Date(b.lastMessage?.createdAt || b.updatedAt || 0).getTime();
-			return dateB - dateA;
-		});
-
-		return res.status(200).json({ conversations: formatted });
+		return res.status(200).json({ conversations: formatted, hasMore, nextCursor });
 	} catch (error) {
 		console.error("Error occurred while fetching conversations", error);
 		return res.status(500).json({ message: "Internal server error" });
+	}
+}
+
+export async function getGroups(req, res) {
+	try {
+		const myId = req.user._id.toString();
+		const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+		const cursor = req.query.cursor;
+		const search = (req.query.search || '').trim();
+
+		const matchQuery = { 'participants.userId': myId, type: 'group' };
+		if (cursor) {
+			const d = new Date(cursor);
+			if (!isNaN(d.getTime())) matchQuery.updatedAt = { $lt: d };
+		}
+		if (search) {
+			matchQuery['group.name'] = { $regex: search, $options: 'i' };
+		}
+
+		let rawGroups = await Conversation.find(matchQuery)
+			.sort({ updatedAt: -1 })
+			.limit(limit + 1)
+			.populate('participants.userId', 'displayName avatarUrl email bio phone')
+			.populate('lastMessage.senderId', 'displayName avatarUrl')
+			.lean();
+
+		const hasMore = rawGroups.length > limit;
+		if (hasMore) rawGroups.pop();
+		const nextCursor = hasMore && rawGroups.length > 0
+			? rawGroups[rawGroups.length - 1].updatedAt
+			: null;
+
+		const formatted = rawGroups.map((c) => {
+			const myParticipant = c.participants?.find((p) => {
+				const pid = p?.userId?._id?.toString?.() || p?.userId?.toString?.();
+				return pid === myId;
+			});
+			const pinnedAt = myParticipant?.pinnedAt
+				? new Date(myParticipant.pinnedAt).toISOString()
+				: null;
+
+			return {
+				...c,
+				isPinned: !!pinnedAt,
+				pinnedAt,
+				participants: c.participants.map((p) => {
+					let userObj = p.userId;
+					if (!userObj && p.userInfo) {
+						userObj = {
+							_id: null,
+							displayName: p.userInfo.displayName || 'Người dùng đã xóa',
+							avatarUrl: p.userInfo.avatarUrl || null,
+						};
+					} else if (!userObj) {
+						userObj = { _id: null, displayName: 'Người dùng đã xóa', avatarUrl: null };
+					}
+					return { ...p, userId: userObj };
+				}),
+				unreadCounts: c.unreadCounts || {},
+			};
+		});
+
+		return res.status(200).json({ groups: formatted, hasMore, nextCursor });
+	} catch (error) {
+		console.error('Error fetching groups:', error);
+		return res.status(500).json({ message: 'Internal server error' });
 	}
 }
 

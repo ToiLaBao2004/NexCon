@@ -1,13 +1,13 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, type UIEvent } from "react";
 import { useChatStore } from "@/stores/useChatStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import DirectMessageCard from "./DirectMessageCard";
 import GroupChatCard from "./GroupChatCard";
 import { Input } from "@/components/ui/input";
-import { Search, X } from "lucide-react";
+import { Search, X, Loader2 } from "lucide-react";
 
 const ConversationMixedList = () => {
-  const { conversations, fetchConversations } = useChatStore();
+  const { conversations, fetchConversations, fetchMoreConversations, conversationsHasMore, convoLoading } = useChatStore();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -28,6 +28,14 @@ const ConversationMixedList = () => {
       fetchConversations();
     }
   }, [conversations.length, fetchConversations]);
+
+  const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+    if (searchQuery.trim() || convoLoading || !conversationsHasMore) return;
+    const t = e.currentTarget;
+    if (t.scrollTop + t.clientHeight >= t.scrollHeight * 0.7) {
+      void fetchMoreConversations();
+    }
+  };
 
   if (!conversations) return null;
 
@@ -74,7 +82,7 @@ const ConversationMixedList = () => {
       </div>
 
       {/* Conversation list */}
-      <div className="flex-1 min-h-0 overflow-y-auto beautiful-scrollbar px-2 pb-2 pt-2 space-y-1">
+      <div className="flex-1 min-h-0 overflow-y-auto beautiful-scrollbar px-2 pb-2 pt-2 space-y-1" onScroll={handleScroll}>
         {filtered.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
             {searchQuery ? (
@@ -94,6 +102,11 @@ const ConversationMixedList = () => {
               <DirectMessageCard convo={convo} key={convo._id} />
             )
           )
+        )}
+        {convoLoading && conversations.length > 0 && (
+          <div className="flex justify-center py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
         )}
       </div>
     </div>

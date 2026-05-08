@@ -82,6 +82,8 @@ export interface Conversation {
 
 export interface ConversationResponse {
   conversations: Conversation[];
+  hasMore?: boolean;
+  nextCursor?: string | null;
 }
 
 export type MessageType = 'text' | 'image' | 'audio' | 'file' | 'link' | 'system' | 'sticker';

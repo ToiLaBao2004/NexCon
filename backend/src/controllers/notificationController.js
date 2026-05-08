@@ -4,8 +4,31 @@ import { emitToUser } from '../socket/index.js';
 export async function getNotifications(req, res) {
     try {
         const userId = req.user._id;
-        const notifications = await Notification.find({ userId: userId }).sort({ createdAt: -1 });
-        res.status(200).json({ success: true, notifications });
+        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+        const cursor = req.query.cursor;
+
+        const query = { userId };
+        if (cursor) {
+            const d = new Date(cursor);
+            if (!isNaN(d.getTime())) query.createdAt = { $lt: d };
+        }
+
+        const [raw, totalUnreadCount, totalCount] = await Promise.all([
+            Notification.find(query)
+                .sort({ createdAt: -1 })
+                .limit(limit + 1)
+                .lean(),
+            Notification.countDocuments({ userId, isRead: false }),
+            Notification.countDocuments({ userId }),
+        ]);
+
+        const hasMore = raw.length > limit;
+        if (hasMore) raw.pop();
+        const nextCursor = hasMore && raw.length > 0
+            ? raw[raw.length - 1].createdAt
+            : null;
+
+        res.status(200).json({ success: true, notifications: raw, hasMore, nextCursor, totalUnreadCount, totalCount });
     } catch (error) {
         console.error('Error fetching notifications:', error);
         res.status(500).json({ success: false, message: 'Failed to fetch notifications' });
