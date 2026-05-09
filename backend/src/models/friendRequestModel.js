@@ -34,6 +34,9 @@ friendRequestSchema.post('findOneAndUpdate', async function(doc) {
     }
 });
 
+// Auto delete friend requests after 30 days if not accepted
+friendRequestSchema.index({ createdAt: 1 }, { expireAfterSeconds: 2592000 });
+
 const FriendRequestModel = mongoose.models.FriendRequest || mongoose.model('FriendRequest', friendRequestSchema);
 
 export default FriendRequestModel;
