@@ -7,7 +7,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     notifications: [],
     loading: false,
     notificationsFetched: false,
+    hasMore: false,
+    nextCursor: null,
     unreadCount: 0,
+    totalCount: 0,
     pendingReadIds: [],
     markAllPending: false,
 
@@ -16,7 +19,10 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
             notifications: [],
             loading: false,
             notificationsFetched: false,
+            hasMore: false,
+            nextCursor: null,
             unreadCount: 0,
+            totalCount: 0,
             pendingReadIds: [],
             markAllPending: false,
         });
@@ -24,17 +30,54 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
 
     fetchNotifications: async (force = false) => {
         try {
-            if (!force && get().notificationsFetched) {
-                return;
-            }
+            if (get().loading) return;
+            if (!force && get().notificationsFetched) return;
 
             set({ loading: true });
-            const notifications = await notificationService.getNotifications();
-            const unreadCount = notifications.filter((n: Notification) => !n.isRead).length;
-            set({ notifications, notificationsFetched: true, unreadCount, pendingReadIds: [], markAllPending: false });
+            const { notifications, hasMore, nextCursor, totalUnreadCount, totalCount } = await notificationService.getNotifications({ limit: 20 });
+            const unreadCount = totalUnreadCount ?? notifications.filter((n: any) => !n.isRead).length;
+            const count = totalCount ?? notifications.length;
+            set({
+                notifications,
+                notificationsFetched: true,
+                hasMore: hasMore ?? false,
+                nextCursor: nextCursor ?? null,
+                unreadCount,
+                totalCount: count,
+                pendingReadIds: [],
+                markAllPending: false,
+            });
         } catch (error: any) {
             console.error('Lỗi khi tải thông báo:', error);
             toast.error('Không thể lấy thông báo');
+        } finally {
+            set({ loading: false });
+        }
+    },
+
+    fetchMoreNotifications: async () => {
+        const { loading, hasMore, nextCursor } = get();
+        if (loading || !hasMore || !nextCursor) return;
+        try {
+            set({ loading: true });
+            const { notifications: incoming, hasMore: more, nextCursor: cursor, totalUnreadCount, totalCount } = await notificationService.getNotifications({
+                cursor: nextCursor,
+                limit: 20,
+            });
+            set((state) => {
+                const existingIds = new Set(state.notifications.map((n) => n._id));
+                const unique = incoming.filter((n: any) => !existingIds.has(n._id));
+                const merged = [...state.notifications, ...unique];
+                return {
+                    notifications: merged,
+                    hasMore: more ?? false,
+                    nextCursor: cursor ?? null,
+                    unreadCount: totalUnreadCount ?? merged.filter((n) => !n.isRead).length,
+                    totalCount: totalCount ?? state.totalCount,
+                };
+            });
+        } catch (error: any) {
+            console.error('Lỗi khi tải thêm thông báo:', error);
         } finally {
             set({ loading: false });
         }

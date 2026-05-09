@@ -34,6 +34,9 @@ const pushSubscriptionSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// Auto delete stale push subscriptions after 90 days
+pushSubscriptionSchema.index({ createdAt: 1 }, { expireAfterSeconds: 7776000 });
+
 const PushSubscriptionModel =
     mongoose.models.PushSubscription || mongoose.model('PushSubscription', pushSubscriptionSchema);
 

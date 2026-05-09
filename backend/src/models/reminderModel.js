@@ -169,6 +169,24 @@ reminderSchema.index(
     }
 );
 
+// Auto delete personal triggered reminders after 30 days
+reminderSchema.index(
+    { updatedAt: 1 },
+    {
+        expireAfterSeconds: 2592000, // 30 days
+        partialFilterExpression: { status: 'triggered', scope: 'personal' },
+    }
+);
+
+// Auto delete shared reminders 30 days after the scheduled remind time
+reminderSchema.index(
+    { remindAt: 1 },
+    {
+        expireAfterSeconds: 2592000, // 30 days
+        partialFilterExpression: { scope: 'shared' },
+    }
+);
+
 const ReminderModel = mongoose.models.Reminder || mongoose.model('Reminder', reminderSchema);
 
 export default ReminderModel;

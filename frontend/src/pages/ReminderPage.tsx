@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from 'react';
 import {
     AlarmClock,
     CalendarRange,
@@ -10,6 +10,7 @@ import {
     Search,
     SlidersHorizontal,
     Trash2,
+    Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -75,6 +76,9 @@ const ReminderPage = () => {
         deleteReminderAsync,
         deleteRemindersByScopeAsync,
         updateReminderInStore,
+        fetchMoreReminders,
+        isLoadingMore,
+        hasMore,
     } = useReminderStore();
 
     const tabQuery = getReminderTabFromQuery(searchParams.get('tab'));
@@ -155,6 +159,7 @@ const ReminderPage = () => {
             from: fromDate || undefined,
             to: toDate || undefined,
             sharedKey: focusSharedKey || undefined,
+            limit: 50,
         };
 
         if (activeTab === 'upcoming') {
@@ -188,10 +193,11 @@ const ReminderPage = () => {
     const lastQueryKey = useMemo(() => JSON.stringify(lastFetchParams ?? null), [lastFetchParams]);
 
     useEffect(() => {
-        if (reminders.length === 0 || queryKey !== lastQueryKey) {
+        if (isLoading) return;
+        if (queryKey !== lastQueryKey) {
             void fetchReminders(currentQueryParams);
         }
-    }, [fetchReminders, currentQueryParams, reminders.length, queryKey, lastQueryKey]);
+    }, [fetchReminders, currentQueryParams, queryKey, lastQueryKey, isLoading]);
 
     useEffect(() => {
         if (!focusReminderId || !highlightedReminderId) return;
@@ -239,6 +245,15 @@ const ReminderPage = () => {
 
         return () => window.clearTimeout(timeout);
     }, [highlightedReminderId, reminders]);
+
+    const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+        if (viewMode === 'calendar' || isLoadingMore || !hasMore || isLoading) return;
+        const t = e.currentTarget;
+        const threshold = 100; // Trigger when within 100px of bottom
+        if (t.scrollHeight - t.scrollTop - t.clientHeight < threshold) {
+            void fetchMoreReminders(currentQueryParams);
+        }
+    };
 
     useEffect(() => {
         if (!shouldOpenEditFromQuery || !focusReminderId) return;
@@ -1036,6 +1051,7 @@ const ReminderPage = () => {
                         ? 'flex-1 min-h-0 overflow-hidden bg-background'
                         : 'flex-1 min-h-0 overflow-y-auto beautiful-scrollbar bg-muted/20 p-4 md:p-6'
                 }
+                onScroll={handleScroll}
             >
                 {viewMode === 'list' && (
                     <div className="mb-4 flex justify-end">
@@ -1093,25 +1109,32 @@ const ReminderPage = () => {
                     !hasUpcomingData ? (
                         upcomingEmpty
                     ) : (
-                        <div className="space-y-4 md:space-y-6">
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                                {filteredReminders.map((item) => (
-                                    <ReminderCard
-                                        key={item._id}
-                                        reminder={item}
-                                        activeTab={activeTab}
-                                        options={getReminderCardOptions(item)}
-                                        onEdit={handleReminderPrimaryAction}
-                                        onDelete={handleOpenDeleteConfirm}
-                                        onReuse={handleReuseReminder}
-                                        onRepeat={(reminder, minutes) => {
-                                            void handleRepeatReminder(reminder, minutes);
-                                        }}
-                                        onBindRef={bindReminderCardRef}
-                                    />
-                                ))}
-                            </div>
-
+                        <div className="space-y-6 md:space-y-8">
+                            {groupedUpcoming.map((group) => (
+                                <div key={group.key} className="space-y-3">
+                                    <h3 className="px-1 text-sm font-bold text-muted-foreground/80 flex items-center gap-2">
+                                        <div className="h-1.5 w-1.5 rounded-full bg-primary/60" />
+                                        {group.label}
+                                    </h3>
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                        {group.items.map((item) => (
+                                            <ReminderCard
+                                                key={item._id}
+                                                reminder={item}
+                                                activeTab={activeTab}
+                                                options={getReminderCardOptions(item)}
+                                                onEdit={handleReminderPrimaryAction}
+                                                onDelete={handleOpenDeleteConfirm}
+                                                onReuse={handleReuseReminder}
+                                                onRepeat={(reminder, minutes) => {
+                                                    void handleRepeatReminder(reminder, minutes);
+                                                }}
+                                                onBindRef={bindReminderCardRef}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )
                 ) : activeTab === 'past' ? (
@@ -1157,7 +1180,12 @@ const ReminderPage = () => {
                         ))}
                     </div>
                 )}
-
+                
+                {isLoadingMore && (
+                    <div className="flex justify-center py-6">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                )}
             </div>
 
             <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>

@@ -87,6 +87,13 @@ export interface ChatState {
 
   conversations: Conversation[];
   conversationsFetched: boolean;
+  conversationsHasMore: boolean;
+  conversationsNextCursor: string | null;
+  groupConversations: Conversation[];
+  groupsFetched: boolean;
+  groupsLoading: boolean;
+  groupsHasMore: boolean;
+  groupsNextCursor: string | null;
   messages: Record<string, {
     items: Message[],
     hasMore: boolean,
@@ -110,6 +117,10 @@ export interface ChatState {
   setReplyingTo: (message: Message | null) => void;
   clearConversationCache: (keepConversationIds: string[]) => void;
   fetchConversations: (force?: boolean) => Promise<void>;
+  fetchMoreConversations: () => Promise<void>;
+  fetchGroups: (force?: boolean) => Promise<void>;
+  fetchMoreGroups: () => Promise<void>;
+  searchGroups: (query: string) => Promise<Conversation[]>;
   fetchMessages: (conversationId?: string) => Promise<void>;
   toggleConversationPin: (conversationId: string) => Promise<void>;
   sendMessage: (payload: SendMessagePayload, onProgress?: (pct: number) => void) => Promise<void>;
@@ -314,10 +325,14 @@ export interface NotificationState {
   notifications: Notification[];
   loading: boolean;
   notificationsFetched: boolean;
+  hasMore: boolean;
+  nextCursor: string | null;
   unreadCount: number;
+  totalCount: number;
   pendingReadIds: string[];
   markAllPending: boolean;
   fetchNotifications: (force?: boolean) => Promise<void>;
+  fetchMoreNotifications: () => Promise<void>;
   markAsRead: (id: string) => Promise<void>;
   markAllAsRead: () => Promise<void>;
   addNotification: (notification: Notification) => void;

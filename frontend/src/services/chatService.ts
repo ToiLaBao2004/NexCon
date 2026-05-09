@@ -33,9 +33,21 @@ function resolveErrorMessage(error: any): string {
 }
 
 export const chatService = {
-	async fetchConversations(): Promise<ConversationResponse> {
-		const res = await api.get('/conversations/get-conversations');
+	async fetchConversations(params?: { limit?: number; cursor?: string }): Promise<ConversationResponse> {
+		const query = new URLSearchParams();
+		if (params?.limit) query.append('limit', String(params.limit));
+		if (params?.cursor) query.append('cursor', params.cursor);
+		const res = await api.get(`/conversations/get-conversations?${query}`);
 		return res.data;
+	},
+
+	async fetchGroups(params?: { limit?: number; cursor?: string; search?: string }) {
+		const query = new URLSearchParams();
+		if (params?.limit) query.append('limit', String(params.limit));
+		if (params?.cursor) query.append('cursor', params.cursor);
+		if (params?.search) query.append('search', params.search);
+		const res = await api.get(`/conversations/get-groups?${query}`);
+		return res.data as { groups: any[]; hasMore: boolean; nextCursor: string | null };
 	},
 
 	async fetchMessages(params: FetchMessagesParams): Promise<FetchMessageProps & { anchorId?: string, hasMoreOlder?: boolean, hasMoreNewer?: boolean }> {

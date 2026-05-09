@@ -7,6 +7,7 @@ const isUpcomingStatus = (status: Reminder['status']): boolean =>
   status === 'pending' || status === 'snoozed';
 
 let reminderFetchSequence = 0;
+let isFetchingSummary = false;
 
 export const useReminderStore = create<ReminderState>((set, get) => ({
   reminders: [],
@@ -19,15 +20,20 @@ export const useReminderStore = create<ReminderState>((set, get) => ({
   upcomingCount: 0,
 
   fetchUpcomingCount: async () => {
+    if (isFetchingSummary) return;
+    isFetchingSummary = true;
     try {
       const { upcomingCount } = await reminderService.getReminderSummary();
       set({ upcomingCount });
     } catch (error) {
       console.error('Lỗi khi tải reminder summary:', error);
+    } finally {
+      isFetchingSummary = false;
     }
   },
 
   fetchReminders: async (params) => {
+    if (get().isLoading) return;
     const currentSequence = ++reminderFetchSequence;
 
     set({

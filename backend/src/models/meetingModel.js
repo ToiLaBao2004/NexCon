@@ -63,6 +63,15 @@ const meetingSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
+// Auto delete ended meetings after 7 days
+meetingSchema.index(
+    { updatedAt: 1 },
+    {
+        expireAfterSeconds: 604800, // 7 days
+        partialFilterExpression: { status: 'ended' },
+    }
+);
+
 const Meeting = mongoose.models.Meeting || mongoose.model('Meeting', meetingSchema);
 
 export default Meeting;

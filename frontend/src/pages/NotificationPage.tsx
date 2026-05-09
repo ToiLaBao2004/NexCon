@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type UIEvent } from "react";
 import { Bell, Inbox, CheckCheck, Loader2 } from "lucide-react";
 import { useNotificationStore } from "@/stores/useNotificationStore";
 import NotificationCard from "@/components/notification/NotificationCard";
@@ -10,9 +10,12 @@ const NotificationPage = () => {
     const [filter, setFilter] = useState<"all" | "unread">("all");
     const notifications = useNotificationStore((state) => state.notifications);
     const fetchNotifications = useNotificationStore((state) => state.fetchNotifications);
+    const fetchMoreNotifications = useNotificationStore((state) => state.fetchMoreNotifications);
     const markAllAsRead = useNotificationStore((state) => state.markAllAsRead);
     const loading = useNotificationStore((state) => state.loading);
+    const hasMore = useNotificationStore((state) => state.hasMore);
     const unreadCount = useNotificationStore((state) => state.unreadCount);
+    const totalCount = useNotificationStore((state) => state.totalCount);
     const markAllPending = useNotificationStore((state) => state.markAllPending);
 
     const filteredNotifications = useMemo(() => {
@@ -26,6 +29,14 @@ const NotificationPage = () => {
     useEffect(() => {
         void fetchNotifications();
     }, [fetchNotifications]);
+
+    const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+        if (loading || !hasMore) return;
+        const t = e.currentTarget;
+        if (t.scrollTop + t.clientHeight >= t.scrollHeight * 0.7) {
+            void fetchMoreNotifications();
+        }
+    };
 
     return (
         <div className="relative flex-1 h-full overflow-hidden rounded-none border-0 bg-background md:rounded-3xl md:border md:border-border/60 md:shadow-soft">
@@ -68,7 +79,7 @@ const NotificationPage = () => {
                                     : "border-border/70 bg-background/70 text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            Tất cả ({notifications.length})
+                            Tất cả ({totalCount})
                         </button>
                         <button
                             type="button"
@@ -85,7 +96,7 @@ const NotificationPage = () => {
                     </div>
                 </div>
 
-                <div className="beautiful-scrollbar relative z-10 flex-1 overflow-y-auto p-4 md:p-6">
+                <div className="beautiful-scrollbar relative z-10 flex-1 overflow-y-auto p-4 md:p-6" onScroll={handleScroll}>
                     {loading && notifications.length === 0 ? (
                         <div className="mx-auto flex w-full max-w-3xl flex-col gap-3">
                             {Array.from({ length: 4 }).map((_, index) => (
@@ -107,6 +118,11 @@ const NotificationPage = () => {
                                     <NotificationCard notification={notification} />
                                 </div>
                             ))}
+                            {loading && (
+                                <div className="flex justify-center py-3">
+                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="flex h-full flex-col items-center justify-center px-6 py-20 text-center">
