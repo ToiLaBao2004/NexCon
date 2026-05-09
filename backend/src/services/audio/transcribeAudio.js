@@ -38,10 +38,8 @@ export async function transcribeAudioFromBuffer(buffer, filename = 'voice_messag
         const transcript = await assemblyClient.transcripts.transcribe({
             audio: buffer,
 
-            // Bắt buộc theo docs mới của AssemblyAI
             speech_models: ['universal-3-pro', 'universal-2'],
 
-            // Vì app của bạn chủ yếu tiếng Việt
             language_code: 'vi',
         });
 
