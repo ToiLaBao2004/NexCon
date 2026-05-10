@@ -164,7 +164,7 @@ export const useAuthStore = create<AuthState>()(
         if (Capacitor.isNativePlatform()) {
           // Luồng mobile: dùng plugin native
           await GoogleAuth.initialize({
-            clientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+            clientId: '329414919529-r6no231nkn80oh0piajrhk49nhl2c80p.apps.googleusercontent.com',
             scopes: ['profile', 'email'],
           });
 
