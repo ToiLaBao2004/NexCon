@@ -266,24 +266,43 @@ const ChatWindowBody: React.FC = () => {
     const container = scrollRef.current;
     if (!container) return;
 
-    const resizeObserver = new ResizeObserver(() => {
-      // Don't auto-scroll to bottom if we are loading older/newer messages
-      if (loadingMoreRef.current) return;
+    // Biến lưu trữ chiều cao trước khi resize để tính toán delta
+    let lastHeight = container.getBoundingClientRect().height;
 
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      // Only auto-scroll if near bottom and NOT near the top
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
-      const isNearTop = scrollTop < 100;
+    const handleResize = () => {
+      if (loadingMoreRef.current || isJumpMode) return;
 
-      if (isNearBottom && !isNearTop && !isFirstLoad.current && !isJumpMode) {
-        container.scrollTop = scrollHeight;
+      const { scrollTop, scrollHeight } = container;
+      const clientHeight = container.getBoundingClientRect().height;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+      const heightDelta = lastHeight - clientHeight;
+      lastHeight = clientHeight;
+
+      if (heightDelta !== 0) {
+        if (isAtBottom && bottomRef.current) {
+          bottomRef.current.scrollIntoView({ behavior: 'instant', block: 'end' });
+        } else {
+          container.scrollTop = scrollTop + heightDelta;
+        }
       }
-    });
+    };
 
-    const content = container.firstElementChild;
-    if (content) resizeObserver.observe(content);
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
+    window.addEventListener('resize', handleResize);
 
-    return () => resizeObserver.disconnect();
+    const handleViewportChange = () => {
+      if (!window.visualViewport || isJumpMode || loadingMoreRef.current) return;
+      handleResize();
+    };
+
+    window.visualViewport?.addEventListener('resize', handleViewportChange);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', handleResize);
+      window.visualViewport?.removeEventListener('resize', handleViewportChange);
+    };
   }, [convoId, isJumpMode]);
 
 
