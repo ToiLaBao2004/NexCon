@@ -2,7 +2,7 @@ import express from 'express';
 import {
     signUp, signIn, signOut, signOutAll, verifyValidFieldsSignUp,
     resetNewPassword, googleAuthCallback, refreshToken, googleSuccess,
-    getSessions, signOutBySession
+    getSessions, signOutBySession, googleMobileAuth
 } from '../controllers/authController.js';
 import passport from '../config/passport.js';
 
@@ -34,5 +34,7 @@ authRouter.get(
 authRouter.get('/google/success', googleSuccess);
 
 authRouter.post('/refresh-token', refreshToken);
+
+authRouter.post('/google/mobile', googleMobileAuth);
 
 export default authRouter;

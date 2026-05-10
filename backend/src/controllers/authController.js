@@ -9,6 +9,8 @@ import { removeSubscription } from '../services/pushNotificationService.js';
 import { createNotification } from '../services/notificationServices.js';
 import { disconnectSessionSockets, disconnectUserSockets } from '../socket/index.js';
 import { checkFieldFormat } from '../utils/fieldFormat.js';
+import { OAuth2Client } from 'google-auth-library';
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
@@ -430,5 +432,55 @@ export async function refreshToken(req, res) {
     } catch (error) {
         console.error('Error during token refresh:', error);
         return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function googleMobileAuth(req, res) {
+    try {
+        const { idToken } = req.body;
+        if (!idToken) return res.status(400).json({ message: 'idToken is required.' });
+
+        const ticket = await googleClient.verifyIdToken({
+            idToken,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const { sub: googleId, email, name, picture } = ticket.getPayload();
+
+        let user = await User.findOne({ $or: [{ googleId }, { email }] });
+        if (user) {
+            user.googleId = googleId;
+            await user.save();
+        } else {
+            user = await User.create({
+                email,
+                password: crypto.randomBytes(16).toString('hex'),
+                displayName: name || email.split('@')[0],
+                googleId,
+            });
+        }
+
+        const refreshTokenValue = crypto.randomBytes(64).toString('hex');
+        const userAgent = req.headers['user-agent'] || '';
+        const ip = parseIp(req);
+        const deviceName = parseDeviceName(userAgent);
+
+        const session = await Session.create({
+            userId: user._id,
+            refreshToken: refreshTokenValue,
+            expiresAt: Date.now() + REFRESH_TOKEN_TTL,
+            deviceInfo: { userAgent, ip, deviceName }
+        });
+
+        const accessToken = jwt.sign(
+            { userId: user._id, sessionId: session._id },
+            process.env.ACCESS_TOKEN_SECRET,
+            { expiresIn: ACCESS_TOKEN_TTL }
+        );
+
+        return res.status(200).json({ accessToken, refreshToken: refreshTokenValue });
+    } catch (error) {
+        console.error('Google mobile auth error:', error);
+        return res.status(401).json({ message: 'Invalid Google token.' });
     }
 }

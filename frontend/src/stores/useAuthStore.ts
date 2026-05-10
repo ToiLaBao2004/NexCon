@@ -9,8 +9,9 @@ import { useNotificationStore } from './useNotificationStore';
 import { useFriendStore } from './useFriendStore';
 import { unsubscribePushOnLogout } from '@/hooks/usePushNotification';
 import { Capacitor } from '@capacitor/core';
-import { saveRefreshToken } from '@/lib/axios';
+import api, { saveRefreshToken } from '@/lib/axios';
 import { clearRefreshToken } from '@/lib/axios';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 export const useAuthStore = create<AuthState>()(
   persist((set, get) => ({
@@ -158,9 +159,29 @@ export const useAuthStore = create<AuthState>()(
       }
     },
 
-    loginGoogle: () => {
+    loginGoogle: async () => {
       try {
-        authService.loginGoogle();
+        if (Capacitor.isNativePlatform()) {
+          // Luồng mobile: dùng plugin native
+          await GoogleAuth.initialize({
+            clientId: 'YOUR_WEB_CLIENT_ID.apps.googleusercontent.com',
+            scopes: ['profile', 'email'],
+          });
+
+          const googleUser = await GoogleAuth.signIn();
+          const idToken = googleUser.authentication.idToken;
+
+          const { data } = await api.post('/auth/google/mobile', { idToken });
+          get().setAccessToken(data.accessToken);
+          await saveRefreshToken(data.refreshToken);
+
+          await get().fetchMe();
+          useChatStore.getState().fetchConversations();
+          useNotificationStore.getState().fetchNotifications();
+          toast.success('Đăng nhập bằng Google thành công!');
+        } else {
+          authService.loginGoogle();
+        }
       } catch (error) {
         console.error('Lỗi khi đăng nhập bằng Google:', error);
         toast.error('Đăng nhập bằng Google thất bại.');

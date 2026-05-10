@@ -8,6 +8,13 @@ const config: CapacitorConfig = {
     url: 'https://nex-con-mu.vercel.app',
     cleartext: false,
   },
+  plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      serverClientId: '329414919529-f8ldstaqh5sv7o32b0onfkfj4r66jr2m.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true,
+    },
+  },
 };
 
 export default config;
