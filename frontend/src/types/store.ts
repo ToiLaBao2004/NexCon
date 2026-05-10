@@ -203,8 +203,10 @@ export interface FriendState {
   friendsFetched: boolean;
   incomingRequests: FriendRequest[];
   incomingRequestsFetched: boolean;
+  fetchingIncomingRequests: boolean;
   sentRequests: SentFriendRequest[];
   sentRequestsFetched: boolean;
+  fetchingSentRequests: boolean;
   fetchFriends: (force?: boolean) => Promise<void>;
   fetchIncomingRequests: (force?: boolean) => Promise<void>;
   fetchSentRequests: (force?: boolean) => Promise<void>;

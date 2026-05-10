@@ -16,8 +16,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	friendsFetched: false,
 	incomingRequests: [],
 	incomingRequestsFetched: false,
+	fetchingIncomingRequests: false,
 	sentRequests: [],
 	sentRequestsFetched: false,
+	fetchingSentRequests: false,
 	blockedUsers: [],
 	blockedUsersFetched: false,
 	blockedBy: [],
@@ -53,27 +55,33 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 
 	fetchIncomingRequests: async (force = false) => {
 		try {
-			if (!force && get().incomingRequestsFetched) {
+			if (!force && (get().incomingRequestsFetched || get().fetchingIncomingRequests)) {
 				return;
 			}
 
+			set({ fetchingIncomingRequests: true });
 			const data = await friendService.fetchIncomingRequests();
 			set({ incomingRequests: data.friendRequests || [], incomingRequestsFetched: true });
 		} catch (error) {
 			console.error('Lỗi khi tải lời mời kết bạn đến:', error);
+		} finally {
+			set({ fetchingIncomingRequests: false });
 		}
 	},
 
 	fetchSentRequests: async (force = false) => {
 		try {
-			if (!force && get().sentRequestsFetched) {
+			if (!force && (get().sentRequestsFetched || get().fetchingSentRequests)) {
 				return;
 			}
 
+			set({ fetchingSentRequests: true });
 			const data = await friendService.fetchSentRequests();
 			set({ sentRequests: data.friendRequests || [], sentRequestsFetched: true });
 		} catch (error) {
 			console.error('Lỗi khi tải lời mời kết bạn đi:', error);
+		} finally {
+			set({ fetchingSentRequests: false });
 		}
 	},
 

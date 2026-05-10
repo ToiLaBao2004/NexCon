@@ -98,6 +98,7 @@ function App() {
     if (isAuth) {
       connectSocket();
       useFriendStore.getState().fetchFriends();
+      useFriendStore.getState().fetchIncomingRequests();
       useNotificationStore.getState().fetchNotifications();
       useChatStore.getState().fetchConversations();
       useReminderStore.getState().fetchUpcomingCount();
