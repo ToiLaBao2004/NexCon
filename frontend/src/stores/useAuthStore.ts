@@ -179,12 +179,14 @@ export const useAuthStore = create<AuthState>()(
           useChatStore.getState().fetchConversations();
           useNotificationStore.getState().fetchNotifications();
           toast.success('Đăng nhập bằng Google thành công!');
+          return true;
         } else {
           authService.loginGoogle();
         }
       } catch (error) {
         console.error('Lỗi khi đăng nhập bằng Google:', error);
         toast.error('Đăng nhập bằng Google thất bại.');
+        return false;
       }
     },
 

@@ -53,7 +53,7 @@ export default interface AuthState {
 
   signOut: () => Promise<void>;
 
-  loginGoogle: () => void;
+  loginGoogle: () => Promise<boolean | void>;
 
   fetchMe: (silent?: boolean) => Promise<void>;
 

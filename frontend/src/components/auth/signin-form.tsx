@@ -82,7 +82,8 @@ export function SigninForm({
   }
 
   const handleGoogleSignIn = async () => {
-    loginGoogle();
+    const success = await loginGoogle();
+    if (success) navigate('/');
   }
 
   return (
