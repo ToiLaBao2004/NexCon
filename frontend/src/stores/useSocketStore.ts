@@ -15,8 +15,6 @@ import { useReminderStore } from "./useReminderStore";
 import { showReminderToast } from "@/components/reminder/showReminderToast";
 import { useMeetStore } from "./useMeetStore";
 import { flashTabTitle } from "@/utils/tabTitle";
-import { showMessageNotification } from "@/lib/localNotification";
-import { Capacitor } from "@capacitor/core/types/global";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -330,26 +328,30 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         void playMessageSound();
 
         flashTabTitle("💬 Bạn có tin nhắn mới 💬");
-      }
 
-      if (!isMine && !mutedMessages && Capacitor.isNativePlatform()) {
-        const senderName = message.senderInfo?.displayName || 'Tin nhắn mới';
-        let body = '';
+        void (async () => {
+          const { Capacitor } = await import('@capacitor/core');
+          if (!Capacitor.isNativePlatform()) return;
 
-        if (message.type === 'image') body = '📷 Hình ảnh';
-        else if (message.type === 'file') body = `📎 ${message.fileName || 'File'}`;
-        else if (message.type === 'audio') body = '🎙️ Tin nhắn thoại';
-        else if (message.type === 'sticker') body = 'Đã gửi một nhãn dán';
-        else body = message.content || '';
+          const { showMessageNotification } = await import('@/lib/localNotification');
+          const senderName = message.senderInfo?.displayName || 'Tin nhắn mới';
+          let body = '';
 
-        const { activeConversationId } = useChatStore.getState();
-        if (activeConversationId !== message.conversationId) {
-          void showMessageNotification({
-            title: senderName,
-            body,
-            conversationId: message.conversationId,
-          });
-        }
+          if (message.type === 'image') body = '📷 Hình ảnh';
+          else if (message.type === 'file') body = `📎 ${message.fileName || 'File'}`;
+          else if (message.type === 'audio') body = '🎙️ Tin nhắn thoại';
+          else if (message.type === 'sticker') body = 'Đã gửi một nhãn dán';
+          else body = message.content || '';
+
+          const { activeConversationId } = useChatStore.getState();
+          if (activeConversationId !== message.conversationId) {
+            void showMessageNotification({
+              title: senderName,
+              body,
+              conversationId: message.conversationId,
+            });
+          }
+        })();
       }
 
       if (!isMine && currentConversation?.type === "direct") {
