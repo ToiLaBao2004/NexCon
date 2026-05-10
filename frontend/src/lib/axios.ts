@@ -1,5 +1,28 @@
 import { useAuthStore } from '@/stores/useAuthStore';
+import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 import axios from 'axios';
+
+const isMobile = () => Capacitor.isNativePlatform();
+
+// Helpers lưu/lấy refresh token trên mobile
+const getRefreshToken = async (): Promise<string | null> => {
+    if (!isMobile()) return null;
+    const { value } = await Preferences.get({ key: 'refreshToken' });
+    return value;
+};
+
+export const saveRefreshToken = async (token: string) => {
+    if (isMobile()) {
+        await Preferences.set({ key: 'refreshToken', value: token });
+    }
+};
+
+export const clearRefreshToken = async () => {
+    if (isMobile()) {
+        await Preferences.remove({ key: 'refreshToken' });
+    }
+};
 
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL,
@@ -10,6 +33,9 @@ api.interceptors.request.use((config) => {
     const accessToken = useAuthStore.getState().accessToken;
     if (accessToken) {
         config.headers.Authorization = `Bearer ${accessToken}`;
+    }
+    if (isMobile()) {
+        config.headers['x-client-type'] = 'mobile';
     }
     return config;
 });
@@ -38,9 +64,6 @@ api.interceptors.response.use(
             return Promise.reject(error);
         }
 
-
-
-        // Token hết hạn → thử refresh
         if (error.response?.status === 401 && !originalRequest._retry) {
             originalRequest._retry = true;
 
@@ -56,8 +79,15 @@ api.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const response = await api.post('/auth/refresh-token');
+                // Mobile: lấy refreshToken từ Preferences và gửi trong body
+                // Web: cookie tự động gửi, body rỗng
+                const body = isMobile()
+                    ? { refreshToken: await getRefreshToken() }
+                    : {};
+
+                const response = await api.post('/auth/refresh-token', body);
                 const newAccessToken = response.data.accessToken;
+
                 useAuthStore.getState().setAccessToken(newAccessToken);
                 originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
                 resolvePending(newAccessToken);
@@ -65,6 +95,7 @@ api.interceptors.response.use(
             } catch (refreshError) {
                 pendingRequests = [];
                 useAuthStore.getState().clearState();
+                await clearRefreshToken();
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;

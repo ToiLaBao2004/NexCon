@@ -10,7 +10,7 @@ import { createNotification } from '../services/notificationServices.js';
 import { disconnectSessionSockets, disconnectUserSockets } from '../socket/index.js';
 import { checkFieldFormat } from '../utils/fieldFormat.js';
 
-const ACCESS_TOKEN_TTL = '30m';
+const ACCESS_TOKEN_TTL = '10s';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 
 function parseIp(req) {
@@ -154,6 +154,14 @@ export async function signIn(req, res) {
                 }
             );
         }
+
+        const isMobile = req.headers['x-client-type'] === 'mobile';
+
+        return res.status(200).json({
+            message: `User ${user.displayName} logged in successfully.`,
+            accessToken,
+            ...(isMobile && { refreshToken })
+        });
 
         return res.status(200).json({ message: `User ${user.displayName} logged in successfully.`, accessToken: accessToken });
     } catch (error) {
@@ -403,7 +411,9 @@ export async function googleSuccess(req, res) {
 
 export async function refreshToken(req, res) {
     try {
-        const token = req.cookies?.refreshToken;
+        // Mobile gửi trong body, Web gửi qua cookie
+        const token = req.cookies?.refreshToken || req.body?.refreshToken;
+
         if (!token) {
             return res.status(400).json({ message: 'Token not found.' });
         }
@@ -411,8 +421,12 @@ export async function refreshToken(req, res) {
         if (!session || session.expiresAt < Date.now()) {
             return res.status(401).json({ message: 'Invalid or expired refresh token.' });
         }
-        const accessToken = jwt.sign({ userId: session.userId, sessionId: session._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
-        return res.status(200).json({ accessToken: accessToken });
+        const accessToken = jwt.sign(
+            { userId: session.userId, sessionId: session._id },
+            process.env.ACCESS_TOKEN_SECRET,
+            { expiresIn: ACCESS_TOKEN_TTL }
+        );
+        return res.status(200).json({ accessToken });
     } catch (error) {
         console.error('Error during token refresh:', error);
         return res.status(500).json({ message: 'Internal server error.' });

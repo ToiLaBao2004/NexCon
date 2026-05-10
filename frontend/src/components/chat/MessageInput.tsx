@@ -976,8 +976,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							rows={1}
 							placeholder={
 								attachment
-									? "Thêm chú thích (tuỳ chọn)…"
-									: "Soạn tin nhắn"
+									? ""
+									: ""
 							}
 							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/50 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
 							disabled={sending}

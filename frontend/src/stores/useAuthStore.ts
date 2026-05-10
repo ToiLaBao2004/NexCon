@@ -8,6 +8,9 @@ import { useChatStore } from './useChatStore';
 import { useNotificationStore } from './useNotificationStore';
 import { useFriendStore } from './useFriendStore';
 import { unsubscribePushOnLogout } from '@/hooks/usePushNotification';
+import { Capacitor } from '@capacitor/core';
+import { saveRefreshToken } from '@/lib/axios';
+import { clearRefreshToken } from '@/lib/axios';
 
 export const useAuthStore = create<AuthState>()(
   persist((set, get) => ({
@@ -27,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
       useNotificationStore.getState().reset();
       useFriendStore.getState().reset();
       localStorage.clear();
+      clearRefreshToken();
     },
 
     verifyValidFieldsSignUp: async (email, password, confirmPassword) => {
@@ -78,8 +82,11 @@ export const useAuthStore = create<AuthState>()(
         useNotificationStore.getState().reset();
         useFriendStore.getState().reset();
         // API Call
-        const { accessToken } = await authService.signIn(email, password);
+        const { accessToken, refreshToken } = await authService.signIn(email, password);
         get().setAccessToken(accessToken);
+        if (Capacitor.isNativePlatform() && refreshToken) {
+          await saveRefreshToken(refreshToken);
+        }
         toast.success('Đăng nhập thành công!');
         await get().fetchMe();
         useChatStore.getState().fetchConversations();
