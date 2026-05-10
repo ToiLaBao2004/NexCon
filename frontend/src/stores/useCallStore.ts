@@ -9,6 +9,8 @@ import {
   stopRingtone,
 } from "@/utils/sound";
 import { Room, RoomEvent, Track } from "livekit-client";
+import { Capacitor } from '@capacitor/core';
+import { Camera } from '@capacitor/camera';
 
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL as string;
 const CALL_NO_ANSWER_FALLBACK_MS = 35_000;
@@ -258,21 +260,42 @@ function clearCurrentCallBeforeAcceptingPending(
 }
 
 async function ensureMediaPermission(callType: CallType) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // Xin quyền micro bằng getUserMedia trực tiếp (không cần plugin riêng)
+      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStream.getTracks().forEach(t => t.stop());
+
+      // Xin quyền camera nếu là video call
+      if (callType === 'video') {
+        const camResult = await Camera.requestPermissions({ permissions: ['camera'] });
+        if (camResult.camera !== 'granted') {
+          toast.error('Vui lòng cấp quyền camera trong cài đặt điện thoại.');
+          return false;
+        }
+      }
+    } catch (error) {
+      console.error('Native permission request failed:', error);
+      toast.error('Vui lòng cấp quyền micro/camera trong cài đặt điện thoại.');
+      return false;
+    }
+  }
+
   if (!navigator.mediaDevices?.getUserMedia) {
-    toast.error("Trình duyệt không hỗ trợ truy cập micro/camera.");
+    toast.error('Trình duyệt không hỗ trợ truy cập micro/camera.');
     return false;
   }
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: true,
-      video: callType === "video",
+      video: callType === 'video',
     });
     stream.getTracks().forEach((track) => track.stop());
     return true;
   } catch (error) {
-    console.error("Media permission failed:", error);
-    toast.error("Vui lòng cấp quyền micro/camera cho trình duyệt rồi thử lại.");
+    console.error('Media permission failed:', error);
+    toast.error('Vui lòng cấp quyền micro/camera cho trình duyệt rồi thử lại.');
     return false;
   }
 }
@@ -694,7 +717,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       isRemoteConnecting: false,
       isMutedCall,
     });
-    
+
     if (!isMutedCall) {
       console.log("[CallStore] handleIncomingCall triggered, starting ringtone");
       void playRingtone();

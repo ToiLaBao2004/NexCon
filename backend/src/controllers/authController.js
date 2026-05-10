@@ -10,7 +10,7 @@ import { createNotification } from '../services/notificationServices.js';
 import { disconnectSessionSockets, disconnectUserSockets } from '../socket/index.js';
 import { checkFieldFormat } from '../utils/fieldFormat.js';
 
-const ACCESS_TOKEN_TTL = '10s';
+const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 
 function parseIp(req) {
