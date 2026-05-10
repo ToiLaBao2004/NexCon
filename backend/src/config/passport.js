@@ -4,7 +4,7 @@ import User from "../models/userModel.js";
 import crypto from "crypto";
 import { upLoadImageFromBuffer } from "../middlewares/uploadMiddleware.js";
 
-async function saveGoogleAvatarToCloudinary(url) {
+export async function saveGoogleAvatarToCloudinary(url) {
     if (!url) return { avatarUrl: "", avatarId: "" };
 
     const res = await fetch(url);

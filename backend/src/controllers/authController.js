@@ -10,6 +10,8 @@ import { createNotification } from '../services/notificationServices.js';
 import { disconnectSessionSockets, disconnectUserSockets } from '../socket/index.js';
 import { checkFieldFormat } from '../utils/fieldFormat.js';
 import { OAuth2Client } from 'google-auth-library';
+import { saveGoogleAvatarToCloudinary } from '../config/passport.js';
+
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const ACCESS_TOKEN_TTL = '30m';
@@ -164,8 +166,6 @@ export async function signIn(req, res) {
             accessToken,
             ...(isMobile && { refreshToken })
         });
-
-        return res.status(200).json({ message: `User ${user.displayName} logged in successfully.`, accessToken: accessToken });
     } catch (error) {
         console.error('Error during login:', error);
         return res.status(500).json({ message: 'Internal server error.' });
@@ -450,13 +450,27 @@ export async function googleMobileAuth(req, res) {
         let user = await User.findOne({ $or: [{ googleId }, { email }] });
         if (user) {
             user.googleId = googleId;
+            if (!user.avatarUrl && picture) {
+                const uploaded = await saveGoogleAvatarToCloudinary(picture);
+                user.avatarUrl = uploaded.avatarUrl;
+                user.avatarId = uploaded.avatarId;
+            }
             await user.save();
         } else {
+            let avatarUrl = '';
+            let avatarId = '';
+            if (picture) {
+                const uploaded = await saveGoogleAvatarToCloudinary(picture);
+                avatarUrl = uploaded.avatarUrl;
+                avatarId = uploaded.avatarId;
+            }
             user = await User.create({
                 email,
                 password: crypto.randomBytes(16).toString('hex'),
                 displayName: name || email.split('@')[0],
                 googleId,
+                avatarUrl,
+                avatarId,
             });
         }
 
