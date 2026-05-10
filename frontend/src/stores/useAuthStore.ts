@@ -162,11 +162,6 @@ export const useAuthStore = create<AuthState>()(
     loginGoogle: async () => {
       try {
         if (Capacitor.isNativePlatform()) {
-          // Luồng mobile: dùng plugin native
-          await GoogleAuth.initialize({
-            clientId: '329414919529-r6no231nkn80oh0piajrhk49nhl2c80p.apps.googleusercontent.com',
-            scopes: ['profile', 'email'],
-          });
 
           const googleUser = await GoogleAuth.signIn();
           const idToken = googleUser.authentication.idToken;
