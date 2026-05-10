@@ -259,7 +259,15 @@ export const useAuthStore = create<AuthState>()(
       try {
         set({ loading: true });
         const { user, fetchMe, setAccessToken } = get();
-        const accessToken = await authService.refreshToken();
+        let body = {};
+        const { Capacitor } = await import('@capacitor/core');
+        if (Capacitor.isNativePlatform()) {
+          const { getRefreshToken } = await import('@/lib/axios');
+          const token = await getRefreshToken();
+          if (!token) throw new Error('No refresh token');
+          body = { refreshToken: token };
+        }
+        const accessToken = await authService.refreshToken(body);
         setAccessToken(accessToken);
         if (!user) {
           await fetchMe();

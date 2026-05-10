@@ -86,9 +86,9 @@ export const authService = {
     return response.data.user;
   },
 
-  refreshToken: async () => {
-    const response = await api.post('/auth/refresh-token', {}, { withCredentials: true });
-    return response.data.accessToken;
+  async refreshToken(body = {}) {
+    const res = await api.post('/auth/refresh-token', body);
+    return res.data.accessToken as string;
   },
 
   googleSuccess: async () => {

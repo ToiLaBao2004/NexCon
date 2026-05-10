@@ -6,7 +6,7 @@ import axios from 'axios';
 const isMobile = () => Capacitor.isNativePlatform();
 
 // Helpers lưu/lấy refresh token trên mobile
-const getRefreshToken = async (): Promise<string | null> => {
+export const getRefreshToken = async (): Promise<string | null> => {
     if (!isMobile()) return null;
     const { value } = await Preferences.get({ key: 'refreshToken' });
     return value;

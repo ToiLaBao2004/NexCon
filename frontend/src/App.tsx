@@ -28,12 +28,29 @@ import MeetManager from "./components/call/MeetManager";
 import ImageViewerModal from "./components/chat/ImageViewerModal";
 import { usePushNotification } from "./hooks/usePushNotification";
 import SessionsPage from "./pages/SessionsPage"
+import { Capacitor } from '@capacitor/core';
 
 function App() {
   const initTheme = useThemeStore((state) => state.initTheme);
   const { accessToken } = useAuthStore();
   const { connectSocket, disconnectSocket } = useSocketStore();
   const { isSupported, requestPermission, subscribe } = usePushNotification();
+
+  useEffect(() => {
+    const tryRestoreSession = async () => {
+      if (accessToken) return;
+
+      try {
+        await useAuthStore.getState().refreshToken();
+      } catch {
+        // Không cần làm gì nếu refresh token thất bại, người dùng sẽ phải đăng nhập lại
+      }
+    };
+
+    if (Capacitor.isNativePlatform()) {
+      void tryRestoreSession();
+    }
+  }, []);
 
   useEffect(() => {
     useThemeStore.getState().initTheme();
