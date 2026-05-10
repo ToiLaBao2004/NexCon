@@ -212,6 +212,9 @@ export const useChatStore = create<ChatState>()(
                         }
                     }
 
+                    const activeId = get().activeConversationId;
+                    const activeConvoBeforeSync = activeId ? get().conversations.find(c => c._id === activeId) : null;
+
                     set({
                         conversations: sortConversations(conversations as any),
                         conversationsFetched: true,
@@ -219,6 +222,12 @@ export const useChatStore = create<ChatState>()(
                         conversationsNextCursor: nextCursor ?? null,
                         convoLoading: false,
                     });
+
+                    if (activeConvoBeforeSync && !get().conversations.find(c => c._id === activeId)) {
+                        set(state => ({
+                            conversations: [activeConvoBeforeSync, ...state.conversations]
+                        }));
+                    }
                 } catch (error) {
                     console.error('Lỗi khi tải danh sách cuộc trò chuyện:', error);
                     set({ convoLoading: false });
@@ -1208,6 +1217,34 @@ export const useChatStore = create<ChatState>()(
                             const conv = res.conversation || res;
                             await fetchConversations(true);
                             targetId = conv?._id || conv;
+
+                            // Đảm bảo conversation này có trong store ngay cả khi bị fetchConversations ẩn đi (do đã xóa trước đó)
+                            set((state) => {
+                                const exists = state.conversations.find((c) => c._id === targetId);
+                                if (!exists && conv && typeof conv === 'object') {
+                                    let modifiedConv = { ...conv };
+                                    const { user } = useAuthStore.getState();
+                                    const me = modifiedConv.participants?.find((p: any) =>
+                                        p.userId?._id === user?._id || p.userId === user?._id
+                                    );
+
+                                    // Nếu tin nhắn cuối cùng cũ hơn thời điểm xóa, hãy ẩn nó đi
+                                    if (me && me.clearedAt) {
+                                        const compareTime = modifiedConv.lastMessage?.createdAt
+                                            ? new Date(modifiedConv.lastMessage.createdAt).getTime()
+                                            : new Date(modifiedConv.updatedAt || modifiedConv.createdAt || 0).getTime();
+
+                                        if (compareTime <= new Date(me.clearedAt).getTime()) {
+                                            modifiedConv.lastMessage = null;
+                                        }
+                                    }
+
+                                    return {
+                                        conversations: [modifiedConv, ...state.conversations]
+                                    };
+                                }
+                                return state;
+                            });
                         }
                     }
 
