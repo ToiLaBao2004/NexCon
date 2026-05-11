@@ -53,8 +53,43 @@ function isUserOnline(userId) {
     return Boolean(roomSockets && roomSockets.size > 0);
 }
 
-function emitOnlineUsers() {
-    io.emit("online-users", getOnlineUserIds());
+async function emitOnlineUsers() {
+    try {
+        const allOnlineIds = getOnlineUserIds();
+        const sockets = Array.from(io.sockets.sockets.values());
+        
+        const userSocketsMap = new Map();
+        sockets.forEach(s => {
+            const uid = s.user?._id?.toString();
+            if (uid) {
+                if (!userSocketsMap.has(uid)) userSocketsMap.set(uid, []);
+                userSocketsMap.get(uid).push(s);
+            }
+        });
+
+        await Promise.all(Array.from(userSocketsMap.entries()).map(async ([userId, clientSockets]) => {
+            try {
+                const blocks = await BlockUser.find({
+                    $or: [
+                        { from: userId },
+                        { to: userId }
+                    ]
+                }).lean();
+
+                const blockedIds = new Set(blocks.map(b => 
+                    b.from.toString() === userId ? b.to.toString() : b.from.toString()
+                ));
+
+                const filteredIds = allOnlineIds.filter(id => !blockedIds.has(id));
+                
+                clientSockets.forEach(s => s.emit("online-users", filteredIds));
+            } catch (err) {
+                console.error(`Error filtering online users for ${userId}:`, err);
+            }
+        }));
+    } catch (err) {
+        console.error("Critical error in emitOnlineUsers:", err);
+    }
 }
 
 function getReceiverSocketId(userId) {
@@ -128,7 +163,7 @@ io.on("connection", async (socket) => {
     if (sessionId) {
         socket.join(getSessionRoom(sessionId));
     }
-    emitOnlineUsers();
+    await emitOnlineUsers();
 
     socket.use(async (_packet, next) => {
         try {
@@ -262,7 +297,7 @@ io.on("connection", async (socket) => {
     // Disconnect
     socket.on("disconnect", async () => {
         const userId = user._id.toString();
-        emitOnlineUsers();
+        await emitOnlineUsers();
 
         // Xử lý cuộc gọi đang active (lưu DB + thông báo đối phương)
         await handleCallDisconnect(userId, socket.id, activeCalls, io, getReceiverSocketId);
@@ -285,4 +320,5 @@ export {
     leaveUserSocketsFromRoom,
     disconnectSessionSockets,
     disconnectUserSockets,
+    emitOnlineUsers,
 };
