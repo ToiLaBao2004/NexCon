@@ -89,7 +89,7 @@ const ParticipantCardInner = ({
   const isLocal = trackRef.participant.isLocal;
 
   const [showControls, setShowControls] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleCardClick = () => {
     setShowControls(true);
@@ -115,7 +115,12 @@ const ParticipantCardInner = ({
       {hasVideo ? (
         <VideoTrack
           trackRef={trackRef as TrackReference}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: isScreenShare ? 'contain' : 'cover',
+            display: 'block'
+          }}
         />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-muted/50">
@@ -234,7 +239,7 @@ const Stage = () => {
     const otherTracks = tracks.filter(t => t !== focusTrack);
 
     return (
-      <div className="h-full w-full flex flex-col lg:flex-row gap-3 p-3 bg-background overflow-hidden">
+      <div className="h-full w-full flex flex-col sm:flex-row landscape:flex-row gap-3 p-3 bg-background overflow-hidden">
         <div className="flex-[3] relative min-h-0 min-w-0">
           <ParticipantCardInner
             trackRef={focusTrack}
@@ -245,8 +250,8 @@ const Stage = () => {
 
         {otherTracks.length > 0 && (
           <div className={cn(
-            "flex gap-3 overflow-auto lg:h-full lg:w-72 scrollbar-hide",
-            "flex-row lg:flex-col shrink-0"
+            "flex gap-3 overflow-auto sm:h-full sm:w-72 landscape:h-full landscape:w-72 scrollbar-hide",
+            "flex-row sm:flex-col landscape:flex-col shrink-0"
           )}>
             {otherTracks.map((trackRef) => {
               const sid = isTrackReference(trackRef)
@@ -256,7 +261,7 @@ const Stage = () => {
               return (
                 <div
                   key={`${trackRef.participant.identity}-${trackRef.source}`}
-                  className="aspect-video w-48 lg:w-full shrink-0"
+                  className="aspect-video w-48 sm:w-full landscape:w-full shrink-0"
                 >
                   <ParticipantCardInner
                     trackRef={trackRef}
