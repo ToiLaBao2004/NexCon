@@ -341,7 +341,26 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           else if (message.type === 'file') body = `📎 ${message.fileName || 'File'}`;
           else if (message.type === 'audio') body = '🎙️ Tin nhắn thoại';
           else if (message.type === 'sticker') body = 'Đã gửi một nhãn dán';
-          else body = message.content || '';
+          else {
+            const rawContent = message.content || '';
+            const convo = chatState.conversations.find(
+              (c) => String(c._id) === String(message.conversationId)
+            );
+            body = rawContent.replace(
+              /@\[USER:([^\]]+)\]/g,
+              (_full: string, uid: string) => {
+                const p = convo?.participants?.find(
+                  (item: any) =>
+                    String(item.userId?._id || item.userId) === uid.trim()
+                );
+                const name =
+                  p?.userId?.nickname?.trim() ||
+                  p?.userId?.displayName?.trim() ||
+                  'Thành viên';
+                return `@${name}`;
+              }
+            );
+          }
 
           const { activeConversationId } = useChatStore.getState();
           if (activeConversationId !== message.conversationId) {
