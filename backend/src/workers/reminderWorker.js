@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import redisIOClient from '../config/redisIOClient.js';
+import redisIOClient, { isRedisIOReady } from '../config/redisIOClient.js';
 import { scheduleReminderJob } from '../config/reminderQueue.js';
 import Reminder from '../models/reminderModel.js';
 import Meeting from '../models/meetingModel.js';
@@ -145,18 +145,31 @@ export function startReminderWorker() {
  * Đẩy lại tất cả nhắc hẹn đang chờ vào Queue khi Server khởi động
  */
 export async function reloadPendingReminders() {
-    try {
-        const now = new Date();
-        const reminders = await Reminder.find({
-            status: { $in: ['pending', 'snoozed'] },
-            $or: [{ remindAt: { $gt: now } }, { snoozeUntil: { $gt: now } }],
-        }).lean();
+    const runReload = async () => {
+        try {
+            const now = new Date();
+            const reminders = await Reminder.find({
+                status: { $in: ['pending', 'snoozed'] },
+                $or: [{ remindAt: { $gt: now } }, { snoozeUntil: { $gt: now } }],
+            }).lean();
 
-        for (const rem of reminders) {
-            await scheduleReminderJob(rem);
+            let count = 0;
+            for (const rem of reminders) {
+                const job = await scheduleReminderJob(rem);
+                if (job) count += 1;
+            }
+            console.log(`[ReminderMigration] Đã reload ${count}/${reminders.length} nhắc hẹn vào Queue.`);
+        } catch (error) {
+            console.error('[ReminderMigration] Lỗi reload nhắc hẹn:', error);
         }
-        console.log(`[ReminderMigration] Đã reload ${reminders.length} nhắc hẹn vào Queue.`);
-    } catch (error) {
-        console.error('[ReminderMigration] Lỗi reload nhắc hẹn:', error);
+    };
+
+    if (isRedisIOReady) {
+        await runReload();
+    } else {
+        console.log('[ReminderMigration] Chờ RedisIO sẵn sàng để reload...');
+        redisIOClient.once('ready', () => {
+            void runReload();
+        });
     }
 }
