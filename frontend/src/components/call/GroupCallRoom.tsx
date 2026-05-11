@@ -88,12 +88,28 @@ const ParticipantCardInner = ({
 
   const isLocal = trackRef.participant.isLocal;
 
+  const [showControls, setShowControls] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleCardClick = () => {
+    setShowControls(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setShowControls(false), 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   return (
     <div
+      onClick={handleCardClick}
       className={cn(
-        'relative w-full h-full overflow-hidden rounded-2xl transition-all duration-300 group/card',
+        'relative w-full h-full overflow-hidden rounded-2xl transition-all duration-300 group/card cursor-pointer',
         isSpeaking ? 'ring-2 ring-primary shadow-lg shadow-primary/20' : 'ring-1 ring-border',
-        isPinned ? 'ring-2 ring-amber-400' : '',
+        isPinned ? 'ring-2 ring-orange-500' : '',
       )}
     >
       {hasVideo ? (
@@ -127,7 +143,6 @@ const ParticipantCardInner = ({
         </div>
       )}
 
-      {/* Pin Toggle Button */}
       {onPinToggle && (
         <button
           onClick={(e) => {
@@ -136,9 +151,9 @@ const ParticipantCardInner = ({
           }}
           className={cn(
             "absolute top-2.5 right-2.5 p-2 rounded-lg backdrop-blur-md transition-all duration-200 z-20",
-            isPinned
-              ? "bg-orange-500 text-white opacity-100 shadow-[0_0_15px_rgba(249,115,22,0.5)] scale-110 ring-2 ring-white/20"
-              : "opacity-0 group-hover/card:opacity-100 bg-black/40 text-white hover:bg-black/60"
+            (isPinned || showControls)
+              ? "opacity-100 bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.5)] scale-110 ring-2 ring-white/20"
+              : "opacity-0 lg:group-hover/card:opacity-100 bg-black/40 text-white hover:bg-black/60"
           )}
           title={isPinned ? "Bỏ ghim" : "Ghim màn hình"}
         >
