@@ -66,10 +66,10 @@ const MeetManager = () => {
         style={isMinimized ? dragStyle : undefined}
         {...(isMinimized ? dragHandlers : {})}
         className={cn(
-          "z-[90] overflow-hidden transition-all duration-300",
+          "z-[90] overflow-hidden",
           isMinimized
-            ? "fixed w-80 rounded-2xl shadow-2xl border border-border bg-card flex flex-col cursor-grab active:cursor-grabbing"
-            : "fixed top-0 right-0 bottom-0 left-0 md:top-2 md:right-2 md:bottom-2 md:left-[5rem] bg-background md:rounded-2xl md:border md:border-border/40 md:shadow-soft"
+            ? "fixed w-72 rounded-2xl shadow-2xl border border-border bg-card flex flex-col cursor-grab active:cursor-grabbing"
+            : "fixed top-0 right-0 bottom-0 left-0 md:top-2 md:right-2 md:bottom-2 md:left-[5rem] bg-background md:rounded-2xl md:border md:border-border/40 md:shadow-soft transition-all duration-300"
         )}
       >
         <div className={cn("flex h-full min-w-0", isMinimized ? "flex-col" : "")}>
@@ -86,6 +86,7 @@ const MeetManager = () => {
               enablePresenceToasts
               onParticipantsChange={setParticipants}
               onLeaveIntercept={handleLeaveIntercept}
+              roomType="meet"
             />
  
             {!isMinimized && (

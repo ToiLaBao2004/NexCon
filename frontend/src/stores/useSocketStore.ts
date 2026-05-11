@@ -1005,7 +1005,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           ?.displayName ||
         "Một người";
 
-      toast.success(`${joinedDisplayName} đã tham gia cuộc họp.`, {
+      toast.success(`${joinedDisplayName} đã tham gia cuộc gọi.`, {
         duration: 3500,
       });
     });
@@ -1065,7 +1065,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         payload.participants.find((participant) => participant.userId === leftUserId)
           ?.displayName || "Một người";
 
-      toast.info(`${leftDisplayName} đã rời cuộc họp.`, {
+      toast.info(`${leftDisplayName} đã rời cuộc gọi.`, {
         duration: 3500,
       });
     });

@@ -30,7 +30,7 @@ const GroupCallScreen = () => {
         ref={dragRef}
         style={dragStyle}
         {...dragHandlers}
-        className="z-[90] w-80 rounded-2xl shadow-2xl border border-border bg-card flex flex-col overflow-hidden cursor-grab active:cursor-grabbing"
+        className="z-[90] w-72 rounded-2xl shadow-2xl border border-border bg-card flex flex-col overflow-hidden cursor-grab active:cursor-grabbing"
       >
         <GroupCallRoom
           roomName={conversationId}
@@ -40,6 +40,8 @@ const GroupCallScreen = () => {
           minimized={true}
           onMinimize={() => setIsMinimized(true)}
           onMaximize={() => setIsMinimized(false)}
+          roomType="call"
+          callType={callType as "video" | "audio" | undefined}
         />
       </div>
     );
@@ -56,6 +58,8 @@ const GroupCallScreen = () => {
           minimized={false}
           onMinimize={() => setIsMinimized(true)}
           onMaximize={() => setIsMinimized(false)}
+          roomType="call"
+          callType={callType as "video" | "audio" | undefined}
         />
       </div>
     );
