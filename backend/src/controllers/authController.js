@@ -174,13 +174,14 @@ export async function signIn(req, res) {
 
 export async function signOut(req, res) {
     try {
-        const refreshToken = req.cookies?.refreshToken;
-        if (!refreshToken) {
-            return res.status(400).json({ message: 'Refresh token not found.' });
-        }
         const pushEndpoint = req.body?.pushEndpoint;
         if (pushEndpoint) {
             await removeSubscription(pushEndpoint);
+        }
+
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken) {
+            return res.status(200).json({ message: 'User logged out (session already cleared).' });
         }
 
         const session = await Session.findOne({ refreshToken }).select('_id');

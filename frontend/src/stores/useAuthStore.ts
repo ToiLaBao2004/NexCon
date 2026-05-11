@@ -7,6 +7,7 @@ import { persist } from 'zustand/middleware';
 import { useChatStore } from './useChatStore';
 import { useNotificationStore } from './useNotificationStore';
 import { useFriendStore } from './useFriendStore';
+import { useSocketStore } from './useSocketStore';
 import { unsubscribePushOnLogout } from '@/hooks/usePushNotification';
 import { Capacitor } from '@capacitor/core';
 import api, { saveRefreshToken } from '@/lib/axios';
@@ -27,6 +28,7 @@ export const useAuthStore = create<AuthState>()(
 
     clearState: () => {
       set({ accessToken: null, user: null, loading: false });
+      useSocketStore.getState().disconnectSocket();
       useChatStore.getState().reset();
       useNotificationStore.getState().reset();
       useFriendStore.getState().reset();
@@ -143,8 +145,9 @@ export const useAuthStore = create<AuthState>()(
         set({ loading: true });
         const pushEndpoint = await unsubscribePushOnLogout();
 
-        get().clearState();
         await authService.signOut(pushEndpoint);
+
+        get().clearState();
         toast.success('Đăng xuất thành công!');
       } catch (error: any) {
         console.error('Lỗi khi đăng xuất:', error);
