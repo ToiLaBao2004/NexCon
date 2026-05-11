@@ -58,18 +58,15 @@ const PeoplePage = () => {
 
 	useEffect(() => {
 		fetchFriends();
-	}, [fetchFriends]);
+		fetchIncomingRequests();
+		fetchSentRequests();
+	}, [fetchFriends, fetchIncomingRequests, fetchSentRequests]);
 
 	useEffect(() => {
-		if (tab === "requests") {
-			fetchIncomingRequests();
-			fetchSentRequests();
-		}
-
 		if (tab === "blocked") {
 			fetchBlockedList();
 		}
-	}, [tab, fetchIncomingRequests, fetchSentRequests, fetchBlockedList]);
+	}, [tab, fetchBlockedList]);
 
 	useEffect(() => {
 		setActiveConversation(null);

@@ -357,7 +357,8 @@ export async function getFriendRequests(req, res) {
     try {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ to: user._id, status: 'pending' })
-            .populate('from', 'displayName email avatarUrl bio phone');
+            .populate('from', 'displayName email avatarUrl bio phone')
+            .sort({ createdAt: -1 });
         if (friendRequests.length === 0) {
             return res.status(200).json({ friendRequests: [] });
         }
@@ -554,7 +555,8 @@ export async function getFriendRequestsSended(req, res) {
     try {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ from: user._id, status: 'pending' })
-            .populate('to', 'displayName email avatarUrl bio phone');
+            .populate('to', 'displayName email avatarUrl bio phone')
+            .sort({ createdAt: -1 });
         if (friendRequests.length === 0) {
             return res.status(200).json({ friendRequests: [] });
         }

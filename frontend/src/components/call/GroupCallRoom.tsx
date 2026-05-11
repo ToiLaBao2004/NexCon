@@ -17,7 +17,7 @@ import {
   type TrackReference,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor, MonitorUp, MonitorOff, Minimize2, Maximize2 } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor, MonitorUp, MonitorOff, Minimize2, Maximize2, Pin, PinOff } from 'lucide-react';
 import { cn, nameToColor } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -34,6 +34,8 @@ interface GroupCallRoomProps {
   enablePresenceToasts?: boolean;
   onParticipantsChange?: (participants: RoomParticipantSummary[]) => void;
   onLeaveIntercept?: (disconnect: () => void) => void;
+  roomType?: 'call' | 'meet';
+  callType?: 'video' | 'audio';
 }
 
 export interface RoomParticipantSummary {
@@ -52,7 +54,15 @@ const LIVEKIT_CONNECT_OPTIONS = {
 };
 
 /* ─── ParticipantCard ─── */
-const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }) => {
+const ParticipantCardInner = ({
+  trackRef,
+  isPinned,
+  onPinToggle,
+}: {
+  trackRef: TrackReferenceOrPlaceholder;
+  isPinned?: boolean;
+  onPinToggle?: () => void;
+}) => {
   const { identity, name } = useParticipantInfo({ participant: trackRef.participant });
   const isSpeaking = useIsSpeaking(trackRef.participant);
   const micRef: TrackReferenceOrPlaceholder = {
@@ -78,17 +88,39 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
 
   const isLocal = trackRef.participant.isLocal;
 
+  const [showControls, setShowControls] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleCardClick = () => {
+    setShowControls(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setShowControls(false), 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
   return (
     <div
+      onClick={handleCardClick}
       className={cn(
-        'relative w-full h-full overflow-hidden rounded-2xl transition-shadow duration-300',
+        'relative w-full h-full overflow-hidden rounded-2xl transition-all duration-300 group/card cursor-pointer',
         isSpeaking ? 'ring-2 ring-primary shadow-lg shadow-primary/20' : 'ring-1 ring-border',
+        isPinned ? 'ring-2 ring-orange-500' : '',
       )}
     >
       {hasVideo ? (
         <VideoTrack
           trackRef={trackRef as TrackReference}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: isScreenShare ? 'contain' : 'cover',
+            display: 'block'
+          }}
         />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-muted/50">
@@ -116,6 +148,28 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
         </div>
       )}
 
+      {onPinToggle && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPinToggle();
+          }}
+          className={cn(
+            "absolute top-2.5 right-2.5 p-2 rounded-lg backdrop-blur-md transition-all duration-200 z-20",
+            (isPinned || showControls)
+              ? "opacity-100 bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.5)] scale-110 ring-2 ring-white/20"
+              : "opacity-0 lg:group-hover/card:opacity-100 bg-black/40 text-white hover:bg-black/60"
+          )}
+          title={isPinned ? "Bỏ ghim" : "Ghim màn hình"}
+        >
+          {isPinned ? (
+            <PinOff size={14} className="fill-current" />
+          ) : (
+            <Pin size={14} className="rotate-45" />
+          )}
+        </button>
+      )}
+
       {/* Name + mic overlay */}
       <div className="absolute bottom-0 inset-x-0 px-3 py-2 flex items-center gap-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent">
         <span className="text-white text-xs font-medium truncate drop-shadow-md">
@@ -141,33 +195,82 @@ const Stage = () => {
     { onlySubscribed: false },
   );
 
+  const [pinnedTrackSid, setPinnedTrackSid] = useState<string | null>(null);
+  const lastScreenShareTracksRef = useRef<string[]>([]);
+
   const screenShareTracks = tracks.filter((t) => t.source === Track.Source.ScreenShare);
-  const cameraTracks = tracks.filter((t) => t.source === Track.Source.Camera);
-  if (screenShareTracks.length > 0) {
-    const primaryShare = screenShareTracks[0];
-    const otherTracks = [...screenShareTracks.slice(1), ...cameraTracks];
+
+  useEffect(() => {
+    const currentSids = screenShareTracks.map(t =>
+      isTrackReference(t) ? t.publication.trackSid : `${t.participant.sid}-${t.source}`
+    );
+
+    const newSid = currentSids.find(sid => !lastScreenShareTracksRef.current.includes(sid));
+
+    if (newSid) {
+      setPinnedTrackSid(newSid);
+    } else if (pinnedTrackSid && !currentSids.includes(pinnedTrackSid)) {
+      const allSids = tracks.map(t =>
+        isTrackReference(t) ? t.publication.trackSid : `${t.participant.sid}-${t.source}`
+      );
+      if (!allSids.includes(pinnedTrackSid)) {
+        setPinnedTrackSid(null);
+      }
+    }
+
+    lastScreenShareTracksRef.current = currentSids;
+  }, [screenShareTracks, tracks, pinnedTrackSid]);
+
+  const focusTrack = pinnedTrackSid
+    ? tracks.find(t =>
+      (isTrackReference(t) ? t.publication.trackSid : `${t.participant.sid}-${t.source}`) === pinnedTrackSid
+    )
+    : null;
+
+  const handlePinToggle = (trackRef: TrackReferenceOrPlaceholder) => {
+    const sid = isTrackReference(trackRef)
+      ? trackRef.publication.trackSid
+      : `${trackRef.participant.sid}-${trackRef.source}`;
+
+    setPinnedTrackSid(prev => (prev === sid ? null : sid));
+  };
+
+  if (focusTrack) {
+    const otherTracks = tracks.filter(t => t !== focusTrack);
 
     return (
-      <div className="h-full w-full flex flex-col lg:flex-row gap-3 p-3 bg-background overflow-hidden">
-        {/* Main Screen Share Area */}
+      <div className="h-full w-full flex flex-col sm:flex-row landscape:flex-row gap-3 p-3 bg-background overflow-hidden">
         <div className="flex-[3] relative min-h-0 min-w-0">
-          <ParticipantCardInner trackRef={primaryShare} />
+          <ParticipantCardInner
+            trackRef={focusTrack}
+            isPinned={pinnedTrackSid !== null}
+            onPinToggle={() => handlePinToggle(focusTrack)}
+          />
         </div>
 
-        {/* Sidebar for other participants */}
         {otherTracks.length > 0 && (
           <div className={cn(
-            "flex gap-3 overflow-auto lg:h-full lg:w-72 scrollbar-hide",
-            "flex-row lg:flex-col shrink-0"
+            "flex gap-3 overflow-auto sm:h-full sm:w-72 landscape:h-full landscape:w-72 scrollbar-hide",
+            "flex-row sm:flex-col landscape:flex-col shrink-0"
           )}>
-            {otherTracks.map((trackRef) => (
-              <div
-                key={`${trackRef.participant.identity}-${trackRef.source}`}
-                className="aspect-video w-48 lg:w-full shrink-0"
-              >
-                <ParticipantCardInner trackRef={trackRef} />
-              </div>
-            ))}
+            {otherTracks.map((trackRef) => {
+              const sid = isTrackReference(trackRef)
+                ? trackRef.publication.trackSid
+                : `${trackRef.participant.sid}-${trackRef.source}`;
+
+              return (
+                <div
+                  key={`${trackRef.participant.identity}-${trackRef.source}`}
+                  className="aspect-video w-48 sm:w-full landscape:w-full shrink-0"
+                >
+                  <ParticipantCardInner
+                    trackRef={trackRef}
+                    isPinned={sid === pinnedTrackSid}
+                    onPinToggle={() => handlePinToggle(trackRef)}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -187,24 +290,46 @@ const Stage = () => {
         gridAutoRows: 'minmax(0, 1fr)',
       }}
     >
-      {tracks.map((trackRef) => (
-        <ParticipantCardInner
-          key={`${trackRef.participant.identity}-${trackRef.source}`}
-          trackRef={trackRef}
-        />
-      ))}
+      {tracks.map((trackRef) => {
+        const sid = isTrackReference(trackRef)
+          ? trackRef.publication.trackSid
+          : `${trackRef.participant.sid}-${trackRef.source}`;
+
+        return (
+          <ParticipantCardInner
+            key={`${trackRef.participant.identity}-${trackRef.source}`}
+            trackRef={trackRef}
+            isPinned={pinnedTrackSid === sid}
+            onPinToggle={() => handlePinToggle(trackRef)}
+          />
+        );
+      })}
     </div>
   );
 };
 
 /* ─── Header ─── */
-const RoomHeader = ({ roomName, roomLabel }: { roomName: string; roomLabel?: string }) => {
+const RoomHeader = ({
+  roomName,
+  roomLabel,
+  roomType = 'meet',
+  callType = 'video'
+}: {
+  roomName: string;
+  roomLabel?: string;
+  roomType?: 'call' | 'meet';
+  callType?: 'video' | 'audio';
+}) => {
+  const defaultLabel = roomType === 'meet'
+    ? 'Cuộc họp video'
+    : (callType === 'video' ? 'Cuộc gọi video nhóm' : 'Cuộc gọi thoại nhóm');
+
   return (
     <div className="flex items-center justify-between px-5 py-3 shrink-0 bg-card border-b border-border">
       <div className="flex items-center gap-2.5">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
         <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/60 px-3 py-1 text-sm font-semibold text-foreground">
-          {roomLabel || 'Cuộc họp video'}
+          {roomLabel || defaultLabel}
         </span>
         {!roomLabel && <span className="text-xs text-muted-foreground font-mono">{roomName}</span>}
       </div>
@@ -322,7 +447,21 @@ const ControlBar = ({ onLeave, onMinimize, onLeaveIntercept }: { onLeave?: () =>
 };
 
 /* ─── Mini Controls (PiP mode) ─── */
-const MiniControls = ({ onMaximize, onLeave, onLeaveIntercept }: { onMaximize?: () => void; onLeave?: () => void; onLeaveIntercept?: (disconnect: () => void) => void }) => {
+const MiniControls = ({
+  onMaximize,
+  onLeave,
+  onLeaveIntercept,
+  roomLabel,
+  roomType = 'meet',
+  callType = 'video'
+}: {
+  onMaximize?: () => void;
+  onLeave?: () => void;
+  onLeaveIntercept?: (disconnect: () => void) => void;
+  roomLabel?: string;
+  roomType?: 'call' | 'meet';
+  callType?: 'video' | 'audio';
+}) => {
   const { toggle: toggleMic, enabled: micOn } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn } = useTrackToggle({ source: Track.Source.Camera });
 
@@ -355,29 +494,46 @@ const MiniControls = ({ onMaximize, onLeave, onLeaveIntercept }: { onMaximize?: 
   };
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-card">
-      <div className="flex-1 min-w-0 cursor-pointer" onClick={onMaximize}>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-          <span className="text-sm font-semibold truncate text-foreground">
-            Cuộc họp video
-          </span>
+    <div className="flex flex-col overflow-hidden">
+      {/* Row 1: Info + Maximize */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40">
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={onMaximize}>
+          <p className="text-sm font-semibold truncate text-foreground">
+            {roomLabel || (roomType === 'meet'
+              ? 'Cuộc họp video'
+              : (callType === 'video' ? 'Cuộc gọi video' : 'Cuộc gọi thoại'))}
+          </p>
+          <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+            <Users size={11} /> {participants.length} thành viên
+          </div>
         </div>
-        <div className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-          <Users size={11} /> {participants.length} thành viên
-        </div>
+        <button
+          onClick={onMaximize}
+          className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground"
+          title="Phóng to"
+        >
+          <Maximize2 size={16} />
+        </button>
       </div>
-      <div className="flex items-center gap-1 shrink-0">
+
+      {/* Row 2: Controls */}
+      <div className="flex items-center justify-center gap-4 px-4 py-3 bg-muted/20">
         <button
           onClick={() => toggleMic()}
-          className={cn('p-2 rounded-full transition-colors', micOn ? 'text-foreground hover:bg-muted' : 'text-destructive bg-destructive/10')}
+          className={cn(
+            "p-2 rounded-full transition-colors",
+            micOn ? "bg-muted text-muted-foreground hover:bg-muted/80" : "bg-zinc-200 text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"
+          )}
           title={micOn ? 'Tắt mic' : 'Bật mic'}
         >
           {micOn ? <Mic size={16} /> : <MicOff size={16} />}
         </button>
         <button
           onClick={() => toggleCam()}
-          className={cn('p-2 rounded-full transition-colors', camOn ? 'text-foreground hover:bg-muted' : 'text-destructive bg-destructive/10')}
+          className={cn(
+            "p-2 rounded-full transition-colors",
+            camOn ? "bg-muted text-muted-foreground hover:bg-muted/80" : "bg-zinc-200 text-zinc-900 dark:bg-zinc-100 dark:text-zinc-900"
+          )}
           title={camOn ? 'Tắt camera' : 'Bật camera'}
         >
           {camOn ? <Video size={16} /> : <VideoOff size={16} />}
@@ -385,7 +541,10 @@ const MiniControls = ({ onMaximize, onLeave, onLeaveIntercept }: { onMaximize?: 
         {isScreenShareSupported && (
           <button
             onClick={toggleScreen}
-            className={cn('p-2 rounded-full transition-colors', screenOn ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-muted')}
+            className={cn(
+              "p-2 rounded-full transition-colors",
+              screenOn ? "bg-primary/20 text-primary shadow-sm" : "bg-muted text-muted-foreground hover:bg-muted/80"
+            )}
             title={screenOn ? 'Dừng chia sẻ' : 'Chia sẻ màn hình'}
           >
             {screenOn ? <MonitorOff size={16} /> : <MonitorUp size={16} />}
@@ -393,17 +552,10 @@ const MiniControls = ({ onMaximize, onLeave, onLeaveIntercept }: { onMaximize?: 
         )}
         <button
           onClick={handleLeave}
-          className="p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors"
+          className="p-2 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-lg shadow-destructive/20"
           title="Rời phòng"
         >
           <PhoneOff size={16} />
-        </button>
-        <button
-          onClick={onMaximize}
-          className="p-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          title="Mở rộng"
-        >
-          <Maximize2 size={16} />
         </button>
       </div>
     </div>
@@ -422,7 +574,7 @@ const ScreenShareCleanup = () => {
   return null;
 };
 
-const PresenceToasts = ({ enabled }: { enabled: boolean }) => {
+const PresenceToasts = ({ enabled, roomType = 'meet' }: { enabled: boolean; roomType?: 'call' | 'meet' }) => {
   const participants = useParticipants();
   const previousParticipantsRef = useRef<Map<string, string>>(new Map());
   const initializedRef = useRef(false);
@@ -466,7 +618,7 @@ const PresenceToasts = ({ enabled }: { enabled: boolean }) => {
     for (const [identity, name] of currentParticipants) {
       if (!previousParticipants.has(identity)) {
         if (!shouldSuppressInitialJoinToasts) {
-          toast.success(`${name} đã tham gia cuộc họp.`, {
+          toast.success(`${name} đã tham gia ${roomType === 'meet' ? 'cuộc họp' : 'cuộc gọi'}.`, {
             duration: 3000,
           });
         }
@@ -475,14 +627,14 @@ const PresenceToasts = ({ enabled }: { enabled: boolean }) => {
 
     for (const [identity, name] of previousParticipants) {
       if (!currentParticipants.has(identity)) {
-        toast.info(`${name} đã rời cuộc họp.`, {
+        toast.info(`${name} đã rời ${roomType === 'meet' ? 'cuộc họp' : 'cuộc gọi'}.`, {
           duration: 3000,
         });
       }
     }
 
     previousParticipantsRef.current = currentParticipants;
-  }, [enabled, participants]);
+  }, [enabled, participants, roomType]);
 
   return null;
 };
@@ -588,6 +740,8 @@ const GroupCallRoom = ({
   enablePresenceToasts = false,
   onParticipantsChange,
   onLeaveIntercept,
+  roomType = 'meet',
+  callType = 'video',
 }: GroupCallRoomProps) => {
   return (
     <LiveKitRoom
@@ -603,15 +757,27 @@ const GroupCallRoom = ({
       )}
     >
       <ScreenShareCleanup />
-      <PresenceToasts enabled={enablePresenceToasts} />
+      <PresenceToasts enabled={enablePresenceToasts} roomType={roomType} />
       <ScreenShareToasts />
       <ParticipantsSync onParticipantsChange={onParticipantsChange} />
       <RoomAudioRenderer />
       {minimized ? (
-        <MiniControls onMaximize={onMaximize} onLeave={onLeave} onLeaveIntercept={onLeaveIntercept} />
+        <MiniControls
+          onMaximize={onMaximize}
+          onLeave={onLeave}
+          onLeaveIntercept={onLeaveIntercept}
+          roomLabel={roomLabel}
+          roomType={roomType}
+          callType={callType}
+        />
       ) : (
         <>
-          <RoomHeader roomName={roomName} roomLabel={roomLabel} />
+          <RoomHeader
+            roomName={roomName}
+            roomLabel={roomLabel}
+            roomType={roomType}
+            callType={callType}
+          />
           <div className="flex-1 overflow-hidden">
             <Stage />
           </div>
