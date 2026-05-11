@@ -29,6 +29,12 @@ import ImageViewerModal from "./components/chat/ImageViewerModal";
 import { usePushNotification } from "./hooks/usePushNotification";
 import SessionsPage from "./pages/SessionsPage"
 import { Capacitor } from '@capacitor/core';
+import { useBackButton } from "./hooks/useBackButton";
+
+function BackButtonHandler() {
+  useBackButton();
+  return null;
+}
 
 function App() {
   const initTheme = useThemeStore((state) => state.initTheme);
@@ -149,6 +155,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <BackButtonHandler />
       <Toaster
         richColors
         expand
