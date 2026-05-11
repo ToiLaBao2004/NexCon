@@ -39,27 +39,26 @@ const NotificationPage = () => {
     };
 
     return (
-        <div className="relative flex-1 h-full overflow-hidden rounded-none border-0 bg-background md:rounded-3xl md:border md:border-border/60 md:shadow-soft">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(6,182,212,0.14),transparent_44%),radial-gradient(circle_at_22%_86%,rgba(14,165,233,0.12),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_44%),radial-gradient(circle_at_22%_86%,rgba(56,189,248,0.14),transparent_40%)]" />
+        <div className="relative flex-1 h-full overflow-hidden rounded-none border-0 bg-background md:rounded-l-none md:rounded-r-2xl md:border-y md:border-r md:border-l-0 md:border-border/50">
             <div className="flex h-full flex-col">
-                <div className="relative z-10 border-b border-border/60 bg-card/75 px-4 py-4 backdrop-blur-sm md:px-6 md:py-5">
+                <div className="relative z-10 border-b border-border/50 bg-card/80 px-4 py-4 backdrop-blur-sm md:px-6">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="flex items-start gap-3">
-                            <div className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg shadow-cyan-600/25 dark:shadow-cyan-900/35">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/20">
                                 <Bell className="h-5 w-5" />
                             </div>
-                            <div className="space-y-1">
+                            <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <h1 className="text-xl font-bold text-foreground md:text-2xl">Thông báo</h1>
+                                    <h1 className="truncate text-xl font-semibold tracking-tight text-foreground md:text-2xl">Thông báo</h1>
                                 </div>
-
+                                <p className="text-sm text-muted-foreground">Cập nhật mới và hoạt động cần chú ý</p>
                             </div>
                         </div>
 
                         <Button
                             variant="outline"
                             size="sm"
-                            className="h-9 rounded-full border-border/80 bg-background/90 px-4 text-foreground hover:bg-muted/60"
+                            className="h-9 rounded-lg border-border/70 bg-background px-3 text-sm font-medium text-foreground hover:bg-muted/60"
                             onClick={() => void markAllAsRead()}
                             disabled={markAllPending || unreadCount === 0}
                         >

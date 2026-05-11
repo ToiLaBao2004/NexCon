@@ -10,7 +10,6 @@ import GroupsTab from "@/components/people/GroupsTab";
 import BlockedTab from "@/components/people/BlockedTab";
 import UserSearch from "@/components/shared/UserSearch";
 import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
-import { SidebarProvider, Sidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MOBILE_BOTTOM_NAV_HEIGHT_REM } from "@/constants/layout";
 
@@ -132,16 +131,10 @@ const PeoplePage = () => {
 	const header = headerConfig[tab];
 
 	return (
-		<SidebarProvider
-			className={`h-full min-h-0! w-full relative ${isMobile ? "flex flex-col" : "flex"}`}
-			style={{ "--sidebar-width": "300px", "--sidebar": "var(--card)" } as React.CSSProperties}
-		>
+		<div className={`h-full min-h-0 w-full relative ${isMobile ? "flex flex-col" : "flex"}`}>
 			{!isMobile && (
-				<Sidebar
-					collapsible="offcanvas"
-					className="md:left-20 top-0 md:top-2 bottom-0 md:bottom-2 h-full md:h-[calc(100vh-16px)] bg-card border border-border/40 rounded-none md:rounded-2xl overflow-hidden"
-				>
-					<div className="space-y-2 p-4">
+				<aside className="hidden h-full w-[300px] shrink-0 flex-col overflow-hidden border-y border-r border-l-0 border-border/50 bg-card md:flex">
+					<div className="space-y-1 p-4">
 						{PEOPLE_TABS.map((item) => {
 							const Icon = item.icon;
 							const badge = getTabBadge(item.key);
@@ -150,7 +143,7 @@ const PeoplePage = () => {
 								<button
 									key={item.key}
 									onClick={() => handleTabChange(item.key)}
-									className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-200 ${tab === item.key ? "bg-background text-foreground shadow-sm font-normal" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
+									className={`w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 transition-all duration-200 ${tab === item.key ? "bg-background text-foreground shadow-sm font-medium" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"}`}
 								>
 									<Icon className={`h-4 w-4 transition-colors ${tab === item.key ? "text-primary" : "text-muted-foreground"}`} />
 									<span className="flex-1 text-sm">{item.label}</span>
@@ -161,10 +154,10 @@ const PeoplePage = () => {
 							);
 						})}
 					</div>
-				</Sidebar>
+				</aside>
 			)}
 
-			<main className={`flex h-full min-h-0 flex-1 min-w-0 flex-col bg-card rounded-none md:rounded-2xl overflow-hidden shadow-soft border-0 md:border border-border/40 ${isMobile ? "" : "md:ml-2"}`}>
+			<main className="flex h-full min-h-0 flex-1 min-w-0 flex-col overflow-hidden border-0 bg-card shadow-none md:rounded-l-none md:rounded-r-2xl md:border-y md:border-r md:border-l-0 md:border-border/50">
 				{showChat ? (
 					<div className="h-full flex-1 min-h-0 flex flex-col">
 						<ChatWindowLayout />
@@ -177,13 +170,13 @@ const PeoplePage = () => {
 							</div>
 						)}
 
-						<div className="flex items-center gap-3 px-4 md:px-6 py-3 md:py-4 border-b border-border/40 bg-card/50 backdrop-blur-sm md:sticky md:top-0 md:z-50 shrink-0">
-							<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white shadow-sm">
+						<div className="flex items-center gap-3 px-4 py-4 md:px-6 border-b border-border/50 bg-card/80 backdrop-blur-sm md:sticky md:top-0 md:z-50 shrink-0">
+							<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/20">
 								{header.icon}
 							</div>
-							<div>
-								<h1 className="text-lg font-medium text-foreground tracking-tight">{header.title}</h1>
-								<p className="text-xs text-muted-foreground">
+							<div className="min-w-0">
+								<h1 className="truncate text-xl font-semibold tracking-tight text-foreground md:text-2xl">{header.title}</h1>
+								<p className="text-sm text-muted-foreground">
 									{header.desc}
 								</p>
 							</div>
@@ -253,7 +246,7 @@ const PeoplePage = () => {
 					</div>
 				</div>
 			)}
-		</SidebarProvider>
+		</div>
 	);
 };
 
