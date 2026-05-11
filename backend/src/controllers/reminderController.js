@@ -5,6 +5,7 @@ import Conversation from '../models/conversationModel.js';
 import Meeting from '../models/meetingModel.js';
 import Message from '../models/messageModel.js';
 import User from '../models/userModel.js';
+import BlockUser from '../models/blockUserModel.js';
 import { generateRoomCode } from './meetingController.js';
 import { emitToUser, io } from '../socket/index.js';
 import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
@@ -324,6 +325,21 @@ export async function createSharedReminderFromMessage(req, res) {
                 throw buildHttpError(403, 'Bạn không thuộc cuộc trò chuyện này.');
             }
 
+            if (conversation.type === 'direct') {
+                const otherUserId = participantIds.find(id => id !== userIdStr);
+                if (otherUserId) {
+                    const blockExists = await BlockUser.findOne({
+                        $or: [
+                            { from: userId, to: otherUserId },
+                            { from: otherUserId, to: userId }
+                        ]
+                    });
+                    if (blockExists) {
+                        throw buildHttpError(403, 'Không thể tạo nhắc hẹn chung khi đang bị chặn.');
+                    }
+                }
+            }
+
             const messageQuery = Message.findById(messageId).select('_id conversationId');
             if (session) messageQuery.session(session);
 
@@ -515,6 +531,21 @@ export async function scheduleMeeting(req, res) {
 
         if (!participantIds.includes(userIdStr)) {
             return res.status(403).json({ message: 'Bạn không thuộc cuộc trò chuyện này.' });
+        }
+
+        if (conversation.type === 'direct') {
+            const otherUserId = participantIds.find(id => id !== userIdStr);
+            if (otherUserId) {
+                const blockExists = await BlockUser.findOne({
+                    $or: [
+                        { from: userId, to: otherUserId },
+                        { from: otherUserId, to: userId }
+                    ]
+                });
+                if (blockExists) {
+                    return res.status(403).json({ message: 'Không thể lên lịch cuộc họp khi đang bị chặn.' });
+                }
+            }
         }
 
         await ensureCreatorPendingReminderLimit(userId);

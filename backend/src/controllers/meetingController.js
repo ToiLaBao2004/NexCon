@@ -1,5 +1,6 @@
 import { AccessToken } from 'livekit-server-sdk';
 import Meeting from '../models/meetingModel.js';
+import BlockUser from '../models/blockUserModel.js';
 import { getSocketGateway } from '../socket/socketGateway.js';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
@@ -258,6 +259,20 @@ export async function joinMeeting(req, res) {
         }
 
         const hostId = meeting.hostId.toString();
+
+        // Check block relationship between requester and host
+        if (hostId !== userId) {
+            const blockExists = await BlockUser.findOne({
+                $or: [
+                    { from: hostId, to: userId },
+                    { from: userId, to: hostId }
+                ]
+            });
+            if (blockExists) {
+                return res.status(403).json({ message: 'Bạn không thể tham gia cuộc họp của người dùng này.' });
+            }
+        }
+
         const isHost = hostId === userId;
         const alreadyIn = meeting.participants.some((participant) => participant.userId.toString() === userId);
 

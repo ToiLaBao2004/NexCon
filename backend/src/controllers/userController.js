@@ -1,4 +1,5 @@
 import User from '../models/userModel.js';
+import BlockUser from '../models/blockUserModel.js';
 import { upLoadImageFromBuffer, deleteImage } from '../middlewares/uploadMiddleware.js';
 import bcrypt from 'bcrypt';
 import { searchSpotifyTracks } from '../services/spotifyService.js';
@@ -31,8 +32,20 @@ export async function searchUsers(req, res) {
 
         const searchEmail = keyword.trim();
 
+        const blocks = await BlockUser.find({
+            $or: [
+                { from: currentUserId },
+                { to: currentUserId }
+            ]
+        }).lean();
+
+        const blockedIds = blocks.map(b => 
+            b.from.toString() === currentUserId.toString() ? b.to : b.from
+        );
+
         const users = await User.find({
-            email: searchEmail
+            email: searchEmail,
+            _id: { $nin: blockedIds, $ne: currentUserId }
         })
             .select('_id displayName avatarUrl email')
             .limit(20);
@@ -237,9 +250,22 @@ export async function getUserById(req, res) {
     try {
         const { id } = req.params;
 
-        const user = await User.findById(id).select("-password");
+        const user = await User.findById(id).select("-password").lean();
         if (!user) {
             return res.status(404).json({ message: "User not found" });
+        }
+
+        const currentUserId = req.user?._id?.toString?.();
+        if (currentUserId && id !== currentUserId) {
+            const blockExists = await BlockUser.findOne({
+                $or: [
+                    { from: id, to: currentUserId },
+                    { from: currentUserId, to: id }
+                ]
+            });
+            if (blockExists) {
+                return res.status(404).json({ message: "User not found" });
+            }
         }
 
         return res.status(200).json({ user });

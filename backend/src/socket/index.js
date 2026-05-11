@@ -4,6 +4,8 @@ import express from "express";
 import { socketAuthMiddleware, validateSocketSession } from "../middlewares/socketMiddleware.js";
 import { getUserConversationsForSocketIO } from "../controllers/conversationController.js";
 import Conversation from "../models/conversationModel.js";
+import BlockUser from "../models/blockUserModel.js";
+import Friend from "../models/friendModel.js";
 import { registerCallHandlers, handleCallDisconnect, emitPendingDirectCallsForUser } from "./callHandler.js";
 import { registerGroupCallHandlers, handleGroupCallDisconnect } from "./groupCallHandler.js";
 import { configureSocketGateway } from "./socketGateway.js";
@@ -165,13 +167,41 @@ io.on("connection", async (socket) => {
     });
 
     // Typing indicators
-    socket.on("typing", ({ conversationId }) => {
-        socket.to(conversationId).emit("user-typing", { conversationId, userId: user._id.toString() });
-    });
+    const handleTypingEvent = async (event, { conversationId }) => {
+        try {
+            const conversation = await Conversation.findById(conversationId).select("type participants").lean();
+            if (!conversation) return;
 
-    socket.on("stop-typing", ({ conversationId }) => {
-        socket.to(conversationId).emit("user-stopped-typing", { conversationId, userId: user._id.toString() });
-    });
+            if (conversation.type === "direct") {
+                const myId = user._id.toString();
+                const otherParticipant = conversation.participants.find(p => p.userId.toString() !== myId);
+                if (otherParticipant) {
+                    const [blockExists, friendExists] = await Promise.all([
+                        BlockUser.findOne({
+                            $or: [
+                                { from: myId, to: otherParticipant.userId },
+                                { from: otherParticipant.userId, to: myId }
+                            ]
+                        }).lean(),
+                        Friend.findOne({
+                            $or: [
+                                { userA: myId, userB: otherParticipant.userId },
+                                { userA: otherParticipant.userId, userB: myId }
+                            ]
+                        }).lean()
+                    ]);
+
+                    if (blockExists || !friendExists) return;
+                }
+            }
+            socket.to(conversationId).emit(event, { conversationId, userId: user._id.toString() });
+        } catch (error) {
+            console.error(`Error handling ${event}:`, error);
+        }
+    };
+
+    socket.on("typing", (data) => handleTypingEvent("user-typing", data));
+    socket.on("stop-typing", (data) => handleTypingEvent("user-stopped-typing", data));
 
     socket.on("message-delivered", async ({ messageId, conversationId }) => {
         try {

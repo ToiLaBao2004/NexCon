@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import SecureImage from "../SecureImage";
 import { Input } from "@/components/ui/input";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
+import { useFriendStore } from "@/stores/useFriendStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
 import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions, Check, CheckCheck } from "lucide-react";
@@ -898,22 +899,28 @@ function detectDateTimeInText(text: string): boolean {
 function SmartReminderButton({
 	isOwn,
 	onOpen,
+	disabled = false,
 }: {
 	message: Message;
 	isOwn: boolean;
 	onOpen: () => void;
+	disabled?: boolean;
 }) {
 	return (
 		<button
 			type="button"
 			onClick={(e) => {
 				e.stopPropagation();
-				onOpen();
+				if (!disabled) onOpen();
 			}}
+			disabled={disabled}
 			className={cn(
 				"mt-1 flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px] font-medium border",
 				"transition-all duration-150 animate-in fade-in slide-in-from-top-1",
-				"hover:opacity-80 active:scale-95 select-none cursor-pointer",
+				"select-none",
+				disabled 
+					? "opacity-50 grayscale cursor-not-allowed" 
+					: "hover:opacity-80 active:scale-95 cursor-pointer",
 
 				isOwn
 					? "bg-white/10 text-white border-white/20"
@@ -2012,6 +2019,17 @@ const MessageItem = ({
 
 	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage } = useChatStore();
 	const { isDark } = useThemeStore();
+	const { blockedUsers, blockedBy } = useFriendStore();
+
+	const isBlocked = useMemo(() => {
+		if (selectedConvo.type !== "direct") return false;
+		const otherUser = selectedConvo.participants.find((p) => p.userId?._id?.toString() !== currentUserId);
+		if (!otherUser?.userId?._id) return false;
+		return (
+			blockedUsers.some((u) => u._id === otherUser.userId._id) ||
+			blockedBy.includes(otherUser.userId._id)
+		);
+	}, [selectedConvo, currentUserId, blockedUsers, blockedBy]);
 	const [showConfirmRecall, setShowConfirmRecall] = useState(false);
 	const [showPinOptions, setShowPinOptions] = useState(false);
 	const [showReactionModal, setShowReactionModal] = useState(false);
@@ -2300,6 +2318,7 @@ const MessageItem = ({
 												message={message}
 												isOwn={isOwn}
 												onOpen={openSmartReminder}
+												disabled={isBlocked}
 											/>
 										)}
 										<span className="text-[10px] sm:text-[10.5px] font-medium leading-none whitespace-nowrap">
@@ -2361,8 +2380,11 @@ const MessageItem = ({
 									<Popover open={showEmojiPicker} onOpenChange={setShowEmojiPicker}>
 										<PopoverTrigger asChild>
 											<button
-												className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-primary transition-colors disabled:opacity-50"
-												disabled={isReacting}
+												className={cn(
+													"p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-primary transition-colors disabled:opacity-50",
+													isBlocked && "grayscale opacity-40 cursor-not-allowed"
+												)}
+												disabled={isReacting || isBlocked}
 												title="Thả cảm xúc"
 												onClick={() => setShowEmojiPicker(true)}
 											>
@@ -2431,12 +2453,14 @@ const MessageItem = ({
 												}
 											}}
 										>
-											{!isDisbanded && (
-												<DropdownMenuItem onClick={() => { setShowTouchActions(false); onReply?.(message); }}>
-													<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													Trả lời
-												</DropdownMenuItem>
-											)}
+											<DropdownMenuItem 
+												disabled={isBlocked}
+												onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(message); } }}
+												className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
+											>
+												<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
+												Trả lời
+											</DropdownMenuItem>
 											{!isRecalled && (
 												<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }}>
 													<Forward className="w-4 h-4 mr-2" strokeWidth={1.6} />
@@ -2455,25 +2479,31 @@ const MessageItem = ({
 													Tải xuống
 												</DropdownMenuItem>
 											)}
-											{!isDisbanded && (
-												<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }}>
-													{isPinned ? (
-														<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													) : (
-														<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													)}
-													{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-												</DropdownMenuItem>
-											)}
+											<DropdownMenuItem 
+												disabled={isBlocked}
+												onClick={() => { if(!isBlocked) { setShowTouchActions(false); setShowPinOptions(true); } }}
+												className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
+											>
+												{isPinned ? (
+													<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
+												) : (
+													<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+												)}
+												{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+											</DropdownMenuItem>
 											{canCreateReminder && (
 												<DropdownMenuItem
+													disabled={isBlocked}
 													onClick={() => {
-														setShowTouchActions(false);
-														setReminderTargetMessage({
-															messageId: message._id,
-															messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
-														});
+														if(!isBlocked) {
+															setShowTouchActions(false);
+															setReminderTargetMessage({
+																messageId: message._id,
+																messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
+															});
+														}
 													}}
+													className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
 												>
 													<BellPlus className="w-4 h-4 mr-2" strokeWidth={1.6} />
 													Tạo nhắc hẹn
@@ -2509,21 +2539,27 @@ const MessageItem = ({
 											>
 												<DialogTitle className="sr-only">Thao tác tin nhắn</DialogTitle>
 												<div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-1">
-													<button onClick={() => setTouchActionView("emoji")} className="flex flex-col items-center gap-2">
+													<button 
+														disabled={isBlocked}
+														onClick={() => { if(!isBlocked) setTouchActionView("emoji"); }} 
+														className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
+													>
 														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
 															<Smile className="h-5 w-5" strokeWidth={1.5} />
 														</div>
 														<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Cảm xúc</span>
 													</button>
 
-													{!isDisbanded && (
-														<button onClick={() => { setShowTouchActions(false); onReply?.(message); }} className="flex flex-col items-center gap-2">
-															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-																<Reply className="h-5 w-5" strokeWidth={1.5} />
-															</div>
-															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Trả lời</span>
-														</button>
-													)}
+													<button 
+														disabled={isBlocked}
+														onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(message); } }} 
+														className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
+													>
+														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+															<Reply className="h-5 w-5" strokeWidth={1.5} />
+														</div>
+														<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Trả lời</span>
+													</button>
 
 													{!isRecalled && (
 														<button onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }} className="flex flex-col items-center gap-2">
@@ -2552,22 +2588,27 @@ const MessageItem = ({
 														</button>
 													)}
 
-													{!isDisbanded && (
-														<button onClick={() => { setShowTouchActions(false); setShowPinOptions(true); }} className="flex flex-col items-center gap-2">
-															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-																{isPinned ? <PinOff className="h-5 w-5" strokeWidth={1.5} /> : <Pin className="h-5 w-5" strokeWidth={1.5} />}
-															</div>
-															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">{isPinned ? "Bỏ ghim" : "Ghim"}</span>
-														</button>
-													)}
+													<button 
+														disabled={isBlocked}
+														onClick={() => { if(!isBlocked) { setShowTouchActions(false); setShowPinOptions(true); } }} 
+														className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
+													>
+														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+															{isPinned ? <PinOff className="h-5 w-5" strokeWidth={1.5} /> : <Pin className="h-5 w-5" strokeWidth={1.5} />}
+														</div>
+														<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">{isPinned ? "Bỏ ghim" : "Ghim"}</span>
+													</button>
 
 													{canCreateReminder && (
 														<button
+															disabled={isBlocked}
 															onClick={() => {
-																setShowTouchActions(false);
-																setReminderTargetMessage({ messageId: message._id, messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn") });
+																if(!isBlocked) {
+																	setShowTouchActions(false);
+																	setReminderTargetMessage({ messageId: message._id, messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn") });
+																}
 															}}
-															className="flex flex-col items-center gap-2"
+															className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
 														>
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
 																<BellPlus className="h-5 w-5" strokeWidth={1.5} />

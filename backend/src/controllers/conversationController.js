@@ -554,14 +554,37 @@ export async function markAsSeen(req, res) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
 
-		io.to(conversationId).emit("read-message", {
+		const readMessagePayload = {
 			conversationId: conversationId,
 			userId: userId,
 			lastReadMessageId: latestMessage._id,
 			lastReadAt: now.toISOString(),
 			unreadCount: 0,
 			unreadMentionCount: 0,
-		});
+		};
+
+		if (updated.type === 'direct') {
+			const otherParticipant = updated.participants.find(p => p.userId.toString() !== userId);
+			if (otherParticipant) {
+				const blockExists = await BlockUser.findOne({
+					$or: [
+						{ from: userId, to: otherParticipant.userId },
+						{ from: otherParticipant.userId, to: userId }
+					]
+				});
+				if (blockExists) {
+					// Only emit to self personal room to sync devices
+					io.to(`user:${userId}`).emit("read-message", readMessagePayload);
+					return res.status(200).json({
+						message: "Conversation marked as seen",
+						lastReadMessageId: latestMessage._id,
+						myunreadCount: 0,
+					});
+				}
+			}
+		}
+
+		io.to(conversationId).emit("read-message", readMessagePayload);
 
 		return res.status(200).json({
 			message: "Conversation marked as seen",
