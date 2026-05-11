@@ -17,7 +17,7 @@ import {
   type TrackReference,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor, MonitorUp, MonitorOff, Minimize2, Maximize2 } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor, MonitorUp, MonitorOff, Minimize2, Maximize2, Pin, PinOff } from 'lucide-react';
 import { cn, nameToColor } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -54,7 +54,15 @@ const LIVEKIT_CONNECT_OPTIONS = {
 };
 
 /* ─── ParticipantCard ─── */
-const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlaceholder }) => {
+const ParticipantCardInner = ({
+  trackRef,
+  isPinned,
+  onPinToggle,
+}: {
+  trackRef: TrackReferenceOrPlaceholder;
+  isPinned?: boolean;
+  onPinToggle?: () => void;
+}) => {
   const { identity, name } = useParticipantInfo({ participant: trackRef.participant });
   const isSpeaking = useIsSpeaking(trackRef.participant);
   const micRef: TrackReferenceOrPlaceholder = {
@@ -83,8 +91,9 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
   return (
     <div
       className={cn(
-        'relative w-full h-full overflow-hidden rounded-2xl transition-shadow duration-300',
+        'relative w-full h-full overflow-hidden rounded-2xl transition-all duration-300 group/card',
         isSpeaking ? 'ring-2 ring-primary shadow-lg shadow-primary/20' : 'ring-1 ring-border',
+        isPinned ? 'ring-2 ring-amber-400' : '',
       )}
     >
       {hasVideo ? (
@@ -118,6 +127,29 @@ const ParticipantCardInner = ({ trackRef }: { trackRef: TrackReferenceOrPlacehol
         </div>
       )}
 
+      {/* Pin Toggle Button */}
+      {onPinToggle && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onPinToggle();
+          }}
+          className={cn(
+            "absolute top-2.5 right-2.5 p-2 rounded-lg backdrop-blur-md transition-all duration-200 z-20",
+            isPinned
+              ? "bg-orange-500 text-white opacity-100 shadow-[0_0_15px_rgba(249,115,22,0.5)] scale-110 ring-2 ring-white/20"
+              : "opacity-0 group-hover/card:opacity-100 bg-black/40 text-white hover:bg-black/60"
+          )}
+          title={isPinned ? "Bỏ ghim" : "Ghim màn hình"}
+        >
+          {isPinned ? (
+            <PinOff size={14} className="fill-current" />
+          ) : (
+            <Pin size={14} className="rotate-45" />
+          )}
+        </button>
+      )}
+
       {/* Name + mic overlay */}
       <div className="absolute bottom-0 inset-x-0 px-3 py-2 flex items-center gap-2 bg-gradient-to-t from-black/70 via-black/30 to-transparent">
         <span className="text-white text-xs font-medium truncate drop-shadow-md">
@@ -143,33 +175,82 @@ const Stage = () => {
     { onlySubscribed: false },
   );
 
+  const [pinnedTrackSid, setPinnedTrackSid] = useState<string | null>(null);
+  const lastScreenShareTracksRef = useRef<string[]>([]);
+
   const screenShareTracks = tracks.filter((t) => t.source === Track.Source.ScreenShare);
-  const cameraTracks = tracks.filter((t) => t.source === Track.Source.Camera);
-  if (screenShareTracks.length > 0) {
-    const primaryShare = screenShareTracks[0];
-    const otherTracks = [...screenShareTracks.slice(1), ...cameraTracks];
+
+  useEffect(() => {
+    const currentSids = screenShareTracks.map(t =>
+      isTrackReference(t) ? t.publication.trackSid : `${t.participant.sid}-${t.source}`
+    );
+
+    const newSid = currentSids.find(sid => !lastScreenShareTracksRef.current.includes(sid));
+
+    if (newSid) {
+      setPinnedTrackSid(newSid);
+    } else if (pinnedTrackSid && !currentSids.includes(pinnedTrackSid)) {
+      const allSids = tracks.map(t =>
+        isTrackReference(t) ? t.publication.trackSid : `${t.participant.sid}-${t.source}`
+      );
+      if (!allSids.includes(pinnedTrackSid)) {
+        setPinnedTrackSid(null);
+      }
+    }
+
+    lastScreenShareTracksRef.current = currentSids;
+  }, [screenShareTracks, tracks, pinnedTrackSid]);
+
+  const focusTrack = pinnedTrackSid
+    ? tracks.find(t =>
+      (isTrackReference(t) ? t.publication.trackSid : `${t.participant.sid}-${t.source}`) === pinnedTrackSid
+    )
+    : null;
+
+  const handlePinToggle = (trackRef: TrackReferenceOrPlaceholder) => {
+    const sid = isTrackReference(trackRef)
+      ? trackRef.publication.trackSid
+      : `${trackRef.participant.sid}-${trackRef.source}`;
+
+    setPinnedTrackSid(prev => (prev === sid ? null : sid));
+  };
+
+  if (focusTrack) {
+    const otherTracks = tracks.filter(t => t !== focusTrack);
 
     return (
       <div className="h-full w-full flex flex-col lg:flex-row gap-3 p-3 bg-background overflow-hidden">
-        {/* Main Screen Share Area */}
         <div className="flex-[3] relative min-h-0 min-w-0">
-          <ParticipantCardInner trackRef={primaryShare} />
+          <ParticipantCardInner
+            trackRef={focusTrack}
+            isPinned={pinnedTrackSid !== null}
+            onPinToggle={() => handlePinToggle(focusTrack)}
+          />
         </div>
 
-        {/* Sidebar for other participants */}
         {otherTracks.length > 0 && (
           <div className={cn(
             "flex gap-3 overflow-auto lg:h-full lg:w-72 scrollbar-hide",
             "flex-row lg:flex-col shrink-0"
           )}>
-            {otherTracks.map((trackRef) => (
-              <div
-                key={`${trackRef.participant.identity}-${trackRef.source}`}
-                className="aspect-video w-48 lg:w-full shrink-0"
-              >
-                <ParticipantCardInner trackRef={trackRef} />
-              </div>
-            ))}
+            {otherTracks.map((trackRef) => {
+              const sid = isTrackReference(trackRef)
+                ? trackRef.publication.trackSid
+                : `${trackRef.participant.sid}-${trackRef.source}`;
+
+              return (
+                <div
+                  key={`${trackRef.participant.identity}-${trackRef.source}`}
+                  className="aspect-video w-48 lg:w-full shrink-0"
+                >
+                  <ParticipantCardInner
+                    trackRef={trackRef}
+                    isPinned={sid === pinnedTrackSid}
+                    onPinToggle={() => handlePinToggle(trackRef)}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -189,12 +270,20 @@ const Stage = () => {
         gridAutoRows: 'minmax(0, 1fr)',
       }}
     >
-      {tracks.map((trackRef) => (
-        <ParticipantCardInner
-          key={`${trackRef.participant.identity}-${trackRef.source}`}
-          trackRef={trackRef}
-        />
-      ))}
+      {tracks.map((trackRef) => {
+        const sid = isTrackReference(trackRef)
+          ? trackRef.publication.trackSid
+          : `${trackRef.participant.sid}-${trackRef.source}`;
+
+        return (
+          <ParticipantCardInner
+            key={`${trackRef.participant.identity}-${trackRef.source}`}
+            trackRef={trackRef}
+            isPinned={pinnedTrackSid === sid}
+            onPinToggle={() => handlePinToggle(trackRef)}
+          />
+        );
+      })}
     </div>
   );
 };
