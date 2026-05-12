@@ -21,7 +21,7 @@ authRouter.post('/signout', signOut);
 authRouter.post('/signout-all', signOutAll);
 authRouter.get('/sessions', getSessions);
 authRouter.delete('/sessions/:sessionId', signOutBySession);
-authRouter.put('/reset-new-password', resetNewPassword)
+authRouter.put('/reset-new-password', signupIpLimiter, resetNewPassword)
 
 authRouter.get(
     '/google',
@@ -41,6 +41,6 @@ authRouter.get('/google/success', googleSuccess);
 
 authRouter.post('/refresh-token', refreshToken);
 
-authRouter.post('/google/mobile', googleMobileAuth);
+authRouter.post('/google/mobile', signinIpLimiter, googleMobileAuth);
 
 export default authRouter;

@@ -11,6 +11,6 @@ const otpRouter = express.Router();
 
 otpRouter.post('/otp-create-user', otpCreateIpLimiter, otpCreateEmailLimiter, sendOtpMakeUser);
 otpRouter.post('/otp-reset-password', otpResetIpLimiter, otpResetEmailLimiter, sendOtpResetPassword);
-otpRouter.post('/otp-verify-reset-password', verifyOtpResetPassword);
+otpRouter.post('/otp-verify-reset-password', otpResetIpLimiter, otpResetEmailLimiter, verifyOtpResetPassword);
 
 export default otpRouter;
