@@ -5,12 +5,18 @@ import {
     getSessions, signOutBySession, googleMobileAuth
 } from '../controllers/authController.js';
 import passport from '../config/passport.js';
+import {
+    signupIpLimiter,
+    signupEmailLimiter,
+    signinIpLimiter,
+    signinEmailLimiter
+} from '../middlewares/rateLimiters.js';
 
 const authRouter = express.Router();
 
-authRouter.post('/verify-valid-fields-signup', verifyValidFieldsSignUp);
-authRouter.post('/signup', signUp);
-authRouter.post('/signin', signIn);
+authRouter.post('/verify-valid-fields-signup', signupIpLimiter, signupEmailLimiter, verifyValidFieldsSignUp);
+authRouter.post('/signup', signupIpLimiter, signupEmailLimiter, signUp);
+authRouter.post('/signin', signinIpLimiter, signinEmailLimiter, signIn);
 authRouter.post('/signout', signOut);
 authRouter.post('/signout-all', signOutAll);
 authRouter.get('/sessions', getSessions);

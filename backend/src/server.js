@@ -18,8 +18,17 @@ import pushRouter from './routes/pushRoute.js';
 import { app, server } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { startReminderWorker, reloadPendingReminders } from './workers/reminderWorker.js';
+import { apiLimiter } from './middlewares/rateLimiters.js';
 
 const PORT = process.env.PORT;
+
+const trustProxy = process.env.TRUST_PROXY;
+if (trustProxy) {
+    const parsed = trustProxy === 'true' ? 1 : Number.parseInt(trustProxy, 10);
+    if (Number.isFinite(parsed)) {
+        app.set('trust proxy', parsed);
+    }
+}
 
 
 // middlewares
@@ -27,6 +36,8 @@ app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+app.use('/api', apiLimiter);
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
