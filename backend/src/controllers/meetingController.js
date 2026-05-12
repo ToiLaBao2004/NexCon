@@ -208,6 +208,14 @@ export async function createMeeting(req, res) {
         const roomName = await createUniqueRoomName();
         const isImmediate = !scheduledAt;
 
+        if (conversationId) {
+            const { default: Conversation } = await import('../models/conversationModel.js');
+            const conversation = await Conversation.findById(conversationId);
+            if (conversation && conversation.type === 'group' && conversation.disbanded) {
+                return res.status(403).json({ message: 'Không thể tạo cuộc họp trong nhóm đã giải tán.' });
+            }
+        }
+
         const parsedSchedule = scheduledAt ? new Date(scheduledAt) : null;
         if (parsedSchedule && Number.isNaN(parsedSchedule.getTime())) {
             return res.status(400).json({ message: 'scheduledAt không hợp lệ' });
@@ -252,6 +260,14 @@ export async function joinMeeting(req, res) {
         let meeting = await Meeting.findOne({ roomName });
         if (!meeting) {
             return res.status(404).json({ message: 'Không tìm thấy phòng họp' });
+        }
+
+        if (meeting.conversationId) {
+            const { default: Conversation } = await import('../models/conversationModel.js');
+            const conversation = await Conversation.findById(meeting.conversationId);
+            if (conversation && conversation.type === 'group' && conversation.disbanded) {
+                return res.status(403).json({ message: 'Cuộc họp này thuộc về một nhóm đã bị giải tán.' });
+            }
         }
 
         if (meeting.status === 'ended') {
