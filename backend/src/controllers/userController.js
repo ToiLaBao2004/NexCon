@@ -45,6 +45,7 @@ export async function searchUsers(req, res) {
 
         const users = await User.find({
             email: searchEmail,
+            $or: [{ role: 'user' }, { role: { $exists: false } }, { role: null }],
             _id: { $nin: blockedIds, $ne: currentUserId }
         })
             .select('_id displayName avatarUrl email')
@@ -250,7 +251,10 @@ export async function getUserById(req, res) {
     try {
         const { id } = req.params;
 
-        const user = await User.findById(id).select("-password").lean();
+        const user = await User.findOne({
+            _id: id,
+            $or: [{ role: 'user' }, { role: { $exists: false } }, { role: null }],
+        }).select("-password").lean();
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }

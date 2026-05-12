@@ -22,8 +22,34 @@ import { createNotification } from '../services/notificationServices.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
 import { transcribeAudioFromBuffer } from '../services/audio/transcribeAudio.js';
 import { moderateImageMessage } from '../services/moderation/imageModerationService.js';
+import { registerViolation } from '../services/moderation/violationService.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
+
+async function respondWithModerationBlock(req, res, moderationResult, message, messageType) {
+    const violation = await registerViolation({
+        userId: req.user._id,
+        source: `ai_${messageType}`,
+        reason: moderationResult.reason || message,
+        metadata: {
+            category: moderationResult.category,
+            confidence: moderationResult.confidence ?? null,
+            conversationId: req.conversation?._id?.toString?.() || null,
+            messageType,
+        },
+    });
+
+    return res.status(violation.locked ? 423 : 400).json({
+        message: `${message} Hệ thống đã ghi nhận một lần vi phạm.`,
+        moderation: {
+            category: moderationResult.category,
+            reason: moderationResult.reason,
+            source: moderationResult.source,
+            confidence: moderationResult.confidence ?? null,
+        },
+        violation,
+    });
+}
 
 const parseMentionPayload = (rawMentions) => {
     if (Array.isArray(rawMentions)) {
@@ -261,15 +287,7 @@ export async function sendMessage(req, res) {
                 const moderationResult = await moderateTextMessage(trimmedContent);
 
                 if (moderationResult.blocked) {
-                    return res.status(400).json({
-                        message: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng.',
-                        moderation: {
-                            category: moderationResult.category,
-                            reason: moderationResult.reason,
-                            source: moderationResult.source,
-                            confidence: moderationResult.confidence ?? null,
-                        },
-                    });
+                    return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn vi phạm tiêu chuẩn cộng đồng.', 'text');
                 }
 
                 messageData.content = trimmedContent;
@@ -285,15 +303,7 @@ export async function sendMessage(req, res) {
                 const moderationResult = await moderateLinkMessage(trimmedLink);
 
                 if (moderationResult.blocked) {
-                    return res.status(400).json({
-                        message: 'Link vi phạm tiêu chuẩn cộng đồng.',
-                        moderation: {
-                            category: moderationResult.category,
-                            reason: moderationResult.reason,
-                            source: moderationResult.source,
-                            confidence: moderationResult.confidence ?? null,
-                        },
-                    });
+                    return respondWithModerationBlock(req, res, moderationResult, 'Link vi phạm tiêu chuẩn cộng đồng.', 'link');
                 }
 
                 let normalizedUrl = trimmedLink;
@@ -333,15 +343,7 @@ export async function sendMessage(req, res) {
                 const moderationResult = await moderateImageMessage(imageBuffer, mimeType);
 
                 if (moderationResult.blocked) {
-                    return res.status(400).json({
-                        message: 'Ảnh vi phạm tiêu chuẩn cộng đồng.',
-                        moderation: {
-                            category: moderationResult.category,
-                            reason: moderationResult.reason,
-                            source: moderationResult.source,
-                            confidence: moderationResult.confidence ?? null,
-                        },
-                    });
+                    return respondWithModerationBlock(req, res, moderationResult, 'Ảnh vi phạm tiêu chuẩn cộng đồng.', 'image');
                 }
 
                 const result = await safeUpload(uploadChatImageFromBuffer, uploadedFile.buffer);
@@ -412,15 +414,7 @@ export async function sendMessage(req, res) {
                 const moderationResult = await moderateTextMessage(cleanTranscript);
 
                 if (moderationResult.blocked) {
-                    return res.status(400).json({
-                        message: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng.',
-                        moderation: {
-                            category: moderationResult.category,
-                            reason: moderationResult.reason,
-                            source: moderationResult.source,
-                            confidence: moderationResult.confidence ?? null,
-                        },
-                    });
+                    return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn thoại vi phạm tiêu chuẩn cộng đồng.', 'audio');
                 }
 
                 const result = await safeUpload(

@@ -140,6 +140,12 @@ function ReportCard({ report }: { report: MyReport }) {
                 {description}
               </p>
             )}
+
+            {report.resolution?.reporterMessage && (
+              <p className="mt-3 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-sm leading-relaxed text-foreground/80">
+                {report.resolution.reporterMessage}
+              </p>
+            )}
           </div>
         </div>
 

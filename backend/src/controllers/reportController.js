@@ -203,7 +203,7 @@ export async function getMyReports(req, res) {
         const reports = await Report.find({ reporterId: req.user._id })
             .sort({ createdAt: -1 })
             .limit(50)
-            .select('targetType targetUserId targetMessageId conversationId reasonCategory description status createdAt updatedAt targetUserSnapshot messageSnapshot')
+            .select('targetType targetUserId targetMessageId conversationId reasonCategory description status createdAt updatedAt targetUserSnapshot messageSnapshot review resolution')
             .lean();
 
         return res.status(200).json({ reports });

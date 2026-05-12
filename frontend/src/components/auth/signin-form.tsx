@@ -12,6 +12,8 @@ import { useAuthStore } from "@/stores/useAuthStore"
 import { useNavigate } from "react-router"
 import { Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
+import { authService } from "@/services/authService"
+import { Textarea } from "@/components/ui/textarea"
 
 const signInSchema = z.object({
   email: z.string().trim().email("Địa chỉ email không hợp lệ"),
@@ -28,6 +30,9 @@ export function SigninForm({
   const { sendOtpResetPassword } = useOTPStore();
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
+  const [lockedMessage, setLockedMessage] = useState<string | null>(null);
+  const [appealReason, setAppealReason] = useState("");
+  const [appealSubmitting, setAppealSubmitting] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError, watch } = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
@@ -36,11 +41,16 @@ export function SigninForm({
   const onSubmit = async (data: SignInFormValues) => {
     const { email, password } = data;
     try {
+      setLockedMessage(null);
       await signIn(email, password);
-      navigate("/");
+      const role = useAuthStore.getState().user?.role;
+      navigate(role === "admin" ? "/admin" : "/");
     } catch (error: any) {
       console.error("Sign in failed:", error);
       const backendMsg = error.response?.data?.message || "Đăng nhập thất bại.";
+      if (error.response?.status === 423 || error.response?.data?.locked) {
+        setLockedMessage(backendMsg);
+      }
       if (backendMsg.toLowerCase().includes("email")) {
         setError("email", { type: "server", message: backendMsg });
       } else if (backendMsg.toLowerCase().includes("password")) {
@@ -83,7 +93,32 @@ export function SigninForm({
 
   const handleGoogleSignIn = async () => {
     const success = await loginGoogle();
-    if (success) navigate('/');
+    if (success) {
+      const role = useAuthStore.getState().user?.role;
+      navigate(role === "admin" ? "/admin" : "/");
+    }
+  }
+
+  const handleSubmitAppeal = async () => {
+    const emailValue = watch("email");
+    if (!emailValue) {
+      setError("email", {
+        type: "manual",
+        message: "Vui lòng nhập email để gửi kháng cáo",
+      });
+      return;
+    }
+
+    try {
+      setAppealSubmitting(true);
+      await authService.submitLockedAppeal(emailValue, appealReason);
+      setLockedMessage("Đã gửi kháng cáo. Vui lòng chờ admin xem xét.");
+      setAppealReason("");
+    } catch (error: any) {
+      setLockedMessage(error.response?.data?.message || "Không thể gửi kháng cáo.");
+    } finally {
+      setAppealSubmitting(false);
+    }
   }
 
   return (
@@ -146,6 +181,29 @@ export function SigninForm({
             </Button>
             {/* global error message */}
             {errors.root && <p className="text-sm text-destructive mt-2">{errors.root.message}</p>}
+            {lockedMessage && (
+              <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                <p className="text-sm font-medium text-destructive">{lockedMessage}</p>
+                <div className="mt-3 space-y-2">
+                  <Textarea
+                    value={appealReason}
+                    onChange={(event) => setAppealReason(event.target.value)}
+                    placeholder="Mô tả lý do bạn muốn kháng cáo khóa tài khoản"
+                    className="min-h-24 resize-none bg-background"
+                    maxLength={2000}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    disabled={appealSubmitting || appealReason.trim().length < 20}
+                    onClick={handleSubmitAppeal}
+                  >
+                    Gửi kháng cáo
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="flex items-center my-4">
               <div className="flex-1 h-px bg-border" />
               <span className="px-2 text-xs text-muted-foreground">Hoặc tiếp tục với</span>

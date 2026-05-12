@@ -16,10 +16,13 @@ import meetingRouter from './routes/meetingRoutes.js';
 import reminderRouter from './routes/reminderRoute.js';
 import pushRouter from './routes/pushRoute.js';
 import reportRouter from './routes/reportRoute.js';
+import adminRouter from './routes/adminRoute.js';
 import { app, server } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { startReminderWorker, reloadPendingReminders } from './workers/reminderWorker.js';
 import { apiLimiter } from './middlewares/rateLimiters.js';
+import { auditLogMiddleware } from './middlewares/auditLogMiddleware.js';
+import { requireUser } from './middlewares/roleMiddleware.js';
 
 const PORT = process.env.PORT;
 
@@ -53,15 +56,17 @@ app.use('/api/push', pushRouter);
 
 // private routes
 app.use(authMiddleware);
+app.use(auditLogMiddleware);
+app.use('/api/admin', adminRouter);
 app.use('/api/users', userRouter);
-app.use('/api/friends', friendRouter);
-app.use('/api/messages', messageRouter);
-app.use('/api/conversations', conversationRouter);
-app.use('/api/notifications', notificationRouter);
-app.use('/api/livekit', livekitRouter);
-app.use('/api/meetings', meetingRouter);
-app.use('/api/reminders', reminderRouter);
-app.use('/api/reports', reportRouter);
+app.use('/api/friends', requireUser, friendRouter);
+app.use('/api/messages', requireUser, messageRouter);
+app.use('/api/conversations', requireUser, conversationRouter);
+app.use('/api/notifications', requireUser, notificationRouter);
+app.use('/api/livekit', requireUser, livekitRouter);
+app.use('/api/meetings', requireUser, meetingRouter);
+app.use('/api/reminders', requireUser, reminderRouter);
+app.use('/api/reports', requireUser, reportRouter);
 
 connectDB().then(() => {
     try {

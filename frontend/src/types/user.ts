@@ -11,6 +11,19 @@ export interface User {
   phone?: string;
   googleId?: string;
   music?: UserMusic;
+  role?: "user" | "admin";
+  lock?: {
+    isLocked?: boolean;
+    lockedAt?: string | null;
+    lockedBy?: string | null;
+    reason?: string;
+    unlockedAt?: string | null;
+    unlockedBy?: string | null;
+  };
+  moderation?: {
+    violationCountCache?: number;
+    lastViolationAt?: string | null;
+  };
   createdAt?: string;
   updatedAt?: string;
 }

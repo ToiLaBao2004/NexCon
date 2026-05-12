@@ -74,6 +74,17 @@ const messageSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    reportStatus: {
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    reportReview: {
+        reportId: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        reviewedAt: { type: Date, default: null },
+        note: { type: String, trim: true, maxlength: 1000, default: '' },
+    },
     replyTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Message',

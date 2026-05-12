@@ -5,10 +5,12 @@ import {
 } from '../controllers/userController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 import { upload } from '../middlewares/uploadMiddleware.js';
+import { requireUser } from '../middlewares/roleMiddleware.js';
 
 const userRouter = express.Router();
 
 userRouter.get('/me', authMiddleware, getCurrentUser);
+userRouter.use(requireUser);
 userRouter.get('/search', authMiddleware, searchUsers);
 userRouter.put('/update-profile', authMiddleware, updateProfile);
 userRouter.post('/update-avatar', authMiddleware, upload.single('file'), updateAvatar);

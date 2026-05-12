@@ -14,6 +14,13 @@ export async function authMiddleware(req, res, next) {
         if (!user) {
             return res.status(401).json({ message: 'User not found.' });
         }
+        if (user.lock?.isLocked) {
+            return res.status(423).json({
+                success: false,
+                locked: true,
+                message: user.lock.reason || 'Tài khoản của bạn đang bị khóa.',
+            });
+        }
         const session = await Session.findById(payload.sessionId);
         if (!session || session.expiresAt < Date.now()) {
             return res.status(401).json({ message: 'Session expired or not found.' });

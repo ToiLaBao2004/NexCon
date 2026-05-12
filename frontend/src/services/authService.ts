@@ -40,6 +40,14 @@ export const authService = {
     return response.data;
   },
 
+  submitLockedAppeal: async (
+    email: string,
+    reason: string
+  ) => {
+    const response = await api.post('/auth/locked-appeals', { email, reason });
+    return response.data;
+  },
+
   resetNewPassword: async (
     resetToken: string,
     newPassword: string,

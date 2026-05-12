@@ -47,6 +47,18 @@ export interface MyReport {
       avatarUrl?: string;
     } | null;
   };
+  review?: {
+    reviewedAt?: string | null;
+    note?: string;
+  };
+  resolution?: {
+    decision?: "violation" | "no_violation" | null;
+    actionTaken?: string;
+    reporterMessage?: string;
+    targetMessage?: string;
+    targetViolationCount?: number | null;
+    targetLocked?: boolean;
+  };
 }
 
 function resolveReportError(error: any): string {

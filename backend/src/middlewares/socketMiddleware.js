@@ -49,6 +49,9 @@ export const socketAuthMiddleware = async (socket, next) => {
         if (!user) {
             return next(new Error("User does not exist"));
         }
+        if (user.lock?.isLocked) {
+            return next(new Error("Account locked"));
+        }
 
         socket.user = user;
         socket.sessionId = session._id.toString();
