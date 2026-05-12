@@ -5,6 +5,7 @@ import MeetPage from "./pages/MeetPage";
 import PeoplePage from "./pages/PeoplePage";
 import ReminderPage from "./pages/ReminderPage";
 import NotificationPage from "./pages/NotificationPage";
+import ReportHistoryPage from "./pages/ReportHistoryPage";
 import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
 import OtpPage from "./pages/OtpPage";
@@ -186,6 +187,7 @@ function App() {
             <Route path="/reminder" element={<ReminderPage />} />
             <Route path="/reminders" element={<ReminderPage />} />
             <Route path="/notification" element={<NotificationPage />} />
+            <Route path="/reports/my" element={<ReportHistoryPage />} />
             <Route path="/settings/sessions" element={<SessionsPage />} />
             <Route path="/" element={<Navigate to="/chat" replace />} />
           </Route>

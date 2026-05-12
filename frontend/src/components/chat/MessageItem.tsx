@@ -19,7 +19,7 @@ import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
-import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions, Check, CheckCheck } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions, Check, CheckCheck, Flag } from "lucide-react";
 import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -35,6 +35,7 @@ import ReminderFormModal from "@/components/reminder/ReminderFormModal";
 import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder";
 import ForwardMessageModal from "./ForwardMessageModal";
 import { DetailDialog } from "./ConversationRemindersPanel";
+import { ReportDialog } from "@/components/shared/ReportDialog";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -2041,6 +2042,7 @@ const MessageItem = ({
 	const [reminderTargetMessage, setReminderTargetMessage] = useState<{ messageId: string; messagePreview: string } | null>(null);
 	const [showForwardModal, setShowForwardModal] = useState(false);
 	const [showSeenUsersDialog, setShowSeenUsersDialog] = useState(false);
+	const [showReportDialog, setShowReportDialog] = useState(false);
 	const messageRootRef = useRef<HTMLDivElement | null>(null);
 	const longPressTimeoutRef = useRef<number | null>(null);
 
@@ -2224,6 +2226,7 @@ const MessageItem = ({
 	};
 
 	const canCreateReminder = !isDisbanded && !isRecalled && message.type === "text";
+	const canReportMessage = !isOwn && !isDisbanded && !isRecalled && (!message.status || message.status === "sent");
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
 	return (
@@ -2518,6 +2521,15 @@ const MessageItem = ({
 													Thu hồi
 												</DropdownMenuItem>
 											)}
+											{canReportMessage && (
+												<DropdownMenuItem
+													className="text-destructive focus:text-destructive focus:bg-destructive/10"
+													onClick={() => { setShowTouchActions(false); setShowReportDialog(true); }}
+												>
+													<Flag className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Báo cáo tin nhắn
+												</DropdownMenuItem>
+											)}
 										</DropdownMenuContent>
 									</DropdownMenu>
 								</div>
@@ -2623,6 +2635,14 @@ const MessageItem = ({
 																<Undo2 className="h-5 w-5" strokeWidth={1.5} />
 															</div>
 															<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Thu hồi</span>
+														</button>
+													)}
+													{canReportMessage && (
+														<button onClick={() => { setShowTouchActions(false); setShowReportDialog(true); }} className="flex flex-col items-center gap-2">
+															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 shadow-sm hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors">
+																<Flag className="h-5 w-5" strokeWidth={1.5} />
+															</div>
+															<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Báo cáo</span>
 														</button>
 													)}
 												</div>
@@ -2840,6 +2860,18 @@ const MessageItem = ({
 					onOpenChange={(open) => setShowForwardModal(open)}
 					message={message}
 					messages={bubbleMessages.filter((item) => item.isRecalled !== true && (!item.status || item.status === "sent"))}
+				/>
+			)}
+
+			{canReportMessage && (
+				<ReportDialog
+					open={showReportDialog}
+					onOpenChange={setShowReportDialog}
+					targetType="message"
+					targetId={message._id}
+					targetName={message.senderInfo?.displayName}
+					conversationId={message.conversationId}
+					preview={message.type === "image" ? "[Hình ảnh]" : message.type === "file" ? (message.fileName || "[File]") : message.content}
 				/>
 			)}
 		</>

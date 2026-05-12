@@ -1,0 +1,86 @@
+import api from "@/lib/axios";
+
+export type ReportReasonCategory =
+  | "spam"
+  | "harassment"
+  | "hate_speech"
+  | "sexual_content"
+  | "violence"
+  | "scam"
+  | "impersonation"
+  | "self_harm"
+  | "other";
+
+export interface CreateReportPayload {
+  reasonCategory: ReportReasonCategory;
+  description?: string;
+  conversationId?: string;
+}
+
+export type ReportTargetType = "message" | "user";
+export type ReportStatus = "pending" | "reviewing" | "resolved" | "dismissed";
+
+export interface MyReport {
+  _id: string;
+  targetType: ReportTargetType;
+  targetUserId: string;
+  targetMessageId?: string | null;
+  conversationId?: string | null;
+  reasonCategory: ReportReasonCategory;
+  description?: string;
+  status: ReportStatus;
+  createdAt: string;
+  updatedAt?: string;
+  targetUserSnapshot?: {
+    displayName?: string;
+    email?: string;
+    avatarUrl?: string;
+  };
+  messageSnapshot?: {
+    type?: string;
+    content?: string;
+    fileName?: string;
+    mimeType?: string;
+    createdAt?: string;
+    senderInfo?: {
+      displayName?: string;
+      avatarUrl?: string;
+    } | null;
+  };
+}
+
+function resolveReportError(error: any): string {
+  const serverMessage = error?.response?.data?.message;
+  if (serverMessage) return serverMessage;
+  if (!navigator.onLine) return "Không có kết nối mạng.";
+  return "Không thể gửi báo cáo. Vui lòng thử lại.";
+}
+
+export const reportService = {
+  async reportMessage(messageId: string, payload: CreateReportPayload) {
+    try {
+      const response = await api.post(`/reports/messages/${messageId}`, payload);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(resolveReportError(error));
+    }
+  },
+
+  async reportUser(userId: string, payload: CreateReportPayload) {
+    try {
+      const response = await api.post(`/reports/users/${userId}`, payload);
+      return response.data;
+    } catch (error: any) {
+      throw new Error(resolveReportError(error));
+    }
+  },
+
+  async getMyReports() {
+    try {
+      const response = await api.get("/reports/my");
+      return response.data as { reports: MyReport[] };
+    } catch (error: any) {
+      throw new Error(resolveReportError(error));
+    }
+  },
+};

@@ -9,7 +9,7 @@ import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import MentionCountBadge from './MentionCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen, Mic, BellOff } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen, Mic, BellOff, Flag } from "lucide-react";
 import { StickerIcon as Sticker } from "@/components/shared/StickerIcon";
 import { isUrl } from '@/lib/utils';
 import { isMuted } from '@/utils/isMuted';
@@ -36,6 +36,7 @@ import { ConfirmationModal } from "../shared/ConfirmationModal";
 import { getSystemMessageText } from '@/utils/chatUtils';
 import { FIELD_LIMITS, checkFieldFormat } from '@/lib/fieldFormat';
 import { toast } from "sonner";
+import { ReportDialog } from "../shared/ReportDialog";
 
 const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
 
@@ -69,6 +70,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [openClearConfirm, setOpenClearConfirm] = useState(false);
   const [pinning, setPinning] = useState(false);
+  const [openReportUser, setOpenReportUser] = useState(false);
 
   const isConversationPinned = convo.isPinned === true;
 
@@ -266,6 +268,17 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
                   </DropdownMenuItem>
                 )}
               />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={(e) => {
+                  e.preventDefault();
+                  setDropdownOpen(false);
+                  setOpenReportUser(true);
+                }}
+              >
+                <Flag className="h-4 w-4 mr-2" />
+                Báo cáo người dùng
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -311,6 +324,14 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
         description="Hành động này không thể hoàn tác!"
         variant="destructive"
         confirmText="Xác nhận xóa"
+      />
+      <ReportDialog
+        open={openReportUser}
+        onOpenChange={setOpenReportUser}
+        targetType="user"
+        targetId={otherUser.userId._id}
+        targetName={displayName}
+        conversationId={convo._id}
       />
     </>
   );

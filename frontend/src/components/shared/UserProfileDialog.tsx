@@ -15,9 +15,10 @@ import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { ConfirmationModal } from "./ConfirmationModal";
-import { Loader2, UserMinus, UserPlus, Mail, Phone, Info, Check, X as CloseIcon } from "lucide-react";
+import { Flag, Loader2, UserMinus, UserPlus, Mail, Phone, Info, Check, X as CloseIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { User } from "@/types/user";
+import { ReportDialog } from "./ReportDialog";
 
 interface UserProfile {
     _id: string;
@@ -49,6 +50,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     const [unfriendModalOpen, setUnfriendModalOpen] = useState(false);
     const [fullUser, setFullUser] = useState<User | null>(null);
     const [albumArt, setAlbumArt] = useState<string | null>(null);
+    const [reportOpen, setReportOpen] = useState(false);
 
     useEffect(() => {
         if (open && user?._id) {
@@ -261,6 +263,18 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                     </div>
 
                     {renderActions()}
+
+                    {!isSelf && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setReportOpen(true)}
+                            className="mt-3 w-full gap-2 rounded-xl text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        >
+                            <Flag className="h-4 w-4" />
+                            Báo cáo người dùng
+                        </Button>
+                    )}
                 </div>
             </DialogContent>
 
@@ -277,6 +291,16 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                 variant="destructive"
                 isLoading={actionLoading}
             />
+
+            {!isSelf && (
+                <ReportDialog
+                    open={reportOpen}
+                    onOpenChange={setReportOpen}
+                    targetType="user"
+                    targetId={user._id}
+                    targetName={user.displayName}
+                />
+            )}
         </Dialog>
     );
 }
