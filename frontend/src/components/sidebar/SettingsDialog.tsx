@@ -19,7 +19,8 @@ import { useOTPStore } from "@/stores/useOtpStore";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Bell, Shield, Eye, EyeOff } from "lucide-react";
+import { Bell, Flag, Shield, Eye, EyeOff } from "lucide-react";
+import { ReportHistoryContent } from "@/pages/ReportHistoryPage";
 
 const resetPassSchema = z.object({
     newPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
@@ -36,7 +37,7 @@ interface SettingsDialogProps {
     onOpenChange: (open: boolean) => void;
 }
 
-type TabType = "notifications" | "security";
+type TabType = "notifications" | "security" | "reports";
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     const [activeTab, setActiveTab] = useState<TabType>("notifications");
@@ -161,7 +162,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         {/* Sidebar */}
                         <div className="w-full sm:w-[220px] bg-muted/40 border-b sm:border-b-0 sm:border-r border-border/50 flex flex-col p-3 sm:p-4">
                             <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-6 px-1 sm:px-2">Cài đặt</h2>
-                            <div className="grid grid-cols-2 sm:grid-cols-1 gap-1">
+                            <div className="grid grid-cols-3 sm:grid-cols-1 gap-1">
                                 <button
                                     onClick={() => setActiveTab("notifications")}
                                     className={cn(
@@ -182,6 +183,16 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                     <Shield className="w-4 h-4" />
                                     Bảo mật
                                 </button>
+                                <button
+                                    onClick={() => setActiveTab("reports")}
+                                    className={cn(
+                                        "flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                                        (activeTab === "reports") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                    )}
+                                >
+                                    <Flag className="w-4 h-4" />
+                                    Báo cáo
+                                </button>
                             </div>
                         </div>
 
@@ -190,6 +201,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             <div className="p-4 sm:p-6 h-full relative">
                                 {activeTab === "notifications" && <NotificationTab />}
                                 {activeTab === "security" && <SecurityTab onForgotPassword={handleForgotPassword} />}
+                                {activeTab === "reports" && <ReportHistoryContent embedded />}
                             </div>
                         </div>
                     </div>

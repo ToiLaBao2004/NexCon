@@ -4,15 +4,23 @@ import { useFriendStore } from "@/stores/useFriendStore";
 import { UserX } from "lucide-react";
 import { useState } from "react";
 import { ConfirmationModal } from "../shared/ConfirmationModal";
+import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 
 export default function BlockedTab() {
     const { blockedUsers, unblockUser, loading } = useFriendStore();
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [showUnblockConfirm, setShowUnblockConfirm] = useState(false);
+    const [profileUser, setProfileUser] = useState<any>(null);
+    const [isProfileOpen, setIsProfileOpen] = useState(false);
 
     const handleOpenUnblock = (user: any) => {
         setSelectedUser(user);
         setShowUnblockConfirm(true);
+    };
+
+    const handleOpenProfile = (user: any) => {
+        setProfileUser(user);
+        setIsProfileOpen(true);
     };
 
     const handleConfirmUnblock = async () => {
@@ -33,18 +41,29 @@ export default function BlockedTab() {
                 <div className="flex flex-col gap-2">
                     {blockedUsers.map((user) => (
                         <div key={user._id} className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-card border border-border/40 hover:border-primary/30 transition-all duration-300">
-                            <Avatar className="h-12 w-12 shrink-0">
-                                <AvatarImage src={user.avatarUrl} />
-                                <AvatarFallback className="text-base font-bold bg-muted text-muted-foreground">
-                                    {user.displayName.charAt(0)}
-                                </AvatarFallback>
-                            </Avatar>
+                            <button
+                                type="button"
+                                onClick={() => handleOpenProfile(user)}
+                                className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                aria-label={`Xem hồ sơ ${user.displayName}`}
+                            >
+                                <Avatar className="h-12 w-12">
+                                    <AvatarImage src={user.avatarUrl} />
+                                    <AvatarFallback className="text-base font-bold bg-muted text-muted-foreground">
+                                        {user.displayName.charAt(0)}
+                                    </AvatarFallback>
+                                </Avatar>
+                            </button>
 
-                            <div className="flex-1 min-w-0">
+                            <button
+                                type="button"
+                                onClick={() => handleOpenProfile(user)}
+                                className="flex-1 min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
+                            >
                                 <p className="text-sm font-medium text-foreground truncate">
                                     {user.displayName}
                                 </p>
-                            </div>
+                            </button>
 
                             <Button
                                 size="sm"
@@ -80,6 +99,19 @@ export default function BlockedTab() {
                 confirmText="Bỏ chặn"
                 variant="default"
                 isLoading={loading}
+            />
+
+            <UserProfileDialog
+                open={isProfileOpen}
+                onOpenChange={setIsProfileOpen}
+                user={profileUser ? {
+                    _id: profileUser._id,
+                    displayName: profileUser.displayName,
+                    email: profileUser.email || "",
+                    avatarUrl: profileUser.avatarUrl,
+                    bio: profileUser.bio,
+                    phone: profileUser.phone,
+                } : null}
             />
         </div>
     );

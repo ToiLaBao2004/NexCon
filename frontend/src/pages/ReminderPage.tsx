@@ -1045,6 +1045,23 @@ const ReminderPage = () => {
                 </div>
             </div>
 
+            {viewMode === 'list' && (
+                <div className="shrink-0 bg-muted/20 px-4 pt-4 md:px-6 md:pt-6">
+                    <div className="flex justify-end">
+                        <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-9 w-9 rounded-lg border-border/70 bg-background text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                            disabled={isLoading || !includePersonalReminders || visiblePersonalReminderCount === 0}
+                            onClick={() => setDeleteScope(activeTab)}
+                            title="XÃ³a táº¥t cáº£"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             <div
                 className={
                     viewMode === 'calendar'
@@ -1053,7 +1070,7 @@ const ReminderPage = () => {
                 }
                 onScroll={handleScroll}
             >
-                {viewMode === 'list' && (
+                {false && viewMode === 'list' && (
                     <div className="mb-4 flex justify-end">
                         <Button
                             size="icon"

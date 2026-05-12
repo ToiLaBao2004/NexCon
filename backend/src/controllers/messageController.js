@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Message from '../models/messageModel.js';
+import BlockUser from '../models/blockUserModel.js';
 import Conversation from '../models/conversationModel.js';
 import { emitNewMessage, updateConversationLastMessage, generateSignedUrl, replaceMentionTags } from '../utils/messageHelper.js';
 import { io, getReceiverSocketId, emitToUser, joinUserSocketsToRoom } from '../socket/index.js';
@@ -722,6 +723,21 @@ export async function pinMessage(req, res) {
             return res.status(404).json({ message: 'Không tìm thấy cuộc trò chuyện.' });
         }
 
+        if (conversation.type === 'direct') {
+            const otherParticipant = conversation.participants.find(p => p.userId.toString() !== req.user._id.toString());
+            if (otherParticipant) {
+                const blockExists = await BlockUser.findOne({
+                    $or: [
+                        { from: req.user._id, to: otherParticipant.userId },
+                        { from: otherParticipant.userId, to: req.user._id }
+                    ]
+                });
+                if (blockExists) {
+                    return res.status(403).json({ message: 'Không thể ghim tin nhắn khi đang bị chặn.' });
+                }
+            }
+        }
+
         const senderInfo = {
             displayName: req.user.displayName,
             avatarUrl: req.user.avatarUrl,
@@ -994,6 +1010,21 @@ export async function reactToMessage(req, res) {
 
         const { message, conversation } = req;
 
+        if (conversation.type === 'direct') {
+            const otherParticipant = conversation.participants.find(p => p.userId.toString() !== req.user._id.toString());
+            if (otherParticipant) {
+                const blockExists = await BlockUser.findOne({
+                    $or: [
+                        { from: req.user._id, to: otherParticipant.userId },
+                        { from: otherParticipant.userId, to: req.user._id }
+                    ]
+                });
+                if (blockExists) {
+                    return res.status(403).json({ message: 'Không thể thả cảm xúc khi đang bị chặn.' });
+                }
+            }
+        }
+
         const existingReactionIndex = message.reactions.findIndex(
             (r) => r.userId.toString() === userId.toString()
         );
@@ -1126,6 +1157,22 @@ export async function forwardMessage(req, res) {
                 if (!isMember) {
                     errors.push({ conversationId: targetConvoId, reason: 'Bạn không phải thành viên.' });
                     continue;
+                }
+
+                if (targetConvo.type === 'direct') {
+                    const otherParticipant = targetConvo.participants.find(p => p.userId.toString() !== senderId.toString());
+                    if (otherParticipant) {
+                        const blockExists = await BlockUser.findOne({
+                            $or: [
+                                { from: senderId, to: otherParticipant.userId },
+                                { from: otherParticipant.userId, to: senderId }
+                            ]
+                        });
+                        if (blockExists) {
+                            errors.push({ conversationId: targetConvoId, reason: 'Không thể chuyển tiếp vào cuộc trò chuyện đang bị chặn.' });
+                            continue;
+                        }
+                    }
                 }
                 const forwardedMetadata = {
                     ...(sourceMetadata.linkPreview ? { linkPreview: sourceMetadata.linkPreview } : {}),

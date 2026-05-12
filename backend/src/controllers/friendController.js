@@ -3,7 +3,7 @@ import User from '../models/userModel.js';
 import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
-import { io, getReceiverSocketId, emitToUser } from "../socket/index.js";
+import { io, getReceiverSocketId, emitToUser, emitOnlineUsers } from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
 import { checkFieldFormat } from "../utils/fieldFormat.js";
 
@@ -468,6 +468,8 @@ export async function blockUser(req, res) {
             });
         }
 
+        emitOnlineUsers();
+
         return res.status(200).json({
             message: `Bạn đã chặn ${userBlocked.displayName}.`,
             blockedUser: {
@@ -508,6 +510,8 @@ export async function unblockUser(req, res) {
                 unblockedBy: user._id.toString()
             });
         }
+
+        emitOnlineUsers();
 
         return res.status(200).json({ message: `Bạn đã bỏ chặn ${userUnblocked.displayName}.` });
     } catch (error) {
