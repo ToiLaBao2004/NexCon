@@ -47,7 +47,15 @@ function NativeFcmHandler({ enabled }: { enabled: boolean }) {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!enabled) {
+    if (!Capacitor.isNativePlatform()) {
+      return;
+    }
+
+    void listenForNativeFcmOpen((path) => navigate(path));
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !enabled) {
       return;
     }
 
@@ -56,9 +64,7 @@ function NativeFcmHandler({ enabled }: { enabled: boolean }) {
     const setupNativeFcm = async () => {
       try {
         await registerNativeFcm();
-        if (!cancelled) {
-          await listenForNativeFcmOpen((path) => navigate(path));
-        }
+        if (cancelled) return;
       } catch (error) {
         console.error('[App] Native FCM setup failed:', error);
       }
@@ -69,7 +75,7 @@ function NativeFcmHandler({ enabled }: { enabled: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [enabled, navigate]);
+  }, [enabled]);
 
   return null;
 }
@@ -204,7 +210,7 @@ function App() {
   return (
     <BrowserRouter>
       <BackButtonHandler />
-      <NativeFcmHandler enabled={Capacitor.isNativePlatform() && isAuth && !isAdmin} />
+      <NativeFcmHandler enabled={isAuth && !isAdmin} />
       <Toaster
         richColors
         expand

@@ -21,10 +21,12 @@ import { moderateLinkMessage } from '../services/moderation/moderationLinkServic
 import { fetchLinkPreview } from '../utils/linkPreview.js';
 import { createNotification } from '../services/notificationServices.js';
 import { sendPushToUser } from '../services/pushNotificationService.js';
+import { sendFCMToUser } from '../services/fcmService.js';
 import { transcribeAudioFromBuffer } from '../services/audio/transcribeAudio.js';
 import { moderateImageMessage } from '../services/moderation/imageModerationService.js';
 import { registerViolation } from '../services/moderation/violationService.js';
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
+import { isMuted } from '../utils/isMuted.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
 
@@ -190,6 +192,78 @@ const buildValidMentions = (conversation, rawMentions) => {
 
     return mentions;
 };
+
+function participantUserId(participant) {
+    const userId = participant?.userId;
+    return (userId?._id || userId)?.toString?.() || null;
+}
+
+function messageMetadataObject(message) {
+    if (message?.metadata instanceof Map) {
+        return Object.fromEntries(message.metadata);
+    }
+    return message?.metadata || {};
+}
+
+function isMessageVisibleToUser(message, userId) {
+    const metadata = messageMetadataObject(message);
+    if (!Array.isArray(metadata.visibleToUserIds) || metadata.visibleToUserIds.length === 0) {
+        return true;
+    }
+    return metadata.visibleToUserIds.map((id) => id.toString()).includes(userId.toString());
+}
+
+function buildMessagePushPreview(message) {
+    switch (message.type) {
+        case 'image':
+            return message.content || 'Đã gửi một ảnh';
+        case 'file':
+            return message.fileName ? `Đã gửi tập tin ${message.fileName}` : 'Đã gửi một tập tin';
+        case 'audio':
+            return 'Tin nhắn thoại';
+        case 'sticker':
+            return 'Đã gửi một sticker';
+        case 'link':
+            return message.content || 'Đã gửi một liên kết';
+        default:
+            return replaceMentionTags(message.content || '', message.mentions).trim() || 'Tin nhắn mới';
+    }
+}
+
+async function sendOfflineMessagePushes({ conversation, message, senderId, senderName, skipUserIds = new Set() }) {
+    const preview = buildMessagePushPreview(message).slice(0, 160);
+    const conversationId = conversation._id.toString();
+    const messageId = message._id.toString();
+    const url = `/chat?conversationId=${conversationId}&messageId=${messageId}`;
+    const title = conversation.type === 'group'
+        ? conversation.group?.name || 'Tin nhắn nhóm'
+        : senderName || 'Tin nhắn mới';
+    const body = conversation.type === 'group'
+        ? `${senderName || 'Thành viên'}: ${preview}`
+        : preview;
+
+    await Promise.all((conversation.participants || []).map(async (participant) => {
+        const recipientId = participantUserId(participant);
+        if (!recipientId) return;
+        if (recipientId === senderId.toString()) return;
+        if (skipUserIds.has(recipientId)) return;
+        if (!isMessageVisibleToUser(message, recipientId)) return;
+        if (isMuted(participant.mute, 'messages')) return;
+        if (getReceiverSocketId(recipientId)) return;
+
+        await sendFCMToUser(recipientId, {
+            title,
+            body,
+            data: {
+                type: 'message',
+                url,
+                conversationId,
+                messageId,
+                chatType: conversation.type,
+            },
+        });
+    }));
+}
 
 const saveConversationForNewMessage = async ({ conversationId, message, senderId, mentions = [] }) => {
     const maxAttempts = 3;
@@ -499,6 +573,20 @@ export async function sendMessage(req, res) {
 
         const signedUrl = generateSignedUrl(message.filePublicId, message.type);
         emitNewMessage(io, conversation, message, signedUrl);
+
+        const mentionTargetIds = new Set(
+            (message.mentions || [])
+                .map((mention) => mention.userId.toString())
+                .filter((mentionUserId) => mentionUserId !== senderId.toString())
+        );
+
+        await sendOfflineMessagePushes({
+            conversation,
+            message,
+            senderId,
+            senderName: req.user.displayName,
+            skipUserIds: mentionTargetIds,
+        });
 
         if (Array.isArray(message.mentions) && message.mentions.length > 0) {
             const cleanContent = replaceMentionTags(message.content, message.mentions);
@@ -1237,6 +1325,13 @@ export async function forwardMessage(req, res) {
 
                 const signedUrl = generateSignedUrl(newMsg.filePublicId, newMsg.type);
                 emitNewMessage(io, savedTargetConvo, newMsg, signedUrl);
+
+                await sendOfflineMessagePushes({
+                    conversation: savedTargetConvo,
+                    message: newMsg,
+                    senderId,
+                    senderName: req.user.displayName,
+                });
 
                 results.push({
                     conversationId: targetConvoId,
