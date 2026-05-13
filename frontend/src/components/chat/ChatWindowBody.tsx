@@ -5,7 +5,7 @@ import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import MessageItem from "./MessageItem";
 import CallMessageItem from "./CallMessageItem";
 import { PinnedMessagesBanner } from "@/components/chat/PinnedMessagesBanner";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSocketStore } from "@/stores/useSocketStore";
@@ -133,6 +133,14 @@ const ChatWindowBody: React.FC = () => {
 
   const loadingMoreRef = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const scrollToBottom = useCallback((instant: boolean = false) => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: instant ? "auto" : "smooth",
+      });
+    }
+  }, []);
 
   // Track scroll position to show "Back to latest" button in normal mode
   useEffect(() => {
@@ -219,19 +227,31 @@ const ChatWindowBody: React.FC = () => {
 
   // Handle auto-scroll to bottom on first load or new messages
   useEffect(() => {
-    const scrollToBottom = (instant: boolean = false) => {
-      if (scrollRef.current) {
-        scrollRef.current.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: instant ? "auto" : "smooth"
-        });
-      }
-    };
-
     const isNewMessageAtBottom = lastItemId !== prevLastItemIdRef.current;
     prevLastItemIdRef.current = lastItemId;
 
-    if (loadingMoreRef.current || isJumpMode || showScrollToBottom) return;
+    const lastMessage = messages[messages.length - 1];
+    const lastSenderObj = typeof lastMessage?.senderId === "object" ? (lastMessage?.senderId as any) : null;
+    const lastSenderId = lastSenderObj ? lastSenderObj._id : lastMessage?.senderId;
+    const isSystemNonCall = lastMessage?.type === "system" && lastMessage?.systemType !== "call";
+    const isOwnLastMessage = Boolean(
+      !isSystemNonCall &&
+      lastSenderId &&
+      user?._id &&
+      lastSenderId?.toString?.() === user._id.toString()
+    );
+
+    if (loadingMoreRef.current) return;
+
+    if (isJumpMode && convoId && isNewMessageAtBottom && isOwnLastMessage) {
+      void exitJumpMode(convoId).then(() => {
+        requestAnimationFrame(() => scrollToBottom(true));
+        setTimeout(() => scrollToBottom(true), 120);
+      });
+      return;
+    }
+
+    if (isJumpMode) return;
 
     if (isFirstLoad.current) {
       if (messages.length > 0) {
@@ -242,9 +262,58 @@ const ChatWindowBody: React.FC = () => {
         isFirstLoad.current = false;
       }
     } else if (convoId && isNewMessageAtBottom) {
-      scrollToBottom();
+      if (isOwnLastMessage) {
+        scrollToBottom(true);
+        return;
+      }
+
+      if (!showScrollToBottom) {
+        scrollToBottom();
+      }
     }
-  }, [lastItemId, messages.length, convoId, isJumpMode]);
+  }, [lastItemId, messages.length, convoId, isJumpMode, showScrollToBottom, user?._id, exitJumpMode, scrollToBottom, messages]);
+
+  useEffect(() => {
+    if (!convoId || messages.length === 0) return;
+
+    const lastMessage = messages[messages.length - 1];
+    if (!lastMessage || lastMessage.type !== "image") return;
+
+    const lastSenderObj = typeof lastMessage.senderId === "object" ? (lastMessage.senderId as any) : null;
+    const lastSenderId = lastSenderObj ? lastSenderObj._id : lastMessage.senderId;
+    const isOwnLastMessage = Boolean(
+      lastSenderId && user?._id && lastSenderId?.toString?.() === user._id.toString()
+    );
+    if (!isOwnLastMessage) return;
+
+    const container = document.getElementById(`message-${lastMessage._id}`);
+    if (!container) return;
+
+    const images = Array.from(container.querySelectorAll("img"));
+    if (images.length === 0) return;
+
+    let hasScrolled = false;
+    const handleLoad = () => {
+      if (hasScrolled) return;
+      hasScrolled = true;
+      scrollToBottom(true);
+      setTimeout(() => scrollToBottom(true), 120);
+    };
+
+    const pending: HTMLImageElement[] = [];
+    images.forEach((img) => {
+      if (img.complete && img.naturalHeight > 0) {
+        handleLoad();
+      } else {
+        pending.push(img);
+        img.addEventListener("load", handleLoad, { once: true });
+      }
+    });
+
+    return () => {
+      pending.forEach((img) => img.removeEventListener("load", handleLoad));
+    };
+  }, [convoId, lastItemId, messages, scrollToBottom, user?._id]);
 
 
   // Handle jump scroll to anchor

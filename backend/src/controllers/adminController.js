@@ -868,13 +868,13 @@ export async function resolveAdminReport(req, res) {
             actionTaken = violation.locked
                 ? 'Đã xác nhận vi phạm và khóa tài khoản theo chính sách kiểm duyệt.'
                 : 'Đã xác nhận vi phạm và ghi nhận vào hồ sơ kiểm duyệt.';
-            reporterMessage = 'Chúng tôi đã xem xét báo cáo của bạn và xác nhận có vi phạm. Cảm ơn bạn đã giúp giữ cộng đồng an toàn.';
+            reporterMessage = 'Chúng tôi đã xem xét và xác nhận rằng người dùng bạn báo cáo đã vi phạm tiêu chuẩn cộng đồng. Cảm ơn bạn đã giúp giữ cộng đồng an toàn.';
             targetMessage = report.targetType === 'message'
-                ? `Một tin nhắn từ tài khoản của bạn đã bị xác nhận vi phạm tiêu chuẩn cộng đồng. Bằng chứng: ${evidencePreview || 'tin nhắn được báo cáo trong đoạn chat.'} Vui lòng xem lại nội dung trước khi gửi và không tái phạm.`
+                ? `Một tin nhắn từ tài khoản của bạn đã bị xác nhận vi phạm tiêu chuẩn cộng đồng. Nội dung: ${evidencePreview || 'tin nhắn được báo cáo trong đoạn chat.'} Vui lòng xem lại nội dung trước khi gửi và không tái phạm.`
                 : 'Tài khoản của bạn đã bị xác nhận có hành vi vi phạm tiêu chuẩn cộng đồng. Vui lòng điều chỉnh cách sử dụng NexCon và không tái phạm.';
         } else {
             actionTaken = 'Không xác nhận vi phạm sau khi xem xét.';
-            reporterMessage = 'Chúng tôi đã xem xét báo cáo của bạn nhưng chưa đủ cơ sở xác nhận vi phạm trong trường hợp này.';
+            reporterMessage = 'Chúng tôi đã xem xét báo cáo của bạn nhưng chưa đủ cơ sở xác nhận vi phạm trong trường hợp này. Cảm ơn bạn đã báo cáo để giúp NexCon an toàn hơn.';
         }
 
         report.status = decision === 'violation' ? 'resolved' : 'dismissed';
