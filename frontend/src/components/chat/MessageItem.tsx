@@ -307,7 +307,7 @@ function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 						/>
 					))}
 				</div>
-				<span className={cn("text-[10px] tabular-nums font-mono leading-none", isOwn ? "text-white/60" : "text-muted-foreground")}>
+				<span className={cn("text-[12px] sm:text-[13px] tabular-nums font-mono leading-none", isOwn ? "text-white/60" : "text-muted-foreground")}>
 					{(progress > 0 || isPlaying) ? fmt(currentTime) : fmt(duration)}
 				</span>
 			</div>
@@ -343,7 +343,7 @@ function AudioMessageBubble({
 						type="button"
 						onClick={() => setShowTranscript((current) => !current)}
 						className={cn(
-							"shrink-0 size-7 rounded-full border text-[11px] font-bold",
+							"shrink-0 size-7 rounded-full border text-[12px] sm:text-[13px] font-bold",
 							"flex items-center justify-center transition-all",
 							showTranscript && "scale-105",
 							isOwn
@@ -370,7 +370,7 @@ function AudioMessageBubble({
 			{hasTranscript && showTranscript && (
 				<div
 					className={cn(
-						"max-w-[260px] rounded-xl px-3 py-2 text-sm leading-relaxed",
+						"max-w-[320px] rounded-xl px-4 py-3 text-[15px] sm:text-[16px] leading-relaxed",
 						"whitespace-pre-wrap break-words animate-in fade-in slide-in-from-top-1 duration-150",
 						isOwn
 							? "bg-white/12 text-white border border-white/10"
@@ -426,7 +426,7 @@ function ImageBatchGrid({
 			return (
 				<div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-destructive/10 text-destructive">
 					<ShieldAlert className="size-7" strokeWidth={1.7} />
-					<span className="px-2 text-center text-xs font-semibold">Tin nhắn vi phạm tiêu chuẩn cộng đồng</span>
+					<span className="px-2 text-center text-[13px] sm:text-[14px] font-semibold">Tin nhắn vi phạm tiêu chuẩn cộng đồng</span>
 				</div>
 			);
 		}
@@ -498,7 +498,7 @@ function ImageBatchGrid({
 				))}
 			</div>
 			{items[0]?.content && !items[0]?.isRecalled && !items[0]?.reportStatus && (
-				<p className="text-sm px-1">
+				<p className="text-[15px] sm:text-[16px] px-2 leading-relaxed">
 					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
 				</p>
 			)}
@@ -555,7 +555,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<SecureImage
 							messageId={message._id}
 							alt={message.fileName ?? "image"}
-							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+							className="max-w-[280px] max-h-[340px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
 						/>
 						{errorBadge}
 					</button>
@@ -576,12 +576,16 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<img
 							src={message.fileUrl!}
 							alt={message.fileName ?? "image"}
-							className="max-w-[240px] max-h-[300px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+							className="max-w-[280px] max-h-[340px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
 						/>
 						{errorBadge}
 					</button>
 				)}
-				{message.content && <p className="text-sm px-1">{renderMentionedText(message.content, message.mentions, isOwn, participants)}</p>}
+				{message.content && (
+					<p className="text-[15px] sm:text-[16px] px-2 leading-relaxed">
+						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
+					</p>
+				)}
 			</div>
 		);
 	}
@@ -636,7 +640,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						}
 					}}
 					className={cn(
-						"flex items-center gap-2.5 px-2.5 py-2 rounded-xl transition-all group/file",
+						"flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group/file",
 						isOwn
 							? "bg-white/12 border border-white/10 hover:bg-white/18"
 							: "bg-background/50 dark:bg-black/20 border border-border/40 hover:bg-background/80 dark:hover:bg-black/30"
@@ -647,15 +651,15 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<FileText className={cn("size-5", isOwn ? "text-white" : "text-primary")} />
 					</div>
 					<div className="flex flex-col min-w-0">
-						<span className="text-sm font-medium truncate max-w-[180px]">{message.fileName ?? "File"}</span>
-						<span className={cn("text-xs", isOwn ? "text-white/70" : "text-muted-foreground")}>
+						<span className="text-[15px] sm:text-[16px] font-medium truncate max-w-[180px]">{message.fileName ?? "File"}</span>
+						<span className={cn("text-[12px] sm:text-[13px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
 							{message.fileSize ? formatBytes(message.fileSize) : (message.mimeType ?? "")}
 						</span>
 					</div>
 					<ExternalLink className={cn("size-3.5 shrink-0 ml-1 opacity-0 group-hover/file:opacity-70 transition-opacity", isOwn ? "text-white" : "text-muted-foreground")} />
 				</a>
 				{message.content && (
-					<div className="text-sm px-1 leading-relaxed whitespace-pre-wrap break-words">
+					<div className="text-[15px] sm:text-[16px] px-2 leading-relaxed whitespace-pre-wrap break-words">
 						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
 					</div>
 				)}
@@ -683,7 +687,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					target="_blank"
 					rel="noopener noreferrer"
 					className={cn(
-						"block max-w-[320px] overflow-hidden rounded-2xl border transition hover:opacity-95",
+						"block max-w-[360px] overflow-hidden rounded-2xl border transition hover:opacity-95",
 						isOwn
 							? "border-white/20 bg-white text-slate-900 dark:bg-slate-800 dark:text-slate-100 dark:border-white/10"
 							: "border-border bg-background"
@@ -698,24 +702,24 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					)}
 
 					<div className="p-3">
-						<div className="mb-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+						<div className="mb-1 flex items-center gap-1.5 text-[12px] sm:text-[13px] text-muted-foreground">
 							<Link2 className="size-3.5 shrink-0" />
 							<span className="truncate">{preview.siteName || hostname}</span>
 						</div>
 
 						{preview.title && (
-							<div className="line-clamp-2 text-sm font-semibold">
+							<div className="line-clamp-2 text-[15px] sm:text-[16px] font-semibold">
 								{preview.title}
 							</div>
 						)}
 
 						{preview.description && (
-							<div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+							<div className="mt-1 line-clamp-2 text-[12px] sm:text-[13px] text-muted-foreground">
 								{preview.description}
 							</div>
 						)}
 
-						<div className="mt-2 text-[11px] break-all text-muted-foreground/80">
+						<div className="mt-2 text-[12px] sm:text-[13px] break-all text-muted-foreground/80">
 							{message.content}
 						</div>
 					</div>
@@ -734,7 +738,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				)}
 			>
 				<Link2 className="size-3.5 shrink-0" />
-				<span className="text-sm break-all">{message.content}</span>
+				<span className="text-[15px] sm:text-[16px] break-all">{message.content}</span>
 			</a>
 		);
 	}
@@ -864,7 +868,7 @@ function ReplyQuoteInline({
 			{senderName && (
 				<span
 					className={cn(
-						"block text-xs font-semibold truncate leading-snug mb-0.5",
+						"block text-[12px] sm:text-[13px] font-semibold truncate leading-snug mb-0.5",
 						isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
 					)}
 				>
@@ -873,7 +877,7 @@ function ReplyQuoteInline({
 			)}
 			<span
 				className={cn(
-					"block truncate text-xs leading-snug",
+					"block truncate text-[12px] sm:text-[13px] leading-snug",
 					senderName ? "mt-px" : "",
 					isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
 				)}
@@ -1925,6 +1929,11 @@ const MessageItem = ({
 		index === 0 ||
 		actualSenderId !== (typeof prev?.senderId === "object" ? (prev?.senderId as any)._id : prev?.senderId) ||
 		new Date(message.createdAt).getTime() - new Date(prev?.createdAt || 0).getTime() > 300000;
+	const hasTimeGapFromPrev = prev
+		? (new Date(message.createdAt).getTime() - new Date(prev.createdAt || 0).getTime()) > 300000
+		: false;
+	const isSameSenderAsPrev = Boolean(prev) && actualSenderId?.toString() === (typeof prev?.senderId === "object" ? (prev?.senderId as any)._id : prev?.senderId)?.toString?.();
+	const shouldAddGap = isSameSenderAsPrev && hasTimeGapFromPrev;
 
 	// Determine participant. If populated object, mock the participant object. Otherwise, look up in selectedConvo.
 	let participant = selectedConvo.participants.find(
@@ -1944,6 +1953,11 @@ const MessageItem = ({
 	}
 
 	const isOwn = actualSenderId?.toString() === currentUserId?.toString();
+	const resolveMessageSenderId = (msg?: Message | null) => {
+		if (!msg) return "";
+		const senderObj = typeof msg.senderId === "object" ? (msg.senderId as any) : null;
+		return (senderObj ? senderObj._id : msg.senderId)?.toString?.() ?? "";
+	};
 
 	const { onlineUsers } = useSocketStore();
 	const isImageBatch = (imageBatchItems?.length ?? 0) > 1;
@@ -1962,6 +1976,15 @@ const MessageItem = ({
 		? Boolean(imageBatchItems?.some((item) => item.isRecalled !== true && item.reportStatus !== true && item.content?.trim()))
 		: message.type === "sticker" || isViolationMessage ? false : !!message.content?.trim();
 	const isVisualOnly = (isImage || isSticker) && !hasContent && !message.replyTo && !message.metadata?.forwardedFrom;
+	const nextMessage = messages[index + 1];
+	const nextSenderId = resolveMessageSenderId(nextMessage);
+	const currentSenderId = actualSenderId?.toString?.() ?? "";
+	const isNextSameSender = nextSenderId !== "" && nextSenderId === currentSenderId;
+	const nextIsSystem = nextMessage?.type === "system";
+	const hasGapToNext = nextMessage
+		? (new Date(nextMessage.createdAt).getTime() - new Date(message.createdAt).getTime()) > 300000
+		: true;
+	const showTimestamp = !nextMessage || nextIsSystem || !isNextSameSender || hasGapToNext;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.getUrl(message._id));
 	const isBlob = message.fileUrl?.startsWith("blob:") ?? false;
@@ -2259,7 +2282,8 @@ const MessageItem = ({
 				ref={messageRootRef}
 				id={`msg-${message._id}`}
 				className={cn(
-					"group relative flex gap-2 mt-0.5 mx-2 px-1",
+					"group relative flex gap-2 mx-2 px-1",
+					shouldAddGap ? "mt-3" : "mt-0.5",
 					isOwn ? "justify-end" : "justify-start"
 				)}
 				onPointerDown={handlePointerDownForActions}
@@ -2273,12 +2297,13 @@ const MessageItem = ({
 				}}
 			>
 				{!isOwn && (
-					<div className="w-8 shrink-0 pt-0.5">
+					<div className="w-10 shrink-0 pt-0.5">
 						{isGroupBreak && (
 							<UserAvatar
 								type="chat"
 								name={participant?.userId.nickname ?? participant?.userId.displayName ?? "User"}
 								avatarUrl={participant?.userId.avatarUrl ?? undefined}
+								className="size-10 text-base"
 								status={isSenderOnline ? "online" : "offline"}
 							/>
 						)}
@@ -2287,7 +2312,7 @@ const MessageItem = ({
 
 				<div
 					className={cn(
-						"relative max-w-[75%] sm:max-w-[65%] md:max-w-[55%] flex flex-col",
+						"relative max-w-[90%] sm:max-w-[80%] md:max-w-[72%] flex flex-col",
 						isOwn ? "items-end" : "items-start"
 					)}
 				>
@@ -2296,7 +2321,7 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-1.5 text-sm" : "px-2 py-1.5 text-sm"),
+								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[15px] sm:text-[16px] leading-relaxed" : "px-4 py-2.5 text-[15px] sm:text-[16px] leading-relaxed"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
 								(isRecalled && !isImageBatch)
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
@@ -2319,7 +2344,7 @@ const MessageItem = ({
 								/>
 							)}
 							{!isRecalled && !isViolationMessage && message.metadata?.forwardedFrom && (
-								<div className={cn("flex items-center gap-1 px-1 pt-1 pb-0 text-[11px] opacity-70 select-none", isOwn ? "text-blue-100 justify-end" : "text-muted-foreground justify-start")}>
+								<div className={cn("flex items-center gap-1 px-1 pt-1 pb-0 text-[12px] sm:text-[13px] opacity-70 select-none", isOwn ? "text-blue-100 justify-end" : "text-muted-foreground justify-start")}>
 									<Forward className="h-3 w-3 shrink-0" strokeWidth={2} />
 									<span>Đã chuyển tiếp tin nhắn</span>
 								</div>
@@ -2335,7 +2360,7 @@ const MessageItem = ({
 									/>
 								</div>
 
-								{!isVisualOnly && (
+								{!isVisualOnly && showTimestamp && (
 									<div className={cn(
 										"flex items-center gap-1 select-none -mt-0.5 pb-1",
 										isOwn ? "self-end" : "self-start",
@@ -2350,7 +2375,7 @@ const MessageItem = ({
 												disabled={isBlocked}
 											/>
 										)}
-										<span className="text-[10px] sm:text-[10.5px] font-medium leading-none whitespace-nowrap">
+										<span className="text-[12px] sm:text-[13px] font-medium leading-none whitespace-nowrap">
 											{formatMessageTime(new Date(message.createdAt))}
 										</span>
 										{isOwn && message.status === "error" && (
@@ -2369,7 +2394,7 @@ const MessageItem = ({
 							)}>
 								<div className="flex items-center gap-1.5 bg-black/20 dark:bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 h-5">
 									<Clock className="size-3 text-white/80 animate-spin" />
-									<span className="text-[11px] font-medium text-white/90">Đang gửi</span>
+									<span className="text-[12px] sm:text-[13px] font-medium text-white/90">Đang gửi</span>
 								</div>
 							</div>
 						)}
@@ -2391,7 +2416,7 @@ const MessageItem = ({
 									))}
 								</div>
 								{reactionSummary.totalCount > 1 && (
-									<span className="text-[10px] font-bold text-muted-foreground ml-0.5 leading-none group-hover/reacts:text-foreground">
+									<span className="text-[12px] font-bold text-muted-foreground ml-0.5 leading-none group-hover/reacts:text-foreground">
 										{reactionSummary.totalCount}
 									</span>
 								)}
@@ -2776,7 +2801,7 @@ const MessageItem = ({
 											</span>
 										</TooltipTrigger>
 										<TooltipContent side="top" sideOffset={6} className="max-w-56 text-left">
-											<div className="mb-1 text-[11px] font-semibold text-background/80">Đã xem bởi</div>
+											<div className="mb-1 text-[12px] sm:text-[13px] font-semibold text-background/80">Đã xem bởi</div>
 											<div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto pr-1">
 												{seenUsersForThisMessage.map((seenUser) => (
 													<span key={seenUser._id}>{seenUser.displayName}</span>
@@ -2790,7 +2815,7 @@ const MessageItem = ({
 					)
 				) : isLastMyMessage ? (
 					selectedConvo.type === "direct" ? (
-						<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end text-[11px] text-muted-foreground">
+						<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end text-[12px] sm:text-[13px] text-muted-foreground">
 							{message.isDelivered ? (
 								<>
 									<CheckCheck className="size-3.5" strokeWidth={2.2} />
@@ -2805,7 +2830,7 @@ const MessageItem = ({
 						</div>
 					) : (
 						<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end">
-							<span className="text-[11px] text-muted-foreground">Đã gửi</span>
+							<span className="text-[12px] sm:text-[13px] text-muted-foreground">Đã gửi</span>
 						</div>
 					)
 				) : null

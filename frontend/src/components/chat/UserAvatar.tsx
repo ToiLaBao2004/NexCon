@@ -20,11 +20,12 @@ const UserAvatar = ({ type, name, avatarUrl, className, status }: IUserAvatarPro
     return (
         <span className="relative inline-flex">
             <Avatar
-                className={cn(className ?? "",
+                className={cn(
                     (type === "sidebar" || type === "card") && "size-12 text-base",
                     type === "chat" && "size-8 text-sm",
                     type === "profile" && "size-24 text-3xl shadow-md",
-                    type === "seen" && "size-4 text-[8px]"
+                    type === "seen" && "size-4 text-[8px]",
+                    className ?? ""
                 )}
             >
                 <AvatarImage src={avatarUrl} alt={name} />
