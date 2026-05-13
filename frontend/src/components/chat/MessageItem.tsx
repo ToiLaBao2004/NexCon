@@ -1353,6 +1353,24 @@ function SystemMessageComponent({
 			}
 		}
 
+		if (message.systemType === "group_avatar_permission_changed") {
+			const changedByActor = makeActor(
+				metadata.changedBy,
+				metadata.changedByName || message.senderInfo?.displayName || "Quản trị viên",
+				metadata.changedByInfo?.avatarUrl || message.senderInfo?.avatarUrl
+			);
+			if (changedByActor) {
+				const actionText = metadata.allowMembersChangeAvatar
+					? "đã bật quyền cho thành viên đổi ảnh đại diện nhóm"
+					: "đã tắt quyền cho thành viên đổi ảnh đại diện nhóm";
+				return (
+					<>
+						{actorBadge(changedByActor)} {textPart(actionText)}
+					</>
+				);
+			}
+		}
+
 		if (message.systemType === "reminder_created_local") {
 			const creatorActor = makeActor(
 				metadata.creatorId || message.senderId,

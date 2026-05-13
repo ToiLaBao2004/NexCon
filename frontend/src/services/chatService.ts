@@ -251,9 +251,15 @@ export const chatService = {
 		}
 	},
 
-	async updateGroupSettings(conversationId: string, isApprovalRequired: boolean) {
+	async updateGroupSettings(
+		conversationId: string,
+		settings: {
+			isApprovalRequired?: boolean;
+			allowMembersChangeAvatar?: boolean;
+		}
+	) {
 		try {
-			const res = await api.patch(`/conversations/${conversationId}/settings`, { isApprovalRequired });
+			const res = await api.patch(`/conversations/${conversationId}/settings`, settings);
 			return res.data;
 		} catch (error: any) {
 			throw new Error(resolveErrorMessage(error));

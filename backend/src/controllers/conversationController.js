@@ -52,6 +52,14 @@ function sanitizePopulatedConversation(conversation) {
 	};
 }
 
+function isConversationParticipant(conversation, userId) {
+	return conversation?.participants?.some((participant) => participant.userId.toString() === userId);
+}
+
+function isGroupAdmin(conversation, userId) {
+	return conversation?.group?.admins?.some((adminId) => adminId.toString() === userId);
+}
+
 function sanitizeModeratedMessage(message) {
 	if (!message) return message;
 	const raw = message?.toObject ? message.toObject() : message;
@@ -998,8 +1006,13 @@ export async function updateGroupAvatar(req, res) {
 			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
 		}
 
-		if (!conversation.participants.some((p) => p.userId.toString() === userId)) {
+		if (!isConversationParticipant(conversation, userId)) {
 			return res.status(403).json({ message: 'Only group participants can update group avatar.' });
+		}
+
+		const canUpdateAvatar = isGroupAdmin(conversation, userId) || conversation.group?.allowMembersChangeAvatar !== false;
+		if (!canUpdateAvatar) {
+			return res.status(403).json({ message: 'Chỉ quản trị viên mới có thể đổi ảnh nhóm lúc này.' });
 		}
 
 		const previousAvatarId = conversation.group?.avatarId || null;
@@ -1350,7 +1363,10 @@ export async function addMembers(req, res) {
 export async function updateSettings(req, res) {
 	try {
 		const { conversationId } = req.params;
-		const { isApprovalRequired } = req.body;
+		const {
+			isApprovalRequired,
+			allowMembersChangeAvatar,
+		} = req.body;
 		const userId = req.user._id.toString();
 
 		const conversation = await Conversation.findById(conversationId);
@@ -1366,6 +1382,9 @@ export async function updateSettings(req, res) {
 			if (!isApprovalRequired) {
 				conversation.group.approvalQueue = [];
 			}
+		}
+		if (allowMembersChangeAvatar !== undefined) {
+			conversation.group.allowMembersChangeAvatar = Boolean(allowMembersChangeAvatar);
 		}
 
 		await conversation.save();
@@ -1402,7 +1421,54 @@ export async function updateSettings(req, res) {
 			emitNewMessage(io, updatedConversation, finalMsg);
 		}
 
-		return res.status(200).json({ success: true, message: 'Settings updated successfully.', group: conversation.group });
+		if (allowMembersChangeAvatar !== undefined) {
+			const canMembersChangeAvatar = Boolean(allowMembersChangeAvatar);
+			const systemMessage = new Message({
+				conversationId,
+				senderId: userId,
+				senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+				type: 'system',
+				systemType: 'group_avatar_permission_changed',
+				metadata: {
+					changedBy: userId,
+					changedByName: req.user.displayName,
+					allowMembersChangeAvatar: canMembersChangeAvatar,
+				},
+				content: canMembersChangeAvatar
+					? `Đã bật quyền cho thành viên đổi ảnh đại diện nhóm`
+					: `Đã tắt quyền cho thành viên đổi ảnh đại diện nhóm`
+			});
+
+			const savedMsg = await systemMessage.save();
+			const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
+
+			updateConversationLastMessage(conversation, finalMsg, userId);
+			await conversation.save();
+
+			const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
+				path: 'participants.userId',
+				select: CLIENT_PARTICIPANT_SELECT
+			}));
+
+			emitNewMessage(io, updatedConversation, finalMsg);
+		}
+
+		const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
+			path: 'participants.userId',
+			select: CLIENT_PARTICIPANT_SELECT
+		}));
+
+		io.to(conversationId.toString()).emit('conversation-updated', {
+			conversationId,
+			conversation: updatedConversation,
+		});
+
+		return res.status(200).json({
+			success: true,
+			message: 'Settings updated successfully.',
+			group: updatedConversation.group,
+			conversation: updatedConversation,
+		});
 	} catch (error) {
 		console.error('Error updating settings:', error);
 		res.status(500).json({ message: 'Internal server error' });

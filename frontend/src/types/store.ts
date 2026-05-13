@@ -137,7 +137,13 @@ export interface ChatState {
   disbandGroup: (conversationId: string) => Promise<void>;
   pinMessage: (messageId: string) => Promise<void>;
   pinMessageLocal: (conversationId: string, messageId: string, patch: { isPinned: boolean, pinnedAt: string | null }) => void;
-  updateGroupSettings: (conversationId: string, isApprovalRequired: boolean) => Promise<void>;
+  updateGroupSettings: (
+    conversationId: string,
+    settings: {
+      isApprovalRequired?: boolean;
+      allowMembersChangeAvatar?: boolean;
+    }
+  ) => Promise<void>;
   handleApproval: (conversationId: string, userId: string, action: 'approve' | 'reject') => Promise<void>;
   recallMessageLocal: (conversationId: string, messageId: string, updateData: { content: string, isRecalled: boolean }) => void;
   clearConversation: (conversationId: string) => Promise<void>;
