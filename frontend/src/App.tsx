@@ -6,6 +6,10 @@ import PeoplePage from "./pages/PeoplePage";
 import ReminderPage from "./pages/ReminderPage";
 import NotificationPage from "./pages/NotificationPage";
 import ReportHistoryPage from "./pages/ReportHistoryPage";
+import AdminLayout from "./layouts/AdminLayout";
+import AdminOverviewPage from "./pages/AdminOverviewPage";
+import AdminReportsPage from "./pages/AdminReportsPage";
+import AdminAppealsPage from "./pages/AdminAppealsPage";
 import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
 import OtpPage from "./pages/OtpPage";
@@ -13,6 +17,7 @@ import OtpResetPassPage from "./pages/OtpResetPassPage";
 import ResetPassPage from "./pages/ResetPassPage";
 import { Toaster } from "sonner";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import AdminRoute from "./components/auth/AdminRoute";
 import OAuthSuccess from "./components/auth/OAuthSuccess";
 import { useThemeStore } from "./stores/useThemeStore";
 import { useEffect } from "react";
@@ -39,7 +44,7 @@ function BackButtonHandler() {
 
 function App() {
   const initTheme = useThemeStore((state) => state.initTheme);
-  const { accessToken } = useAuthStore();
+  const { accessToken, user } = useAuthStore();
   const { connectSocket, disconnectSocket } = useSocketStore();
   const { isSupported, requestPermission, subscribe } = usePushNotification();
 
@@ -100,9 +105,19 @@ function App() {
   }, []);
 
   const isAuth = !!accessToken;
+  const isAdmin = user?.role === "admin";
 
   useEffect(() => {
-    if (isAuth) {
+    if (!isAuth) {
+      disconnectSocket();
+      return;
+    }
+
+    if (!user) {
+      return;
+    }
+
+    if (!isAdmin) {
       connectSocket();
       useFriendStore.getState().fetchFriends();
       useFriendStore.getState().fetchIncomingRequests();
@@ -112,10 +127,10 @@ function App() {
     } else {
       disconnectSocket();
     }
-  }, [isAuth, connectSocket, disconnectSocket]);
+  }, [isAuth, isAdmin, user, connectSocket, disconnectSocket]);
 
   useEffect(() => {
-    if (!accessToken || !isSupported()) {
+    if (!accessToken || isAdmin || !isSupported()) {
       return;
     }
 
@@ -152,7 +167,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [accessToken, isSupported, requestPermission, subscribe]);
+  }, [accessToken, isAdmin, isSupported, requestPermission, subscribe]);
 
   return (
     <BrowserRouter>
@@ -168,10 +183,14 @@ function App() {
           style: { zIndex: 2147483647 },
         }}
       />
-      <CallManager />
-      <GroupCallManager />
-      <MeetManager />
-      <ImageViewerModal />
+      {isAuth && !isAdmin && (
+        <>
+          <CallManager />
+          <GroupCallManager />
+          <MeetManager />
+          <ImageViewerModal />
+        </>
+      )}
       <Routes>
         <Route path="/signin" element={<SignInPage />} />
         <Route path="/signup" element={<SignUpPage />} />
@@ -179,6 +198,15 @@ function App() {
         <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
         <Route path="/reset-password" element={<ResetPassPage />} />
         <Route path="/oauth-success" element={<OAuthSuccess />} />
+        <Route element={<AdminRoute />}>
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
+            <Route path="/admin/overview" element={<AdminOverviewPage />} />
+            <Route path="/admin/reports/messages" element={<AdminReportsPage targetType="message" />} />
+            <Route path="/admin/reports/users" element={<AdminReportsPage targetType="user" />} />
+            <Route path="/admin/appeals" element={<AdminAppealsPage />} />
+          </Route>
+        </Route>
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/chat" element={<ChatAppPage />} />

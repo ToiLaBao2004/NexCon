@@ -13,6 +13,7 @@ export const REPORT_REASON_CATEGORIES = [
     'other',
 ];
 export const REPORT_STATUSES = ['pending', 'reviewing', 'resolved', 'dismissed'];
+export const REPORT_DECISIONS = ['violation', 'no_violation'];
 
 const messageSnapshotSchema = new mongoose.Schema({
     type: { type: String, default: '' },
@@ -93,11 +94,25 @@ const reportSchema = new mongoose.Schema({
         reviewedAt: { type: Date, default: null },
         note: { type: String, trim: true, maxlength: 1000, default: '' },
     },
+    resolution: {
+        decision: { type: String, enum: [...REPORT_DECISIONS, null], default: null },
+        actionTaken: { type: String, trim: true, maxlength: 1000, default: '' },
+        targetViolationCount: { type: Number, default: null },
+        targetLocked: { type: Boolean, default: false },
+        reporterMessage: { type: String, trim: true, maxlength: 1000, default: '' },
+        targetMessage: { type: String, trim: true, maxlength: 1000, default: '' },
+    },
+    expiresAt: {
+        type: Date,
+        default: null,
+        index: true,
+    },
 }, { timestamps: true });
 
 reportSchema.index({ reporterId: 1, targetType: 1, targetUserId: 1, status: 1 });
 reportSchema.index({ reporterId: 1, targetType: 1, targetMessageId: 1, status: 1 });
 reportSchema.index({ status: 1, createdAt: -1 });
+reportSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 const ReportModel = mongoose.models.Report || mongoose.model('Report', reportSchema);
 

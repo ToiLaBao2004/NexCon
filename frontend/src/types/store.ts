@@ -319,7 +319,7 @@ export interface CallState {
   handleCallAccepted: (payload: { token: string; roomName: string }) => Promise<void>;
   handleCallRejected: (payload?: DirectCallEventPayload) => void;
   handleCallEnded: (payload?: DirectCallEventPayload) => void;
-  handleCallFailed: (reason: 'offline' | 'no-answer' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'already-active' | 'rate-limited' | 'server-error') => void;
+  handleCallFailed: (reason: 'offline' | 'no-answer' | 'busy' | 'self-call' | 'blocked' | 'not-friends' | 'already-in-call' | 'already-active' | 'account-locked' | 'user-not-found' | 'rate-limited' | 'server-error') => void;
   handleIceCandidate: (_candidate: RTCIceCandidateInit) => Promise<void>;
 }
 
@@ -347,12 +347,14 @@ export type GroupCallParticipantStatus =
   | "joined"
   | "declined"
   | "left"
-  | "no-answer";
+  | "no-answer"
+  | "locked";
 
 export interface GroupCallParticipant {
   userId: string;
   displayName: string;
   avatarUrl: string | null;
+  isLocked?: boolean;
   status: GroupCallParticipantStatus;
   joinedAt: string | null;
   leftAt: string | null;

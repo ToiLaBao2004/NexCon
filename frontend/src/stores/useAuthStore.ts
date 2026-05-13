@@ -85,16 +85,24 @@ export const useAuthStore = create<AuthState>()(
         useNotificationStore.getState().reset();
         useFriendStore.getState().reset();
         // API Call
-        const { accessToken, refreshToken } = await authService.signIn(email, password);
+        const { accessToken, refreshToken, user } = await authService.signIn(email, password);
         get().setAccessToken(accessToken);
+        if (user) {
+          set({ user });
+        }
         if (Capacitor.isNativePlatform() && refreshToken) {
           await saveRefreshToken(refreshToken);
         }
         toast.success('Đăng nhập thành công!');
         await get().fetchMe();
-        useChatStore.getState().fetchConversations();
-        useNotificationStore.getState().fetchNotifications();
+        if (get().user?.role !== "admin") {
+          useChatStore.getState().fetchConversations();
+          useNotificationStore.getState().fetchNotifications();
+        }
       } catch (error: any) {
+        if (error.response?.status === 423 || error.response?.data?.locked) {
+          throw error;
+        }
         console.error('Lỗi khi đăng nhập:', error);
         if (error.response?.data?.message) {
           toast.error(error.response.data.message);
@@ -171,11 +179,16 @@ export const useAuthStore = create<AuthState>()(
 
           const { data } = await api.post('/auth/google/mobile', { idToken });
           get().setAccessToken(data.accessToken);
+          if (data.user) {
+            set({ user: data.user });
+          }
           await saveRefreshToken(data.refreshToken);
 
           await get().fetchMe();
-          useChatStore.getState().fetchConversations();
-          useNotificationStore.getState().fetchNotifications();
+          if (get().user?.role !== "admin") {
+            useChatStore.getState().fetchConversations();
+            useNotificationStore.getState().fetchNotifications();
+          }
           toast.success('Đăng nhập bằng Google thành công!');
           return true;
         } else {

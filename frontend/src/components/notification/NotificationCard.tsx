@@ -147,6 +147,15 @@ const getConversationIdFromNotification = (notification: Notification) => {
 };
 
 const resolveNotificationPath = (notification: Notification) => {
+    const type = (notification.type || '').toLowerCase();
+    if (type === 'account-unlock') {
+        return '/notification';
+    }
+
+    if (type === 'lock-appeal-result' && notification.metadata?.action === 'approve') {
+        return '/notification';
+    }
+
     const internalPath = toInternalAppPath(notification.linkUrl);
     if (internalPath) {
         return internalPath;

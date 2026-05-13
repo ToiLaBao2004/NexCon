@@ -7,6 +7,10 @@ export interface Participant {
     email: string;
     bio?: string;
     phone?: string;
+    isLocked?: boolean;
+    lock?: {
+      isLocked?: boolean;
+    };
   };
   joinedAt: string;
   unreadMentionCount?: number;
@@ -97,6 +101,7 @@ export interface ReplyToMessage {
   fileUrl?: string | null;
   filePublicId?: string | null;
   isRecalled?: boolean | null;
+  reportStatus?: boolean | null;
 }
 
 export interface LinkPreview {
@@ -152,6 +157,7 @@ export interface Message {
     avatarUrl?: string | null;
   };
   isRecalled: boolean | null;
+  reportStatus?: boolean | null;
   isPinned: boolean | null;
   pinnedAt?: string | null;
   updatedAt?: string | null;

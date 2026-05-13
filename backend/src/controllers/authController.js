@@ -11,6 +11,7 @@ import { disconnectSessionSockets, disconnectUserSockets } from '../socket/index
 import { checkFieldFormat } from '../utils/fieldFormat.js';
 import { OAuth2Client } from 'google-auth-library';
 import { saveGoogleAvatarToCloudinary } from '../config/passport.js';
+import LockAppeal from '../models/lockAppealModel.js';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -40,6 +41,43 @@ function parseDeviceName(userAgent = '') {
     else if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS';
 
     return `${browser} on ${os}`;
+}
+
+function buildSafeUser(user) {
+    return {
+        _id: user._id,
+        email: user.email,
+        displayName: user.displayName,
+        avatarUrl: user.avatarUrl,
+        bio: user.bio,
+        phone: user.phone,
+        googleId: user.googleId,
+        music: user.music,
+        role: user.role || 'user',
+        lock: user.lock,
+        moderation: user.moderation,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+    };
+}
+
+function ensureAccountUnlocked(user) {
+    if (user?.lock?.isLocked) {
+        const error = new Error(user.lock.reason || 'Tài khoản của bạn đang bị khóa.');
+        error.statusCode = 423;
+        throw error;
+    }
+}
+
+function handleAuthError(res, error, fallbackMessage = 'Internal server error.') {
+    if (error?.statusCode === 423) {
+        return res.status(423).json({
+            locked: true,
+            message: error.message || 'Tài khoản của bạn đang bị khóa.',
+        });
+    }
+
+    return res.status(500).json({ message: fallbackMessage });
 }
 
 export async function verifyValidFieldsSignUp(req, res) {
@@ -114,6 +152,7 @@ export async function signIn(req, res) {
         if (!isPasswordValid) {
             return res.status(401).json({ message: 'Invalid email or password.' });
         }
+        ensureAccountUnlocked(user);
 
         const userAgent = req.headers['user-agent'] || '';
         const ip = parseIp(req);
@@ -164,11 +203,12 @@ export async function signIn(req, res) {
         return res.status(200).json({
             message: `User ${user.displayName} logged in successfully.`,
             accessToken,
+            user: buildSafeUser(user),
             ...(isMobile && { refreshToken })
         });
     } catch (error) {
         console.error('Error during login:', error);
-        return res.status(500).json({ message: 'Internal server error.' });
+        return handleAuthError(res, error);
     }
 }
 
@@ -340,6 +380,7 @@ export async function resetNewPassword(req, res) {
 export async function googleAuthCallback(req, res) {
     try {
         const user = req.user;
+        ensureAccountUnlocked(user);
         const refreshToken = crypto.randomBytes(64).toString('hex');
         const userAgent = req.headers['user-agent'] || '';
         const ip = parseIp(req);
@@ -384,6 +425,9 @@ export async function googleAuthCallback(req, res) {
         );
     } catch (error) {
         console.error('Error during Google OAuth callback:', error);
+        if (error?.statusCode === 423) {
+            return res.redirect(`${process.env.FRONTEND_URL}/signin?locked=1`);
+        }
         return res.status(500).json({ message: 'Internal server error.' });
     }
 }
@@ -399,6 +443,8 @@ export async function googleSuccess(req, res) {
         if (!session || session.expiresAt < Date.now()) {
             return res.status(401).json({ message: 'Session expired' });
         }
+        const user = await User.findById(session.userId).select('lock');
+        ensureAccountUnlocked(user);
 
         const accessToken = jwt.sign(
             { userId: session.userId, sessionId: session._id },
@@ -408,6 +454,9 @@ export async function googleSuccess(req, res) {
 
         res.json({ accessToken });
     } catch (err) {
+        if (err?.statusCode === 423) {
+            return res.status(423).json({ locked: true, message: err.message });
+        }
         res.status(500).json({ message: 'OAuth failed' });
     }
 }
@@ -424,6 +473,8 @@ export async function refreshToken(req, res) {
         if (!session || session.expiresAt < Date.now()) {
             return res.status(401).json({ message: 'Invalid or expired refresh token.' });
         }
+        const user = await User.findById(session.userId).select('lock');
+        ensureAccountUnlocked(user);
         const accessToken = jwt.sign(
             { userId: session.userId, sessionId: session._id },
             process.env.ACCESS_TOKEN_SECRET,
@@ -432,7 +483,7 @@ export async function refreshToken(req, res) {
         return res.status(200).json({ accessToken });
     } catch (error) {
         console.error('Error during token refresh:', error);
-        return res.status(500).json({ message: 'Internal server error.' });
+        return handleAuthError(res, error);
     }
 }
 
@@ -450,6 +501,7 @@ export async function googleMobileAuth(req, res) {
 
         let user = await User.findOne({ $or: [{ googleId }, { email }] });
         if (user) {
+            ensureAccountUnlocked(user);
             user.googleId = googleId;
             if (!user.avatarUrl && picture) {
                 const uploaded = await saveGoogleAvatarToCloudinary(picture);
@@ -493,9 +545,59 @@ export async function googleMobileAuth(req, res) {
             { expiresIn: ACCESS_TOKEN_TTL }
         );
 
-        return res.status(200).json({ accessToken, refreshToken: refreshTokenValue });
+        return res.status(200).json({ accessToken, refreshToken: refreshTokenValue, user: buildSafeUser(user) });
     } catch (error) {
         console.error('Google mobile auth error:', error);
+        if (error?.statusCode === 423) {
+            return res.status(423).json({ locked: true, message: error.message });
+        }
         return res.status(401).json({ message: 'Invalid Google token.' });
+    }
+}
+
+export async function submitLockedAppeal(req, res) {
+    try {
+        const email = String(req.body?.email || '').trim().toLowerCase();
+        const reason = String(req.body?.reason || '').trim();
+
+        if (!validator.isEmail(email)) {
+            return res.status(400).json({ message: 'Email không hợp lệ.' });
+        }
+
+        if (reason.length < 20) {
+            return res.status(400).json({ message: 'Vui lòng mô tả lý do kháng cáo ít nhất 20 ký tự.' });
+        }
+
+        if (reason.length > 2000) {
+            return res.status(400).json({ message: 'Nội dung kháng cáo không được vượt quá 2000 ký tự.' });
+        }
+
+        const user = await User.findOne({ email }).select('_id email lock');
+        if (!user || !user.lock?.isLocked) {
+            return res.status(400).json({ message: 'Tài khoản này không ở trạng thái bị khóa.' });
+        }
+
+        const existing = await LockAppeal.findOne({
+            userId: user._id,
+            status: 'pending',
+        }).sort({ createdAt: -1 });
+
+        if (existing) {
+            return res.status(409).json({
+                code: 'PENDING_APPEAL_EXISTS',
+                message: 'Bạn đã có một kháng cáo đang chờ xem xét. Vui lòng chờ kết quả trước khi gửi kháng cáo mới.',
+            });
+        }
+
+        await LockAppeal.create({
+            userId: user._id,
+            email,
+            reason,
+        });
+
+        return res.status(201).json({ message: 'Đã gửi kháng cáo. Vui lòng chờ admin xem xét.' });
+    } catch (error) {
+        console.error('Error submitting locked appeal:', error);
+        return res.status(500).json({ message: 'Không thể gửi kháng cáo. Vui lòng thử lại.' });
     }
 }

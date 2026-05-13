@@ -2,7 +2,7 @@ import express from 'express';
 import {
     signUp, signIn, signOut, signOutAll, verifyValidFieldsSignUp,
     resetNewPassword, googleAuthCallback, refreshToken, googleSuccess,
-    getSessions, signOutBySession, googleMobileAuth
+    getSessions, signOutBySession, googleMobileAuth, submitLockedAppeal
 } from '../controllers/authController.js';
 import passport from '../config/passport.js';
 import {
@@ -17,6 +17,7 @@ const authRouter = express.Router();
 authRouter.post('/verify-valid-fields-signup', signupIpLimiter, signupEmailLimiter, verifyValidFieldsSignUp);
 authRouter.post('/signup', signupIpLimiter, signupEmailLimiter, signUp);
 authRouter.post('/signin', signinIpLimiter, signinEmailLimiter, signIn);
+authRouter.post('/locked-appeals', submitLockedAppeal);
 authRouter.post('/signout', signOut);
 authRouter.post('/signout-all', signOutAll);
 authRouter.get('/sessions', getSessions);

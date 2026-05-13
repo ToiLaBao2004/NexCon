@@ -1,6 +1,7 @@
 import Friend from '../models/friendModel.js';
 import BlockUser from '../models/blockUserModel.js';
 import Conversation from '../models/conversationModel.js';
+import User from '../models/userModel.js';
 import { AccessToken } from 'livekit-server-sdk';
 import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
 import { hasUserActiveGroupCall } from './groupCallHandler.js';
@@ -147,6 +148,10 @@ async function isBlocked(userId1, userId2) {
         ]
     }).lean();
     return !!block;
+}
+
+async function findCallableUser(userId) {
+    return User.findById(userId).select('lock').lean();
 }
 
 async function findOrCreateDirectConversation(userId1, userId2) {
@@ -468,6 +473,19 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
         try {
             if (callerId === receiverId) {
                 socket.emit('call-failed', { reason: 'self-call' });
+                return;
+            }
+
+            const receiver = await findCallableUser(receiverId);
+            if (!receiver) {
+                socket.emit('call-failed', { reason: 'user-not-found' });
+                return;
+            }
+            if (receiver.lock?.isLocked) {
+                socket.emit('call-failed', {
+                    reason: 'account-locked',
+                    message: 'Không thể gọi tài khoản đã bị khóa.',
+                });
                 return;
             }
 

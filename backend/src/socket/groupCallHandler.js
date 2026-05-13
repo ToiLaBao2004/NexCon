@@ -3,6 +3,7 @@ import Conversation from '../models/conversationModel.js';
 import Meeting from '../models/meetingModel.js';
 import User from '../models/userModel.js';
 import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
+import { LOCKED_USER_DISPLAY_NAME } from '../utils/lockedUser.js';
 import {
     clearWaitingTimeout,
     emitWaitingRoomUpdate,
@@ -213,7 +214,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
         try {
             // Validate conversation
             const conversation = await Conversation.findById(conversationId)
-                .populate('participants.userId', '_id displayName avatarUrl');
+                .populate('participants.userId', '_id displayName avatarUrl lock');
             if (!conversation || conversation.type !== 'group') {
                 return socket.emit('group-call:error', { reason: 'not-a-group' });
             }
@@ -242,11 +243,13 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
             const participantsMap = new Map();
             for (const participant of conversation.participants) {
                 const pid = participant.userId._id.toString();
+                const isLocked = Boolean(participant.userId.lock?.isLocked);
                 participantsMap.set(pid, {
                     userId: pid,
-                    displayName: participant.userId.displayName,
-                    avatarUrl: participant.userId.avatarUrl || null,
-                    status: pid === userId ? 'joined' : 'ringing',
+                    displayName: isLocked ? LOCKED_USER_DISPLAY_NAME : participant.userId.displayName,
+                    avatarUrl: isLocked ? null : (participant.userId.avatarUrl || null),
+                    isLocked,
+                    status: isLocked ? 'locked' : (pid === userId ? 'joined' : 'ringing'),
                     joinedAt: pid === userId ? new Date().toISOString() : null,
                     leftAt: null,
                 });

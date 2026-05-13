@@ -13,7 +13,8 @@ const ProtectedRoute = () => {
         await refreshToken();
       }
 
-      if (accessToken && !user) {
+      const latest = useAuthStore.getState();
+      if (latest.accessToken && !latest.user) {
         await fetchMe();
       }
     } catch (error) {
@@ -43,6 +44,11 @@ const ProtectedRoute = () => {
       <Navigate to="/signin" replace />
     )
   }
+
+  if (user?.role === "admin") {
+    return <Navigate to="/admin" replace />;
+  }
+
   return (
     <Outlet></Outlet>
   );

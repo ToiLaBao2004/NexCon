@@ -4,6 +4,7 @@ import { upLoadImageFromBuffer, deleteImage } from '../middlewares/uploadMiddlew
 import bcrypt from 'bcrypt';
 import { searchSpotifyTracks } from '../services/spotifyService.js';
 import { checkFieldFormat } from '../utils/fieldFormat.js';
+import { maskLockedUser } from '../utils/lockedUser.js';
 
 export async function getCurrentUser(req, res) {
     try {
@@ -45,12 +46,14 @@ export async function searchUsers(req, res) {
 
         const users = await User.find({
             email: searchEmail,
+            $or: [{ role: 'user' }, { role: { $exists: false } }, { role: null }],
             _id: { $nin: blockedIds, $ne: currentUserId }
         })
-            .select('_id displayName avatarUrl email')
-            .limit(20);
+            .select('_id displayName avatarUrl email lock')
+            .limit(20)
+            .lean();
 
-        return res.status(200).json({ users });
+        return res.status(200).json({ users: users.map(maskLockedUser) });
     } catch (error) {
         console.error('Search users error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -250,7 +253,10 @@ export async function getUserById(req, res) {
     try {
         const { id } = req.params;
 
-        const user = await User.findById(id).select("-password").lean();
+        const user = await User.findOne({
+            _id: id,
+            $or: [{ role: 'user' }, { role: { $exists: false } }, { role: null }],
+        }).select("-password").lean();
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -268,7 +274,9 @@ export async function getUserById(req, res) {
             }
         }
 
-        return res.status(200).json({ user });
+        return res.status(200).json({
+            user: currentUserId && id === currentUserId ? user : maskLockedUser(user),
+        });
     } catch (error) {
         console.error("Get user by ID error:", error);
         return res.status(500).json({ message: "Server error" });

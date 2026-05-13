@@ -76,6 +76,7 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   const currentNickname = useMemo(() => {
     const otherUser = convo.participants.find((p) => p.userId?._id?.toString() !== user?._id?.toString());
+    if (otherUser?.userId?.isLocked || otherUser?.userId?.lock?.isLocked) return "";
     return otherUser?.userId?.nickname ?? "";
   }, [convo.participants, user?._id]);
 
@@ -92,8 +93,9 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
 
   const otherUser = convo.participants.find((p) => p.userId?._id?.toString() !== user._id.toString());
   if (!otherUser) return null;
+  const isOtherUserLocked = Boolean(otherUser.userId?.isLocked || otherUser.userId?.lock?.isLocked);
 
-  const displayName = otherUser?.userId?.nickname?.trim()
+  const displayName = !isOtherUserLocked && otherUser?.userId?.nickname?.trim()
     ? otherUser.userId.nickname
     : otherUser?.userId?.displayName ?? "";
 
@@ -204,8 +206,10 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
               onPointerDown={(e) => e.stopPropagation()}
             >
               <DropdownMenuItem
+                disabled={isOtherUserLocked}
                 onSelect={(e) => {
                   e.preventDefault();
+                  if (isOtherUserLocked) return;
                   onChangeNickname();
                 }}
               >

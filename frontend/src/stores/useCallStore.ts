@@ -836,6 +836,8 @@ export const useCallStore = create<CallState>((set, get) => ({
 
   handleCallFailed(reason) {
     const reasonMap: Record<string, string> = {
+      "account-locked": "Không thể gọi tài khoản đã bị khóa.",
+      "user-not-found": "Không tìm thấy tài khoản này.",
       offline: "Người dùng đang offline.",
       "no-answer": "Người nhận không phản hồi.",
       busy: "Người dùng đang bận.",

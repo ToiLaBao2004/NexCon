@@ -11,7 +11,10 @@ export default function OAuthSuccess() {
     if (ranRef.current) return;
     ranRef.current = true;
     handleGoogleCallback()
-      .then(() => navigate('/'))
+      .then(() => {
+        const role = useAuthStore.getState().user?.role;
+        navigate(role === 'admin' ? '/admin' : '/');
+      })
       .catch(() => navigate('/signin'));
   }, []);
 
