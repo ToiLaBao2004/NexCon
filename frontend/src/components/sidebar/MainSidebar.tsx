@@ -70,7 +70,7 @@ const MainSidebar = () => {
 
     const topNavItems = [
         { icon: MessageSquare, label: "Tin nhắn", id: "chat", path: "/chat", badge: unreadMessagesCount },
-        { icon: Users, label: "Danh bạ", id: "people", path: "/people", badge: friendRequestCount },
+        { icon: Users, label: "Mọi người", id: "people", path: "/people", badge: friendRequestCount },
         { icon: Calendar, label: "Lời nhắc", id: "reminder", path: "/reminder", badge: 0 },
         { icon: Bell, label: "Thông báo", id: "notification", path: "/notification", badge: unreadCount },
     ];
@@ -87,7 +87,7 @@ const MainSidebar = () => {
     return (
         <aside
             onClick={handleSidebarClick}
-            className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-[#0068ff] dark:bg-[#081c36] shadow-none shrink-0 cursor-default transition-colors duration-300"
+            className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-white dark:bg-[#081c36] border-r border-border/50 shadow-none shrink-0 cursor-default transition-colors duration-300"
         >
             <TooltipProvider delayDuration={0}>
                 {/* Top Section: Avatar and Main Nav */}
@@ -99,14 +99,14 @@ const MainSidebar = () => {
                     <div className="mb-4">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 hover:bg-white/10 transition-all border-none bg-transparent shadow-none">
-                                    <Avatar className="h-10 w-10 border-2 border-white/20">
+                                <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 hover:bg-slate-100 dark:hover:bg-white/10 transition-all border-none bg-transparent shadow-none">
+                                    <Avatar className="h-10 w-10 border-2 border-slate-200 dark:border-white/20">
                                         <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
-                                        <AvatarFallback className="bg-white/20 text-white font-bold">
+                                        <AvatarFallback className="bg-primary/10 text-primary font-bold">
                                             {user?.displayName?.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <div className="absolute bottom-1 right-1 h-3 w-3 rounded-full bg-green-500 border-2 border-[#0068ff] dark:border-[#081c36]" />
+                                    <div className="absolute bottom-1 right-1 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-[#081c36]" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-80 ml-2" align="start" side="right" sideOffset={15}>
@@ -160,16 +160,22 @@ const MainSidebar = () => {
                                         onClick={() => navigate(item.path)}
                                         className={cn(
                                             "h-16 w-full flex items-center justify-center transition-all duration-200 group relative cursor-pointer",
-                                            active 
-                                                ? "bg-black/15 text-white" 
-                                                : "bg-transparent text-white hover:bg-black/10"
+                                            active
+                                                ? "bg-slate-100 dark:bg-white/10 text-black dark:text-white"
+                                                : "bg-transparent text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
                                         )}
                                     >
-                                        <item.icon className={cn("h-[26px] w-[26px] transition-transform", active ? "scale-100" : "scale-95 group-hover:scale-100")} />
+                                        <item.icon 
+                                            strokeWidth={1.5}
+                                            className={cn("h-[26px] w-[26px] transition-transform", active ? "scale-100 text-[#0068ff]" : "scale-95 group-hover:scale-100")} 
+                                        />
                                         {item.badge > 0 && (
-                                            <span className="absolute top-3 right-3 min-w-[1.1rem] h-4.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold border-2 border-[#0068ff] dark:border-[#081c36] px-1">
+                                            <span className="absolute top-3 right-3 min-w-[1.1rem] h-4.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold border-2 border-white dark:border-[#081c36] px-1">
                                                 {item.badge > 99 ? "99+" : item.badge}
                                             </span>
+                                        )}
+                                        {active && (
+                                            <div className="absolute left-0 w-1 h-8 bg-[#0068ff] rounded-r-full" />
                                         )}
                                     </div>
                                 </TooltipTrigger>
@@ -190,26 +196,29 @@ const MainSidebar = () => {
                                         onClick={() => navigate(item.path)}
                                         className={cn(
                                             "h-16 w-full flex items-center justify-center transition-all duration-200 group relative cursor-pointer",
-                                            active 
-                                                ? "bg-black/15 text-white" 
-                                                : "bg-transparent text-white hover:bg-black/10"
+                                            active
+                                                ? "bg-slate-100 dark:bg-white/10 text-black dark:text-white"
+                                                : "bg-transparent text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
                                         )}
                                     >
-                                        <item.icon className="h-[26px] w-[26px]" />
+                                        <item.icon 
+                                            strokeWidth={1.5}
+                                            className={cn("h-[26px] w-[26px]", active && "text-[#0068ff]")} 
+                                        />
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" sideOffset={10}>{item.label}</TooltipContent>
                             </Tooltip>
                         );
                     })}
-                    
+
                     <Tooltip>
                         <TooltipTrigger asChild>
                             <div
                                 onClick={() => setIsSettingsOpen(true)}
-                                className="h-16 w-full flex items-center justify-center transition-all duration-200 text-white hover:bg-black/10 cursor-pointer"
+                                className="h-16 w-full flex items-center justify-center transition-all duration-200 text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer"
                             >
-                                <Settings className="h-[26px] w-[26px]" />
+                                <Settings strokeWidth={1.5} className="h-[26px] w-[26px]" />
                             </div>
                         </TooltipTrigger>
                         <TooltipContent side="right" sideOffset={10}>Cài đặt</TooltipContent>
