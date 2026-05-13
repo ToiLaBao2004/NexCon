@@ -16,6 +16,7 @@ import {
 } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
+import { enqueueGroupCleanup } from '../config/groupCleanupQueue.js';
 
 const MUTE_DURATION_MS = {
 	'1h': 60 * 60 * 1000,
@@ -1077,6 +1078,7 @@ export async function updateGroupAvatar(req, res) {
 
 async function disbandGroup(conversation, adminUser) {
 	conversation.disbanded = true;
+	conversation.disbandedAt = new Date();
 
 	const systemMessage = new Message({
 		conversationId: conversation._id,
@@ -1096,8 +1098,35 @@ async function disbandGroup(conversation, adminUser) {
 	updateConversationLastMessage(conversation, finalMsg, adminUser._id);
 	await conversation.save();
 
+	await queueDisbandCleanup(conversation);
+
 	io.to(conversation._id.toString()).emit('group-disbanded', { conversationId: conversation._id });
 	emitNewMessage(io, conversation, finalMsg);
+}
+
+async function queueDisbandCleanup(conversation) {
+	conversation.cleanup = {
+		...(conversation.cleanup?.toObject?.() || conversation.cleanup || {}),
+		status: 'queued',
+		queuedAt: new Date(),
+		error: undefined,
+		failedAt: undefined,
+	};
+
+	try {
+		const cleanupJob = await enqueueGroupCleanup(conversation._id);
+		if (cleanupJob?.id) {
+			conversation.cleanup.jobId = cleanupJob.id.toString();
+		}
+		await conversation.save();
+		return cleanupJob;
+	} catch (error) {
+		conversation.cleanup.status = 'failed';
+		conversation.cleanup.failedAt = new Date();
+		conversation.cleanup.error = error?.message || 'Cannot enqueue cleanup job';
+		await conversation.save();
+		throw error;
+	}
 }
 export async function disbandGroupByAdmin(req, res) {
 	try {
@@ -1117,8 +1146,24 @@ export async function disbandGroupByAdmin(req, res) {
 			return res.status(403).json({ message: 'Only admins can disband the group.' });
 		}
 
+		if (conversation.disbanded === true) {
+			const cleanupStatus = conversation.cleanup?.status || 'idle';
+			if (['idle', 'failed'].includes(cleanupStatus)) {
+				await queueDisbandCleanup(conversation);
+				return res.status(202).json({
+					message: 'Group already disbanded. Cleanup job queued.',
+					cleanupStatus: 'queued',
+				});
+			}
+
+			return res.status(200).json({
+				message: 'Group already disbanded.',
+				cleanupStatus,
+			});
+		}
+
 		await disbandGroup(conversation, req.user);
-		res.status(200).json({ message: 'Group disbanded successfully.' });
+		res.status(202).json({ message: 'Group disbanded. Cleanup job queued.', cleanupStatus: 'queued' });
 	} catch (error) {
 		console.error('Error disbanding group:', error);
 		res.status(500).json({ message: 'Internal server error' });

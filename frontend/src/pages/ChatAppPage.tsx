@@ -33,12 +33,12 @@ const ChatAppPageContent = ({
 }: ChatAppPageContentProps) => {
   const { state: sidebarState } = useSidebar();
 
-  const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
+  const selectedConvo = conversations.find((c) => c._id === activeConversationId && c.disbanded !== true) ?? null;
   const useOverlayInfoSidebar = isMobile || isTabletOrBelow;
 
   // Mobile: show conversation list when no active chat
-  const showConversationList = !isMobile || !activeConversationId;
-  const showChatWindow = !isMobile || !!activeConversationId;
+  const showConversationList = !isMobile || !selectedConvo;
+  const showChatWindow = !isMobile || !!selectedConvo;
   const tabletOverlayStyle = useMemo<React.CSSProperties>(() => {
     const appSidebarOffset = sidebarState === "expanded" ? APP_SIDEBAR_WIDTH_PX : 0;
     const left = `calc(${MAIN_SIDEBAR_WIDTH_REM}rem + ${appSidebarOffset}px + ${APP_SHELL_GAP_PX}px)`;

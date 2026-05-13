@@ -133,7 +133,7 @@ export function startReminderWorker() {
     });
 
     workerInstance.on('error', (err) => {
-        if (err.message && !err.message.includes('ECONNREFUSED') && !err.message.includes('Connection is closed')) {
+        if (err.message && !err.message.includes('ECONNREFUSED') && !err.message.includes('ECONNRESET') && !err.message.includes('Connection is closed')) {
             console.error('[ReminderWorker] Lỗi:', err.message);
         }
     });

@@ -42,7 +42,7 @@ const ChatWindowLayout = () => {
   const recentConversationIdsRef = useRef<string[]>([]);
   const deepLinkMessageIdRef = useRef<string | null>(null);
 
-  const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
+  const selectedConvo = conversations.find((c) => c._id === activeConversationId && c.disbanded !== true) ?? null;
   const conversationIdParam = searchParams.get('conversationId')?.trim() || '';
   const messageIdParam = searchParams.get('messageId')?.trim() || '';
 
@@ -68,14 +68,19 @@ const ChatWindowLayout = () => {
   }, [activeConversationId, clearConversationCache]);
 
   useEffect(() => {
-    if (activeConversationId) {
+    if (activeConversationId && selectedConvo?.disbanded === true) {
+      useChatStore.getState().markGroupAsDisbanded(activeConversationId);
+      return;
+    }
+
+    if (activeConversationId && selectedConvo) {
       joinConversation(activeConversationId);
 
       if (!allMessages[activeConversationId] && !messageLoading) {
         fetchMessages(activeConversationId);
       }
     }
-  }, [activeConversationId, joinConversation, fetchMessages, messageLoading]);
+  }, [activeConversationId, selectedConvo, joinConversation, fetchMessages, messageLoading]);
 
   useEffect(() => {
     if (!conversationIdParam) return;
