@@ -363,6 +363,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const isGroupAdmin = !!(isGroup && conversation.group?.admins?.some(
     (adminId: any) => adminId?.toString?.() === user?._id?.toString()
   ));
+  const canUpdateGroupAvatar = !isDisbanded && (isGroupAdmin || conversation.group?.allowMembersChangeAvatar !== false);
 
   return (
     <aside className="flex h-full w-full min-w-0 flex-col bg-background overflow-y-auto overflow-x-hidden beautiful-scrollbar md:min-w-[350px] md:border-l md:border-border/40">
@@ -376,7 +377,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 groupAvatarUrl={conversation.group?.avatarUrl}
               />
             </div>
-            {!isDisbanded && (
+            {canUpdateGroupAvatar && (
               <button
                 type="button"
                 onClick={handlePickGroupAvatar}

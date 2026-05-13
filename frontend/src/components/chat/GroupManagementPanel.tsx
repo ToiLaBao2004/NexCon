@@ -24,6 +24,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
 
   const conversation = conversations.find(c => c._id === conversationId);
   const isApprovalRequired = conversation?.group?.isApprovalRequired || false;
+  const allowMembersChangeAvatar = conversation?.group?.allowMembersChangeAvatar !== false;
   const participants = conversation?.participants || [];
 
   const handleDisband = async () => {
@@ -38,9 +39,17 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
 
   const handleToggleApproval = async (checked: boolean) => {
     try {
-      await updateGroupSettings(conversationId, checked);
+      await updateGroupSettings(conversationId, { isApprovalRequired: checked });
     } catch (error) {
       console.error("Lỗi khi thay đổi chế độ phê duyệt:", error);
+    }
+  };
+
+  const handleToggleMemberAvatar = async (checked: boolean) => {
+    try {
+      await updateGroupSettings(conversationId, { allowMembersChangeAvatar: checked });
+    } catch (error) {
+      console.error("Lỗi khi thay đổi quyền đổi ảnh nhóm:", error);
     }
   };
 
@@ -88,7 +97,18 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                       />
                     </div>
                   </div>
-                  
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[15px] font-medium text-foreground">Cho phép thành viên đổi ảnh nhóm</span>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={allowMembersChangeAvatar}
+                        onCheckedChange={handleToggleMemberAvatar}
+                      />
+                    </div>
+                  </div>
+
                   <div className="mt-auto w-full pt-4 border-t border-border/40 flex flex-col gap-3">
                     <button
                       onClick={() => setShowTransferModal(true)}
@@ -136,4 +156,3 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
     </>
   );
 }
-

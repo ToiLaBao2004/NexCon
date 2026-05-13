@@ -904,7 +904,7 @@ const ReminderPage = () => {
             <div className="border-b border-border/50 bg-card/95 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/20">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0068ff] text-white shadow-sm shadow-[#0068ff]/20">
                             <CalendarDays className="h-5 w-5" />
                         </div>
                         <div className="min-w-0">

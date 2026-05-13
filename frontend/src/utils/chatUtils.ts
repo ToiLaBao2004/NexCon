@@ -169,6 +169,18 @@ export const getSystemMessageText = (
             return `${name} đã ${statusStr} chế độ phê duyệt thành viên mới`;
         }
 
+        case "group_avatar_permission_changed": {
+            const changedBy = meta.changedBy;
+            const changedByName = meta.changedByName || "Một quản trị viên";
+            const allowMembersChangeAvatar = meta.allowMembersChangeAvatar;
+            const isMe = changedBy?.toString() === currentUserId;
+
+            const name = isMe ? "Bạn" : changedByName;
+            const statusStr = allowMembersChangeAvatar ? "bật" : "tắt";
+
+            return `${name} đã ${statusStr} quyền cho thành viên đổi ảnh đại diện nhóm`;
+        }
+
         case "reminder_created_local": {
             const reminderContent = String(meta.reminderContent || "").trim();
             return reminderContent

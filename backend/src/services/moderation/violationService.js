@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import redis, { isRedisReady } from '../../config/redis.js';
 import User from '../../models/userModel.js';
 import Session from '../../models/sessionModel.js';
@@ -8,6 +7,114 @@ import { disconnectUserSockets } from '../../socket/index.js';
 const VIOLATION_DECAY_MS = 7 * 24 * 60 * 60 * 1000;
 const VIOLATION_DECAY_SECONDS = Math.floor(VIOLATION_DECAY_MS / 1000);
 const LOCK_THRESHOLD = Number.parseInt(process.env.VIOLATION_LOCK_THRESHOLD || '5', 10);
+
+const READ_REDIS_VIOLATION_STATE_SCRIPT = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local decayMs = tonumber(ARGV[2])
+local keyType = redis.call('TYPE', key).ok
+local count = 0
+local lastViolationAt = 0
+local nextDecayAt = 0
+
+if keyType == 'zset' then
+    count = tonumber(redis.call('ZCARD', key)) or 0
+    if count > 0 then
+        local latest = redis.call('ZRANGE', key, -1, -1, 'WITHSCORES')
+        lastViolationAt = tonumber(latest[2]) or now
+        nextDecayAt = lastViolationAt + decayMs
+    end
+    redis.call('DEL', key)
+elseif keyType == 'hash' then
+    count = tonumber(redis.call('HGET', key, 'count')) or 0
+    lastViolationAt = tonumber(redis.call('HGET', key, 'lastViolationAt')) or 0
+    nextDecayAt = tonumber(redis.call('HGET', key, 'nextDecayAt')) or 0
+elseif keyType ~= 'none' then
+    redis.call('DEL', key)
+end
+
+if count <= 0 then
+    redis.call('DEL', key)
+    return { 0, lastViolationAt, 0 }
+end
+
+if nextDecayAt <= 0 then
+    if lastViolationAt > 0 then
+        nextDecayAt = lastViolationAt + decayMs
+    else
+        nextDecayAt = now + decayMs
+    end
+end
+
+if nextDecayAt <= now then
+    local periods = math.floor((now - nextDecayAt) / decayMs) + 1
+    count = count - periods
+    if count <= 0 then
+        redis.call('DEL', key)
+        return { 0, lastViolationAt, 0 }
+    end
+    nextDecayAt = nextDecayAt + (periods * decayMs)
+end
+
+redis.call('HSET', key, 'count', count, 'lastViolationAt', lastViolationAt, 'nextDecayAt', nextDecayAt)
+local ttl = math.ceil((nextDecayAt + ((count - 1) * decayMs) - now) / 1000)
+if ttl < 1 then ttl = 1 end
+redis.call('EXPIRE', key, ttl)
+
+return { count, lastViolationAt, nextDecayAt }
+`;
+
+const REGISTER_REDIS_VIOLATION_SCRIPT = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local decayMs = tonumber(ARGV[2])
+local decaySeconds = tonumber(ARGV[3])
+local keyType = redis.call('TYPE', key).ok
+local count = 0
+local lastViolationAt = 0
+local nextDecayAt = 0
+
+if keyType == 'zset' then
+    count = tonumber(redis.call('ZCARD', key)) or 0
+    if count > 0 then
+        local latest = redis.call('ZRANGE', key, -1, -1, 'WITHSCORES')
+        lastViolationAt = tonumber(latest[2]) or now
+        nextDecayAt = lastViolationAt + decayMs
+    end
+    redis.call('DEL', key)
+elseif keyType == 'hash' then
+    count = tonumber(redis.call('HGET', key, 'count')) or 0
+    lastViolationAt = tonumber(redis.call('HGET', key, 'lastViolationAt')) or 0
+    nextDecayAt = tonumber(redis.call('HGET', key, 'nextDecayAt')) or 0
+elseif keyType ~= 'none' then
+    redis.call('DEL', key)
+end
+
+if count > 0 then
+    if nextDecayAt <= 0 then
+        if lastViolationAt > 0 then
+            nextDecayAt = lastViolationAt + decayMs
+        else
+            nextDecayAt = now + decayMs
+        end
+    end
+
+    if nextDecayAt <= now then
+        local periods = math.floor((now - nextDecayAt) / decayMs) + 1
+        count = count - periods
+        if count < 0 then count = 0 end
+    end
+end
+
+count = count + 1
+lastViolationAt = now
+nextDecayAt = now + decayMs
+
+redis.call('HSET', key, 'count', count, 'lastViolationAt', lastViolationAt, 'nextDecayAt', nextDecayAt)
+redis.call('EXPIRE', key, count * decaySeconds)
+
+return { count, lastViolationAt, nextDecayAt }
+`;
 
 function violationKey(userId) {
     return `moderation:violations:${userId.toString()}`;
@@ -21,39 +128,119 @@ function buildLockNotice() {
     return 'Tài khoản của bạn đã bị khóa sau khi chúng tôi xem xét vi phạm. Nếu cho rằng quyết định này nhầm lẫn, bạn có thể gửi kháng cáo từ màn hình đăng nhập.';
 }
 
-async function pruneExpiredViolations(userId) {
-    if (!isRedisReady) return;
-    const minScore = Date.now() - VIOLATION_DECAY_MS;
-    await redis.zRemRangeByScore(violationKey(userId), 0, minScore);
+function toMs(value) {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    const ms = date.getTime();
+    return Number.isFinite(ms) ? ms : null;
 }
 
-async function readRedisViolationCount(userId) {
-    await pruneExpiredViolations(userId);
-    return redis.zCard(violationKey(userId));
+function stateFromRedisResult(result) {
+    const count = Math.max(0, Number.parseInt(result?.[0] || 0, 10) || 0);
+    const lastViolationAtMs = Number(result?.[1]) || 0;
+    const nextDecayAtMs = Number(result?.[2]) || 0;
+
+    return {
+        count,
+        lastViolationAt: lastViolationAtMs > 0 ? new Date(lastViolationAtMs) : null,
+        nextDecayAt: nextDecayAtMs > 0 ? new Date(nextDecayAtMs) : null,
+    };
+}
+
+function applyViolationDecay(state, now = Date.now()) {
+    const originalCount = Math.max(0, Number.parseInt(state?.count || 0, 10) || 0);
+    const lastViolationAtMs = toMs(state?.lastViolationAt);
+    const originalNextDecayAtMs = toMs(state?.nextDecayAt);
+    let count = originalCount;
+    let nextDecayAtMs = originalNextDecayAtMs;
+    let changed = false;
+
+    if (count <= 0) {
+        return {
+            count: 0,
+            lastViolationAt: lastViolationAtMs ? new Date(lastViolationAtMs) : null,
+            nextDecayAt: null,
+            changed: originalCount !== 0 || Boolean(originalNextDecayAtMs),
+        };
+    }
+
+    if (!nextDecayAtMs) {
+        nextDecayAtMs = lastViolationAtMs ? lastViolationAtMs + VIOLATION_DECAY_MS : now + VIOLATION_DECAY_MS;
+        changed = true;
+    }
+
+    if (nextDecayAtMs <= now) {
+        const periods = Math.floor((now - nextDecayAtMs) / VIOLATION_DECAY_MS) + 1;
+        count = Math.max(0, count - periods);
+        nextDecayAtMs = count > 0 ? nextDecayAtMs + (periods * VIOLATION_DECAY_MS) : null;
+        changed = true;
+    }
+
+    return {
+        count,
+        lastViolationAt: lastViolationAtMs ? new Date(lastViolationAtMs) : null,
+        nextDecayAt: nextDecayAtMs ? new Date(nextDecayAtMs) : null,
+        changed: changed || count !== originalCount || nextDecayAtMs !== originalNextDecayAtMs,
+    };
+}
+
+async function readRedisViolationState(userId) {
+    const result = await redis.eval(READ_REDIS_VIOLATION_STATE_SCRIPT, {
+        keys: [violationKey(userId)],
+        arguments: [String(Date.now()), String(VIOLATION_DECAY_MS)],
+    });
+
+    return stateFromRedisResult(result);
+}
+
+async function registerRedisViolation(userId) {
+    const result = await redis.eval(REGISTER_REDIS_VIOLATION_SCRIPT, {
+        keys: [violationKey(userId)],
+        arguments: [String(Date.now()), String(VIOLATION_DECAY_MS), String(VIOLATION_DECAY_SECONDS)],
+    });
+
+    return stateFromRedisResult(result);
+}
+
+async function readMongoViolationState(userId) {
+    const user = await User.findById(userId).select('moderation').lean();
+    const state = applyViolationDecay({
+        count: user?.moderation?.violationCountCache || 0,
+        lastViolationAt: user?.moderation?.lastViolationAt || null,
+        nextDecayAt: user?.moderation?.nextViolationDecayAt || null,
+    });
+
+    if (user && state.changed) {
+        await User.findByIdAndUpdate(userId, {
+            $set: {
+                'moderation.violationCountCache': state.count,
+                'moderation.nextViolationDecayAt': state.nextDecayAt,
+            },
+        });
+    }
+
+    return state;
 }
 
 export async function getViolationSummary(userId) {
     if (isRedisReady) {
-        const count = await readRedisViolationCount(userId);
-        const ttlSeconds = await redis.ttl(violationKey(userId));
+        const state = await readRedisViolationState(userId);
 
         return {
-            count,
+            count: state.count,
             threshold: LOCK_THRESHOLD,
             decayDays: 7,
-            nextDecayAt: ttlSeconds > 0
-                ? new Date(Date.now() + Math.min(ttlSeconds, VIOLATION_DECAY_SECONDS) * 1000)
-                : null,
+            nextDecayAt: state.nextDecayAt,
             source: 'redis',
         };
     }
 
-    const user = await User.findById(userId).select('moderation').lean();
+    const state = await readMongoViolationState(userId);
     return {
-        count: user?.moderation?.violationCountCache || 0,
+        count: state.count,
         threshold: LOCK_THRESHOLD,
         decayDays: 7,
-        nextDecayAt: null,
+        nextDecayAt: state.nextDecayAt,
         source: 'mongo-cache',
     };
 }
@@ -121,6 +308,7 @@ export async function unlockAccount({ userId, adminId = null, reason = '', reset
 
     if (resetViolations) {
         update.$set['moderation.lastViolationAt'] = null;
+        update.$set['moderation.nextViolationDecayAt'] = null;
     }
 
     Object.keys(update.$set).forEach((key) => {
@@ -160,34 +348,29 @@ export async function registerViolation({
 }) {
     const normalizedReason = normalizeReason(reason);
     let count;
+    let violationState;
 
     if (isRedisReady) {
-        const key = violationKey(userId);
-        await pruneExpiredViolations(userId);
-        await redis.zAdd(key, {
-            score: Date.now(),
-            value: `${Date.now()}-${crypto.randomUUID()}`,
-        });
-        await redis.expire(key, VIOLATION_DECAY_SECONDS * 2);
-        count = await redis.zCard(key);
+        violationState = await registerRedisViolation(userId);
     } else {
-        const updated = await User.findByIdAndUpdate(
-            userId,
-            {
-                $inc: { 'moderation.violationCountCache': 1 },
-                $set: { 'moderation.lastViolationAt': new Date() },
-            },
-            { new: true }
-        ).select('moderation');
-        count = updated?.moderation?.violationCountCache || 1;
+        const currentState = await readMongoViolationState(userId);
+        const now = new Date();
+        violationState = {
+            count: currentState.count + 1,
+            lastViolationAt: now,
+            nextDecayAt: new Date(now.getTime() + VIOLATION_DECAY_MS),
+        };
     }
+
+    count = violationState.count;
 
     const user = await User.findByIdAndUpdate(
         userId,
         {
             $set: {
                 'moderation.violationCountCache': count,
-                'moderation.lastViolationAt': new Date(),
+                'moderation.lastViolationAt': violationState.lastViolationAt,
+                'moderation.nextViolationDecayAt': violationState.nextDecayAt,
             },
         },
         { new: true }
@@ -234,6 +417,7 @@ export async function registerViolation({
         threshold: LOCK_THRESHOLD,
         locked,
         decayDays: 7,
+        nextDecayAt: violationState.nextDecayAt,
     };
 }
 
@@ -246,6 +430,7 @@ export async function clearViolations(userId) {
         $set: {
             'moderation.violationCountCache': 0,
             'moderation.lastViolationAt': null,
+            'moderation.nextViolationDecayAt': null,
         },
     });
 }

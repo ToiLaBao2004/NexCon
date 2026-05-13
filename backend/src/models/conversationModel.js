@@ -59,6 +59,10 @@ const groupSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    allowMembersChangeAvatar: {
+        type: Boolean,
+        default: true
+    },
     approvalQueue: [{
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -114,7 +118,6 @@ const conversationSchema = new mongoose.Schema({
     lastMessage: {
         type: lastMessageSchema,
     },
-
     unreadCounts: {
         type: Map,
         of: Number,

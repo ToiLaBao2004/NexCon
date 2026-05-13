@@ -1149,12 +1149,16 @@ export const useChatStore = create<ChatState>()(
                     throw error;
                 }
             },
-            updateGroupSettings: async (conversationId: string, isApprovalRequired: boolean) => {
+            updateGroupSettings: async (conversationId: string, settings) => {
                 try {
-                    await chatService.updateGroupSettings(conversationId, isApprovalRequired);
+                    const response = await chatService.updateGroupSettings(conversationId, settings);
+                    if (response?.conversation) {
+                        get().updateConversation(response.conversation);
+                        return;
+                    }
                     set((state) => ({
                         conversations: state.conversations.map((c) =>
-                            c._id === conversationId ? { ...c, group: { ...c.group, isApprovalRequired } } : c
+                            c._id === conversationId ? { ...c, group: { ...c.group, ...settings } } : c
                         )
                     }));
                 } catch (error) {

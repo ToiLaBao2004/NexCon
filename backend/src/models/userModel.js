@@ -57,6 +57,7 @@ const userSchema = new mongoose.Schema({
     moderation: {
         violationCountCache: { type: Number, default: 0 },
         lastViolationAt: { type: Date, default: null },
+        nextViolationDecayAt: { type: Date, default: null },
     },
 }, { timestamps: true });
 
