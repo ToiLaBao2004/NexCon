@@ -1,7 +1,7 @@
 import { useFriendStore } from "@/stores/useFriendStore";
 import { Users, UserX, MessageSquare, UserPlus } from "lucide-react";
 import { useSocketStore } from "@/stores/useSocketStore";
-import { useState, useEffect, type ElementType, type ReactNode } from "react";
+import { useState, useEffect, type ElementType, type ReactNode, type CSSProperties } from "react";
 import { useSearchParams, useLocation } from "react-router";
 import { useChatStore } from "@/stores/useChatStore";
 import FriendsTab from "@/components/people/FriendsTab";
@@ -12,6 +12,7 @@ import UserSearch from "@/components/shared/UserSearch";
 import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MOBILE_BOTTOM_NAV_HEIGHT_REM } from "@/constants/layout";
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 type PeopleTabKey = "friends" | "requests" | "groups" | "blocked";
 
@@ -131,7 +132,10 @@ const PeoplePage = () => {
 	const header = headerConfig[tab];
 
 	return (
-		<div className={`h-full min-h-0 w-full relative ${isMobile ? "flex flex-col" : "flex"}`}>
+		<SidebarProvider
+			style={{ "--sidebar-width": "300px" } as CSSProperties}
+			className={`h-full min-h-0 w-full relative ${isMobile ? "flex flex-col" : "flex"}`}
+		>
 			{!isMobile && (
 				<aside className="hidden h-full w-[300px] shrink-0 flex-col overflow-hidden border-y border-r border-l-0 border-border/50 bg-card md:flex">
 					<div className="space-y-1 p-4">
@@ -246,7 +250,7 @@ const PeoplePage = () => {
 					</div>
 				</div>
 			)}
-		</div>
+		</SidebarProvider>
 	);
 };
 
