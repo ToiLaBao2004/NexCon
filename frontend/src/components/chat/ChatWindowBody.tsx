@@ -224,6 +224,8 @@ const ChatWindowBody: React.FC = () => {
 
 
   const prevLastItemIdRef = useRef<string | undefined>(undefined);
+  const lastImageScrollIdRef = useRef<string | undefined>(undefined);
+  const pendingImageScrollRef = useRef(false);
 
   // Handle auto-scroll to bottom on first load or new messages
   useEffect(() => {
@@ -240,10 +242,12 @@ const ChatWindowBody: React.FC = () => {
       user?._id &&
       lastSenderId?.toString?.() === user._id.toString()
     );
+    const shouldFollowImage = lastMessage?.type === "image";
 
     if (loadingMoreRef.current) return;
 
     if (isJumpMode && convoId && isNewMessageAtBottom && isOwnLastMessage) {
+      pendingImageScrollRef.current = shouldFollowImage;
       void exitJumpMode(convoId).then(() => {
         requestAnimationFrame(() => scrollToBottom(true));
         setTimeout(() => scrollToBottom(true), 120);
@@ -255,6 +259,7 @@ const ChatWindowBody: React.FC = () => {
 
     if (isFirstLoad.current) {
       if (messages.length > 0) {
+        pendingImageScrollRef.current = shouldFollowImage;
         requestAnimationFrame(() => {
           scrollToBottom(true);
           setTimeout(() => scrollToBottom(true), 100);
@@ -263,11 +268,13 @@ const ChatWindowBody: React.FC = () => {
       }
     } else if (convoId && isNewMessageAtBottom) {
       if (isOwnLastMessage) {
+        pendingImageScrollRef.current = shouldFollowImage;
         scrollToBottom(true);
         return;
       }
 
       if (!showScrollToBottom) {
+        pendingImageScrollRef.current = shouldFollowImage;
         scrollToBottom();
       }
     }
@@ -278,6 +285,13 @@ const ChatWindowBody: React.FC = () => {
 
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage || lastMessage.type !== "image") return;
+
+    if (!pendingImageScrollRef.current) return;
+
+    if (lastMessage._id === lastImageScrollIdRef.current) {
+      pendingImageScrollRef.current = false;
+      return;
+    }
 
     const lastSenderObj = typeof lastMessage.senderId === "object" ? (lastMessage.senderId as any) : null;
     const lastSenderId = lastSenderObj ? lastSenderObj._id : lastMessage.senderId;
@@ -290,12 +304,17 @@ const ChatWindowBody: React.FC = () => {
     if (!container) return;
 
     const images = Array.from(container.querySelectorAll("img"));
-    if (images.length === 0) return;
+    if (images.length === 0) {
+      pendingImageScrollRef.current = false;
+      return;
+    }
 
     let hasScrolled = false;
     const handleLoad = () => {
       if (hasScrolled) return;
       hasScrolled = true;
+      pendingImageScrollRef.current = false;
+      lastImageScrollIdRef.current = lastMessage._id;
       scrollToBottom(true);
       setTimeout(() => scrollToBottom(true), 120);
     };
