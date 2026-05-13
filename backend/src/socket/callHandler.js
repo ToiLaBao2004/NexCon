@@ -5,6 +5,8 @@ import User from '../models/userModel.js';
 import { AccessToken } from 'livekit-server-sdk';
 import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
 import { hasUserActiveGroupCall } from './groupCallHandler.js';
+import { sendFCMToUser } from '../services/fcmService.js';
+import { isMuted } from '../utils/isMuted.js';
 
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
@@ -303,6 +305,32 @@ function buildDirectRingingPayload(session) {
     };
 }
 
+async function sendOfflineDirectCallPush({ session, conversation, receiverId }) {
+    const receiverParticipant = conversation.participants.find(
+        (participant) => participant.userId?._id?.toString() === receiverId.toString()
+            || participant.userId?.toString?.() === receiverId.toString()
+    );
+
+    if (isMuted(receiverParticipant?.mute, 'meetings')) {
+        return;
+    }
+
+    const callLabel = session.callType === 'video' ? 'Cuoc goi video' : 'Cuoc goi thoai';
+    await sendFCMToUser(receiverId, {
+        title: session.initiator.displayName || 'Cuoc goi den',
+        body: `${callLabel} den`,
+        data: {
+            type: 'direct-call',
+            callType: session.callType,
+            roomName: session.roomName,
+            conversationId: session.conversationId,
+            callerId: session.callerId,
+            receiverId: session.receiverId,
+            url: `/chat?conversationId=${session.conversationId}`,
+        },
+    });
+}
+
 async function generateLiveKitToken(roomName, identity, displayName, metadata) {
     if (!LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
         throw new Error('LiveKit credentials are missing');
@@ -529,13 +557,14 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
 
             // Gửi incoming-call tới TẤT CẢ thiết bị của receiver
             const receiverTarget = getParticipantSocketTarget(session, receiverId);
+            const callerTarget = getParticipantSocketTarget(session, callerId);
             if (receiverTarget) {
                 io.to(receiverTarget).emit('incoming-call', buildDirectIncomingPayload(session));
-
-                const callerTarget = getParticipantSocketTarget(session, callerId);
-                if (callerTarget) {
-                    io.to(callerTarget).emit('call-ringing', buildDirectRingingPayload(session));
-                }
+            } else {
+                await sendOfflineDirectCallPush({ session, conversation, receiverId });
+            }
+            if (callerTarget) {
+                io.to(callerTarget).emit('call-ringing', buildDirectRingingPayload(session));
             }
 
             console.log(`${user.displayName} is calling ${receiverId} [${callType}] | session: ${session.sessionId}`);

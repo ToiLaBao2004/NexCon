@@ -4,6 +4,8 @@ import Meeting from '../models/meetingModel.js';
 import User from '../models/userModel.js';
 import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
 import { LOCKED_USER_DISPLAY_NAME } from '../utils/lockedUser.js';
+import { sendFCMToUser } from '../services/fcmService.js';
+import { isMuted } from '../utils/isMuted.js';
 import {
     clearWaitingTimeout,
     emitWaitingRoomUpdate,
@@ -54,8 +56,48 @@ function groupCallDevicePayload(groupCall) {
     };
 }
 
+function buildGroupIncomingPayload(groupCall) {
+    return {
+        conversationId: groupCall.conversationId,
+        callId: groupCall.callId,
+        callType: groupCall.callType,
+        initiator: groupCall.initiator,
+        groupName: groupCall.groupName || 'Nhom',
+        participants: participantsArray(groupCall),
+    };
+}
+
 function emitToOtherUserDevices(socket, userId, event, payload) {
     socket.to(`user:${userId.toString()}`).emit(event, payload);
+}
+
+async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupName, getReceiverSocketId }) {
+    const callLabel = groupCallInfo.callType === 'video' ? 'Cuoc goi video nhom' : 'Cuoc goi thoai nhom';
+
+    await Promise.all((conversation.participants || []).map(async (participant) => {
+        const participantUser = participant.userId;
+        const participantId = participantUser?._id?.toString?.() || participantUser?.toString?.();
+        if (!participantId) return;
+        if (participantId === groupCallInfo.initiatorId) return;
+
+        const callParticipant = groupCallInfo.participants.get(participantId);
+        if (!callParticipant || callParticipant.isLocked || callParticipant.status !== 'ringing') return;
+        if (isMuted(participant.mute, 'meetings')) return;
+        if (getReceiverSocketId(participantId)) return;
+
+        await sendFCMToUser(participantId, {
+            title: groupName || 'Cuoc goi nhom',
+            body: `${groupCallInfo.initiator.displayName || 'Thanh vien'} dang bat dau ${callLabel}`,
+            data: {
+                type: 'group-call',
+                callType: groupCallInfo.callType,
+                callId: groupCallInfo.callId,
+                conversationId: groupCallInfo.conversationId,
+                initiatorId: groupCallInfo.initiatorId,
+                url: `/chat?conversationId=${groupCallInfo.conversationId}`,
+            },
+        });
+    }));
 }
 
 function countJoined(groupCall) {
@@ -283,12 +325,14 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 displayName: user.displayName,
                 avatarUrl: user.avatarUrl || null,
             };
+            const groupName = conversation.group?.name || 'Nhóm';
 
             const groupCallInfo = {
                 callId,
                 conversationId,
                 initiatorId: userId,
                 initiator: initiatorInfo,
+                groupName,
                 callType,
                 startedAt: null,
                 participants: participantsMap,
@@ -304,8 +348,6 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
             });
             const token = await generateToken(conversationId, userId, user.displayName, metadata);
 
-            const groupName = conversation.group?.name || 'Nhóm';
-
             // Emit to initiator
             socket.emit('group-call:started', {
                 conversationId,
@@ -318,13 +360,16 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
             });
 
             // Emit to rest of group
-            socket.to(conversationId).except(`user:${userId}`).emit('group-call:incoming', {
-                conversationId,
-                callId,
-                callType,
-                initiator: initiatorInfo,
+            socket.to(conversationId).except(`user:${userId}`).emit(
+                'group-call:incoming',
+                buildGroupIncomingPayload(groupCallInfo)
+            );
+
+            await sendOfflineGroupCallPushes({
+                conversation,
+                groupCallInfo,
                 groupName,
-                participants: participantsArray(groupCallInfo),
+                getReceiverSocketId,
             });
 
             console.log(`[GroupCall] ${user.displayName} started group call in ${conversationId}`);
@@ -739,4 +784,22 @@ async function handleGroupCallDisconnect(userId, socketId, io) {
     }
 }
 
-export { registerGroupCallHandlers, handleGroupCallDisconnect, hasUserActiveGroupCall };
+function emitPendingGroupCallsForUser(socket, userId) {
+    const normalizedUserId = normalizeUserId(userId);
+
+    for (const groupCall of activeGroupCalls.values()) {
+        const participant = groupCall.participants?.get(normalizedUserId);
+        if (!participant || participant.status !== 'ringing' || participant.isLocked) {
+            continue;
+        }
+
+        socket.emit('group-call:incoming', buildGroupIncomingPayload(groupCall));
+    }
+}
+
+export {
+    registerGroupCallHandlers,
+    handleGroupCallDisconnect,
+    hasUserActiveGroupCall,
+    emitPendingGroupCallsForUser,
+};

@@ -7,7 +7,7 @@ import Conversation from "../models/conversationModel.js";
 import BlockUser from "../models/blockUserModel.js";
 import Friend from "../models/friendModel.js";
 import { registerCallHandlers, handleCallDisconnect, emitPendingDirectCallsForUser } from "./callHandler.js";
-import { registerGroupCallHandlers, handleGroupCallDisconnect } from "./groupCallHandler.js";
+import { registerGroupCallHandlers, handleGroupCallDisconnect, emitPendingGroupCallsForUser } from "./groupCallHandler.js";
 import { configureSocketGateway } from "./socketGateway.js";
 import Message from "../models/messageModel.js";
 
@@ -293,6 +293,7 @@ io.on("connection", async (socket) => {
     registerGroupCallHandlers(socket, user, io, getReceiverSocketId, activeCalls);
 
     emitPendingDirectCallsForUser(socket, userId, activeCalls, io, getReceiverSocketId);
+    emitPendingGroupCallsForUser(socket, userId);
 
     // Disconnect
     socket.on("disconnect", async () => {
