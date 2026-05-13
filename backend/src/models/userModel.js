@@ -59,6 +59,10 @@ const userSchema = new mongoose.Schema({
         lastViolationAt: { type: Date, default: null },
         nextViolationDecayAt: { type: Date, default: null },
     },
+    fcmTokens: [{
+        type: String,
+        trim: true,
+    }],
 }, { timestamps: true });
 
 const UserModel = mongoose.models.User || mongoose.model('User', userSchema);

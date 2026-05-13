@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes, Navigate } from "react-router";
+import { BrowserRouter, Route, Routes, Navigate, useNavigate } from "react-router";
 import AppLayout from "./layouts/AppLayout";
 import ChatAppPage from "./pages/ChatAppPage";
 import MeetPage from "./pages/MeetPage";
@@ -36,9 +36,41 @@ import { usePushNotification } from "./hooks/usePushNotification";
 import SessionsPage from "./pages/SessionsPage"
 import { Capacitor } from '@capacitor/core';
 import { useBackButton } from "./hooks/useBackButton";
+import { listenForNativeFcmOpen, registerNativeFcm } from "@/lib/nativeFcm";
 
 function BackButtonHandler() {
   useBackButton();
+  return null;
+}
+
+function NativeFcmHandler({ enabled }: { enabled: boolean }) {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const setupNativeFcm = async () => {
+      try {
+        await registerNativeFcm();
+        if (!cancelled) {
+          await listenForNativeFcmOpen((path) => navigate(path));
+        }
+      } catch (error) {
+        console.error('[App] Native FCM setup failed:', error);
+      }
+    };
+
+    void setupNativeFcm();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, navigate]);
+
   return null;
 }
 
@@ -130,7 +162,7 @@ function App() {
   }, [isAuth, isAdmin, user, connectSocket, disconnectSocket]);
 
   useEffect(() => {
-    if (!accessToken || isAdmin || !isSupported()) {
+    if (Capacitor.isNativePlatform() || !accessToken || isAdmin || !isSupported()) {
       return;
     }
 
@@ -172,6 +204,7 @@ function App() {
   return (
     <BrowserRouter>
       <BackButtonHandler />
+      <NativeFcmHandler enabled={Capacitor.isNativePlatform() && isAuth && !isAdmin} />
       <Toaster
         richColors
         expand

@@ -1,6 +1,12 @@
-import api from '@/lib/axios';
+import api, { getRefreshToken } from '@/lib/axios';
+import { Capacitor } from '@capacitor/core';
 
 const BACKEND_URL = import.meta.env.VITE_API_URL;
+
+async function getMobileRefreshToken(): Promise<string | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  return await getRefreshToken();
+}
 
 export const authService = {
   verifyValidFieldsSignUp: async (
@@ -61,28 +67,40 @@ export const authService = {
   },
 
   signOut: async (pushEndpoint?: string | null) => {
+    const refreshToken = await getMobileRefreshToken();
     return await api.post(
       '/auth/signout',
-      { pushEndpoint: pushEndpoint ?? undefined },
+      {
+        pushEndpoint: pushEndpoint ?? undefined,
+        ...(refreshToken && { refreshToken }),
+      },
       { withCredentials: true }
     );
   },
 
   signOutAll: async () => {
+    const refreshToken = await getMobileRefreshToken();
     return await api.post(
       '/auth/signout-all',
-      {},
+      { ...(refreshToken && { refreshToken }) },
       { withCredentials: true }
     );
   },
 
   getSessions: async () => {
-    const response = await api.get('/auth/sessions', { withCredentials: true });
+    const refreshToken = await getMobileRefreshToken();
+    const response = refreshToken
+      ? await api.post('/auth/sessions', { refreshToken }, { withCredentials: true })
+      : await api.get('/auth/sessions', { withCredentials: true });
     return response.data.sessions;
   },
 
   signOutBySession: async (sessionId: string) => {
-    await api.delete(`/auth/sessions/${sessionId}`, { withCredentials: true });
+    const refreshToken = await getMobileRefreshToken();
+    await api.delete(`/auth/sessions/${sessionId}`, {
+      withCredentials: true,
+      data: { ...(refreshToken && { refreshToken }) },
+    });
   },
 
   loginGoogle: () => {

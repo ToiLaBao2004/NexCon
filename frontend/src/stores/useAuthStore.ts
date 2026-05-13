@@ -13,6 +13,7 @@ import { Capacitor } from '@capacitor/core';
 import api, { saveRefreshToken } from '@/lib/axios';
 import { clearRefreshToken } from '@/lib/axios';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { unregisterNativeFcmOnLogout } from '@/lib/nativeFcm';
 
 export const useAuthStore = create<AuthState>()(
   persist((set, get) => ({
@@ -152,6 +153,7 @@ export const useAuthStore = create<AuthState>()(
       try {
         set({ loading: true });
         const pushEndpoint = await unsubscribePushOnLogout();
+        await unregisterNativeFcmOnLogout();
 
         await authService.signOut(pushEndpoint);
 
@@ -219,6 +221,10 @@ export const useAuthStore = create<AuthState>()(
         const { sessions } = get();
         const target = sessions.find(s => s.sessionId === sessionId);
 
+        if (target?.isCurrent) {
+          await unregisterNativeFcmOnLogout();
+        }
+
         await authService.signOutBySession(sessionId);
 
         if (target?.isCurrent) {
@@ -240,6 +246,7 @@ export const useAuthStore = create<AuthState>()(
     signOutAll: async () => {
       try {
         set({ loading: true });
+        await unregisterNativeFcmOnLogout();
         await authService.signOutAll();
         get().clearState();
         toast.success('Đã đăng xuất tất cả thiết bị.');

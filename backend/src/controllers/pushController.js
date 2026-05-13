@@ -1,4 +1,43 @@
 import { removeSubscription, saveSubscription } from '../services/pushNotificationService.js';
+import User from '../models/userModel.js';
+
+export async function saveFcmToken(req, res) {
+    try {
+        const token = String(req.body?.token || '').trim();
+        if (!token) return res.status(400).json({ message: 'token is required.' });
+
+        await User.updateMany(
+            { _id: { $ne: req.user._id } },
+            { $pull: { fcmTokens: token } }
+        );
+        await User.updateOne(
+            { _id: req.user._id },
+            { $addToSet: { fcmTokens: token } }
+        );
+
+        return res.status(200).json({ message: 'FCM token saved.' });
+    } catch (error) {
+        console.error('Save FCM token error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function removeFcmToken(req, res) {
+    try {
+        const token = String(req.body?.token || '').trim();
+        if (!token) return res.status(400).json({ message: 'token is required.' });
+
+        await User.updateOne(
+            { _id: req.user._id },
+            { $pull: { fcmTokens: token } }
+        );
+
+        return res.status(200).json({ message: 'FCM token removed.' });
+    } catch (error) {
+        console.error('Remove FCM token error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
 
 export async function subscribePush(req, res) {
     try {

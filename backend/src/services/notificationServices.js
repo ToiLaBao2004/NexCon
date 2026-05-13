@@ -1,5 +1,6 @@
 import Notification from '../models/notificationModel.js';
 import { emitToUser } from '../socket/index.js';
+import { sendFCMToUser } from './fcmService.js';
 
 export async function createNotification(userId, title, content, linkUrl, options = {}) {
     const notification = new Notification({
@@ -16,7 +17,19 @@ export async function createNotification(userId, title, content, linkUrl, option
     });
     await notification.save();
 
-    emitToUser(userId.toString(), 'new-notification', { notification });
+    const delivered = emitToUser(userId.toString(), 'new-notification', { notification });
+
+    if (!delivered) {
+        await sendFCMToUser(userId, {
+            title,
+            body: content || 'Ban co mot thong bao moi',
+            data: {
+                url: linkUrl || '/notification',
+                notificationId: notification._id.toString(),
+                type: notification.type,
+            },
+        });
+    }
 
     return notification;
 };

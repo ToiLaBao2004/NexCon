@@ -219,7 +219,7 @@ export async function signOut(req, res) {
             await removeSubscription(pushEndpoint);
         }
 
-        const refreshToken = req.cookies?.refreshToken;
+        const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         if (!refreshToken) {
             return res.status(200).json({ message: 'User logged out (session already cleared).' });
         }
@@ -243,7 +243,7 @@ export async function signOut(req, res) {
 
 export async function signOutAll(req, res) {
     try {
-        const refreshToken = req.cookies?.refreshToken;
+        const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         if (!refreshToken) {
             return res.status(400).json({ message: 'Refresh token not found.' });
         }
@@ -263,7 +263,7 @@ export async function signOutAll(req, res) {
 
 export async function getSessions(req, res) {
     try {
-        const refreshToken = req.cookies?.refreshToken;
+        const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         if (!refreshToken) {
             return res.status(401).json({ message: 'Unauthorized.' });
         }
@@ -293,7 +293,7 @@ export async function getSessions(req, res) {
 
 export async function signOutBySession(req, res) {
     try {
-        const refreshToken = req.cookies?.refreshToken;
+        const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         const { sessionId } = req.params;
 
         if (!refreshToken) {

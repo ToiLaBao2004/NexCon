@@ -91,7 +91,6 @@ const reminderSchema = new mongoose.Schema({
     remindAt: {
         type: Date,
         required: true,
-        index: true,
     },
     snoozeUntil: {
         type: Date,

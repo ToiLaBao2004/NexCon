@@ -20,7 +20,8 @@ authRouter.post('/signin', signinIpLimiter, signinEmailLimiter, signIn);
 authRouter.post('/locked-appeals', submitLockedAppeal);
 authRouter.post('/signout', signOut);
 authRouter.post('/signout-all', signOutAll);
-authRouter.get('/sessions', getSessions);
+authRouter.post('/sessions', getSessions); // mobile
+authRouter.get('/sessions', getSessions); // web
 authRouter.delete('/sessions/:sessionId', signOutBySession);
 authRouter.put('/reset-new-password', signupIpLimiter, resetNewPassword)
 
