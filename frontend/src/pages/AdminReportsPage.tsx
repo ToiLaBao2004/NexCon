@@ -2,21 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { CheckCircle2, Loader2, MessageSquareWarning, RefreshCw, UserRoundX, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import AdminEvidencePreview from "@/components/admin/AdminEvidencePreview";
+import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import {
-  adminService,
-  type AdminReport,
-} from "@/services/adminService";
+import { adminService, type AdminReport } from "@/services/adminService";
 import type { ReportStatus, ReportTargetType } from "@/services/reportService";
 
 const statusOptions: Array<ReportStatus | "all"> = ["pending", "reviewing", "resolved", "dismissed", "all"];
 
 const statusLabels: Record<ReportStatus | "all", string> = {
   pending: "Đang chờ",
-  reviewing: "Đang xem",
+  reviewing: "Đang xem xét",
   resolved: "Vi phạm",
   dismissed: "Không vi phạm",
   all: "Tất cả",
@@ -46,22 +45,27 @@ function formatDate(value?: string | null) {
 }
 
 function getReportTitle(report: AdminReport) {
-  if (report.targetType === "message") return "Báo cáo tin nhắn";
-  return "Báo cáo người dùng";
+  return report.targetType === "message" ? "Báo cáo tin nhắn" : "Báo cáo người dùng";
 }
 
 function getPreview(report: AdminReport) {
   if (report.targetType === "user") return report.description || "Không có mô tả thêm";
+  if (report.messageEvidence?.preview) return report.messageEvidence.preview;
   if (report.messageSnapshot?.type === "image") return "[Hình ảnh]";
   if (report.messageSnapshot?.type === "file") return report.messageSnapshot.fileName || "[File]";
   if (report.messageSnapshot?.type === "audio") return "[Tin nhắn thoại]";
   return report.messageSnapshot?.content || report.description || "[Tin nhắn]";
 }
 
+function userName(snapshot?: { displayName?: string; email?: string }) {
+  return snapshot?.displayName || snapshot?.email || "Không có";
+}
+
 export default function AdminReportsPage({ targetType }: { targetType: ReportTargetType }) {
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [status, setStatus] = useState<ReportStatus | "all">("pending");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drawerUserId, setDrawerUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [note, setNote] = useState("");
@@ -72,6 +76,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
   );
 
   const isMessagePage = targetType === "message";
+  const completed = selectedReport ? ["resolved", "dismissed"].includes(selectedReport.status) : false;
 
   const loadReports = async () => {
     try {
@@ -125,11 +130,11 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
             <div className="flex items-center gap-2">
               {isMessagePage ? <MessageSquareWarning className="size-5 text-destructive" /> : <UserRoundX className="size-5 text-destructive" />}
               <h1 className="text-2xl font-semibold tracking-normal">
-                {isMessagePage ? "Giải quyết báo cáo tin nhắn" : "Giải quyết báo cáo người dùng"}
+                {isMessagePage ? "Báo cáo tin nhắn" : "Báo cáo người dùng"}
               </h1>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Xác nhận vi phạm sẽ thông báo cho người báo cáo, người bị báo cáo và tăng số lần vi phạm.
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+              Admin chỉ xem nội dung đã được báo cáo. Nhấn vào email để mở hồ sơ người dùng trong drawer mà không rời trang.
             </p>
           </div>
           <Button variant="outline" className="rounded-md" onClick={() => void loadReports()}>
@@ -153,14 +158,11 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[390px_minmax(0,1fr)]">
         <aside className="min-h-0 border-b border-border/70 lg:border-b-0 lg:border-r">
           <div className="beautiful-scrollbar h-[34vh] overflow-y-auto lg:h-full">
             {loading ? (
-              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Đang tải báo cáo
-              </div>
+              <Loading text="Đang tải báo cáo" />
             ) : reports.length === 0 ? (
               <div className="p-6 text-center text-sm text-muted-foreground">Không có báo cáo trong bộ lọc này.</div>
             ) : (
@@ -181,7 +183,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                     </Badge>
                   </div>
                   <p className="mt-1 truncate text-sm text-muted-foreground">
-                    {report.targetUserSnapshot?.displayName || report.targetUserSnapshot?.email || "Target user"}
+                    {userName(report.targetUserSnapshot)}
                   </p>
                   <p className="mt-2 line-clamp-2 text-sm">{getPreview(report)}</p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -200,19 +202,39 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
               Chọn một báo cáo để xử lý.
             </div>
           ) : (
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-4">
                 <DetailBlock title="Thông tin báo cáo">
-                  <Info label="Người báo cáo" value={`${selectedReport.reporterSnapshot?.displayName || ""} ${selectedReport.reporterSnapshot?.email || ""}`.trim()} />
-                  <Info label="Người bị báo cáo" value={`${selectedReport.targetUserSnapshot?.displayName || ""} ${selectedReport.targetUserSnapshot?.email || ""}`.trim()} />
-                  <Info label="Lý do" value={reasonLabels[selectedReport.reasonCategory] || selectedReport.reasonCategory} />
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <UserInfoButton
+                      label="Người báo cáo"
+                      name={userName(selectedReport.reporterSnapshot)}
+                      email={selectedReport.reporterSnapshot?.email}
+                      onClick={() => setDrawerUserId(selectedReport.reporterId)}
+                    />
+                    <UserInfoButton
+                      label="Người bị báo cáo"
+                      name={userName(selectedReport.targetUserSnapshot)}
+                      email={selectedReport.targetUserSnapshot?.email}
+                      onClick={() => setDrawerUserId(selectedReport.targetUserId)}
+                    />
+                    <Info label="Lý do" value={reasonLabels[selectedReport.reasonCategory] || selectedReport.reasonCategory} />
+                    <Info label="Ngày gửi" value={formatDate(selectedReport.createdAt)} />
+                  </div>
                   <Info label="Mô tả" value={selectedReport.description || "Không có"} />
                 </DetailBlock>
 
-                <DetailBlock title={isMessagePage ? "Snapshot tin nhắn" : "Bằng chứng người dùng"}>
-                  <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm">
-                    {getPreview(selectedReport)}
-                  </div>
+                <DetailBlock title={isMessagePage ? "Bằng chứng tin nhắn" : "Bằng chứng người dùng"}>
+                  {isMessagePage ? (
+                    <AdminEvidencePreview
+                      message={selectedReport.messageEvidence}
+                      fallbackText={getPreview(selectedReport)}
+                    />
+                  ) : (
+                    <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-2 text-sm">
+                      {selectedReport.description || "Không có mô tả thêm"}
+                    </div>
+                  )}
                   {selectedReport.messageSnapshot?.mimeType && (
                     <p className="text-sm text-muted-foreground">MIME: {selectedReport.messageSnapshot.mimeType}</p>
                   )}
@@ -220,7 +242,10 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
 
                 {selectedReport.resolution?.decision && (
                   <DetailBlock title="Kết quả đã xử lý">
-                    <Info label="Quyết định" value={selectedReport.resolution.decision === "violation" ? "Vi phạm" : "Không vi phạm"} />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Info label="Quyết định" value={selectedReport.resolution.decision === "violation" ? "Vi phạm" : "Không vi phạm"} />
+                      <Info label="Ngày xử lý" value={formatDate(selectedReport.review?.reviewedAt)} />
+                    </div>
                     <Info label="Biện pháp" value={selectedReport.resolution.actionTaken || "Không có"} />
                     <Info label="Ghi chú" value={selectedReport.review?.note || "Không có"} />
                   </DetailBlock>
@@ -235,13 +260,13 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                     onChange={(event) => setNote(event.target.value)}
                     placeholder="Ghi chú nội bộ hoặc lý do xử lý"
                     className="min-h-32 resize-none"
-                    disabled={["resolved", "dismissed"].includes(selectedReport.status)}
+                    disabled={completed}
                   />
                   <div className="grid gap-2">
                     <Button
                       variant="outline"
                       className="rounded-md"
-                      disabled={submitting || ["resolved", "dismissed"].includes(selectedReport.status)}
+                      disabled={submitting || completed}
                       onClick={() => void handleReviewing()}
                     >
                       Đánh dấu đang xem xét
@@ -249,7 +274,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                     <Button
                       variant="destructive"
                       className="rounded-md"
-                      disabled={submitting || ["resolved", "dismissed"].includes(selectedReport.status)}
+                      disabled={submitting || completed}
                       onClick={() => void handleResolve("violation")}
                     >
                       <CheckCircle2 className="size-4" />
@@ -258,7 +283,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                     <Button
                       variant="secondary"
                       className="rounded-md"
-                      disabled={submitting || ["resolved", "dismissed"].includes(selectedReport.status)}
+                      disabled={submitting || completed}
                       onClick={() => void handleResolve("no_violation")}
                     >
                       <XCircle className="size-4" />
@@ -271,15 +296,54 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
           )}
         </section>
       </div>
+
+      <AdminUserDrawer
+        userId={drawerUserId}
+        open={Boolean(drawerUserId)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDrawerUserId(null);
+        }}
+        onChanged={() => void loadReports()}
+      />
     </div>
   );
 }
 
 function DetailBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="rounded-md border border-border/70">
+    <section className="rounded-md border border-border/70">
       <div className="border-b border-border/70 px-4 py-3 font-medium">{title}</div>
       <div className="grid gap-3 p-4">{children}</div>
+    </section>
+  );
+}
+
+function UserInfoButton({
+  label,
+  name,
+  email,
+  onClick,
+}: {
+  label: string;
+  name: string;
+  email?: string;
+  onClick: () => void;
+}) {
+  return (
+    <div className="text-sm">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 font-medium">{name}</div>
+      {email ? (
+        <button
+          type="button"
+          className="mt-1 break-all text-left text-sm text-primary underline-offset-4 hover:underline"
+          onClick={onClick}
+        >
+          {email}
+        </button>
+      ) : (
+        <div className="mt-1 text-sm text-muted-foreground">Không có email</div>
+      )}
     </div>
   );
 }
@@ -289,6 +353,15 @@ function Info({ label, value }: { label: string; value: string }) {
     <div className="text-sm">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="mt-1 break-words font-medium">{value || "Không có"}</div>
+    </div>
+  );
+}
+
+function Loading({ text }: { text: string }) {
+  return (
+    <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
+      <Loader2 className="mr-2 size-4 animate-spin" />
+      {text}
     </div>
   );
 }

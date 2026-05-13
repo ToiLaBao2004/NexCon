@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { adminService, type AdminAppeal, type AdminUser } from "@/services/adminService";
+import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
 
 const statusLabels: Record<AdminAppeal["status"] | "all", string> = {
   pending: "Đang chờ",
@@ -36,6 +37,7 @@ export default function AdminAppealsPage() {
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [drawerUserId, setDrawerUserId] = useState<string | null>(null);
 
   const selectedAppeal = useMemo(
     () => appeals.find((appeal) => appeal._id === selectedId) || appeals[0] || null,
@@ -78,6 +80,16 @@ export default function AdminAppealsPage() {
       setSubmitting(false);
     }
   };
+
+  const selectedUser = selectedAppeal ? appealUser(selectedAppeal) : null;
+  const selectedUserId = selectedAppeal
+    ? (typeof selectedAppeal.userId === "string" ? selectedAppeal.userId : selectedUser?._id || null)
+    : null;
+  const lockStatus = selectedUser?.lock?.isLocked
+    ? "Đang khóa"
+    : selectedAppeal?.status === "approved"
+      ? "Đã mở khóa sau kháng cáo"
+      : "Không khóa";
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -162,9 +174,25 @@ export default function AdminAppealsPage() {
               <div className="rounded-md border border-border/70">
                 <div className="border-b border-border/70 px-4 py-3 font-medium">Nội dung kháng cáo</div>
                 <div className="grid gap-4 p-4 text-sm">
-                  <Info label="Email" value={selectedAppeal.email} />
-                  <Info label="User" value={appealUser(selectedAppeal)?.displayName || "Không có"} />
-                  <Info label="Trạng thái khóa" value={appealUser(selectedAppeal)?.lock?.reason || "Không rõ"} />
+                  <div>
+                    <div className="text-xs text-muted-foreground">Email</div>
+                    {selectedUserId ? (
+                      <button
+                        type="button"
+                        className="mt-1 break-all text-left font-medium text-primary underline-offset-4 hover:underline"
+                        onClick={() => setDrawerUserId(selectedUserId)}
+                      >
+                        {selectedAppeal.email}
+                      </button>
+                    ) : (
+                      <div className="mt-1 break-words font-medium">{selectedAppeal.email}</div>
+                    )}
+                  </div>
+                  <Info label="User" value={selectedUser?.displayName || "Không có"} />
+                  <Info label="Trạng thái tài khoản" value={lockStatus} />
+                  {selectedUser?.lock?.isLocked && (
+                    <Info label="Lý do khóa" value={selectedUser.lock.reason || "Không rõ"} />
+                  )}
                   <Info label="Ngày gửi" value={formatDate(selectedAppeal.createdAt)} />
                   <div>
                     <div className="text-xs text-muted-foreground">Lý do kháng cáo</div>
@@ -211,6 +239,15 @@ export default function AdminAppealsPage() {
           )}
         </section>
       </div>
+      <AdminUserDrawer
+        userId={drawerUserId}
+        open={Boolean(drawerUserId)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDrawerUserId(null);
+        }}
+        initialUser={selectedUserId === drawerUserId ? selectedUser : null}
+        onChanged={() => void loadAppeals()}
+      />
     </div>
   );
 }

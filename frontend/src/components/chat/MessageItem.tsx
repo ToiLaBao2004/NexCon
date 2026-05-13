@@ -19,7 +19,7 @@ import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
-import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions, Check, CheckCheck, Flag } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions, Check, CheckCheck, Flag, ShieldAlert } from "lucide-react";
 import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -422,6 +422,15 @@ function ImageBatchGrid({
 	);
 
 	const renderImage = (item: Message) => {
+		if (item.reportStatus) {
+			return (
+				<div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-destructive/10 text-destructive">
+					<ShieldAlert className="size-7" strokeWidth={1.7} />
+					<span className="px-2 text-center text-xs font-semibold">Tin nhắn vi phạm tiêu chuẩn cộng đồng</span>
+				</div>
+			);
+		}
+
 		if (item.isRecalled) {
 			return (
 				<div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-slate-200/80 text-slate-400 dark:bg-slate-800/70 dark:text-slate-500">
@@ -463,9 +472,9 @@ function ImageBatchGrid({
 						key={item._id}
 						type="button"
 						className={tileClassName(index)}
-						disabled={item.isRecalled === true}
+						disabled={item.isRecalled === true || item.reportStatus === true}
 						onClick={() => {
-							if (item.isRecalled) return;
+							if (item.isRecalled || item.reportStatus) return;
 							useImageViewerStore.getState().openViewer(
 								item.filePublicId
 									? { messageId: item._id, conversationId, message: item, alt: item.fileName ?? "image" }
@@ -474,7 +483,7 @@ function ImageBatchGrid({
 						}}
 					>
 						{renderImage(item)}
-						{isOwn && !item.isRecalled && (
+						{isOwn && !item.isRecalled && !item.reportStatus && (
 							<span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-black/55 text-white shadow-sm">
 								{item.status === "sending" ? (
 									<Clock className="size-3 animate-spin" />
@@ -488,7 +497,7 @@ function ImageBatchGrid({
 					</button>
 				))}
 			</div>
-			{items[0]?.content && !items[0]?.isRecalled && (
+			{items[0]?.content && !items[0]?.isRecalled && !items[0]?.reportStatus && (
 				<p className="text-sm px-1">
 					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
 				</p>
@@ -502,6 +511,15 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 
 	if (imageBatchItems && imageBatchItems.length > 1) {
 		return <ImageBatchGrid items={imageBatchItems} isOwn={isOwn} participants={participants} conversationId={message.conversationId} />;
+	}
+
+	if (message.reportStatus) {
+		return (
+			<span className="inline-flex items-center gap-2 text-sm font-medium text-destructive">
+				<ShieldAlert className="size-4" />
+				Tin nhắn vi phạm tiêu chuẩn cộng đồng
+			</span>
+		);
 	}
 
 	if (message.isRecalled) {
@@ -755,7 +773,9 @@ function ReplyQuoteInline({
 			"Người dùng";
 
 	let preview: React.ReactNode;
-	if (replyTo.isRecalled) {
+	if (replyTo.reportStatus) {
+		preview = <span className="italic">Tin nhắn vi phạm tiêu chuẩn cộng đồng</span>;
+	} else if (replyTo.isRecalled) {
 		preview = <span className="italic">Tin nhắn đã thu hồi</span>;
 	} else if (replyTo.type === "image") {
 		preview = (
@@ -1929,17 +1949,18 @@ const MessageItem = ({
 	const isImageBatch = (imageBatchItems?.length ?? 0) > 1;
 	const hasUnrecalledBatchMessage = imageBatchItems?.some((item) => item.isRecalled !== true) ?? false;
 	const isRecalled = message.isRecalled === true && (!isImageBatch || !hasUnrecalledBatchMessage);
+	const isViolationMessage = message.reportStatus === true;
 	const isPinned = message.isPinned === true;
-	const isImage = isImageBatch || (message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled);
-	const isLink = message.type === "link" && !isRecalled;
+	const isImage = isImageBatch || (message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled && !isViolationMessage);
+	const isLink = message.type === "link" && !isRecalled && !isViolationMessage;
 	const linkPreview = isLink ? message.metadata?.linkPreview : null;
 	const hasLinkPreview = Boolean(linkPreview?.title || linkPreview?.image || linkPreview?.description);
 	const isSticker = message.type === "sticker" && !isRecalled;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
 	const hasContent = isImageBatch
-		? Boolean(imageBatchItems?.some((item) => item.isRecalled !== true && item.content?.trim()))
-		: message.type === "sticker" ? false : !!message.content?.trim();
+		? Boolean(imageBatchItems?.some((item) => item.isRecalled !== true && item.reportStatus !== true && item.content?.trim()))
+		: message.type === "sticker" || isViolationMessage ? false : !!message.content?.trim();
 	const isVisualOnly = (isImage || isSticker) && !hasContent && !message.replyTo && !message.metadata?.forwardedFrom;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.getUrl(message._id));
@@ -1947,13 +1968,14 @@ const MessageItem = ({
 	const downloadUrl = (!isBlob && message.fileUrl) || cachedMediaUrl || "#";
 	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
 	const downloadableBubbleMessages = bubbleMessages.filter((item) =>
-		item.isRecalled !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
+		item.isRecalled !== true && item.reportStatus !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
 	);
 	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
 
 	// Automatically fetch signed URL for files and audio if not cached
 	useEffect(() => {
 		if (
+			!isViolationMessage &&
 			(message.type === "file" || message.type === "audio") &&
 			message.filePublicId &&
 			(!message.fileUrl || isBlob) &&  // fetch nếu là blob hoặc không có url
@@ -1969,7 +1991,7 @@ const MessageItem = ({
 			};
 			fetchUrl();
 		}
-	}, [message._id, message.type, message.filePublicId, message.fileUrl, cachedMediaUrl]);
+	}, [message._id, message.type, message.filePublicId, message.fileUrl, cachedMediaUrl, isViolationMessage]);
 
 	const readReceiptsMap = useMemo(() => {
 		const map: Record<string, { _id: string; displayName: string; avatarUrl?: string | null }[]> = {};
@@ -2096,7 +2118,7 @@ const MessageItem = ({
 	const handlePointerDownForActions = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (!isCoarsePointer) return;
 		if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-		if (isRecalled || (message.status && message.status !== "sent") || isDisbanded) return;
+		if (isRecalled || isViolationMessage || (message.status && message.status !== "sent") || isDisbanded) return;
 
 		clearLongPressTimer();
 		longPressTimeoutRef.current = window.setTimeout(() => {
@@ -2109,6 +2131,7 @@ const MessageItem = ({
 	};
 
 	const reactionSummary = useMemo(() => {
+		if (isViolationMessage) return null;
 		if (!message.reactions?.length) return null;
 
 		const counts: Record<string, number> = {};
@@ -2121,16 +2144,17 @@ const MessageItem = ({
 		const myReaction = message.reactions.find(r => r.userId === currentUserId);
 
 		return { uniqueEmojis, totalCount, myReaction };
-	}, [message.reactions, currentUserId]);
+	}, [isViolationMessage, message.reactions, currentUserId]);
 
 	// ── Smart reminder detection ───────────────────────────────────────────────
 	const showSmartReminderButton = useMemo(() => {
 		if (isRecalled) return false;
+		if (isViolationMessage) return false;
 		if (isDisbanded) return false;
 		if (message.type !== "text") return false;
 		if (!message.content) return false;
 		return detectDateTimeInText(message.content);
-	}, [isRecalled, isDisbanded, message.type, message.content]);
+	}, [isRecalled, isViolationMessage, isDisbanded, message.type, message.content]);
 
 	const openSmartReminder = useCallback(() => {
 		setReminderTargetMessage({
@@ -2214,7 +2238,7 @@ const MessageItem = ({
 
 	const handleRecall = async () => {
 		try {
-			for (const item of bubbleMessages.filter((entry) => entry.isRecalled !== true && (!entry.status || entry.status === "sent"))) {
+			for (const item of bubbleMessages.filter((entry) => entry.isRecalled !== true && entry.reportStatus !== true && (!entry.status || entry.status === "sent"))) {
 				await recallMessage(item._id);
 			}
 		}
@@ -2225,8 +2249,8 @@ const MessageItem = ({
 		}
 	};
 
-	const canCreateReminder = !isDisbanded && !isRecalled && message.type === "text";
-	const canReportMessage = !isOwn && !isDisbanded && !isRecalled && (!message.status || message.status === "sent");
+	const canCreateReminder = !isDisbanded && !isRecalled && !isViolationMessage && message.type === "text";
+	const canReportMessage = !isOwn && !isDisbanded && !isRecalled && !isViolationMessage && (!message.status || message.status === "sent");
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
 	return (
@@ -2274,8 +2298,10 @@ const MessageItem = ({
 								isOwn && "ms-auto",
 								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-1.5 text-sm" : "px-2 py-1.5 text-sm"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
-								isRecalled && !isImageBatch
+								(isRecalled && !isImageBatch)
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
+									: isViolationMessage
+										? "bg-destructive/10 text-destructive border border-destructive/25 rounded-2xl"
 									: (isVisualOnly || hasLinkPreview)
 										? "bg-transparent border-0 shadow-none"
 										: isOwn
@@ -2283,7 +2309,7 @@ const MessageItem = ({
 											: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
 							)}
 						>
-							{message.replyTo && !isRecalled && (
+							{message.replyTo && !isRecalled && !isViolationMessage && (
 								<ReplyQuoteInline
 									replyTo={message.replyTo}
 									isOwn={isOwn}
@@ -2292,7 +2318,7 @@ const MessageItem = ({
 									conversationId={selectedConvo._id}
 								/>
 							)}
-							{!isRecalled && message.metadata?.forwardedFrom && (
+							{!isRecalled && !isViolationMessage && message.metadata?.forwardedFrom && (
 								<div className={cn("flex items-center gap-1 px-1 pt-1 pb-0 text-[11px] opacity-70 select-none", isOwn ? "text-blue-100 justify-end" : "text-muted-foreground justify-start")}>
 									<Forward className="h-3 w-3 shrink-0" strokeWidth={2} />
 									<span>Đã chuyển tiếp tin nhắn</span>
@@ -2373,7 +2399,7 @@ const MessageItem = ({
 						)}
 
 						{/* Hover Action Bar - Quick Reaction Button */}
-						{!isRecalled && !message.status && !isDisbanded && (
+						{!isRecalled && !isViolationMessage && !message.status && !isDisbanded && (
 							<div className={cn(
 								"hidden sm:flex absolute top-1/2 -translate-y-1/2 transition-all duration-200 z-30",
 								"opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
@@ -2421,7 +2447,7 @@ const MessageItem = ({
 						)}
 
 
-						{!isRecalled && (!message.status || message.status === "sent") && (
+						{!isRecalled && !isViolationMessage && (!message.status || message.status === "sent") && (
 							<>
 								{/* Desktop Dropdown */}
 								<div className="hidden sm:block">

@@ -189,6 +189,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		return participants
 			.filter((participant) => participant.userId?._id?.toString() !== currentUserId)
+			.filter((participant) => !participant.userId?.isLocked && !participant.userId?.lock?.isLocked)
 			.map((participant) => ({
 				userId: participant.userId._id,
 				displayName: participant.userId.nickname?.trim() || participant.userId.displayName,
@@ -205,6 +206,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const otherUser = participants.find((p) => p.userId?._id?.toString() !== currentUserId);
 	const otherUserId = otherUser?.userId?._id;
+	const isOtherUserLocked = Boolean(otherUser?.userId?.isLocked || otherUser?.userId?.lock?.isLocked);
 
 	const isBlockedByMe = blockedUsers.some((u) => u._id === otherUserId);
 	const isBlockedByOther = otherUserId && blockedBy.includes(otherUserId);
@@ -784,6 +786,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	if (selectedConvo.type === "direct") {
+		if (isOtherUserLocked) {
+			return (
+				<div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/50">
+					<p className="text-sm text-muted-foreground italic">Không thể gửi tin nhắn tới tài khoản đã bị khóa.</p>
+				</div>
+			);
+		}
 		if (isBlockedByMe) {
 			return (
 				<div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/50">

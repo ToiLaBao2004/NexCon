@@ -6,14 +6,18 @@ import BlockUser from "../models/blockUserModel.js";
 import { io, getReceiverSocketId, emitToUser, emitOnlineUsers } from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
 import { checkFieldFormat } from "../utils/fieldFormat.js";
+import { maskLockedUserDoc } from "../utils/lockedUser.js";
 
-const toFriendItem = (friendship, user) => ({
-    _id: friendship._id,
-    friendId: user._id,
-    displayName: user.displayName,
-    avatarUrl: user.avatarUrl,
-    createdAt: friendship.createdAt
-});
+const toFriendItem = (friendship, user) => {
+    const safeUser = maskLockedUserDoc(user);
+    return {
+        _id: friendship._id,
+        friendId: safeUser._id,
+        displayName: safeUser.displayName,
+        avatarUrl: safeUser.avatarUrl,
+        createdAt: friendship.createdAt
+    };
+};
 
 const MAX_FRIENDS = 500;
 const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
@@ -39,11 +43,13 @@ async function hasReachedPendingRequestLimit(userId) {
 
 async function emitSentRequestUpdated(senderId, requestId) {
     const friendRequest = await FriendRequest.findById(requestId)
-        .populate('to', 'displayName email avatarUrl bio phone');
+        .populate('to', 'displayName email avatarUrl bio phone lock');
 
     if (friendRequest) {
+        const payload = friendRequest.toObject?.() || friendRequest;
+        payload.to = maskLockedUserDoc(friendRequest.to);
         emitToUser(senderId.toString(), "friend-request-sent-updated", {
-            friendRequest
+            friendRequest: payload
         });
     }
 }
@@ -55,9 +61,12 @@ export async function sendFriendRequest(req, res) {
         if (!email) {
             return res.status(400).json({ message: "Email is required." });
         }
-        const receiver = await User.findOne({ email: email.toLowerCase() }).select('_id displayName email avatarUrl').lean();
+        const receiver = await User.findOne({ email: email.toLowerCase() }).select('_id displayName email avatarUrl lock').lean();
         if (!receiver) {
             return res.status(404).json({ message: "User with this email not found." });
+        }
+        if (receiver.lock?.isLocked) {
+            return res.status(423).json({ message: 'Không thể gửi lời mời kết bạn tới tài khoản đã bị khóa.' });
         }
         const isBlocked = await BlockUser.findOne({ from: receiver._id, to: sender._id });
         if (isBlocked) {
@@ -198,6 +207,9 @@ export async function acceptFriendRequest(req, res) {
             return res.status(400).json({ message: 'This friend request is no longer pending.' });
         }
         const sender = await User.findById(friendRequest.from);
+        if (sender?.lock?.isLocked) {
+            return res.status(423).json({ message: 'Không thể chấp nhận lời mời từ tài khoản đã bị khóa.' });
+        }
         if (await checkFriendLimit(receiver._id, sender._id)) {
             return res.status(400).json({ message: FRIEND_LIMIT_MESSAGE });
         }
@@ -357,12 +369,18 @@ export async function getFriendRequests(req, res) {
     try {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ to: user._id, status: 'pending' })
-            .populate('from', 'displayName email avatarUrl bio phone')
-            .sort({ createdAt: -1 });
+            .populate('from', 'displayName email avatarUrl bio phone lock')
+            .sort({ createdAt: -1 })
+            .lean();
         if (friendRequests.length === 0) {
             return res.status(200).json({ friendRequests: [] });
         }
-        return res.status(200).json({ friendRequests });
+        return res.status(200).json({
+            friendRequests: friendRequests.map((request) => ({
+                ...request,
+                from: maskLockedUserDoc(request.from),
+            })),
+        });
     } catch (error) {
         console.error('Get friend requests error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -376,6 +394,9 @@ export async function unfriendUser(req, res) {
         const friend = await User.findById(friendId);
         if (!friend) {
             return res.status(404).json({ message: 'User not found.' });
+        }
+        if (friend.lock?.isLocked) {
+            return res.status(423).json({ message: 'Không thể cập nhật biệt danh cho tài khoản đã bị khóa.' });
         }
         const friendship = await Friend.findOne({
             $or: [
@@ -529,12 +550,12 @@ export async function getAllFriends(req, res) {
                 { userB: user._id }
             ]
         }).populate([
-            { path: 'userA', select: 'displayName avatarUrl email bio phone' },
-            { path: 'userB', select: 'displayName avatarUrl email bio phone' }
+            { path: 'userA', select: 'displayName avatarUrl email bio phone lock' },
+            { path: 'userB', select: 'displayName avatarUrl email bio phone lock' }
         ]).lean();
         const listedFriends = friends.map(friend => {
             const isUserA = friend.userA._id.toString() === user._id.toString();
-            const friendUser = isUserA ? friend.userB : friend.userA;
+            const friendUser = maskLockedUserDoc(isUserA ? friend.userB : friend.userA);
             return {
                 _id: friend._id,
                 friendId: friendUser._id,
@@ -559,12 +580,18 @@ export async function getFriendRequestsSended(req, res) {
     try {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ from: user._id, status: 'pending' })
-            .populate('to', 'displayName email avatarUrl bio phone')
-            .sort({ createdAt: -1 });
+            .populate('to', 'displayName email avatarUrl bio phone lock')
+            .sort({ createdAt: -1 })
+            .lean();
         if (friendRequests.length === 0) {
             return res.status(200).json({ friendRequests: [] });
         }
-        return res.status(200).json({ friendRequests });
+        return res.status(200).json({
+            friendRequests: friendRequests.map((request) => ({
+                ...request,
+                to: maskLockedUserDoc(request.to),
+            })),
+        });
     } catch (error) {
         console.error('Get sent friend requests error:', error);
         return res.status(500).json({ message: 'Server error' });

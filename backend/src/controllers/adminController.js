@@ -13,7 +13,7 @@ import {
     registerViolation,
     unlockAccount,
 } from '../services/moderation/violationService.js';
-import { isUserOnline } from '../socket/index.js';
+import { io, isUserOnline } from '../socket/index.js';
 
 const COMPLETED_REPORT_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const COMPLETED_APPEAL_TTL_MS = 180 * 24 * 60 * 60 * 1000;
@@ -66,15 +66,93 @@ function messagePreview(message) {
     return message.content || '';
 }
 
+function violationEvidencePreview(message) {
+    if (!message) return 'Không có nội dung xem trước.';
+    if (message.type === 'image') {
+        return message.content
+            ? `Ảnh đính kèm kèm nội dung: "${message.content}"`
+            : 'Ảnh đính kèm trong đoạn chat.';
+    }
+    if (message.type === 'file') {
+        return `File đính kèm: ${message.fileName || 'không rõ tên file'}.`;
+    }
+    if (message.type === 'audio') {
+        return message.content
+            ? `Tin nhắn thoại được chuyển thành văn bản: "${message.content}"`
+            : 'Tin nhắn thoại trong đoạn chat.';
+    }
+    if (message.type === 'link') {
+        return `Liên kết đã gửi: ${message.content || 'không rõ liên kết'}.`;
+    }
+    if (message.type === 'sticker') {
+        return 'Nhãn dán trong đoạn chat.';
+    }
+    return `"${String(message.content || '').slice(0, 500)}"`;
+}
+
 function serializeMessage(message) {
     const raw = message?.toObject ? message.toObject() : message;
     if (!raw) return null;
 
     return {
-        ...raw,
+        _id: raw._id,
+        conversationId: raw.conversationId,
+        senderId: raw.senderId,
+        type: raw.type,
+        content: raw.content || '',
+        fileName: raw.fileName || '',
+        mimeType: raw.mimeType || '',
+        fileSize: raw.fileSize || 0,
         signedUrl: raw.filePublicId ? generateSignedUrl(raw.filePublicId, raw.type) : null,
         preview: messagePreview(raw),
+        reportStatus: Boolean(raw.reportStatus),
+        createdAt: raw.createdAt,
+        updatedAt: raw.updatedAt,
     };
+}
+
+function emptyAssetCounts() {
+    return { image: 0, file: 0, link: 0, audio: 0, total: 0 };
+}
+
+function buildAssetCountMap(rows = []) {
+    const map = new Map();
+
+    rows.forEach((row) => {
+        const senderId = row._id?.senderId?.toString?.();
+        const type = row._id?.type;
+        if (!senderId || !type) return;
+
+        const current = map.get(senderId) || emptyAssetCounts();
+        current[type] = row.count;
+        current.total += row.count;
+        map.set(senderId, current);
+    });
+
+    return map;
+}
+
+async function attachReportEvidence(reports) {
+    const messageIds = reports
+        .filter((report) => report.targetType === 'message' && report.targetMessageId)
+        .map((report) => report.targetMessageId);
+
+    if (messageIds.length === 0) {
+        return reports.map((report) => ({ ...report, messageEvidence: null }));
+    }
+
+    const messages = await Message.find({ _id: { $in: messageIds } })
+        .select('_id conversationId senderId type content fileName mimeType fileSize filePublicId reportStatus createdAt updatedAt')
+        .lean();
+
+    const messageMap = new Map(messages.map((message) => [message._id.toString(), serializeMessage(message)]));
+
+    return reports.map((report) => ({
+        ...report,
+        messageEvidence: report.targetMessageId
+            ? messageMap.get(report.targetMessageId.toString()) || null
+            : null,
+    }));
 }
 
 function handleAdminError(res, error, label) {
@@ -138,6 +216,263 @@ export async function listAdminUsers(req, res) {
             User.countDocuments(filter),
         ]);
 
+        const userIds = users.map((user) => user._id);
+        const [reportCounts, assetCounts] = await Promise.all([
+            Report.aggregate([
+                { $match: { targetUserId: { $in: userIds }, status: { $in: ['pending', 'reviewing'] } } },
+                { $group: { _id: '$targetUserId', count: { $sum: 1 } } },
+            ]),
+            Message.aggregate([
+                { $match: { senderId: { $in: userIds }, type: { $in: ['image', 'file', 'link', 'audio'] } } },
+                { $group: { _id: { senderId: '$senderId', type: '$type' }, count: { $sum: 1 } } },
+            ]),
+        ]);
+
+        const reportCountMap = new Map(reportCounts.map((item) => [item._id.toString(), item.count]));
+        const assetCountMap = buildAssetCountMap(assetCounts);
+        const enrichedUsers = await Promise.all(users.map(async (user) => {
+            const violationSummary = await getViolationSummary(user._id);
+            return toUserSummary(user, {
+                online: isUserOnline(user._id),
+                violationSummary,
+                openReportCount: reportCountMap.get(user._id.toString()) || 0,
+                assetCounts: assetCountMap.get(user._id.toString()) || emptyAssetCounts(),
+            });
+        }));
+
+        return res.status(200).json({
+            users: enrichedUsers,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error listing admin users:');
+    }
+}
+
+export async function getAdminUserProfile(req, res) {
+    try {
+        const { userId } = req.params;
+        requireObjectId(userId, 'userId');
+
+        const user = await User.findOne({ _id: userId, ...userRoleFilter() }).select('-password').lean();
+        if (!user) {
+            return res.status(404).json({ message: 'Không tìm thấy người dùng.' });
+        }
+
+        const now = new Date();
+        const [violationSummary, reportCounts, groupCount, assetCounts, resolvedReportCount] = await Promise.all([
+            getViolationSummary(user._id),
+            Report.aggregate([
+                { $match: { $or: [{ reporterId: user._id }, { targetUserId: user._id }] } },
+                { $group: { _id: { targetType: '$targetType', status: '$status' }, count: { $sum: 1 } } },
+            ]),
+            Conversation.countDocuments({ type: 'group', 'participants.userId': user._id }),
+            Message.aggregate([
+                { $match: { senderId: user._id, type: { $in: ['image', 'file', 'link', 'audio'] } } },
+                { $group: { _id: { senderId: '$senderId', type: '$type' }, count: { $sum: 1 } } },
+            ]),
+            Report.countDocuments({
+                targetUserId: user._id,
+                status: { $in: ['resolved', 'dismissed'] },
+                expiresAt: { $gt: now },
+            }),
+        ]);
+
+        const assetCountMap = buildAssetCountMap(assetCounts);
+
+        return res.status(200).json({
+            user: toUserSummary(user, {
+                online: isUserOnline(user._id),
+                violationSummary,
+                assetCounts: assetCountMap.get(user._id.toString()) || emptyAssetCounts(),
+                counters: {
+                    reports: reportCounts,
+                    groups: groupCount,
+                    assets: assetCountMap.get(user._id.toString()) || emptyAssetCounts(),
+                    resolvedReports: resolvedReportCount,
+                },
+            }),
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error fetching admin user profile:');
+    }
+}
+
+/*
+ * Admins should not browse normal user messages from the overview. Older callers
+ * of this endpoint only receive messages that have already been confirmed as
+ * reported evidence.
+ */
+export async function getAdminUserMessages(req, res) {
+    try {
+        const { userId } = req.params;
+        requireObjectId(userId, 'userId');
+        const { limit, skip, page } = parsePagination(req.query, 30, 100);
+        const filter = { senderId: userId, reportStatus: true };
+
+        if (req.query.conversationId) {
+            requireObjectId(req.query.conversationId, 'conversationId');
+            filter.conversationId = req.query.conversationId;
+        }
+
+        const [messages, total] = await Promise.all([
+            Message.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Message.countDocuments(filter),
+        ]);
+
+        return res.status(200).json({
+            messages: messages.map(serializeMessage),
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error fetching reported user messages:');
+    }
+}
+
+export async function getAdminUserResolvedReports(req, res) {
+    try {
+        const { userId } = req.params;
+        requireObjectId(userId, 'userId');
+        const { limit, skip, page } = parsePagination(req.query, 20, 100);
+        const now = new Date();
+
+        const filter = {
+            targetUserId: userId,
+            status: { $in: ['resolved', 'dismissed'] },
+            expiresAt: { $gt: now },
+        };
+
+        const [reports, total] = await Promise.all([
+            Report.find(filter)
+                .sort({ 'review.reviewedAt': -1, updatedAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Report.countDocuments(filter),
+        ]);
+
+        const reportsWithEvidence = await attachReportEvidence(reports);
+
+        return res.status(200).json({
+            reports: reportsWithEvidence,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error fetching resolved reports for user:');
+    }
+}
+
+export async function getAdminUserConversations(req, res) {
+    try {
+        const { userId } = req.params;
+        requireObjectId(userId, 'userId');
+        const { limit, skip, page } = parsePagination(req.query, 30, 100);
+
+        const filter = { type: 'group', 'participants.userId': userId };
+
+        const [conversations, total] = await Promise.all([
+            Conversation.find(filter)
+                .sort({ updatedAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Conversation.countDocuments(filter),
+        ]);
+
+        return res.status(200).json({
+            conversations: conversations.map((conversation) => {
+                const participant = (conversation.participants || []).find((item) => (
+                    item.userId?.toString?.() || String(item.userId)
+                ) === userId);
+                const admins = (conversation.group?.admins || []).map((adminId) => adminId.toString());
+                const role = admins.includes(userId) ? 'admin' : 'member';
+
+                return {
+                    _id: conversation._id,
+                    type: conversation.type,
+                    group: {
+                        name: conversation.group?.name || 'Nhóm chưa đặt tên',
+                        avatarUrl: conversation.group?.avatarUrl || '',
+                    },
+                    disbanded: conversation.disbanded,
+                    participantCount: conversation.participants?.length || 0,
+                    joinedAt: participant?.joinedAt || null,
+                    role,
+                    createdAt: conversation.createdAt,
+                    updatedAt: conversation.updatedAt,
+                };
+            }),
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error fetching user groups:');
+    }
+}
+
+export async function getAdminUserAssets(req, res) {
+    try {
+        const { userId } = req.params;
+        requireObjectId(userId, 'userId');
+        const { limit, skip, page } = parsePagination(req.query, 30, 100);
+        const type = String(req.query.type || 'all');
+        const allowedTypes = ['image', 'file', 'link', 'audio'];
+        const filter = { senderId: userId, type: { $in: allowedTypes } };
+
+        if (allowedTypes.includes(type)) {
+            filter.type = type;
+        }
+
+        const [messages, total] = await Promise.all([
+            Message.find(filter)
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            Message.countDocuments(filter),
+        ]);
+
+        return res.status(200).json({
+            assets: messages.map(serializeMessage),
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error fetching user assets:');
+    }
+}
+
+export async function getAdminUserAuditLogs(req, res) {
+    try {
+        const { userId } = req.params;
+        requireObjectId(userId, 'userId');
+        const { limit, skip, page } = parsePagination(req.query, 30, 100);
+
+        const [logs, total] = await Promise.all([
+            AuditLog.find({ userId })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .lean(),
+            AuditLog.countDocuments({ userId }),
+        ]);
+
+        return res.status(200).json({
+            logs,
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error fetching audit logs:');
+    }
+}
+
+/*
+ * Legacy implementation below intentionally removed in favor of privacy-scoped
+ * group and reported-message views.
+ */
+/*
         const reportCounts = await Report.aggregate([
             { $match: { targetUserId: { $in: users.map((user) => user._id) }, status: { $in: ['pending', 'reviewing'] } } },
             { $group: { _id: '$targetUserId', count: { $sum: 1 } } },
@@ -324,6 +659,8 @@ export async function getAdminUserAssets(req, res) {
     }
 }
 
+*/
+
 export async function addAdminUserViolation(req, res) {
     try {
         const { userId } = req.params;
@@ -356,7 +693,7 @@ export async function lockAdminUser(req, res) {
         const user = await lockAccount({
             userId,
             adminId: req.user._id,
-            reason: req.body?.reason || 'Admin khóa tài khoản sau khi xem xét bằng chứng.',
+            reason: req.body?.reason || 'Tài khoản đã bị khóa.',
         });
 
         return res.status(200).json({ user: toUserSummary(user.toObject ? user.toObject() : user) });
@@ -373,7 +710,7 @@ export async function unlockAdminUser(req, res) {
         const user = await unlockAccount({
             userId,
             adminId: req.user._id,
-            reason: req.body?.reason || 'Admin đã mở khóa tài khoản sau khi xem xét.',
+            reason: req.body?.reason || 'Tài khoản đã được mở khóa sau khi xem xét.',
             resetViolations: req.body?.resetViolations !== false,
         });
 
@@ -413,8 +750,10 @@ export async function listAdminReports(req, res) {
             Report.countDocuments(filter),
         ]);
 
+        const reportsWithEvidence = await attachReportEvidence(reports);
+
         return res.status(200).json({
-            reports,
+            reports: reportsWithEvidence,
             pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
         });
     } catch (error) {
@@ -474,42 +813,68 @@ export async function resolveAdminReport(req, res) {
         let targetLocked = false;
         let reporterMessage = '';
         let targetMessage = '';
+        let evidencePreview = '';
 
         if (decision === 'violation') {
+            let moderatedMessage = null;
             if (report.targetType === 'message' && report.targetMessageId) {
-                await Message.findByIdAndUpdate(report.targetMessageId, {
-                    $set: {
-                        reportStatus: true,
-                        'reportReview.reportId': report._id,
-                        'reportReview.reviewedBy': req.user._id,
-                        'reportReview.reviewedAt': new Date(),
-                        'reportReview.note': note,
+                moderatedMessage = await Message.findByIdAndUpdate(
+                    report.targetMessageId,
+                    {
+                        $set: {
+                            reportStatus: true,
+                            'reportReview.reportId': report._id,
+                            'reportReview.reviewedBy': req.user._id,
+                            'reportReview.reviewedAt': new Date(),
+                            'reportReview.note': note,
+                        },
                     },
-                });
+                    { new: true }
+                ).lean();
+
+                if (moderatedMessage) {
+                    evidencePreview = violationEvidencePreview(moderatedMessage);
+                    const conversation = await Conversation.findById(moderatedMessage.conversationId);
+                    if (conversation?.lastMessage?._id?.toString?.() === moderatedMessage._id.toString()) {
+                        conversation.lastMessage.content = 'Tin nhắn vi phạm tiêu chuẩn cộng đồng';
+                        conversation.lastMessage.type = moderatedMessage.type;
+                        await conversation.save();
+                    }
+
+                    io.to(moderatedMessage.conversationId.toString()).emit('message-moderated', {
+                        conversationId: moderatedMessage.conversationId.toString(),
+                        messageId: moderatedMessage._id.toString(),
+                        reportStatus: true,
+                        content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
+                    });
+                }
             }
 
             const violation = await registerViolation({
                 userId: report.targetUserId,
                 actorId: req.user._id,
                 source: `admin_report_${report.targetType}`,
-                reason: note || 'Admin xác nhận báo cáo vi phạm.',
+                reason: note || 'Báo cáo đã được xác nhận là vi phạm.',
                 metadata: {
                     reportId: report._id.toString(),
                     targetType: report.targetType,
                     targetMessageId: report.targetMessageId?.toString?.() || null,
                 },
+                notify: false,
             });
 
             targetViolationCount = violation.count;
             targetLocked = violation.locked;
             actionTaken = violation.locked
-                ? 'Đã xác nhận vi phạm, tăng số lần vi phạm và khóa tài khoản.'
-                : 'Đã xác nhận vi phạm và tăng số lần vi phạm.';
-            reporterMessage = 'Cảm ơn bạn đã báo cáo. Sau khi xem xét, chúng tôi xác nhận nội dung/người dùng này vi phạm tiêu chuẩn cộng đồng và đã áp dụng biện pháp phù hợp.';
-            targetMessage = `Báo cáo liên quan đến tài khoản của bạn đã được xác nhận là vi phạm. Số lần vi phạm hiện tại: ${violation.count}/${violation.threshold}.`;
+                ? 'Đã xác nhận vi phạm và khóa tài khoản theo chính sách kiểm duyệt.'
+                : 'Đã xác nhận vi phạm và ghi nhận vào hồ sơ kiểm duyệt.';
+            reporterMessage = 'Chúng tôi đã xem xét báo cáo của bạn và xác nhận có vi phạm. Cảm ơn bạn đã giúp giữ cộng đồng an toàn.';
+            targetMessage = report.targetType === 'message'
+                ? `Một tin nhắn từ tài khoản của bạn đã bị xác nhận vi phạm tiêu chuẩn cộng đồng. Bằng chứng: ${evidencePreview || 'tin nhắn được báo cáo trong đoạn chat.'} Vui lòng xem lại nội dung trước khi gửi và không tái phạm.`
+                : 'Tài khoản của bạn đã bị xác nhận có hành vi vi phạm tiêu chuẩn cộng đồng. Vui lòng điều chỉnh cách sử dụng NexCon và không tái phạm.';
         } else {
             actionTaken = 'Không xác nhận vi phạm sau khi xem xét.';
-            reporterMessage = 'Cảm ơn bạn đã báo cáo. Sau khi xem xét, chúng tôi chưa tìm thấy vi phạm trong trường hợp này.';
+            reporterMessage = 'Chúng tôi đã xem xét báo cáo của bạn nhưng chưa đủ cơ sở xác nhận vi phạm trong trường hợp này.';
         }
 
         report.status = decision === 'violation' ? 'resolved' : 'dismissed';
@@ -544,13 +909,13 @@ export async function resolveAdminReport(req, res) {
         if (decision === 'violation') {
             await createNotification(
                 report.targetUserId,
-                'Báo cáo vi phạm đã được xác nhận',
+                'Cảnh báo vi phạm tiêu chuẩn cộng đồng',
                 targetMessage,
                 `${process.env.FRONTEND_URL}/notification`,
                 {
                     type: 'report-violation',
                     actorId: req.user._id,
-                    metadata: { reportId: report._id, targetViolationCount, targetLocked },
+                    metadata: { reportId: report._id, targetLocked },
                 }
             );
         }
@@ -624,14 +989,14 @@ export async function reviewAdminAppeal(req, res) {
             await unlockAccount({
                 userId: appeal.userId,
                 adminId: req.user._id,
-                reason: adminNote || 'Kháng cáo khóa tài khoản đã được chấp nhận.',
+                reason: adminNote || 'Tài khoản đã được mở khóa sau khi xem xét kháng cáo.',
                 resetViolations: true,
             });
         } else if (appeal.userId) {
             await createNotification(
                 appeal.userId,
-                'Kháng cáo khóa tài khoản bị từ chối',
-                adminNote || 'Sau khi xem xét, admin quyết định giữ trạng thái khóa tài khoản.',
+                'Kháng cáo chưa được chấp nhận',
+                adminNote || 'Sau khi xem xét, tài khoản của bạn vẫn đang bị khóa. Vui lòng chỉ gửi lại kháng cáo khi có thông tin mới.',
                 `${process.env.FRONTEND_URL}/signin`,
                 {
                     type: 'lock-appeal-result',

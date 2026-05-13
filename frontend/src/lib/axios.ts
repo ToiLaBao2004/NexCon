@@ -43,6 +43,7 @@ api.interceptors.request.use((config) => {
 const SKIP_URLS = [
     '/auth/signin', '/auth/signup', '/auth/refresh-token',
     '/auth/verify-valid-fields-signup', '/auth/reset-new-password',
+    '/auth/locked-appeals',
     '/auth/google/callback', '/auth/google',
     '/otp/otp-create-user', '/otp/otp-reset-password', '/otp/otp-verify-reset-password'
 ];

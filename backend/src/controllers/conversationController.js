@@ -15,6 +15,7 @@ import {
 	leaveUserSocketsFromRoom,
 } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
+import { maskLockedUserDoc } from '../utils/lockedUser.js';
 
 const MUTE_DURATION_MS = {
 	'1h': 60 * 60 * 1000,
@@ -23,6 +24,67 @@ const MUTE_DURATION_MS = {
 };
 const MAX_GROUP_MEMBERS = 100;
 const MAX_PINNED_CONVERSATIONS = 5;
+
+const PARTICIPANT_SELECT = 'displayName avatarUrl email bio phone lock';
+const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
+const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname email bio phone status lastSeen about lock';
+
+function sanitizeParticipantUser(userObj) {
+	if (!userObj) return userObj;
+	return maskLockedUserDoc(userObj);
+}
+
+function sanitizePopulatedConversation(conversation) {
+	if (!conversation) return conversation;
+	const raw = conversation?.toObject ? conversation.toObject() : conversation;
+	return {
+		...raw,
+		participants: (raw.participants || []).map((participant) => ({
+			...participant,
+			userId: sanitizeParticipantUser(participant.userId),
+		})),
+		lastMessage: raw.lastMessage?.senderId
+			? {
+				...raw.lastMessage,
+				senderId: sanitizeParticipantUser(raw.lastMessage.senderId),
+			}
+			: raw.lastMessage,
+	};
+}
+
+function sanitizeModeratedMessage(message) {
+	if (!message) return message;
+	const raw = message?.toObject ? message.toObject() : message;
+	const next = {
+		...raw,
+		senderId: raw.senderId && typeof raw.senderId === 'object'
+			? sanitizeParticipantUser(raw.senderId)
+			: raw.senderId,
+	};
+
+	if (next.replyTo?.messageId) {
+		next.replyTo = {
+			...next.replyTo,
+			messageId: sanitizeModeratedMessage(next.replyTo.messageId),
+		};
+	}
+
+	if (!next.reportStatus) return next;
+	return {
+		...next,
+		content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
+		filePublicId: undefined,
+		fileUrl: undefined,
+		fileName: undefined,
+		fileSize: undefined,
+		mimeType: undefined,
+		reactions: [],
+	};
+}
+
+function sanitizeMessages(messages = []) {
+	return messages.map((message) => sanitizeModeratedMessage(message));
+}
 
 export async function createConversation(req, res) {
 	try {
@@ -36,7 +98,10 @@ export async function createConversation(req, res) {
 		if (type === 'direct') {
 			const participantId = memberIds[0];
 			conversation = await Conversation.findOne({ type: 'direct', 'participants.userId': { $all: [userId, participantId] } });
-			const partner = await User.findById(participantId).select('displayName avatarUrl');
+			const partner = await User.findById(participantId).select('displayName avatarUrl lock');
+			if (partner?.lock?.isLocked) {
+				return res.status(423).json({ message: 'Không thể tạo cuộc trò chuyện với tài khoản đã bị khóa.' });
+			}
 			if (!conversation) {
 				conversation = new Conversation({
 					type: 'direct',
@@ -52,7 +117,11 @@ export async function createConversation(req, res) {
 			if (memberIds.length + 1 > MAX_GROUP_MEMBERS) {
 				return res.status(400).json({ message: `Nhóm chỉ có thể chứa tối đa ${MAX_GROUP_MEMBERS} thành viên.` });
 			}
-			const members = await User.find({ _id: { $in: memberIds } }).select('displayName avatarUrl');
+			const members = await User.find({ _id: { $in: memberIds } }).select('displayName avatarUrl lock');
+			const lockedMembers = members.filter((member) => member.lock?.isLocked);
+			if (lockedMembers.length > 0) {
+				return res.status(423).json({ message: 'Không thể thêm tài khoản đã bị khóa vào nhóm.' });
+			}
 			const participants = members.map(m => ({
 				userId: m._id,
 				userInfo: { displayName: m.displayName, avatarUrl: m.avatarUrl },
@@ -78,9 +147,10 @@ export async function createConversation(req, res) {
 			return res.status(400).json({ message: 'Failed to create conversation.' });
 		}
 		await conversation.populate([
-			{ path: 'participants.userId', select: 'displayName avatarUrl email bio phone' },
-			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
+			{ path: 'participants.userId', select: PARTICIPANT_SELECT },
+			{ path: 'lastMessage.senderId', select: MESSAGE_SENDER_SELECT }
 		]);
+		conversation = sanitizePopulatedConversation(conversation);
 
 		conversation.participants.forEach(p => {
 			const receiverSocketId = getReceiverSocketId(p.userId._id.toString());
@@ -119,8 +189,8 @@ export async function getConversations(req, res) {
 		let rawConversations = await Conversation.find(matchQuery)
 			.sort({ updatedAt: -1 })
 			.limit(limit + 1)
-			.populate("participants.userId", "displayName avatarUrl email bio phone")
-			.populate("lastMessage.senderId", "displayName avatarUrl")
+			.populate("participants.userId", PARTICIPANT_SELECT)
+			.populate("lastMessage.senderId", MESSAGE_SENDER_SELECT)
 			.lean();
 
 		const hasMore = rawConversations.length > limit;
@@ -145,7 +215,7 @@ export async function getConversations(req, res) {
 
 			const fallback = await Message.findOne({ conversationId: conversation._id, ...visibleMessageFilter })
 				.sort({ createdAt: -1 })
-				.populate('senderId', 'displayName avatarUrl')
+				.populate('senderId', MESSAGE_SENDER_SELECT)
 				.lean();
 
 			if (!fallback) {
@@ -254,8 +324,9 @@ export async function getConversations(req, res) {
 							};
 						}
 
+						userObj = sanitizeParticipantUser(userObj);
 						const pid = userObj?._id?.toString();
-						const nickname = pid && pid !== myId ? nickMap.get(pid) || null : null;
+						const nickname = userObj?.isLocked ? null : (pid && pid !== myId ? nickMap.get(pid) || null : null);
 
 						return {
 							...p,
@@ -295,8 +366,8 @@ export async function getGroups(req, res) {
 		let rawGroups = await Conversation.find(matchQuery)
 			.sort({ updatedAt: -1 })
 			.limit(limit + 1)
-			.populate('participants.userId', 'displayName avatarUrl email bio phone')
-			.populate('lastMessage.senderId', 'displayName avatarUrl')
+			.populate('participants.userId', PARTICIPANT_SELECT)
+			.populate('lastMessage.senderId', MESSAGE_SENDER_SELECT)
 			.lean();
 
 		const hasMore = rawGroups.length > limit;
@@ -329,7 +400,7 @@ export async function getGroups(req, res) {
 					} else if (!userObj) {
 						userObj = { _id: null, displayName: 'Người dùng đã xóa', avatarUrl: null };
 					}
-					return { ...p, userId: userObj };
+					return { ...p, userId: sanitizeParticipantUser(userObj) };
 				}),
 				unreadCounts: c.unreadCounts || {},
 			};
@@ -370,6 +441,9 @@ export async function getMessages(req, res) {
 		}
 
 		const fallbackSender = (msg) => {
+			if (msg?.senderId) {
+				msg.senderId = sanitizeParticipantUser(msg.senderId);
+			}
 			if (msg && !msg.senderId) {
 				msg.senderId = {
 					_id: null,
@@ -407,20 +481,20 @@ export async function getMessages(req, res) {
 				Message.find({ ...baseFilter, createdAt: { $lt: anchor.createdAt } })
 					.sort({ createdAt: -1 })
 					.limit(half)
-					.populate('senderId', 'displayName avatarUrl')
+					.populate('senderId', MESSAGE_SENDER_SELECT)
 					.populate({
 						path: 'replyTo',
-						select: '_id senderId type content fileName isRecalled',
+						select: '_id senderId type content fileName isRecalled reportStatus',
 						populate: { path: 'senderId', select: 'displayName' },
 					})
 					.lean(),
 				Message.find({ ...baseFilter, createdAt: { $gt: anchor.createdAt } })
 					.sort({ createdAt: 1 })
 					.limit(half)
-					.populate('senderId', 'displayName avatarUrl')
+					.populate('senderId', MESSAGE_SENDER_SELECT)
 					.populate({
 						path: 'replyTo',
-						select: '_id senderId type content fileName isRecalled',
+						select: '_id senderId type content fileName isRecalled reportStatus',
 						populate: { path: 'senderId', select: 'displayName' },
 					})
 					.lean(),
@@ -433,7 +507,7 @@ export async function getMessages(req, res) {
 			].map(fallbackSender);
 
 			return res.status(200).json({
-				messages: combined,
+				messages: sanitizeMessages(combined),
 				anchorId: aroundId,
 				hasMoreOlder: olderMessages.length === half,
 				hasMoreNewer: newerMessages.length === half,
@@ -455,10 +529,10 @@ export async function getMessages(req, res) {
 		let messages = await Message.find(query)
 			.sort({ createdAt: sortDirection })
 			.limit(limitNumber + 1)
-			.populate('senderId', 'displayName avatarUrl')
+			.populate('senderId', MESSAGE_SENDER_SELECT)
 			.populate({
 				path: 'replyTo',
-				select: '_id senderId type content fileName isRecalled',
+				select: '_id senderId type content fileName isRecalled reportStatus',
 				populate: { path: 'senderId', select: 'displayName' },
 			})
 			.lean();
@@ -473,7 +547,7 @@ export async function getMessages(req, res) {
 			messages = messages.reverse();
 		}
 
-		messages = messages.map(fallbackSender);
+		messages = sanitizeMessages(messages.map(fallbackSender));
 
 		// Handle pinned messages (only for initial load or backward pagination)
 		let safePinnedMessages = [];
@@ -489,14 +563,14 @@ export async function getMessages(req, res) {
 
 			const pinnedMessages = await Message.find(pinnedQuery)
 				.sort({ pinnedAt: -1, createdAt: -1 })
-				.populate('senderId', 'displayName avatarUrl')
+				.populate('senderId', MESSAGE_SENDER_SELECT)
 				.populate({
 					path: 'replyTo',
-					select: '_id senderId type content fileName isRecalled',
+					select: '_id senderId type content fileName isRecalled reportStatus',
 					populate: { path: 'senderId', select: 'displayName' },
 				})
 				.lean();
-			safePinnedMessages = pinnedMessages.map(fallbackSender);
+			safePinnedMessages = sanitizeMessages(pinnedMessages.map(fallbackSender));
 		}
 
 		return res.status(200).json({
@@ -776,7 +850,7 @@ export async function getMediaByType(req, res) {
 			return res.status(400).json({ message: 'Invalid type. Must be one of: image, file, link' });
 		}
 
-		const query = { conversationId, isRecalled: { $ne: true } };
+		const query = { conversationId, isRecalled: { $ne: true }, reportStatus: { $ne: true } };
 
 		if (type === 'image') {
 			query.type = 'image';
@@ -864,15 +938,15 @@ export async function updateGroupName(req, res) {
 		});
 
 		const savedMsg = await systemMessage.save();
-		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 		updateConversationLastMessage(conversation, finalMsg, req.user._id);
 		await conversation.save();
 
-		const updatedConversation = await Conversation.findById(conversationId).populate({
+		const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 			path: 'participants.userId',
-			select: 'displayName avatarUrl nickname email bio phone status lastSeen',
-		});
+			select: CLIENT_PARTICIPANT_SELECT,
+		}));
 
 		emitNewMessage(io, updatedConversation, finalMsg);
 
@@ -952,7 +1026,7 @@ export async function updateGroupAvatar(req, res) {
 		});
 
 		const savedMsg = await systemMessage.save();
-		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 		updateConversationLastMessage(conversation, finalMsg, req.user._id);
 		await conversation.save();
@@ -965,10 +1039,10 @@ export async function updateGroupAvatar(req, res) {
 			}
 		}
 
-		const updatedConversation = await Conversation.findById(conversationId).populate({
+		const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 			path: 'participants.userId',
-			select: 'displayName avatarUrl nickname email bio phone status lastSeen',
-		});
+			select: CLIENT_PARTICIPANT_SELECT,
+		}));
 
 		emitNewMessage(io, updatedConversation, finalMsg);
 
@@ -1003,7 +1077,7 @@ async function disbandGroup(conversation, adminUser) {
 		content: 'Nhóm đã bị giải tán'
 	});
 	const savedMsg = await systemMessage.save();
-	const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+	const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 
 	updateConversationLastMessage(conversation, finalMsg, adminUser._id);
@@ -1151,7 +1225,11 @@ export async function addMembers(req, res) {
 		if (conversation.participants.length + filteredUserIds.length > MAX_MEMBERS) {
 			return res.status(400).json({ message: `Nhóm chỉ có thể chứa tối đa ${MAX_MEMBERS} thành viên.` });
 		}
-		const membersToAdd = await User.find({ _id: { $in: filteredUserIds } }).select('displayName avatarUrl');
+		const membersToAdd = await User.find({ _id: { $in: filteredUserIds } }).select('displayName avatarUrl lock');
+		const lockedMembers = membersToAdd.filter((member) => member.lock?.isLocked);
+		if (lockedMembers.length > 0) {
+			return res.status(423).json({ message: 'Không thể thêm tài khoản đã bị khóa vào nhóm.' });
+		}
 
 		if (conversation.group.isApprovalRequired && !conversation.group.admins.some(adminId => adminId.toString() === currentUserId)) {
 			let addedCount = 0;
@@ -1192,8 +1270,8 @@ export async function addMembers(req, res) {
 
 		await conversation.save();
 		await conversation.populate([
-			{ path: 'participants.userId', select: 'displayName avatarUrl email bio phone' },
-			{ path: 'lastMessage.senderId', select: 'displayName avatarUrl' }
+			{ path: 'participants.userId', select: CLIENT_PARTICIPANT_SELECT },
+			{ path: 'lastMessage.senderId', select: MESSAGE_SENDER_SELECT }
 		]);
 		const newParticipants = conversation.participants.filter(p =>
 			filteredUserIds.some(id => id.toString() === p.userId._id?.toString())
@@ -1229,17 +1307,17 @@ export async function addMembers(req, res) {
 		});
 
 		const savedMsg = await systemMessage.save();
-		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 
 		updateConversationLastMessage(conversation, finalMsg, currentUserId);
 		await conversation.save();
 
 		// Refresh and populate to ensure full info for socket emit
-		const updatedConversation = await Conversation.findById(conversationId).populate({
+		const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 			path: 'participants.userId',
-			select: 'displayName avatarUrl nickname about status lastSeen'
-		});
+			select: CLIENT_PARTICIPANT_SELECT
+		}));
 
 		emitNewMessage(io, updatedConversation, finalMsg);
 
@@ -1260,7 +1338,7 @@ export async function addMembers(req, res) {
 
 		return res.status(200).json({
 			success: true,
-			conversation
+			conversation: sanitizePopulatedConversation(conversation)
 		});
 
 	} catch (error) {
@@ -1311,15 +1389,15 @@ export async function updateSettings(req, res) {
 			});
 
 			const savedMsg = await systemMessage.save();
-			const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+			const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 			updateConversationLastMessage(conversation, finalMsg, userId);
 			await conversation.save();
 
-			const updatedConversation = await Conversation.findById(conversationId).populate({
+			const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 				path: 'participants.userId',
-				select: 'displayName avatarUrl nickname email bio phone status lastSeen'
-			});
+				select: CLIENT_PARTICIPANT_SELECT
+			}));
 
 			emitNewMessage(io, updatedConversation, finalMsg);
 		}
@@ -1361,9 +1439,12 @@ export async function handleApproval(req, res) {
 
 		if (action === 'approve') {
 			if (!conversation.participants.some(p => p.userId.toString() === userId.toString())) {
-				const memberToAdd = await User.findById(userId).select('displayName avatarUrl');
-				const addedByUser = await User.findById(originalAddedById).select('displayName avatarUrl');
+				const memberToAdd = await User.findById(userId).select('displayName avatarUrl lock');
+				const addedByUser = sanitizeParticipantUser(await User.findById(originalAddedById).select('displayName avatarUrl lock'));
 				if (memberToAdd) {
+					if (memberToAdd.lock?.isLocked) {
+						return res.status(423).json({ message: 'Không thể duyệt tài khoản đã bị khóa vào nhóm.' });
+					}
 					conversation.participants.push({
 						userId: memberToAdd._id,
 						userInfo: { displayName: memberToAdd.displayName, avatarUrl: memberToAdd.avatarUrl },
@@ -1388,7 +1469,7 @@ export async function handleApproval(req, res) {
 							addedByName: addedByUser ? addedByUser.displayName : 'Một người dùng',
 							addedByInfo: {
 								displayName: addedByUser ? addedByUser.displayName : 'Một người dùng',
-								avatarUrl: addedByUser?.avatarUrl || null
+							avatarUrl: addedByUser?.avatarUrl || null
 							},
 							addedUserIds: [memberToAdd._id],
 							addedUserNames: memberToAdd.displayName,
@@ -1398,15 +1479,15 @@ export async function handleApproval(req, res) {
 					});
 
 					const savedMsg = await systemMessage.save();
-					const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+					const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 					updateConversationLastMessage(conversation, finalMsg, currentUserId);
 					await conversation.save();
 
-					const updatedConversation = await Conversation.findById(conversationId).populate({
+					const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 						path: 'participants.userId',
-						select: 'displayName avatarUrl nickname email bio phone status lastSeen'
-					});
+						select: CLIENT_PARTICIPANT_SELECT
+					}));
 
 					emitNewMessage(io, updatedConversation, finalMsg);
 					io.to(conversationId.toString()).emit('members-added', { conversationId, conversation: updatedConversation });
@@ -1437,8 +1518,8 @@ export async function getApprovalQueue(req, res) {
 		const userId = req.user._id.toString();
 
 		const conversation = await Conversation.findById(conversationId)
-			.populate('group.approvalQueue.userId', 'displayName avatarUrl email')
-			.populate('group.approvalQueue.addedBy', 'displayName avatarUrl');
+			.populate('group.approvalQueue.userId', 'displayName avatarUrl email lock')
+			.populate('group.approvalQueue.addedBy', 'displayName avatarUrl lock');
 
 		if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
 		if (conversation.type !== 'group') return res.status(400).json({ message: 'Not a group.' });
@@ -1446,7 +1527,16 @@ export async function getApprovalQueue(req, res) {
 			return res.status(403).json({ message: 'Only admins can view the queue.' });
 		}
 
-		return res.status(200).json({ success: true, queue: conversation.group.approvalQueue });
+		const queue = conversation.group.approvalQueue.map((item) => {
+			const raw = item.toObject?.() || item;
+			return {
+				...raw,
+				userId: sanitizeParticipantUser(item.userId),
+				addedBy: sanitizeParticipantUser(item.addedBy),
+			};
+		});
+
+		return res.status(200).json({ success: true, queue });
 	} catch (error) {
 		console.error('Error getting approval queue:', error);
 		res.status(500).json({ message: 'Internal server error' });
@@ -1487,7 +1577,7 @@ export async function removeMember(req, res) {
 		if (memberIndex === -1) {
 			return res.status(404).json({ message: 'Member not found in group.' });
 		}
-		const kickedUser = await User.findById(memberId).select('displayName avatarUrl');
+		const kickedUser = sanitizeParticipantUser(await User.findById(memberId).select('displayName avatarUrl lock'));
 		// Remove from participants and unread counts
 		conversation.participants.splice(memberIndex, 1);
 		conversation.unreadCounts.delete(memberId);
@@ -1509,15 +1599,15 @@ export async function removeMember(req, res) {
 		});
 
 		const savedMsg = await systemMessage.save();
-		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 		updateConversationLastMessage(conversation, finalMsg, adminId);
 		await conversation.save();
 
-		const updatedConversation = await Conversation.findById(conversationId).populate({
+		const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 			path: 'participants.userId',
-			select: 'displayName avatarUrl nickname email bio phone status lastSeen'
-		});
+			select: CLIENT_PARTICIPANT_SELECT
+		}));
 
 		emitNewMessage(io, updatedConversation, finalMsg);
 
@@ -1546,7 +1636,7 @@ async function transferAdmin(conversation, newAdminId) {
 
 	await conversation.save();
 
-	const newAdmin = await User.findById(newAdminId).select('displayName avatarUrl');
+	const newAdmin = sanitizeParticipantUser(await User.findById(newAdminId).select('displayName avatarUrl lock'));
 
 	return {
 		displayName: newAdmin?.displayName || 'Người dùng',
@@ -1580,6 +1670,11 @@ export async function transferAdminRole(req, res) {
 			return res.status(400).json({ message: 'User is not a participant in this group.' });
 		}
 
+		const targetAdmin = await User.findById(memberId).select('lock').lean();
+		if (targetAdmin?.lock?.isLocked) {
+			return res.status(423).json({ message: 'Không thể chuyển quyền trưởng nhóm cho tài khoản đã bị khóa.' });
+		}
+
 		const appointedUserInfo = await transferAdmin(conversation, memberId);
 		const appointedByInfo = {
 			displayName: req.user.displayName,
@@ -1605,15 +1700,15 @@ export async function transferAdminRole(req, res) {
 		});
 
 		const savedMsg = await systemMessage.save();
-		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', 'displayName avatarUrl');
+		const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 		updateConversationLastMessage(conversation, finalMsg, req.user._id);
 		await conversation.save();
 
-		const updatedConversation = await Conversation.findById(conversationId).populate({
+		const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 			path: 'participants.userId',
-			select: 'displayName avatarUrl nickname email bio phone status lastSeen'
-		});
+			select: CLIENT_PARTICIPANT_SELECT
+		}));
 
 		io.to(conversationId.toString()).emit('admin-transferred', {
 			conversationId,
@@ -1677,14 +1772,18 @@ export async function leaveGroup(req, res) {
 
 			conversation.group.admins = [newAdminParticipant.userId];
 			promotedAdminId = newAdminParticipant.userId.toString();
-			const promotedAdminUser = await User.findById(newAdminParticipant.userId).select('displayName avatarUrl');
+			const promotedAdminUser = await User.findById(newAdminParticipant.userId).select('displayName avatarUrl lock');
+			if (promotedAdminUser?.lock?.isLocked) {
+				return res.status(423).json({ message: 'Không thể chuyển quyền trưởng nhóm cho tài khoản đã bị khóa.' });
+			}
+			const safePromotedAdminUser = sanitizeParticipantUser(promotedAdminUser);
 			promotedAdminName =
 				newAdminParticipant.userInfo?.displayName ||
-				promotedAdminUser?.displayName ||
+				safePromotedAdminUser?.displayName ||
 				'Một thành viên';
 			promotedAdminAvatarUrl =
 				newAdminParticipant.userInfo?.avatarUrl ||
-				promotedAdminUser?.avatarUrl ||
+				safePromotedAdminUser?.avatarUrl ||
 				null;
 		}
 
@@ -1707,14 +1806,14 @@ export async function leaveGroup(req, res) {
 			});
 
 			const savedLeaveMsg = await leaveMessage.save();
-			const finalLeaveMsg = await Message.findById(savedLeaveMsg._id).populate('senderId', 'displayName avatarUrl');
+			const finalLeaveMsg = await Message.findById(savedLeaveMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 			updateConversationLastMessage(conversation, finalLeaveMsg, userId);
 			await conversation.save();
 
-			const updatedConversationForLeave = await Conversation.findById(conversationId).populate({
+			const updatedConversationForLeave = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 				path: 'participants.userId',
-				select: 'displayName avatarUrl nickname email bio phone status lastSeen'
-			});
+				select: CLIENT_PARTICIPANT_SELECT
+			}));
 
 			emitNewMessage(io, updatedConversationForLeave, finalLeaveMsg);
 
@@ -1735,14 +1834,14 @@ export async function leaveGroup(req, res) {
 				});
 
 				const savedTransferMsg = await transferMessage.save();
-				const finalTransferMsg = await Message.findById(savedTransferMsg._id).populate('senderId', 'displayName avatarUrl');
+				const finalTransferMsg = await Message.findById(savedTransferMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 				updateConversationLastMessage(conversation, finalTransferMsg, userId);
 				await conversation.save();
 
-				const updatedConversationForTransfer = await Conversation.findById(conversationId).populate({
+				const updatedConversationForTransfer = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 					path: 'participants.userId',
-					select: 'displayName avatarUrl nickname email bio phone status lastSeen'
-				});
+					select: CLIENT_PARTICIPANT_SELECT
+				}));
 
 				emitNewMessage(io, updatedConversationForTransfer, finalTransferMsg);
 			}
@@ -1750,10 +1849,10 @@ export async function leaveGroup(req, res) {
 			await conversation.save();
 		}
 
-		const updatedConversation = await Conversation.findById(conversationId).populate({
+		const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
 			path: 'participants.userId',
-			select: 'displayName avatarUrl nickname email bio phone status lastSeen'
-		});
+			select: CLIENT_PARTICIPANT_SELECT
+		}));
 
 		if (silent) {
 			const adminIds = Array.from(new Set((conversation.group?.admins || []).map((id) => id.toString())));
@@ -1775,7 +1874,7 @@ export async function leaveGroup(req, res) {
 			});
 
 			const savedSilentMsg = await silentLeaveMessage.save();
-			const finalSilentMsg = await Message.findById(savedSilentMsg._id).populate('senderId', 'displayName avatarUrl');
+			const finalSilentMsg = await Message.findById(savedSilentMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
 			const payloadMessage = typeof finalSilentMsg.toObject === 'function' ? finalSilentMsg.toObject() : { ...finalSilentMsg };
 			if (payloadMessage.metadata instanceof Map) {

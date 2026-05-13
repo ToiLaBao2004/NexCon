@@ -17,15 +17,24 @@ export interface ViolationSummary {
   source: "redis" | "mongo-cache";
 }
 
+export interface AdminAssetCounts {
+  image: number;
+  file: number;
+  link: number;
+  audio: number;
+  total: number;
+}
+
 export interface AdminUser extends User {
   online?: boolean;
   violationSummary?: ViolationSummary;
   openReportCount?: number;
+  assetCounts?: AdminAssetCounts;
   counters?: {
     reports: Array<{ _id: { targetType: ReportTargetType; status: ReportStatus }; count: number }>;
-    conversations: number;
-    messages: number;
-    assets: number;
+    groups: number;
+    assets: AdminAssetCounts;
+    resolvedReports: number;
   };
 }
 
@@ -50,17 +59,12 @@ export interface AdminAuditLog {
 
 export interface AdminConversation {
   _id: string;
-  type: "direct" | "group";
+  type: "group";
   group?: { name?: string; avatarUrl?: string };
   disbanded?: boolean;
   participantCount: number;
-  participants: Array<{ userId: string; displayName?: string; avatarUrl?: string; joinedAt?: string }>;
-  lastMessage?: {
-    content?: string;
-    type?: string;
-    createdAt?: string;
-    senderInfo?: { displayName?: string };
-  };
+  joinedAt?: string | null;
+  role?: "admin" | "member";
   createdAt: string;
   updatedAt: string;
 }
@@ -100,6 +104,7 @@ export interface AdminReport {
     createdAt?: string;
     senderInfo?: { displayName?: string; avatarUrl?: string } | null;
   } | null;
+  messageEvidence?: AdminMessage | null;
   review?: { note?: string; reviewedAt?: string | null };
   resolution?: {
     decision?: "violation" | "no_violation" | null;
@@ -165,6 +170,11 @@ export const adminService = {
     const query = new URLSearchParams({ limit: "50", type });
     const res = await api.get(`/admin/users/${userId}/assets?${query.toString()}`);
     return res.data as { assets: AdminMessage[]; pagination: Pagination };
+  },
+
+  async getUserResolvedReports(userId: string) {
+    const res = await api.get(`/admin/users/${userId}/resolved-reports?limit=50`);
+    return res.data as { reports: AdminReport[]; pagination: Pagination };
   },
 
   async addUserViolation(userId: string, reason: string) {

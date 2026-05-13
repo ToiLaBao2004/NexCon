@@ -583,7 +583,10 @@ export async function submitLockedAppeal(req, res) {
         }).sort({ createdAt: -1 });
 
         if (existing) {
-            return res.status(200).json({ message: 'Kháng cáo của bạn đang chờ admin xem xét.' });
+            return res.status(409).json({
+                code: 'PENDING_APPEAL_EXISTS',
+                message: 'Bạn đã có một kháng cáo đang chờ xem xét. Vui lòng chờ kết quả trước khi gửi kháng cáo mới.',
+            });
         }
 
         await LockAppeal.create({

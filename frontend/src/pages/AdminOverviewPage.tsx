@@ -1,47 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Activity,
-  Archive,
-  FileText,
-  Loader2,
-  Lock,
-  MessageSquare,
-  RefreshCw,
-  Search,
-  ShieldAlert,
-  Unlock,
-  Users,
-} from "lucide-react";
+import { useEffect, useMemo, useState, type UIEvent } from "react";
+import { Archive, FileText, Images, LinkIcon, Loader2, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
 import { toast } from "sonner";
+import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import {
-  adminService,
-  type AdminAuditLog,
-  type AdminConversation,
-  type AdminMessage,
-  type AdminStats,
-  type AdminUser,
-} from "@/services/adminService";
-
-type EvidenceTab = "profile" | "conversations" | "audit" | "messages" | "assets";
-
-const evidenceTabs: Array<{ value: EvidenceTab; label: string; icon: typeof Users }> = [
-  { value: "profile", label: "Hồ sơ", icon: Users },
-  { value: "conversations", label: "Nhóm / hội thoại", icon: MessageSquare },
-  { value: "audit", label: "Audit API", icon: Activity },
-  { value: "messages", label: "Tin nhắn", icon: FileText },
-  { value: "assets", label: "File / ảnh / link", icon: Archive },
-];
+import { adminService, type AdminStats, type AdminUser, type Pagination } from "@/services/adminService";
 
 function formatDate(value?: string | null) {
   if (!value) return "Chưa có";
-  return new Date(value).toLocaleString("vi-VN", {
-    hour: "2-digit",
-    minute: "2-digit",
+  return new Date(value).toLocaleDateString("vi-VN", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -56,88 +25,50 @@ function userLabel(user: AdminUser) {
   return user.displayName || user.email;
 }
 
+function counts(user: AdminUser) {
+  return user.assetCounts || { image: 0, file: 0, link: 0, audio: 0, total: 0 };
+}
+
 export default function AdminOverviewPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
   const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [activeTab, setActiveTab] = useState<EvidenceTab>("profile");
+  const [appliedSearch, setAppliedSearch] = useState("");
   const [loadingUsers, setLoadingUsers] = useState(true);
-  const [loadingPanel, setLoadingPanel] = useState(false);
-  const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
-  const [conversations, setConversations] = useState<AdminConversation[]>([]);
-  const [messages, setMessages] = useState<AdminMessage[]>([]);
-  const [assets, setAssets] = useState<AdminMessage[]>([]);
-  const [manualReason, setManualReason] = useState("");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [drawerUserId, setDrawerUserId] = useState<string | null>(null);
 
-  const listSelectedUser = useMemo(
-    () => users.find((user) => user._id === selectedId) || null,
-    [selectedId, users]
+  const drawerUser = useMemo(
+    () => users.find((user) => user._id === drawerUserId) || null,
+    [drawerUserId, users]
   );
-  const currentUser = selectedUser || listSelectedUser;
+
+  const hasMore = pagination ? pagination.page < pagination.totalPages : false;
 
   const loadStats = async () => {
     const result = await adminService.getStats();
     setStats(result.stats);
   };
 
-  const loadUsers = async () => {
+  const loadUsers = async ({ page = 1, append = false, query = appliedSearch } = {}) => {
     try {
-      setLoadingUsers(true);
-      const result = await adminService.listUsers({ search, limit: 50 });
-      setUsers(result.users);
-      if (!selectedId && result.users[0]) {
-        setSelectedId(result.users[0]._id);
-      }
+      if (append) setLoadingMore(true);
+      else setLoadingUsers(true);
+
+      const result = await adminService.listUsers({ search: query, page, limit: 20 });
+      setUsers((current) => (append ? [...current, ...result.users] : result.users));
+      setPagination(result.pagination);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải danh sách user");
+      toast.error(error?.response?.data?.message || "Không thể tải danh sách người dùng");
     } finally {
       setLoadingUsers(false);
+      setLoadingMore(false);
     }
   };
 
-  const loadSelectedProfile = async (userId: string) => {
-    try {
-      setLoadingPanel(true);
-      const result = await adminService.getUserProfile(userId);
-      setSelectedUser(result.user);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải hồ sơ user");
-    } finally {
-      setLoadingPanel(false);
-    }
-  };
-
-  const loadEvidence = async (tab: EvidenceTab, userId: string) => {
-    if (tab === "profile") {
-      await loadSelectedProfile(userId);
-      return;
-    }
-
-    try {
-      setLoadingPanel(true);
-      if (tab === "audit") {
-        const result = await adminService.getUserAuditLogs(userId);
-        setAuditLogs(result.logs);
-      }
-      if (tab === "conversations") {
-        const result = await adminService.getUserConversations(userId);
-        setConversations(result.conversations);
-      }
-      if (tab === "messages") {
-        const result = await adminService.getUserMessages(userId);
-        setMessages(result.messages);
-      }
-      if (tab === "assets") {
-        const result = await adminService.getUserAssets(userId);
-        setAssets(result.assets);
-      }
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải dữ liệu");
-    } finally {
-      setLoadingPanel(false);
-    }
+  const refresh = async () => {
+    await Promise.all([loadStats(), loadUsers({ page: 1, append: false })]);
   };
 
   useEffect(() => {
@@ -146,61 +77,38 @@ export default function AdminOverviewPage() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void loadUsers();
-    }, 250);
+      setAppliedSearch(search.trim());
+    }, 300);
     return () => window.clearTimeout(timer);
   }, [search]);
 
   useEffect(() => {
-    if (!selectedId) return;
-    setActiveTab("profile");
-    setAuditLogs([]);
-    setConversations([]);
-    setMessages([]);
-    setAssets([]);
-    void loadSelectedProfile(selectedId);
-  }, [selectedId]);
+    void loadUsers({ page: 1, append: false, query: appliedSearch });
+  }, [appliedSearch]);
 
-  const handleTabClick = (tab: EvidenceTab) => {
-    setActiveTab(tab);
-    if (selectedId) {
-      void loadEvidence(tab, selectedId);
+  const loadMore = async () => {
+    if (!pagination || loadingMore || loadingUsers || !hasMore) return;
+    await loadUsers({ page: pagination.page + 1, append: true });
+  };
+
+  const handleScroll = (event: UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget;
+    if (target.scrollTop + target.clientHeight >= target.scrollHeight - 240) {
+      void loadMore();
     }
-  };
-
-  const refreshCurrentUser = async () => {
-    if (!selectedId) return;
-    await Promise.all([loadUsers(), loadSelectedProfile(selectedId), loadStats()]);
-  };
-
-  const handleManualViolation = async () => {
-    if (!selectedId || !manualReason.trim()) return;
-    await adminService.addUserViolation(selectedId, manualReason.trim());
-    toast.success("Đã ghi nhận vi phạm");
-    setManualReason("");
-    await refreshCurrentUser();
-  };
-
-  const handleLockToggle = async () => {
-    if (!selectedId) return;
-    if (locked(currentUser)) {
-      await adminService.unlockUser(selectedId, "Admin mở khóa sau khi xem xét bằng chứng.", true);
-      toast.success("Đã mở khóa tài khoản");
-    } else {
-      await adminService.lockUser(selectedId, manualReason.trim() || "Admin khóa tài khoản sau khi xem xét bằng chứng.");
-      toast.success("Đã khóa tài khoản");
-    }
-    await refreshCurrentUser();
   };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header className="shrink-0 border-b border-border/70 px-4 py-4 md:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-normal">Tổng quan admin</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Chọn từng user để mở hồ sơ, hội thoại, audit API, tin nhắn và tài nguyên đã gửi.
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="size-5 text-primary" />
+              <h1 className="text-2xl font-semibold tracking-normal">Tổng quan admin</h1>
+            </div>
+            <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+              Danh sách người dùng chỉ hiển thị thông tin tổng quan. Chi tiết, nhóm, file, ảnh và link được tải khi admin mở từng hồ sơ.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -213,10 +121,10 @@ export default function AdminOverviewPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <aside className="min-h-0 border-b border-border/70 lg:border-b-0 lg:border-r">
-          <div className="border-b border-border/70 p-3">
-            <div className="relative">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 border-b border-border/70 px-4 py-3 md:px-6">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="relative w-full md:max-w-md">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -225,111 +133,116 @@ export default function AdminOverviewPage() {
                 className="h-10 pl-9"
               />
             </div>
+            <Button variant="outline" className="rounded-md" onClick={() => void refresh()}>
+              <RefreshCw className="size-4" />
+              Làm mới
+            </Button>
           </div>
+        </div>
 
-          <div className="beautiful-scrollbar h-[34vh] overflow-y-auto lg:h-full">
-            {loadingUsers ? (
-              <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Đang tải user
-              </div>
-            ) : users.length === 0 ? (
-              <div className="p-6 text-center text-sm text-muted-foreground">Không có user phù hợp.</div>
-            ) : (
-              users.map((user) => (
-                <button
-                  key={user._id}
-                  type="button"
-                  onClick={() => setSelectedId(user._id)}
-                  className={cn(
-                    "flex w-full items-start gap-3 border-b border-border/60 px-4 py-3 text-left transition-colors hover:bg-muted/50",
-                    selectedId === user._id && "bg-muted"
-                  )}
-                >
-                  <span className={cn("mt-1 size-2.5 rounded-full", user.online ? "bg-emerald-500" : "bg-muted-foreground/35")} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{userLabel(user)}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
-                    <span className="mt-2 flex flex-wrap gap-1">
-                      {locked(user) && <Badge variant="destructive">Locked</Badge>}
-                      {(user.openReportCount || 0) > 0 && <Badge variant="outline">{user.openReportCount} report</Badge>}
-                      <Badge variant="secondary">{user.violationSummary?.count ?? user.moderation?.violationCountCache ?? 0}/{user.violationSummary?.threshold ?? 5}</Badge>
-                    </span>
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
-        </aside>
-
-        <section className="min-h-0 overflow-hidden">
-          {!currentUser ? (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              Chọn một user để xem dữ liệu.
+        <div className="beautiful-scrollbar min-h-0 flex-1 overflow-y-auto p-4 md:p-6" onScroll={handleScroll}>
+          {loadingUsers ? (
+            <div className="flex min-h-60 items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Đang tải danh sách người dùng
+            </div>
+          ) : users.length === 0 ? (
+            <div className="flex min-h-60 items-center justify-center rounded-md border border-border/70 text-sm text-muted-foreground">
+              Không có người dùng phù hợp.
             </div>
           ) : (
-            <div className="flex h-full min-h-0 flex-col">
-              <div className="shrink-0 border-b border-border/70 px-4 py-3 md:px-5">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="truncate text-lg font-semibold">{userLabel(currentUser)}</h2>
-                      <Badge variant={currentUser.online ? "default" : "outline"}>{currentUser.online ? "Online" : "Offline"}</Badge>
-                      {locked(currentUser) && <Badge variant="destructive">Đang khóa</Badge>}
+            <div className="mx-auto w-full max-w-7xl overflow-hidden rounded-md border border-border/70">
+              <div className="hidden grid-cols-[minmax(220px,1.2fr)_minmax(260px,1fr)_130px_120px_92px] gap-4 border-b border-border/70 bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid">
+                <span>Người dùng</span>
+                <span>Tài nguyên</span>
+                <span>Report mở</span>
+                <span>Tham gia</span>
+                <span />
+              </div>
+              {users.map((user) => {
+                const c = counts(user);
+                return (
+                  <div
+                    key={user._id}
+                    className="grid gap-3 border-b border-border/60 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(220px,1.2fr)_minmax(260px,1fr)_130px_120px_92px] lg:items-center"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="relative shrink-0">
+                        {user.avatarUrl ? (
+                          <img src={user.avatarUrl} alt={userLabel(user)} className="size-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="flex size-10 items-center justify-center rounded-full bg-muted text-sm font-semibold">
+                            {userLabel(user).slice(0, 1).toUpperCase()}
+                          </div>
+                        )}
+                        <span
+                          className={cn(
+                            "absolute bottom-0 right-0 size-2.5 rounded-full ring-2 ring-background",
+                            user.online ? "bg-emerald-500" : "bg-muted-foreground/35"
+                          )}
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="truncate font-medium">{userLabel(user)}</span>
+                          {locked(user) && <Badge variant="destructive">Đang khóa</Badge>}
+                        </div>
+                        <div className="truncate text-sm text-muted-foreground">{user.email}</div>
+                      </div>
                     </div>
-                    <p className="mt-1 truncate text-sm text-muted-foreground">{currentUser.email}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {evidenceTabs.map((tab) => {
-                      const Icon = tab.icon;
-                      return (
-                        <Button
-                          key={tab.value}
-                          variant={activeTab === tab.value ? "default" : "outline"}
-                          size="sm"
-                          className="h-9 rounded-md"
-                          onClick={() => handleTabClick(tab.value)}
-                        >
-                          <Icon className="size-4" />
-                          {tab.label}
-                        </Button>
-                      );
-                    })}
-                    <Button variant="outline" size="sm" className="h-9 rounded-md" onClick={() => void refreshCurrentUser()}>
-                      <RefreshCw className="size-4" />
+
+                    <div className="flex flex-wrap gap-2">
+                      <AssetBadge icon={Images} label="ảnh" value={c.image} />
+                      <AssetBadge icon={PaperclipIcon} label="file" value={c.file} />
+                      <AssetBadge icon={LinkIcon} label="link" value={c.link} />
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(user.openReportCount || 0) > 0 ? (
+                        <Badge variant="destructive">{user.openReportCount} report</Badge>
+                      ) : (
+                        <Badge variant="outline">0 report</Badge>
+                      )}
+                      <Badge variant="secondary">
+                        {user.violationSummary?.count ?? user.moderation?.violationCountCache ?? 0}/{user.violationSummary?.threshold ?? 5}
+                      </Badge>
+                    </div>
+
+                    <div className="text-sm text-muted-foreground">{formatDate(user.createdAt)}</div>
+
+                    <Button className="w-fit rounded-md" size="sm" onClick={() => setDrawerUserId(user._id)}>
+                      Xem
                     </Button>
                   </div>
-                </div>
-              </div>
-
-              <div className="beautiful-scrollbar min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
-                {loadingPanel ? (
-                  <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-                    <Loader2 className="mr-2 size-4 animate-spin" />
-                    Đang tải dữ liệu
-                  </div>
-                ) : (
-                  <>
-                    {activeTab === "profile" && (
-                      <ProfilePanel
-                        user={currentUser}
-                        manualReason={manualReason}
-                        onManualReasonChange={setManualReason}
-                        onManualViolation={() => void handleManualViolation()}
-                        onLockToggle={() => void handleLockToggle()}
-                      />
-                    )}
-                    {activeTab === "conversations" && <ConversationsPanel conversations={conversations} />}
-                    {activeTab === "audit" && <AuditPanel logs={auditLogs} />}
-                    {activeTab === "messages" && <MessagesPanel messages={messages} />}
-                    {activeTab === "assets" && <MessagesPanel messages={assets} assets />}
-                  </>
-                )}
-              </div>
+                );
+              })}
             </div>
           )}
-        </section>
+
+          {!loadingUsers && users.length > 0 && (
+            <div className="flex justify-center py-4">
+              {hasMore ? (
+                <Button variant="outline" className="rounded-md" disabled={loadingMore} onClick={() => void loadMore()}>
+                  {loadingMore ? <Loader2 className="size-4 animate-spin" /> : <Users className="size-4" />}
+                  Tải thêm
+                </Button>
+              ) : (
+                <span className="text-sm text-muted-foreground">Đã tải hết danh sách.</span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
+
+      <AdminUserDrawer
+        userId={drawerUserId}
+        open={Boolean(drawerUserId)}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setDrawerUserId(null);
+        }}
+        initialUser={drawerUser}
+        onChanged={() => void refresh()}
+      />
     </div>
   );
 }
@@ -343,138 +256,13 @@ function Metric({ label, value }: { label: string; value: number }) {
   );
 }
 
-function ProfilePanel({
-  user,
-  manualReason,
-  onManualReasonChange,
-  onManualViolation,
-  onLockToggle,
-}: {
-  user: AdminUser;
-  manualReason: string;
-  onManualReasonChange: (value: string) => void;
-  onManualViolation: () => void;
-  onLockToggle: () => void;
-}) {
+function AssetBadge({ icon: Icon, label, value }: { icon: typeof Archive; label: string; value: number }) {
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="rounded-md border border-border/70">
-        <div className="border-b border-border/70 px-4 py-3 font-medium">Hồ sơ và trạng thái</div>
-        <div className="grid gap-3 p-4 text-sm md:grid-cols-2">
-          <Info label="Email" value={user.email} />
-          <Info label="Tên hiển thị" value={user.displayName} />
-          <Info label="Số điện thoại" value={user.phone || "Chưa cập nhật"} />
-          <Info label="Ngày tạo" value={formatDate(user.createdAt)} />
-          <Info label="Bio" value={user.bio || "Chưa cập nhật"} />
-          <Info label="Trạng thái khóa" value={locked(user) ? user.lock?.reason || "Đang khóa" : "Bình thường"} />
-          <Info label="Vi phạm hiệu lực" value={`${user.violationSummary?.count ?? user.moderation?.violationCountCache ?? 0}/${user.violationSummary?.threshold ?? 5}`} />
-          <Info label="Lần vi phạm gần nhất" value={formatDate(user.moderation?.lastViolationAt)} />
-        </div>
-      </div>
-
-      <div className="rounded-md border border-border/70">
-        <div className="border-b border-border/70 px-4 py-3 font-medium">Thao tác kiểm duyệt</div>
-        <div className="space-y-3 p-4">
-          <Textarea
-            value={manualReason}
-            onChange={(event) => onManualReasonChange(event.target.value)}
-            placeholder="Ghi chú lý do vi phạm hoặc khóa tài khoản"
-            className="min-h-24 resize-none"
-          />
-          <div className="grid gap-2">
-            <Button className="rounded-md" disabled={!manualReason.trim()} onClick={onManualViolation}>
-              <ShieldAlert className="size-4" />
-              Ghi nhận một lần vi phạm
-            </Button>
-            <Button variant={locked(user) ? "outline" : "destructive"} className="rounded-md" onClick={onLockToggle}>
-              {locked(user) ? <Unlock className="size-4" /> : <Lock className="size-4" />}
-              {locked(user) ? "Mở khóa tài khoản" : "Khóa tài khoản"}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <Badge variant="outline" className="gap-1.5 rounded-md px-2.5 py-1">
+      <Icon className="size-3.5" />
+      {value} {label}
+    </Badge>
   );
 }
 
-function Info({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 break-words font-medium">{value}</div>
-    </div>
-  );
-}
-
-function ConversationsPanel({ conversations }: { conversations: AdminConversation[] }) {
-  if (conversations.length === 0) return <Empty text="User chưa có hội thoại." />;
-
-  return (
-    <div className="overflow-hidden rounded-md border border-border/70">
-      {conversations.map((conversation) => (
-        <div key={conversation._id} className="border-b border-border/60 px-4 py-3 last:border-b-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{conversation.type}</Badge>
-            <span className="font-medium">
-              {conversation.group?.name || (conversation.type === "direct" ? "Hội thoại trực tiếp" : "Nhóm chưa đặt tên")}
-            </span>
-            {conversation.disbanded && <Badge variant="destructive">Đã giải tán</Badge>}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {conversation.participantCount} thành viên · Cập nhật {formatDate(conversation.updatedAt)}
-          </p>
-          <p className="mt-2 line-clamp-2 text-sm">{conversation.lastMessage?.content || conversation.lastMessage?.type || "Chưa có tin nhắn"}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function AuditPanel({ logs }: { logs: AdminAuditLog[] }) {
-  if (logs.length === 0) return <Empty text="Chưa có audit API." />;
-
-  return (
-    <div className="overflow-hidden rounded-md border border-border/70">
-      {logs.map((log) => (
-        <div key={log._id} className="grid gap-2 border-b border-border/60 px-4 py-3 text-sm last:border-b-0 md:grid-cols-[110px_minmax(0,1fr)_100px_160px]">
-          <div className="font-medium">{log.method}</div>
-          <div className="min-w-0 truncate text-muted-foreground">{log.path}</div>
-          <Badge variant={log.statusCode >= 400 ? "destructive" : "outline"}>{log.statusCode}</Badge>
-          <div className="text-xs text-muted-foreground">{formatDate(log.createdAt)}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MessagesPanel({ messages, assets = false }: { messages: AdminMessage[]; assets?: boolean }) {
-  if (messages.length === 0) return <Empty text={assets ? "User chưa gửi file, ảnh hoặc link." : "User chưa gửi tin nhắn."} />;
-
-  return (
-    <div className="overflow-hidden rounded-md border border-border/70">
-      {messages.map((message) => (
-        <div key={message._id} className="border-b border-border/60 px-4 py-3 last:border-b-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{message.type}</Badge>
-            {message.reportStatus && <Badge variant="destructive">Report true</Badge>}
-            <span className="text-xs text-muted-foreground">{formatDate(message.createdAt)}</span>
-          </div>
-          <p className="mt-2 break-words text-sm">{message.preview || message.content || message.fileName || "Không có nội dung"}</p>
-          {message.signedUrl && (
-            <a className="mt-2 inline-flex text-sm text-primary underline-offset-4 hover:underline" href={message.signedUrl} target="_blank" rel="noreferrer">
-              Mở tài nguyên
-            </a>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Empty({ text }: { text: string }) {
-  return (
-    <div className="flex min-h-40 items-center justify-center rounded-md border border-border/70 text-sm text-muted-foreground">
-      {text}
-    </div>
-  );
-}
+const PaperclipIcon = FileText;

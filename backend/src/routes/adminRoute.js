@@ -7,6 +7,7 @@ import {
     getAdminUserConversations,
     getAdminUserMessages,
     getAdminUserProfile,
+    getAdminUserResolvedReports,
     listAdminAppeals,
     listAdminReports,
     listAdminUsers,
@@ -29,6 +30,7 @@ adminRouter.get('/users/:userId/audit-logs', getAdminUserAuditLogs);
 adminRouter.get('/users/:userId/conversations', getAdminUserConversations);
 adminRouter.get('/users/:userId/messages', getAdminUserMessages);
 adminRouter.get('/users/:userId/assets', getAdminUserAssets);
+adminRouter.get('/users/:userId/resolved-reports', getAdminUserResolvedReports);
 adminRouter.post('/users/:userId/violations', addAdminUserViolation);
 adminRouter.post('/users/:userId/lock', lockAdminUser);
 adminRouter.post('/users/:userId/unlock', unlockAdminUser);

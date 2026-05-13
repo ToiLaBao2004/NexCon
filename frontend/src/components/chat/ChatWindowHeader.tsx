@@ -79,9 +79,10 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
     if (!user || !otherUser) return;
   }
 
+  const isOtherUserLocked = Boolean(otherUser?.userId?.isLocked || otherUser?.userId?.lock?.isLocked);
   const displayName =
     chat.type === "direct"
-      ? (otherUser?.userId?.nickname?.trim()
+      ? (!isOtherUserLocked && otherUser?.userId?.nickname?.trim()
         ? otherUser.userId.nickname
         : otherUser?.userId?.displayName) || "Moji"
       : chat.group?.name;
@@ -89,6 +90,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   const canCall =
     chat.type === "direct" &&
     otherUser &&
+    !isOtherUserLocked &&
     callStatus === "idle" &&
     groupCallStatus === "idle";
 

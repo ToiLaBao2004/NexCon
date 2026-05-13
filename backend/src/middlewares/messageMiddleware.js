@@ -1,6 +1,7 @@
 import Conversation from '../models/conversationModel.js';
 import Friend from '../models/friendModel.js';
 import Message from '../models/messageModel.js';
+import User from '../models/userModel.js';
 
 const pair = (a, b) => (a < b ? [a, b] : [b, a]);
 
@@ -10,6 +11,14 @@ export async function checkMessagePermission(req, res, next) {
         const { recipientId, conversationId } = req.body;
 
         if (recipientId) {
+            const recipient = await User.findById(recipientId).select('lock').lean();
+            if (!recipient) {
+                return res.status(404).json({ message: 'Người nhận không tồn tại.' });
+            }
+            if (recipient.lock?.isLocked) {
+                return res.status(423).json({ message: 'Không thể gửi tin nhắn tới tài khoản đã bị khóa.' });
+            }
+
             const [userA, userB] = pair(senderId, recipientId);
             const friendship = await Friend.findOne({ userA, userB });
             if (!friendship) {
@@ -33,6 +42,18 @@ export async function checkMessagePermission(req, res, next) {
 
             if (conversation.type === 'group' && conversation.disbanded === true) {
                 return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
+            }
+
+            if (conversation.type === 'direct') {
+                const otherParticipant = conversation.participants.find(
+                    (p) => p.userId.toString() !== senderId
+                );
+                if (otherParticipant) {
+                    const recipient = await User.findById(otherParticipant.userId).select('lock').lean();
+                    if (recipient?.lock?.isLocked) {
+                        return res.status(423).json({ message: 'Không thể gửi tin nhắn tới tài khoản đã bị khóa.' });
+                    }
+                }
             }
 
             const isMember = conversation.participants.some(

@@ -780,6 +780,51 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       },
     );
 
+    socket.on("message-moderated", ({ conversationId, messageId, reportStatus, content }) => {
+      const targetConversationId = conversationId?.toString?.() || conversationId;
+      const targetMessageId = messageId?.toString?.() || messageId;
+      if (!targetConversationId || !targetMessageId) return;
+
+      useChatStore.setState((state) => {
+        const currentMessages = state.messages[targetConversationId];
+        const nextMessages = currentMessages
+          ? {
+            ...state.messages,
+            [targetConversationId]: {
+              ...currentMessages,
+              items: currentMessages.items.map((message) =>
+                String(message._id) === String(targetMessageId)
+                  ? {
+                    ...message,
+                    reportStatus: Boolean(reportStatus),
+                    content: content || "Tin nhắn vi phạm tiêu chuẩn cộng đồng",
+                    reactions: [],
+                  }
+                  : message
+              ),
+              pinnedMessages: currentMessages.pinnedMessages.filter(
+                (message) => String(message._id) !== String(targetMessageId)
+              ),
+            },
+          }
+          : state.messages;
+
+        return {
+          messages: nextMessages,
+          conversations: state.conversations.map((conversation) => {
+            if (String(conversation._id) !== String(targetConversationId)) return conversation;
+            if (String(conversation.lastMessage?._id) !== String(targetMessageId)) return conversation;
+            return {
+              ...conversation,
+              lastMessage: conversation.lastMessage
+                ? { ...conversation.lastMessage, content: content || "Tin nhắn vi phạm tiêu chuẩn cộng đồng" }
+                : conversation.lastMessage,
+            };
+          }),
+        };
+      });
+    });
+
     socket.on("pin-message", (payload) => {
       const { pinMessageLocal } = useChatStore.getState();
 

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Message from '../models/messageModel.js';
+import User from '../models/userModel.js';
 import BlockUser from '../models/blockUserModel.js';
 import Conversation from '../models/conversationModel.js';
 import { emitNewMessage, updateConversationLastMessage, generateSignedUrl, replaceMentionTags } from '../utils/messageHelper.js';
@@ -23,8 +24,18 @@ import { sendPushToUser } from '../services/pushNotificationService.js';
 import { transcribeAudioFromBuffer } from '../services/audio/transcribeAudio.js';
 import { moderateImageMessage } from '../services/moderation/imageModerationService.js';
 import { registerViolation } from '../services/moderation/violationService.js';
+import { maskLockedUserDoc } from '../utils/lockedUser.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
+
+function maskPopulatedSender(message) {
+    const raw = message?.toObject ? message.toObject() : message;
+    if (!raw?.senderId || typeof raw.senderId !== 'object') return raw;
+    return {
+        ...raw,
+        senderId: maskLockedUserDoc(raw.senderId),
+    };
+}
 
 async function respondWithModerationBlock(req, res, moderationResult, message, messageType) {
     const violation = await registerViolation({
@@ -457,7 +468,7 @@ export async function sendMessage(req, res) {
         if (message.replyTo) {
             message = await message.populate({
                 path: 'replyTo',
-                select: '_id senderId type content fileName isRecalled',
+                select: '_id senderId type content fileName isRecalled reportStatus',
                 populate: { path: 'senderId', select: 'displayName' },
             });
         }
@@ -712,6 +723,10 @@ export async function pinMessage(req, res) {
             return res.status(404).json({ message: 'Không tìm thấy tin nhắn.' });
         }
 
+        if (message.reportStatus) {
+            return res.status(403).json({ message: 'Không thể ghim tin nhắn đã bị xác nhận vi phạm.' });
+        }
+
         const conversation = req.conversation || await Conversation.findById(message.conversationId);
         if (!conversation) {
             return res.status(404).json({ message: 'Không tìm thấy cuộc trò chuyện.' });
@@ -858,6 +873,7 @@ export async function searchMessages(req, res) {
             conversationId,
             searchContent: { $regex: normalizeVietnamese(q), $options: 'i' },
             isRecalled: { $ne: true },
+            reportStatus: { $ne: true },
             $or: [
                 { 'metadata.visibleToUserIds': { $exists: false } },
                 { 'metadata.visibleToUserIds': { $size: 0 } },
@@ -884,15 +900,20 @@ export async function searchMessages(req, res) {
 
         const messages = await Message.find(filter)
             .sort({ createdAt: -1 })
-            .populate('senderId', 'displayName avatarUrl')
+            .populate('senderId', 'displayName avatarUrl lock')
             .populate({
                 path: 'replyTo',
-                select: '_id senderId type content fileName isRecalled',
-                populate: { path: 'senderId', select: 'displayName' },
+                select: '_id senderId type content fileName isRecalled reportStatus',
+                populate: { path: 'senderId', select: 'displayName avatarUrl lock' },
             })
             .lean();
 
-        return res.status(200).json({ messages });
+        return res.status(200).json({
+            messages: messages.map((message) => ({
+                ...maskPopulatedSender(message),
+                replyTo: message.replyTo ? maskPopulatedSender(message.replyTo) : message.replyTo,
+            })),
+        });
     } catch (error) {
         console.error('Error searching messages:', error);
         return res.status(500).json({ message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™.' });
@@ -918,6 +939,7 @@ export async function getMentionMessages(req, res) {
         const query = {
             conversationId: { $in: conversationIds },
             'mentions.userId': userId,
+            reportStatus: { $ne: true },
         };
 
         if (before) {
@@ -955,11 +977,11 @@ export async function getMentionMessages(req, res) {
             .sort({ createdAt: -1, _id: -1 })
             .limit(limitNumber + 1)
             .populate('conversationId', 'type group.name group.avatarUrl')
-            .populate('senderId', 'displayName avatarUrl')
+            .populate('senderId', 'displayName avatarUrl lock')
             .lean();
 
         const hasMore = messages.length > limitNumber;
-        const items = hasMore ? messages.slice(0, limitNumber) : messages;
+        const items = (hasMore ? messages.slice(0, limitNumber) : messages).map(maskPopulatedSender);
         const nextCursor = hasMore ? items[items.length - 1]?._id?.toString() || null : null;
 
         return res.status(200).json({
@@ -1003,6 +1025,9 @@ export async function reactToMessage(req, res) {
         }
 
         const { message, conversation } = req;
+        if (message.reportStatus) {
+            return res.status(403).json({ message: 'Không thể tương tác với tin nhắn đã bị xác nhận vi phạm.' });
+        }
 
         if (conversation.type === 'direct') {
             const otherParticipant = conversation.participants.find(p => p.userId.toString() !== req.user._id.toString());
@@ -1065,6 +1090,10 @@ export async function getSignedMediaUrl(req, res) {
             return res.status(404).json({ message: 'Tin nhắn không có file đính kèm.' });
         }
 
+        if (message.reportStatus) {
+            return res.status(403).json({ message: 'Tài nguyên này đã bị ẩn do vi phạm tiêu chuẩn cộng đồng.' });
+        }
+
         const conversation = await Conversation.findOne({
             _id: message.conversationId,
             'participants.userId': req.user._id
@@ -1105,6 +1134,9 @@ export async function forwardMessage(req, res) {
         }
         if (source.isRecalled) {
             return res.status(400).json({ message: 'Không thể chuyển tiếp tin nhắn đã thu hồi.' });
+        }
+        if (source.reportStatus) {
+            return res.status(403).json({ message: 'Không thể chuyển tiếp tin nhắn đã bị xác nhận vi phạm.' });
         }
         if (source.type === 'system') {
             return res.status(400).json({ message: 'Không thể chuyển tiếp tin nhắn hệ thống.' });
@@ -1156,6 +1188,11 @@ export async function forwardMessage(req, res) {
                 if (targetConvo.type === 'direct') {
                     const otherParticipant = targetConvo.participants.find(p => p.userId.toString() !== senderId.toString());
                     if (otherParticipant) {
+                        const recipient = await User.findById(otherParticipant.userId).select('lock').lean();
+                        if (recipient?.lock?.isLocked) {
+                            errors.push({ conversationId: targetConvoId, reason: 'Không thể chuyển tiếp tới tài khoản đã bị khóa.' });
+                            continue;
+                        }
                         const blockExists = await BlockUser.findOne({
                             $or: [
                                 { from: senderId, to: otherParticipant.userId },

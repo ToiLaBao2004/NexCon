@@ -100,6 +100,9 @@ export const useAuthStore = create<AuthState>()(
           useNotificationStore.getState().fetchNotifications();
         }
       } catch (error: any) {
+        if (error.response?.status === 423 || error.response?.data?.locked) {
+          throw error;
+        }
         console.error('Lỗi khi đăng nhập:', error);
         if (error.response?.data?.message) {
           toast.error(error.response.data.message);

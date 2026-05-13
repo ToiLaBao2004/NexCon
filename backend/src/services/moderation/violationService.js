@@ -17,6 +17,10 @@ function normalizeReason(reason) {
     return String(reason || 'Vi phạm tiêu chuẩn cộng đồng.').trim().slice(0, 1000);
 }
 
+function buildLockNotice() {
+    return 'Tài khoản của bạn đã bị khóa sau khi chúng tôi xem xét vi phạm. Nếu cho rằng quyết định này nhầm lẫn, bạn có thể gửi kháng cáo từ màn hình đăng nhập.';
+}
+
 async function pruneExpiredViolations(userId) {
     if (!isRedisReady) return;
     const minScore = Date.now() - VIOLATION_DECAY_MS;
@@ -56,6 +60,8 @@ export async function getViolationSummary(userId) {
 
 export async function lockAccount({ userId, adminId = null, reason = '' }) {
     const lockReason = normalizeReason(reason || 'Tài khoản bị khóa do vượt ngưỡng vi phạm.');
+    const current = await User.findById(userId).select('lock').lean();
+    const wasLocked = Boolean(current?.lock?.isLocked);
     const user = await User.findByIdAndUpdate(
         userId,
         {
@@ -77,19 +83,23 @@ export async function lockAccount({ userId, adminId = null, reason = '' }) {
         throw error;
     }
 
-    await Session.deleteMany({ userId: user._id });
-    disconnectUserSockets(user._id, 'account-locked');
+    if (!wasLocked) {
+        await Session.deleteMany({ userId: user._id });
+        disconnectUserSockets(user._id, 'account-locked');
+    }
 
-    await createNotification(
-        user._id,
-        'Tài khoản đã bị khóa',
-        `${lockReason} Bạn có thể gửi kháng cáo từ màn hình đăng nhập.`,
-        `${process.env.FRONTEND_URL}/signin`,
-        {
-            type: 'account-lock',
-            metadata: { reason: lockReason },
-        }
-    );
+    if (!wasLocked) {
+        await createNotification(
+            user._id,
+            'Tài khoản đã bị khóa',
+            buildLockNotice(),
+            `${process.env.FRONTEND_URL}/signin`,
+            {
+                type: 'account-lock',
+                metadata: { reason: lockReason },
+            }
+        );
+    }
 
     return user;
 }
@@ -104,7 +114,7 @@ export async function unlockAccount({ userId, adminId = null, reason = '', reset
             'lock.isLocked': false,
             'lock.unlockedAt': new Date(),
             'lock.unlockedBy': adminId,
-            'lock.reason': normalizeReason(reason || 'Tài khoản đã được mở khóa.'),
+            'lock.reason': null,
             'moderation.violationCountCache': resetViolations ? 0 : undefined,
         },
     };
@@ -129,8 +139,8 @@ export async function unlockAccount({ userId, adminId = null, reason = '', reset
     await createNotification(
         user._id,
         'Tài khoản đã được mở khóa',
-        reason || 'Kháng cáo của bạn đã được chấp nhận. Bạn có thể đăng nhập lại.',
-        `${process.env.FRONTEND_URL}/signin`,
+        'Tài khoản của bạn đã được mở khóa. Bạn có thể tiếp tục sử dụng NexCon.',
+        `${process.env.FRONTEND_URL}/notification`,
         {
             type: 'account-unlock',
             metadata: { resetViolations },
@@ -192,8 +202,8 @@ export async function registerViolation({
     if (notify) {
         await createNotification(
             user._id,
-            'Bạn đã vi phạm tiêu chuẩn cộng đồng',
-            `Vi phạm được ghi nhận: ${normalizedReason}. Số lần vi phạm hiện tại là ${count}/${LOCK_THRESHOLD}.`,
+            'Cảnh báo vi phạm tiêu chuẩn cộng đồng',
+            'Chúng tôi đã xác nhận một vi phạm liên quan đến tài khoản của bạn. Vui lòng xem lại tiêu chuẩn cộng đồng và không tái phạm.',
             `${process.env.FRONTEND_URL}/notification`,
             {
                 type: 'moderation-violation',
@@ -214,7 +224,7 @@ export async function registerViolation({
         await lockAccount({
             userId,
             adminId: actorId,
-            reason: `Tài khoản bị khóa vì đạt ${count}/${LOCK_THRESHOLD} lần vi phạm còn hiệu lực.`,
+            reason: 'Tài khoản bị khóa do có vi phạm lặp lại tiêu chuẩn cộng đồng.',
         });
         locked = true;
     }

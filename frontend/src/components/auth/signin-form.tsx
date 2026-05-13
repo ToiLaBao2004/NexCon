@@ -33,8 +33,9 @@ export function SigninForm({
   const [lockedMessage, setLockedMessage] = useState<string | null>(null);
   const [appealReason, setAppealReason] = useState("");
   const [appealSubmitting, setAppealSubmitting] = useState(false);
+  const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, setError, watch } = useForm<SignInFormValues>({
+  const { register, handleSubmit, formState: { errors, isSubmitting }, setError, clearErrors, watch } = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
   });
 
@@ -42,6 +43,7 @@ export function SigninForm({
     const { email, password } = data;
     try {
       setLockedMessage(null);
+      setHasPendingAppeal(false);
       await signIn(email, password);
       const role = useAuthStore.getState().user?.role;
       navigate(role === "admin" ? "/admin" : "/");
@@ -50,6 +52,8 @@ export function SigninForm({
       const backendMsg = error.response?.data?.message || "Đăng nhập thất bại.";
       if (error.response?.status === 423 || error.response?.data?.locked) {
         setLockedMessage(backendMsg);
+        clearErrors("root");
+        return;
       }
       if (backendMsg.toLowerCase().includes("email")) {
         setError("email", { type: "server", message: backendMsg });
@@ -114,8 +118,12 @@ export function SigninForm({
       await authService.submitLockedAppeal(emailValue, appealReason);
       setLockedMessage("Đã gửi kháng cáo. Vui lòng chờ admin xem xét.");
       setAppealReason("");
+      setHasPendingAppeal(true);
     } catch (error: any) {
       setLockedMessage(error.response?.data?.message || "Không thể gửi kháng cáo.");
+      if (error.response?.data?.code === "PENDING_APPEAL_EXISTS" || error.response?.status === 409) {
+        setHasPendingAppeal(true);
+      }
     } finally {
       setAppealSubmitting(false);
     }
@@ -196,10 +204,10 @@ export function SigninForm({
                     type="button"
                     variant="outline"
                     className="w-full"
-                    disabled={appealSubmitting || appealReason.trim().length < 20}
+                    disabled={hasPendingAppeal || appealSubmitting || appealReason.trim().length < 20}
                     onClick={handleSubmitAppeal}
                   >
-                    Gửi kháng cáo
+                    {hasPendingAppeal ? "Đang chờ xem xét" : "Gửi kháng cáo"}
                   </Button>
                 </div>
               </div>
