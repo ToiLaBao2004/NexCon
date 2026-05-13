@@ -23,6 +23,7 @@ export interface User {
   moderation?: {
     violationCountCache?: number;
     lastViolationAt?: string | null;
+    nextViolationDecayAt?: string | null;
   };
   createdAt?: string;
   updatedAt?: string;
