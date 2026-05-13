@@ -420,7 +420,7 @@ const ChatWindowBody: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-primary-foreground overflow-hidden relative">
+    <div className="flex flex-col h-full bg-chat-surface overflow-hidden relative">
       <PinnedMessagesBanner />
 
       <div

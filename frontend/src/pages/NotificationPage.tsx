@@ -44,7 +44,7 @@ const NotificationPage = () => {
                 <div className="relative z-10 border-b border-border/50 bg-card/80 px-4 py-4 backdrop-blur-sm md:px-6">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                         <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm shadow-primary/20">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0068ff] text-white shadow-sm shadow-[#0068ff]/20">
                                 <Bell className="h-5 w-5" />
                             </div>
                             <div className="min-w-0">

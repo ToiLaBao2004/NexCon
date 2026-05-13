@@ -2,8 +2,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
 @config "../tailwind.config.ts";
+@custom-variant dark (&:is(.dark *));
 
 @layer base {
   :root {
@@ -20,8 +20,8 @@
     --popover-foreground: 222 47% 11%;
 
     /* Primary – BLUE */
-    --primary: 217 91% 60%; /* blue-500 */
-    --primary-foreground: 210 40% 98%;
+    --primary: 215 100% 50%; /* Zalo Blue #0068ff */
+    --primary-foreground: 0 0% 100%;
     --primary-glow: 199 100% 70%; /* cyan */
 
     /* Secondary – light blue */
@@ -121,8 +121,8 @@
     --popover: 222 47% 9%;
     --popover-foreground: 210 40% 96%;
 
-    --primary: 217 100% 70%;
-    --primary-foreground: 222 47% 8%;
+    --primary: 215 100% 60%;
+    --primary-foreground: 0 0% 100%;
     --primary-glow: 199 100% 75%;
 
     --secondary: 217 32% 17%;
@@ -187,6 +187,14 @@
 
   .chat-bubble-received {
     @apply bg-[hsl(var(--chat-bubble-received))] text-[hsl(var(--chat-bubble-received-foreground))] border border-border/50;
+  }
+
+  .bg-chat-surface {
+    background-color: hsl(210 20% 96%);
+  }
+
+  .dark .bg-chat-surface {
+    background-color: hsl(222 47% 10%);
   }
 
   /* Status indicators */
