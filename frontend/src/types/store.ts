@@ -193,6 +193,7 @@ export interface ChatState {
 export interface SocketState {
   socket: Socket | null;
   onlineUsers: string[];
+  connectionStatus: 'idle' | 'connected' | 'reconnecting' | 'disconnected';
   connectSocket: () => void;
   joinConversation: (conversationId: string) => void;
   disconnectSocket: () => void;

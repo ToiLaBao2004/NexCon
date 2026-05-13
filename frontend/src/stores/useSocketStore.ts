@@ -15,6 +15,7 @@ import { useReminderStore } from "./useReminderStore";
 import { showReminderToast } from "@/components/reminder/showReminderToast";
 import { useMeetStore } from "./useMeetStore";
 import { flashTabTitle } from "@/utils/tabTitle";
+import { useAppStatusStore } from "./useAppStatusStore";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -168,6 +169,7 @@ const playWaitingRoomKnock = () => {
 export const useSocketStore = create<SocketState>((set, get) => ({
   socket: null,
   onlineUsers: [],
+  connectionStatus: 'idle',
   typingUsers: {},
   setTypingUser: (conversationId, userId, isTyping) => {
     set((state) => {
@@ -217,6 +219,9 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("connect", () => {
       console.log("Connected to Socket");
+      set({ connectionStatus: 'connected' });
+      useAppStatusStore.getState().setSocketStatus('connected');
+      useAppStatusStore.getState().clearMaintenance();
 
       // B online trở lại -> duyệt qua các msg chưa có B trong deliveredTo -> emit
       const currentUserId = useAuthStore.getState().user?._id;
@@ -267,6 +272,9 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("connect_error", async (err) => {
       console.error("Socket connect_error:", err.message);
+      const nextStatus = navigator.onLine ? 'reconnecting' : 'disconnected';
+      set({ connectionStatus: nextStatus });
+      useAppStatusStore.getState().setSocketStatus(nextStatus);
       if (
         err.message.includes("Unauthorized") ||
         err.message.includes("jwt expired")
@@ -282,6 +290,33 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           console.error("Failed to refresh token for socket", refreshErr);
         }
       }
+    });
+
+    socket.on("disconnect", (reason) => {
+      const nextStatus = reason === "io client disconnect"
+        ? 'idle'
+        : navigator.onLine
+          ? 'reconnecting'
+          : 'disconnected';
+      set({ connectionStatus: nextStatus });
+      useAppStatusStore.getState().setSocketStatus(nextStatus);
+    });
+
+    socket.io.on("reconnect_attempt", () => {
+      set({ connectionStatus: 'reconnecting' });
+      useAppStatusStore.getState().setSocketStatus('reconnecting');
+    });
+
+    socket.io.on("reconnect", () => {
+      set({ connectionStatus: 'connected' });
+      useAppStatusStore.getState().setSocketStatus('connected');
+      useAppStatusStore.getState().clearMaintenance();
+    });
+
+    socket.io.on("reconnect_error", () => {
+      const nextStatus = navigator.onLine ? 'reconnecting' : 'disconnected';
+      set({ connectionStatus: nextStatus });
+      useAppStatusStore.getState().setSocketStatus(nextStatus);
     });
 
     socket.on("online-users", (userIds) => {
@@ -1250,7 +1285,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     const socket = get().socket;
     if (socket) {
       socket.disconnect();
-      set({ socket: null });
+      set({ socket: null, connectionStatus: 'idle' });
+      useAppStatusStore.getState().setSocketStatus('idle');
       // Reset call state if any
       useCallStore.getState().handleCallEnded();
       useGroupCallStore.getState().reset();
