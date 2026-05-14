@@ -117,7 +117,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogPortal>
           <DialogOverlay className="bg-transparent" />
-          <DialogPrimitive.Content className="fixed inset-y-0 right-0 w-screen md:w-[380px] p-0 m-0 rounded-none shadow-2xl bg-card border-l border-border/40 z-[201] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
+          <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-[201] m-0 w-screen rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card">
               <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-muted/10">
                 <ChevronLeft className="h-5 w-5" />

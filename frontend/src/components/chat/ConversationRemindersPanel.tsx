@@ -332,13 +332,13 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
     <Dialog open={!!reminder} onOpenChange={(open) => !open && onClose()}>
       <DialogPortal>
         {/* Backdrop */}
-        <DialogOverlay className="z-[60] bg-black/40" />
+        <DialogOverlay className="z-[260] bg-black/40" />
 
         {/* Dialog Content Wrapper */}
         <DialogPrimitive.Content
           onPointerDownOutside={onClose}
           onEscapeKeyDown={onClose}
-          className="fixed z-[61] inset-0 flex items-end sm:items-center justify-center pointer-events-none px-4 pb-6 sm:pb-0 outline-none"
+          className="fixed z-[261] inset-0 flex items-end sm:items-center justify-center pointer-events-none px-4 pb-6 sm:pb-0 outline-none"
         >
           <div
             className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border/60 bg-card shadow-2xl overflow-hidden"
@@ -827,9 +827,9 @@ export function ConversationRemindersPanel({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         {/* Backdrop — click to close */}
-        <DialogOverlay className="z-[51] bg-transparent" />
+        <DialogOverlay className="z-[200] bg-transparent" />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 right-0 w-screen md:w-[380px] z-[51] flex flex-col rounded-none bg-card font-sans shadow-2xl border-l border-border/40 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
+          className="fixed inset-y-0 right-0 z-[201] flex w-screen flex-col rounded-none border-l border-border/40 bg-card font-sans shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
         >
           {/*  Header  */}
           <div className="flex items-center gap-2 px-4 py-4 border-b border-border/40 bg-card shrink-0">

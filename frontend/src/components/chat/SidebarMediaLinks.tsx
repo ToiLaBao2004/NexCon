@@ -490,7 +490,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         {imageMessages.length === 0 ? (
           <div className="text-sm text-muted-foreground/90 py-2">Không có ảnh nào</div>
         ) : (
-        <div className="grid grid-cols-4 gap-[6px]">
+        <div className="grid grid-cols-3 gap-[6px] sm:grid-cols-4">
           {imageMessages.map((msg, i) => (
             <button
               key={`img-${msg._id || i}`}

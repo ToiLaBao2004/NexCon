@@ -1,18 +1,12 @@
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
-import { SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
 import ConversationInfoSidebar from "@/components/chat/ConversationInfoSidebar";
 import { useChatStore } from "@/stores/useChatStore";
-import { useMemo } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMaxWidth } from "@/hooks/use-max-width";
 import type { Conversation } from "@/types/chat";
-import {
-  APP_SHELL_GAP_PX,
-  APP_SIDEBAR_WIDTH_PX,
-  MAIN_SIDEBAR_WIDTH_REM,
-  TABLET_OVERLAY_MAX_WIDTH,
-} from "@/constants/layout";
+import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
 
 interface ChatAppPageContentProps {
   activeConversationId: string | null;
@@ -31,19 +25,12 @@ const ChatAppPageContent = ({
   isMobile,
   isTabletOrBelow,
 }: ChatAppPageContentProps) => {
-  const { state: sidebarState } = useSidebar();
-
   const selectedConvo = conversations.find((c) => c._id === activeConversationId && c.disbanded !== true) ?? null;
   const useOverlayInfoSidebar = isMobile || isTabletOrBelow;
 
   // Mobile: show conversation list when no active chat
   const showConversationList = !isMobile || !selectedConvo;
   const showChatWindow = !isMobile || !!selectedConvo;
-  const tabletOverlayStyle = useMemo<React.CSSProperties>(() => {
-    const appSidebarOffset = sidebarState === "expanded" ? APP_SIDEBAR_WIDTH_PX : 0;
-    const left = `calc(${MAIN_SIDEBAR_WIDTH_REM}rem + ${appSidebarOffset}px + ${APP_SHELL_GAP_PX}px)`;
-    return { left };
-  }, [sidebarState]);
 
   return (
     <>
@@ -83,9 +70,8 @@ const ChatAppPageContent = ({
           className={
             isMobile
               ? "fixed inset-0 z-50 flex flex-col bg-background overflow-hidden"
-              : "fixed top-2 right-2 bottom-2 z-50 flex flex-col bg-background overflow-hidden rounded-2xl border border-border/40 shadow-soft"
+              : "fixed inset-y-0 right-0 z-50 flex w-full max-w-[380px] flex-col overflow-hidden border-l border-border/40 bg-background shadow-2xl"
           }
-          style={isMobile ? undefined : tabletOverlayStyle}
         >
           <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 bg-card border-b border-border/40">
             <button

@@ -27,7 +27,7 @@ const ActionBtnLocal = forwardRef<HTMLButtonElement, {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex min-w-0 flex-col items-center gap-2 rounded-xl px-2 py-2 transition-colors bg-transparent",
+        "flex min-w-0 flex-col items-center gap-2 rounded-xl px-1.5 py-2 transition-colors bg-transparent",
         disabled ? "opacity-100 cursor-default" : "hover:bg-muted/60 cursor-pointer"
       )}
       {...props}
@@ -35,7 +35,7 @@ const ActionBtnLocal = forwardRef<HTMLButtonElement, {
       <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted/40 text-foreground">
         <Icon className="h-5 w-5" strokeWidth={1.55} />
       </div>
-      <span className="w-[76px] text-center text-[15px] font-normal leading-5 text-foreground">{label}</span>
+      <span className="w-full max-w-[76px] text-center text-[13px] font-normal leading-4 text-foreground sm:text-[15px] sm:leading-5">{label}</span>
     </button>
   );
 });
@@ -230,8 +230,8 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   // DIRECT variant
   if (conversation.type === "direct") {
     return (
-      <aside className="flex h-full w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-card beautiful-scrollbar md:min-w-[380px] md:border-l md:border-border/40">
-        <div className="flex flex-col items-center border-b border-border/40 bg-card px-5 pb-5 pt-6">
+      <aside className="flex h-full w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-card beautiful-scrollbar md:border-l md:border-border/40">
+        <div className="flex flex-col items-center border-b border-border/40 bg-card px-4 pb-5 pt-6 sm:px-5">
           <div className="flex w-full max-w-[380px] flex-col items-center">
             <div className="relative mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full">
               <UserAvatar
@@ -260,7 +260,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
               </div>
             </div>
 
-            <div className="mt-2 flex w-full justify-center gap-3 px-2 sm:gap-4">
+            <div className="mt-2 grid w-full grid-cols-3 gap-1.5 px-0 sm:gap-3 sm:px-2">
               <MuteDropdown conversationId={conversation._id}>
                 <ActionBtnLocal icon={isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "messages") || isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "meetings") ? BellOff : Bell} label="Thông báo" />
               </MuteDropdown>
@@ -373,8 +373,8 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const canUpdateGroupAvatar = !isDisbanded && (isGroupAdmin || conversation.group?.allowMembersChangeAvatar !== false);
 
   return (
-    <aside className="flex h-full w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-card beautiful-scrollbar md:min-w-[380px] md:border-l md:border-border/40">
-      <div className="flex flex-col items-center border-b border-border/40 bg-card px-5 pb-5 pt-6">
+    <aside className="flex h-full w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-card beautiful-scrollbar md:border-l md:border-border/40">
+      <div className="flex flex-col items-center border-b border-border/40 bg-card px-4 pb-5 pt-6 sm:px-5">
         <div className="flex w-full max-w-[380px] flex-col items-center">
           <div className="relative mb-2">
             <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full">
@@ -429,7 +429,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             </div>
           </div>
 
-          <div className="mt-2 flex w-full justify-center gap-3 px-2 sm:gap-4">
+          <div className="mt-2 grid w-full grid-cols-4 gap-1 px-0 sm:gap-2 sm:px-1">
             <MuteDropdown conversationId={conversation._id} disabled={isDisbanded}>
               <ActionBtnLocal icon={isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "messages") || isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "meetings") ? BellOff : Bell} label="Thông báo" disabled={isDisbanded} />
             </MuteDropdown>
