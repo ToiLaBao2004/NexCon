@@ -3,6 +3,7 @@ import type { Conversation } from "@/types/chat";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useChatStore } from "@/stores/useChatStore";
+import { useSocketStore } from "@/stores/useSocketStore";
 import UserAvatar from "./UserAvatar";
 import GroupChatAvatar from "./GroupChatAvatar";
 import NewGroupModal from "./NewGroupModal";
@@ -65,6 +66,7 @@ interface ConversationInfoSidebarProps {
 export default function ConversationInfoSidebar({ conversation, }: ConversationInfoSidebarProps) {
   const { user } = useAuthStore();
   const { conversations } = useChatStore();
+  const onlineUsers = useSocketStore((s) => s.onlineUsers);
   const [mutualPopoverOpen, setMutualPopoverOpen] = useState(false);
   const { setNickName, loading: nicknameLoading, friends } = useFriendStore();
   const [newGroupInitialSelected, setNewGroupInitialSelected] = useState<string[] | undefined>(undefined);
@@ -107,6 +109,10 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
         : otherParticipant?.userId?.displayName) || "Người dùng"
     );
   }, [otherParticipant]);
+
+  const isDirectParticipantOnline = Boolean(
+    otherParticipant?.userId?._id && onlineUsers.includes(otherParticipant.userId._id)
+  );
 
   const groupDisplayName = conversation.group?.name || "Nhóm";
   const isConversationPinned = conversation.isPinned === true;
@@ -233,6 +239,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 name={directDisplayName}
                 avatarUrl={otherParticipant?.userId?.avatarUrl ?? undefined}
                 className="!h-20 !w-20 !text-2xl"
+                status={isDirectParticipantOnline ? "online" : undefined}
               />
             </div>
 

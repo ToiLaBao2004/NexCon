@@ -125,9 +125,6 @@ export function LeaveGroupModal({
                       <span className="block text-sm text-foreground truncate">
                         {member.displayName || "Người dùng"}
                       </span>
-                      <span className="block text-[11px] text-muted-foreground">
-                        {isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
-                      </span>
                     </div>
                   </label>
                 );

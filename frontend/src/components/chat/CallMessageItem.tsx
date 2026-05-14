@@ -2,7 +2,6 @@ import { cn, formatMessageTime } from "@/lib/utils";
 import type { Conversation, Message, Participant } from "@/types/chat";
 import UserAvatar from "./UserAvatar";
 import CallMessageBubble from "./CallMessageBubble";
-import { useSocketStore } from "@/stores/useSocketStore";
 import { parseCallSnapshot } from "@/utils/callMessageUtils";
 import { useMemo } from "react";
 import { Check, CheckCheck } from "lucide-react";
@@ -29,7 +28,6 @@ const CallMessageItem = ({
   if (!snapshot) return null;
 
   const isInitiator = snapshot.initiatorUser._id === currentUserId;
-  const { onlineUsers } = useSocketStore();
 
   const otherCallParticipant = snapshot.participants.find(
     (p) => (p.userId?._id || p.userId)?.toString?.() !== currentUserId?.toString()
@@ -41,8 +39,6 @@ const CallMessageItem = ({
   const avatarUser = !isInitiator
     ? (snapshot.initiatorUser || otherCallParticipant || otherConversationParticipant)
     : (otherCallParticipant || otherConversationParticipant || snapshot.initiatorUser);
-  const avatarUserId = avatarUser?._id?.toString?.() || "";
-  const avatarStatus = avatarUserId && onlineUsers.includes(avatarUserId) ? "online" : "offline";
 
 
   const seenUsersForThisMessage = useMemo(() => {
@@ -76,7 +72,6 @@ const CallMessageItem = ({
             type="chat"
             name={avatarUser?.displayName ?? "User"}
             avatarUrl={avatarUser?.avatarUrl ?? undefined}
-            status={avatarStatus}
           />
         </div>
       )}

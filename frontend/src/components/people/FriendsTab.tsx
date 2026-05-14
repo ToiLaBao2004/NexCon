@@ -73,16 +73,14 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                                             {friend.displayName.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <div className={`absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-2 border-card ${isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-muted-foreground/40'}`} />
+                                    {isOnline && (
+                                        <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-2 border-card bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                                    )}
                                 </div>
 
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProfile(friend)}>
                                     <p className="truncate text-base font-semibold text-foreground">
                                         {friend.nickname || friend.displayName}
-                                    </p>
-                                    <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-                                        <span className={`h-2 w-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-muted-foreground/50'}`} />
-                                        {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
                                     </p>
                                 </div>
 

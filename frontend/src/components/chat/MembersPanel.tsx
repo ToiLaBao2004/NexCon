@@ -205,10 +205,6 @@ export default function MembersPanel({ conversationId, participants, memberCount
                             </span>
                           )}
                         </div>
-                        <div className="text-[11.5px] text-muted-foreground truncate leading-tight flex items-center gap-1.5">
-                          <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                          {isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
-                        </div>
                       </div>
 
                       <DropdownMenu>

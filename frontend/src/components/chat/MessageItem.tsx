@@ -24,11 +24,11 @@ import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSocketStore } from "@/stores/useSocketStore";
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import ReactionDetailModal from "./ReactionDetailModal";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
-import { useSocketStore } from "@/stores/useSocketStore";
 import { useThemeStore } from "@/stores/useThemeStore";
 import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
 import ReminderFormModal from "@/components/reminder/ReminderFormModal";
@@ -2012,7 +2012,6 @@ const MessageItem = ({
 		item.isRecalled !== true && item.reportStatus !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
 	);
 	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
-
 	// Automatically fetch signed URL for files and audio if not cached
 	useEffect(() => {
 		if (
@@ -2322,7 +2321,7 @@ const MessageItem = ({
 								name={participant?.userId.nickname ?? participant?.userId.displayName ?? "User"}
 								avatarUrl={participant?.userId.avatarUrl ?? undefined}
 								className="size-10 text-base"
-								status={isSenderOnline ? "online" : "offline"}
+								status={selectedConvo.type === "group" && isSenderOnline ? "online" : undefined}
 							/>
 						)}
 					</div>
