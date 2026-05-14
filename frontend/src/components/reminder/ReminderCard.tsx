@@ -150,7 +150,7 @@ export default function ReminderCard({
         if (!editable) return;
         onEdit(reminder);
       }}
-      className={`group relative flex h-full w-full flex-col rounded-xl border border-transparent bg-card p-4 font-sans shadow-none transition-colors duration-200 hover:bg-muted/60 ${editable ? 'cursor-pointer' : 'cursor-default'} ${faded ? 'opacity-65' : ''} ${highlighted ? 'ring-2 ring-primary/35 border-primary/50 bg-primary/5 shadow-lg shadow-primary/10' : ''}`}
+      className={`group relative flex h-full w-full flex-col rounded-xl border border-border/60 bg-card p-4 font-sans shadow-sm shadow-slate-900/5 transition-colors duration-200 hover:border-border hover:bg-muted/60 ${editable ? 'cursor-pointer' : 'cursor-default'} ${faded ? 'opacity-65' : ''} ${highlighted ? 'ring-2 ring-primary/35 border-primary/50 bg-primary/5 shadow-lg shadow-primary/10' : ''}`}
     >
       {/* Top Section */}
       <div className="flex items-start gap-3.5">

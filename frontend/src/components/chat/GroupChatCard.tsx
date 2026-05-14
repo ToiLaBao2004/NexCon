@@ -50,7 +50,17 @@ const decodeMentionTokens = (text: string, convo: Conversation) => {
 	});
 };
 
-const GroupChatCard = ({ convo, hideStatusIcon, density = "default" }: { convo: Conversation; hideStatusIcon?: boolean; density?: "default" | "people" }) => {
+const GroupChatCard = ({
+	convo,
+	hideStatusIcon,
+	density = "default",
+	onOpen,
+}: {
+	convo: Conversation;
+	hideStatusIcon?: boolean;
+	density?: "default" | "people";
+	onOpen?: (conversation: Conversation) => void;
+}) => {
 	const { user } = useAuthStore();
 	const {
 		focusedConversationId,
@@ -100,6 +110,7 @@ const GroupChatCard = ({ convo, hideStatusIcon, density = "default" }: { convo: 
 		}
 
 		setActiveConversation(id);
+		onOpen?.(convo);
 
 		if (!messages?.[id]) {
 			await fetchMessages(id);

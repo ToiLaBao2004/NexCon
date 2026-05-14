@@ -49,7 +49,7 @@ const STATUS_CONFIG: Record<
     bar: "bg-emerald-500",
     dot: "bg-emerald-500",
     label: "Sắp đến",
-    labelClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    labelClass: "bg-primary/10 text-primary",
   },
   snoozed: {
     bar: "bg-amber-400",
@@ -61,7 +61,7 @@ const STATUS_CONFIG: Record<
     bar: "bg-sky-400/60",
     dot: "bg-sky-400/60",
     label: "Đã nhắc",
-    labelClass: "bg-sky-400/10 text-sky-600 dark:text-sky-400",
+    labelClass: "bg-primary/10 text-primary",
   },
   dismissed: {
     bar: "bg-muted-foreground/30",
@@ -81,7 +81,7 @@ function ParticipationBadge({ status }: { status?: Reminder["participationStatus
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-medium",
         isJoined
-          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          ? "bg-primary/10 text-primary"
           : "bg-rose-500/10 text-rose-500"
       )}
     >
@@ -142,7 +142,7 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "group w-full text-left flex items-stretch gap-0 rounded-xl border border-transparent bg-card overflow-hidden",
+        "group w-full text-left flex items-stretch gap-0 rounded-xl border border-border/50 bg-card font-sans overflow-hidden",
         "transition-colors duration-150 hover:bg-muted/60 active:scale-[0.99]"
       )}
     >
@@ -150,14 +150,14 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
       <div className={cn("w-[3px] shrink-0", cfg.bar)} />
 
       {/* Calendar block */}
-      <div className="w-[58px] shrink-0 flex flex-col items-center justify-center border-r border-border/50 bg-muted/25 py-2.5 px-1 gap-0.5">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/80 leading-none">
+      <div className="w-[58px] shrink-0 flex flex-col items-center justify-center border-r border-border/50 bg-muted/30 py-2.5 px-1 gap-0.5">
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground leading-none">
           {calendarWeekday}
         </span>
-        <span className="text-[22px] font-extrabold leading-none text-foreground">
+        <span className="text-[22px] font-semibold leading-none text-foreground">
           {calendarDay}
         </span>
-        <span className="text-[10px] font-semibold text-rose-500 leading-none">
+        <span className="text-[10px] font-semibold text-muted-foreground leading-none">
           Th.{calendarMonth}
         </span>
       </div>
@@ -212,7 +212,7 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
           </span>
           <ParticipationBadge status={reminder.participationStatus} />
           {reminder.createdBy && (
-            <span className="inline-flex items-center gap-1 rounded-full pr-1.5 pl-0.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground border border-border/40">
+            <span className="inline-flex items-center gap-1 rounded-full pr-1.5 pl-0.5 py-0.5 text-[10px] font-medium bg-muted/70 text-muted-foreground border border-border/40">
               <UserAvatar
                 type="seen"
                 name={creatorNameDisplay}
@@ -829,7 +829,7 @@ export function ConversationRemindersPanel({
         {/* Backdrop — click to close */}
         <DialogOverlay className="z-[51] bg-transparent" />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 right-0 w-screen md:w-[380px] z-[51] flex flex-col rounded-none shadow-2xl bg-card border-l border-border/40 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
+          className="fixed inset-y-0 right-0 w-screen md:w-[380px] z-[51] flex flex-col rounded-none bg-card font-sans shadow-2xl border-l border-border/40 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
         >
           {/*  Header  */}
           <div className="flex items-center gap-2 px-4 py-4 border-b border-border/40 bg-card shrink-0">

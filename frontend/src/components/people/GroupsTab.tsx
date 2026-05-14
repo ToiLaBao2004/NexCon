@@ -9,9 +9,10 @@ import type { Conversation } from "@/types/chat";
 interface GroupsTabProps {
     title?: string;
     count?: number;
+    onOpenGroup?: (conversation: Conversation) => void;
 }
 
-export default function GroupsTab({ title = "Quản lý nhóm", count }: GroupsTabProps) {
+export default function GroupsTab({ title = "Quản lý nhóm", count, onOpenGroup }: GroupsTabProps) {
     const { groupConversations, groupsFetched, groupsLoading, groupsHasMore, fetchGroups, fetchMoreGroups, searchGroups } = useChatStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -103,7 +104,12 @@ export default function GroupsTab({ title = "Quản lý nhóm", count }: GroupsT
                 ) : displayGroups.length > 0 ? (
                     displayGroups.map((group) => (
                         <div key={group._id} className="w-full">
-                            <GroupChatCard convo={group as any} hideStatusIcon={true} density="people" />
+                            <GroupChatCard
+                                convo={group as any}
+                                hideStatusIcon={true}
+                                density="people"
+                                onOpen={onOpenGroup}
+                            />
                         </div>
                     ))
                 ) : (

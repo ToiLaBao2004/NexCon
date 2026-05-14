@@ -905,7 +905,7 @@ const ReminderPage = () => {
                     <div className="flex min-w-0 items-center gap-3">
                         <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
-                                <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground md:text-[28px]">Nhắc hẹn</h1>
+                                <h1 className="truncate text-[28px] font-bold leading-tight tracking-tight text-foreground">Nhắc hẹn</h1>
                             </div>
                             <p className="hidden text-sm text-muted-foreground md:block">
                                 Quản lý các việc cần nhớ của bạn

@@ -1696,8 +1696,8 @@ function SystemMessageComponent({
 		return (
 			<>
 				<div className="my-4 flex w-full animate-in justify-center fade-in transition-all duration-300">
-					<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-						<p className="text-[13px] font-normal tracking-normal break-words">
+					<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-3 py-1.5 font-sans shadow-sm backdrop-blur-sm">
+						<p className="text-[13px] font-medium tracking-normal text-muted-foreground break-words">
 							<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
 								{systemContent}
 							</span>
@@ -1705,7 +1705,7 @@ function SystemMessageComponent({
 					</div>
 				</div>
 
-				<div className="my-2 mx-auto w-full max-w-[520px] space-y-2 animate-in fade-in duration-300">
+				<div className="my-2 mx-auto w-full max-w-[520px] space-y-2 font-sans animate-in fade-in duration-300">
 					<div
 						id={reminderAnchorId || undefined}
 						data-shared-reminder-card={isShared && sharedKey ? sharedKey : undefined}
@@ -1745,7 +1745,7 @@ function SystemMessageComponent({
 												setIsParticipantDialogOpen(true);
 												void loadSharedOverview();
 											}}
-											className="h-8 rounded-full border border-border bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/80"
+											className="h-8 rounded-lg border border-border/70 bg-background px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60"
 										>
 											Xem người tham gia
 										</button>
@@ -1771,7 +1771,7 @@ function SystemMessageComponent({
 										<button
 											type="button"
 											onClick={openReminderEdit}
-											className="w-full rounded-xl border border-border bg-muted/50 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+											className="w-full rounded-lg border border-border/70 bg-background py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/60"
 										>
 											Chỉnh sửa
 										</button>
@@ -1783,7 +1783,7 @@ function SystemMessageComponent({
 												type="button"
 												disabled={isUpdatingParticipation}
 												onClick={() => void updateParticipation(true)}
-												className="w-full rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
+												className="w-full rounded-lg border border-primary/25 bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60"
 											>
 												Tham gia lại
 											</button>
@@ -1792,7 +1792,7 @@ function SystemMessageComponent({
 												type="button"
 												disabled={isUpdatingParticipation}
 												onClick={() => void updateParticipation(false)}
-												className="w-full rounded-xl border border-amber-200 bg-amber-50 py-2.5 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-60"
+												className="w-full rounded-lg border border-rose-500/45 bg-background py-2.5 text-sm font-semibold text-rose-500 transition-colors hover:bg-rose-500/10 disabled:opacity-60"
 											>
 												Không tham gia
 											</button>
@@ -1802,7 +1802,7 @@ function SystemMessageComponent({
 									<button
 										type="button"
 										onClick={openReminder}
-										className="w-full rounded-xl border border-border bg-muted py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/80"
+										className="w-full rounded-lg border border-primary/25 bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
 									>
 										Xem chi tiết
 									</button>

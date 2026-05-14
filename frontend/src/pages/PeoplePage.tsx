@@ -47,7 +47,7 @@ const PeoplePage = () => {
 	} = useFriendStore();
 
 	const { onlineUsers } = useSocketStore();
-	const { openChat, activeConversationId, setActiveConversation, conversations, groupConversations } = useChatStore();
+	const { openChat, setActiveConversation, conversations, groupConversations } = useChatStore();
 	const [processingId, setProcessingId] = useState<string | null>(null);
 	const [searchParams, setSearchParams] = useSearchParams();
 	const rawTab = searchParams.get("tab") as PeopleTabKey | null;
@@ -69,14 +69,6 @@ const PeoplePage = () => {
 	}, [tab, fetchBlockedList]);
 
 	useEffect(() => {
-		if (activeConversationId) {
-			setShowChat(true);
-		} else {
-			setShowChat(false);
-		}
-	}, [activeConversationId]);
-
-	useEffect(() => {
 		const urlTab = searchParams.get("tab") as PeopleTabKey | null;
 		if (urlTab && PEOPLE_TABS.some((item) => item.key === urlTab)) {
 			setTab(urlTab);
@@ -85,6 +77,7 @@ const PeoplePage = () => {
 
 	const handleTabChange = (newTab: PeopleTabKey) => {
 		setTab(newTab);
+		setShowChat(false);
 		setActiveConversation(null);
 		setSearchParams({ tab: newTab });
 	};
@@ -92,6 +85,11 @@ const PeoplePage = () => {
 	const handleOpenChat = async (friend: any) => {
 		const friendId = friend.friendId || friend._id;
 		await openChat({ userId: friendId });
+		setShowChat(true);
+	};
+
+	const handleOpenGroupChat = () => {
+		setShowChat(true);
 	};
 
 	const getTabBadge = (key: PeopleTabKey): number => {
@@ -202,7 +200,13 @@ const PeoplePage = () => {
 									/>
 								)}
 
-								{tab === 'groups' && <GroupsTab title={header.title} count={header.count} />}
+								{tab === 'groups' && (
+									<GroupsTab
+										title={header.title}
+										count={header.count}
+										onOpenGroup={handleOpenGroupChat}
+									/>
+								)}
 
 								{tab === 'blocked' && <BlockedTab />}
 							</div>
