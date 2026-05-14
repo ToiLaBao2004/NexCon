@@ -70,7 +70,7 @@ const ChatAppPageContent = ({
 
           {/* Right info sidebar – hidden on mobile, full-screen overlay handled separately */}
           {!useOverlayInfoSidebar && showInfo && selectedConvo && (
-            <div className="w-[350px] shrink-0 border-l border-border/70 overflow-hidden bg-card/10">
+            <div className="w-[380px] shrink-0 border-l border-border/70 overflow-hidden bg-card">
               <ConversationInfoSidebar conversation={selectedConvo} />
             </div>
           )}
@@ -114,7 +114,7 @@ const ChatAppPage = () => {
 
   return (
     <SidebarProvider
-      style={{ "--sidebar-width": "300px" } as React.CSSProperties}
+      style={{ "--sidebar-width": "340px" } as React.CSSProperties}
       className="flex h-full w-full relative min-h-0"
     >
       <ChatAppPageContent

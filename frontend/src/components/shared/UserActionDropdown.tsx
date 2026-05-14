@@ -66,13 +66,13 @@ export const UserActionDropdown = ({
                         title={isBlockedByMe ? "Bỏ chặn" : "Chặn"}
                         onClick={toggleModal}
                         className={cn(
-                            "h-9 w-9 flex items-center justify-center rounded-xl transition-all active:scale-95 disabled:opacity-50",
+                            "h-10 w-10 flex items-center justify-center rounded-xl transition-all active:scale-95 disabled:opacity-50",
                             isBlockedByMe
                                 ? "hover:bg-primary/10 text-primary"
-                                : "hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                : "hover:bg-destructive/10 text-foreground hover:text-destructive"
                         )}
                     >
-                        <UserX className="h-5 w-5" />
+                        <UserX className="h-5 w-5" strokeWidth={1.65} />
                     </button>
                 )
             ) : (
@@ -87,7 +87,7 @@ export const UserActionDropdown = ({
                             : "border-destructive/20 text-destructive hover:bg-destructive/10 hover:border-destructive/40"
                     )}
                 >
-                    <UserX className="h-4 w-4" />
+                    <UserX className="h-4 w-4" strokeWidth={1.65} />
                     {isBlockedByMe ? "Bỏ chặn" : "Chặn"}
                 </Button>
             )}

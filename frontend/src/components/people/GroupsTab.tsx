@@ -6,7 +6,12 @@ import NewGroupModal from "@/components/chat/NewGroupModal";
 import GroupChatCard from "@/components/chat/GroupChatCard";
 import type { Conversation } from "@/types/chat";
 
-export default function GroupsTab() {
+interface GroupsTabProps {
+    title?: string;
+    count?: number;
+}
+
+export default function GroupsTab({ title = "Quản lý nhóm", count }: GroupsTabProps) {
     const { groupConversations, groupsFetched, groupsLoading, groupsHasMore, fetchGroups, fetchMoreGroups, searchGroups } = useChatStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
@@ -52,41 +57,45 @@ export default function GroupsTab() {
 
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <div className="sticky top-0 z-40 space-y-4 border-b border-border/40 bg-card/95 px-4 pb-4 pt-4 backdrop-blur-md">
-            <div className="relative p-1">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-                    <Search className="h-4 w-4 text-muted-foreground" />
-                </span>
-                <input
-                    placeholder="Tìm kiếm nhóm..."
-                    value={searchQuery}
-                    onChange={(e) => handleSearchChange(e.target.value)}
-                    className="flex h-10 w-full rounded-xl border border-border/60 bg-muted/30 px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-10 pr-10"
-                />
-                {searchQuery && (
-                    <button
-                        onClick={() => handleSearchChange("")}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            <div className="sticky top-0 z-40 bg-card/95 px-5 pb-3 pt-5 backdrop-blur-md">
+                <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                        <Search className="h-5 w-5 text-foreground" strokeWidth={1.65} />
+                    </span>
+                    <input
+                        placeholder="Tìm kiếm nhóm..."
+                        value={searchQuery}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        className="flex h-11 w-full rounded-xl border border-border/60 bg-muted/30 px-4 py-2 text-[15px] shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-10 pr-10"
+                    />
+                    {searchQuery && (
+                        <button
+                            onClick={() => handleSearchChange("")}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-foreground hover:text-primary"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-4 border-b border-border/40 px-1 pb-3">
+                    <div className="min-w-0">
+                        <h2 className="truncate text-lg font-semibold tracking-tight text-foreground">
+                            {title} {count !== undefined && `(${count})`}
+                        </h2>
+                    </div>
+                    <Button
+                        onClick={() => setIsModalOpen(true)}
+                        className="h-10 gap-2 rounded-xl bg-primary px-4 font-semibold text-primary-foreground shadow-md transition-all hover:bg-primary/90 active:scale-95"
                     >
-                        <X className="h-4 w-4" />
-                    </button>
-                )}
-            </div>
-
-            <div className="flex items-center justify-between px-1">
-                <div />
-                <Button
-                    onClick={() => setIsModalOpen(true)}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md transition-all active:scale-95 gap-2"
-                >
-                    <Plus className="h-4 w-4" />
-                    Tạo nhóm mới
-                </Button>
-            </div>
+                        <Plus className="h-4 w-4" strokeWidth={1.65} />
+                        Tạo nhóm mới
+                    </Button>
+                </div>
 
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden beautiful-scrollbar px-4 pb-4 pt-4 space-y-2" onScroll={handleScroll}>
+            <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden beautiful-scrollbar px-5 pb-5 pt-5 space-y-2.5" onScroll={handleScroll}>
                 {isSearching ? (
                     <div className="flex justify-center py-10">
                         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -94,7 +103,7 @@ export default function GroupsTab() {
                 ) : displayGroups.length > 0 ? (
                     displayGroups.map((group) => (
                         <div key={group._id} className="w-full">
-                            <GroupChatCard convo={group as any} hideStatusIcon={true} />
+                            <GroupChatCard convo={group as any} hideStatusIcon={true} density="people" />
                         </div>
                     ))
                 ) : (

@@ -48,18 +48,18 @@ export default function BlockedTab() {
     return (
         <div className="space-y-4">
             {blockedUsers.length > 0 ? (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2.5">
                     {blockedUsers.map((user) => (
-                        <div key={user._id} className="flex items-center gap-3 px-4 py-3 rounded-2xl bg-card border border-border/40 hover:border-primary/30 transition-all duration-300">
+                        <div key={user._id} className="flex min-h-[84px] items-center gap-4 rounded-xl border border-transparent bg-transparent px-4 py-3.5 transition-colors hover:bg-muted/60">
                             <button
                                 type="button"
                                 onClick={() => handleOpenProfile(user)}
                                 className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                                 aria-label={`Xem hồ sơ ${user.displayName}`}
                             >
-                                <Avatar className="h-12 w-12">
+                                <Avatar className="h-14 w-14">
                                     <AvatarImage src={user.avatarUrl} />
-                                    <AvatarFallback className="text-base font-bold bg-muted text-muted-foreground">
+                                    <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">
                                         {user.displayName.charAt(0)}
                                     </AvatarFallback>
                                 </Avatar>
@@ -70,7 +70,7 @@ export default function BlockedTab() {
                                 onClick={() => handleOpenProfile(user)}
                                 className="flex-1 min-w-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded-lg"
                             >
-                                <p className="text-sm font-medium text-foreground truncate">
+                                <p className="text-base font-semibold text-foreground truncate">
                                     {user.displayName}
                                 </p>
                             </button>
@@ -80,18 +80,18 @@ export default function BlockedTab() {
                                 variant="outline"
                                 onClick={() => handleOpenUnblock(user)}
                                 disabled={loading && selectedUser?._id === user._id}
-                                className="gap-2 rounded-xl border-primary/20 text-primary hover:bg-primary/10 hover:border-primary/40 transition-all active:scale-95"
+                                className="h-9 gap-2 rounded-xl border-primary/20 px-4 text-sm font-semibold text-primary hover:bg-primary/10 hover:border-primary/40 transition-all active:scale-95"
                             >
-                                <UserX className="h-4 w-4" />
+                                <UserX className="h-4 w-4" strokeWidth={1.65} />
                                 Bỏ chặn
                             </Button>
                             <Button
                                 size="sm"
                                 onClick={() => handleUnblockAndSendRequest(user)}
                                 disabled={sendingRequest}
-                                className="gap-2 rounded-xl transition-all active:scale-95"
+                                className="h-9 gap-2 rounded-xl px-4 text-sm font-semibold transition-all active:scale-95"
                             >
-                                <UserPlus className="h-4 w-4" />
+                                <UserPlus className="h-4 w-4" strokeWidth={1.65} />
                                 Kết bạn
                             </Button>
                         </div>

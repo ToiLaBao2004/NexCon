@@ -10,17 +10,17 @@ import { ConversationRemindersPanel } from "./ConversationRemindersPanel";
 
 // Local replacements for previously-shared sidebar helpers
 function ThickDividerLocal() {
-  return <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />;
+  return <div className="h-2 w-full shrink-0 bg-muted/40 pointer-events-none" />;
 }
 
 function ListRowLocal({ icon: Icon, label, onClick }: { icon: React.ElementType; label: string; onClick?: () => void; }) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal"
+      className="flex w-full items-center gap-3 bg-card px-5 py-3.5 text-foreground transition-colors hover:bg-muted/60"
     >
-      <Icon className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
-      <span className="text-[15px]">{label}</span>
+      <Icon className="h-5 w-5 shrink-0 text-foreground" strokeWidth={1.65} />
+      <span className="text-[15px] font-normal">{label}</span>
     </button>
   );
 }

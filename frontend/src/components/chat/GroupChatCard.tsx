@@ -50,7 +50,7 @@ const decodeMentionTokens = (text: string, convo: Conversation) => {
 	});
 };
 
-const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideStatusIcon?: boolean }) => {
+const GroupChatCard = ({ convo, hideStatusIcon, density = "default" }: { convo: Conversation; hideStatusIcon?: boolean; density?: "default" | "people" }) => {
 	const { user } = useAuthStore();
 	const {
 		focusedConversationId,
@@ -92,6 +92,13 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 	const unreadMentionCount = myParticipant?.unreadMentionCount ?? 0;
 
 	const handleSelectConversation = async (id: string) => {
+		const currentConversations = useChatStore.getState().conversations;
+		if (!currentConversations.some((item) => item._id === id)) {
+			useChatStore.setState((state) => ({
+				conversations: [convo, ...state.conversations.filter((item) => item._id !== id)],
+			}));
+		}
+
 		setActiveConversation(id);
 
 		if (!messages?.[id]) {
@@ -340,11 +347,12 @@ const GroupChatCard = ({ convo, hideStatusIcon }: { convo: Conversation; hideSta
 			titleAccessory={isPartiallyMuted && <span title="Đã tắt thông báo" className="flex items-center"><BellOff className="size-3.5 text-muted-foreground shrink-0" /></span>}
 			rightSection={menuNode}
 			statusIcon={statusIcon}
+			density={density}
 			leftSection={
 				<>
 					{unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
 					{unreadMentionCount > 0 && <MentionCountBadge count={unreadMentionCount} />}
-					<GroupChatAvatar participants={convo.participants} type="card" groupAvatarUrl={convo.group?.avatarUrl} />
+					<GroupChatAvatar participants={convo.participants} type={density === "people" ? "people" : "card"} groupAvatarUrl={convo.group?.avatarUrl} />
 				</>
 			}
 			subtitle={

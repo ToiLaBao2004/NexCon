@@ -120,7 +120,7 @@ function renderMentionedText(
 			tokenParts.push(<span key={`token-tail-${tokenCursor}`}>{safeText.slice(tokenCursor)}</span>);
 		}
 
-		return <span className="text-sm whitespace-pre-wrap break-words">{tokenParts}</span>;
+		return <span className="text-base whitespace-pre-wrap break-words">{tokenParts}</span>;
 	}
 
 	const validMentions = (mentions ?? [])
@@ -128,7 +128,7 @@ function renderMentionedText(
 		.sort((a, b) => a.offset - b.offset);
 
 	if (!validMentions.length) {
-		return <span className="text-sm whitespace-pre-wrap break-words">{safeText}</span>;
+		return <span className="text-base whitespace-pre-wrap break-words">{safeText}</span>;
 	}
 
 	const parts: React.ReactNode[] = [];
@@ -156,7 +156,7 @@ function renderMentionedText(
 		parts.push(<span key={`text-tail-${cursor}`}>{safeText.slice(cursor)}</span>);
 	}
 
-	return <span className="text-sm whitespace-pre-wrap break-words">{parts}</span>;
+	return <span className="text-base whitespace-pre-wrap break-words">{parts}</span>;
 }
 
 function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
@@ -370,7 +370,7 @@ function AudioMessageBubble({
 			{hasTranscript && showTranscript && (
 				<div
 					className={cn(
-						"max-w-[320px] rounded-xl px-4 py-3 text-[15px] sm:text-[16px] leading-relaxed",
+						"max-w-[340px] rounded-xl px-4 py-3 text-base leading-relaxed sm:text-[17px]",
 						"whitespace-pre-wrap break-words animate-in fade-in slide-in-from-top-1 duration-150",
 						isOwn
 							? "bg-white/12 text-white border border-white/10"
@@ -498,7 +498,7 @@ function ImageBatchGrid({
 				))}
 			</div>
 			{items[0]?.content && !items[0]?.isRecalled && !items[0]?.reportStatus && (
-				<p className="text-[15px] sm:text-[16px] px-2 leading-relaxed">
+				<p className="px-2 text-base leading-relaxed sm:text-[17px]">
 					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
 				</p>
 			)}
@@ -582,7 +582,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					</button>
 				)}
 				{message.content && (
-					<p className="text-[15px] sm:text-[16px] px-2 leading-relaxed">
+					<p className="px-2 text-base leading-relaxed sm:text-[17px]">
 						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
 					</p>
 				)}
@@ -651,7 +651,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<FileText className={cn("size-5", isOwn ? "text-white" : "text-primary")} />
 					</div>
 					<div className="flex flex-col min-w-0">
-						<span className="text-[15px] sm:text-[16px] font-medium truncate max-w-[180px]">{message.fileName ?? "File"}</span>
+						<span className="max-w-[180px] truncate text-base font-medium sm:text-[17px]">{message.fileName ?? "File"}</span>
 						<span className={cn("text-[12px] sm:text-[13px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
 							{message.fileSize ? formatBytes(message.fileSize) : (message.mimeType ?? "")}
 						</span>
@@ -659,7 +659,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					<ExternalLink className={cn("size-3.5 shrink-0 ml-1 opacity-0 group-hover/file:opacity-70 transition-opacity", isOwn ? "text-white" : "text-muted-foreground")} />
 				</a>
 				{message.content && (
-					<div className="text-[15px] sm:text-[16px] px-2 leading-relaxed whitespace-pre-wrap break-words">
+					<div className="px-2 text-base leading-relaxed whitespace-pre-wrap break-words sm:text-[17px]">
 						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
 					</div>
 				)}
@@ -708,7 +708,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						</div>
 
 						{preview.title && (
-							<div className="line-clamp-2 text-[15px] sm:text-[16px] font-semibold">
+							<div className="line-clamp-2 text-base font-semibold sm:text-[17px]">
 								{preview.title}
 							</div>
 						)}
@@ -738,7 +738,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				)}
 			>
 				<Link2 className="size-3.5 shrink-0" />
-				<span className="text-[15px] sm:text-[16px] break-all">{message.content}</span>
+				<span className="break-all text-base sm:text-[17px]">{message.content}</span>
 			</a>
 		);
 	}
@@ -2339,7 +2339,7 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[15px] sm:text-[16px] leading-relaxed" : "px-4 py-2.5 text-[15px] sm:text-[16px] leading-relaxed"),
+								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-base leading-relaxed sm:text-[17px]" : "px-4 py-2.5 text-base leading-relaxed sm:text-[17px]"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
 								(isRecalled && !isImageBatch)
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
@@ -2393,7 +2393,7 @@ const MessageItem = ({
 												disabled={isBlocked}
 											/>
 										)}
-										<span className="text-[12px] sm:text-[13px] font-medium leading-none whitespace-nowrap">
+										<span className="text-[13px] font-medium leading-none whitespace-nowrap sm:text-sm">
 											{formatMessageTime(new Date(message.createdAt))}
 										</span>
 										{isOwn && message.status === "error" && (
@@ -2412,7 +2412,7 @@ const MessageItem = ({
 							)}>
 								<div className="flex items-center gap-1.5 bg-black/20 dark:bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 h-5">
 									<Clock className="size-3 text-white/80 animate-spin" />
-									<span className="text-[12px] sm:text-[13px] font-medium text-white/90">Đang gửi</span>
+									<span className="text-[13px] font-medium text-white/90 sm:text-sm">Đang gửi</span>
 								</div>
 							</div>
 						)}

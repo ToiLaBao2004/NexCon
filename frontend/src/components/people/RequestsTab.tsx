@@ -17,7 +17,7 @@ type RequestsTabProps = {
 const panelClass = "flex min-h-0 flex-1 flex-col overflow-hidden";
 const panelBodyClass = "beautiful-scrollbar min-h-0 flex-1 overflow-y-auto pr-1";
 const requestItemClass =
-    "group flex min-h-[68px] items-center gap-3 rounded-lg border border-transparent bg-transparent p-3 transition-colors hover:bg-muted/60";
+    "group flex min-h-[84px] items-center gap-4 rounded-xl border border-transparent bg-transparent px-4 py-3.5 transition-colors hover:bg-muted/60";
 
 const getInitial = (name?: string) => name?.trim()?.charAt(0)?.toUpperCase() || "?";
 
@@ -41,11 +41,11 @@ export default function RequestsTab({
 
     return (
         <div className="relative flex h-full min-h-0 flex-col gap-4">
-            <div className="grid shrink-0 grid-cols-2 gap-2 rounded-2xl bg-muted/40 p-1">
+            <div className="grid shrink-0 grid-cols-2 gap-2 rounded-2xl bg-muted/40 p-1.5">
                 <button
                     type="button"
                     onClick={() => setActiveView("incoming")}
-                    className={`rounded-xl px-3 py-2 text-sm transition-all duration-200 ${activeView === "incoming" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`rounded-xl px-4 py-2.5 text-[15px] font-semibold transition-all duration-200 ${activeView === "incoming" ? "bg-card text-foreground shadow-sm" : "text-foreground hover:bg-card/60"}`}
                 >
                     Lời mời đến
                     <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
@@ -55,7 +55,7 @@ export default function RequestsTab({
                 <button
                     type="button"
                     onClick={() => setActiveView("sent")}
-                    className={`rounded-xl px-3 py-2 text-sm transition-all duration-200 ${activeView === "sent" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                    className={`rounded-xl px-4 py-2.5 text-[15px] font-semibold transition-all duration-200 ${activeView === "sent" ? "bg-card text-foreground shadow-sm" : "text-foreground hover:bg-card/60"}`}
                 >
                     Lời mời đã gửi
                     <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary">
@@ -70,15 +70,15 @@ export default function RequestsTab({
                         <div className="flex flex-col gap-2">
                             {sentRequests.map((request) => (
                                 <div key={request._id} className={requestItemClass}>
-                                    <Avatar className="h-11 w-11 shrink-0 cursor-pointer" onClick={() => handleOpenProfile(request.to)}>
+                                    <Avatar className="h-14 w-14 shrink-0 cursor-pointer" onClick={() => handleOpenProfile(request.to)}>
                                         <AvatarImage src={request.to.avatarUrl} />
                                         <AvatarFallback>{getInitial(request.to.displayName)}</AvatarFallback>
                                     </Avatar>
                                     <div className="min-w-0 flex-1 cursor-pointer" onClick={() => handleOpenProfile(request.to)}>
-                                        <p className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                                        <p className="truncate text-base font-semibold text-foreground">
                                             {request.to.displayName}
                                         </p>
-                                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                        <p className="mt-1 truncate text-sm text-muted-foreground">
                                             {request.message || request.to.email}
                                         </p>
                                     </div>
@@ -86,7 +86,7 @@ export default function RequestsTab({
                                         size="sm"
                                         variant="outline"
                                         onClick={() => onCancel(request._id)}
-                                        className="h-8 shrink-0 rounded-full px-4 shadow-sm transition-all active:scale-95"
+                                        className="h-9 shrink-0 rounded-full px-5 text-sm font-semibold shadow-sm transition-all active:scale-95"
                                     >
                                         Hủy
                                     </Button>
@@ -114,15 +114,15 @@ export default function RequestsTab({
 
                                 return (
                                     <div key={request._id} className={requestItemClass}>
-                                        <Avatar className="h-11 w-11 shrink-0 cursor-pointer" onClick={() => handleOpenProfile(request.from)}>
+                                        <Avatar className="h-14 w-14 shrink-0 cursor-pointer" onClick={() => handleOpenProfile(request.from)}>
                                             <AvatarImage src={request.from.avatarUrl} />
                                             <AvatarFallback>{getInitial(request.from.displayName)}</AvatarFallback>
                                         </Avatar>
                                         <div className="min-w-0 flex-1 cursor-pointer" onClick={() => handleOpenProfile(request.from)}>
-                                            <p className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                                            <p className="truncate text-base font-semibold text-foreground">
                                                 {request.from.displayName}
                                             </p>
-                                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                            <p className="mt-1 truncate text-sm text-muted-foreground">
                                                 {request.message || request.from.email}
                                             </p>
                                         </div>
@@ -131,7 +131,7 @@ export default function RequestsTab({
                                                 size="sm"
                                                 disabled={isProcessing}
                                                 onClick={() => onAccept(request._id)}
-                                                className="h-8 rounded-full px-3 text-xs shadow-sm transition-all active:scale-95 md:px-4 md:text-sm"
+                                                className="h-9 rounded-full px-4 text-sm font-semibold shadow-sm transition-all active:scale-95 md:px-5"
                                             >
                                                 {isProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                                                 Đồng ý
@@ -141,7 +141,7 @@ export default function RequestsTab({
                                                 variant="outline"
                                                 disabled={isProcessing}
                                                 onClick={() => onReject(request._id)}
-                                                className="h-8 rounded-full px-3 text-xs shadow-sm transition-all active:scale-95 md:px-4 md:text-sm"
+                                                className="h-9 rounded-full px-4 text-sm font-semibold shadow-sm transition-all active:scale-95 md:px-5"
                                             >
                                                 Từ chối
                                             </Button>

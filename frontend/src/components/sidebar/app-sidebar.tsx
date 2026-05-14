@@ -43,14 +43,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
           <AddFriendModal />
 
-          <SidebarGroup className="flex min-h-0 flex-1 flex-col">
+          <SidebarGroup className="flex min-h-0 flex-1 flex-col px-5">
             <SidebarGroupLabel asChild>
-              <div className="uppercase flex items-center justify-between">
-                <span>cuộc trò chuyện</span>
+              <div className="flex items-center justify-between px-0 py-3">
+                <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">cuộc trò chuyện</span>
                 <button
                   type="button"
                   onClick={() => setIsGroupModalOpen(true)}
-                  className="normal-case text-xs font-medium px-2 py-1 rounded-md border border-border/60 bg-background hover:bg-muted/20 text-foreground transition-colors cursor-pointer"
+                  className="normal-case rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/50 cursor-pointer"
                 >
                   Tạo nhóm
                 </button>

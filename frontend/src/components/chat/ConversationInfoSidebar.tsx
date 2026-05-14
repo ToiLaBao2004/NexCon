@@ -26,15 +26,15 @@ const ActionBtnLocal = forwardRef<HTMLButtonElement, {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex flex-col items-center gap-[6px] rounded-lg py-1 px-1 transition-colors min-w-0 bg-transparent",
+        "flex min-w-0 flex-col items-center gap-2 rounded-xl px-2 py-2 transition-colors bg-transparent",
         disabled ? "opacity-100 cursor-default" : "hover:bg-muted/60 cursor-pointer"
       )}
       {...props}
     >
-      <div className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-muted/10 text-foreground">
-        <Icon className="h-5 w-5" strokeWidth={1.2} />
+      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted/40 text-foreground">
+        <Icon className="h-5 w-5" strokeWidth={1.55} />
       </div>
-      <span className="text-[12px] text-center text-muted-foreground/90 font-normal leading-[16px] w-[65px]">{label}</span>
+      <span className="w-[76px] text-center text-[15px] font-normal leading-5 text-foreground">{label}</span>
     </button>
   );
 });
@@ -224,28 +224,28 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   // DIRECT variant
   if (conversation.type === "direct") {
     return (
-      <aside className="flex h-full w-full min-w-0 flex-col bg-background overflow-y-auto overflow-x-hidden beautiful-scrollbar md:min-w-[350px] md:border-l md:border-border/40">
-        <div className="flex flex-col items-center pt-6 pb-4 bg-card">
-          <div className="w-full max-w-[350px] px-4 flex flex-col items-center">
-            <div className="relative mb-1 h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
+      <aside className="flex h-full w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-card beautiful-scrollbar md:min-w-[380px] md:border-l md:border-border/40">
+        <div className="flex flex-col items-center border-b border-border/40 bg-card px-5 pb-5 pt-6">
+          <div className="flex w-full max-w-[380px] flex-col items-center">
+            <div className="relative mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full">
               <UserAvatar
                 type="profile"
                 name={directDisplayName}
                 avatarUrl={otherParticipant?.userId?.avatarUrl ?? undefined}
-                className="!h-16 !w-16 !text-xl"
+                className="!h-20 !w-20 !text-2xl"
               />
             </div>
 
             <div className="relative w-full mt-0 mb-3">
               <div className="w-full flex justify-center">
                 <div className="relative inline-block">
-                  <span ref={nameRefDirect} className="font-bold text-[17px] text-foreground leading-tight block text-center">
+                  <span ref={nameRefDirect} className="block text-center text-xl font-bold leading-tight text-foreground">
                     {directDisplayName}
                   </span>
                   <button
                     onClick={() => setOpenNickname(true)}
                     title="Đổi nickname"
-                    className="absolute left-full top-1/2 ml-3 -translate-y-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-card/10 text-muted-foreground hover:bg-muted/60 transition-colors"
+                    className="absolute left-full top-1/2 ml-3 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted/60"
                   >
                     <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
                   </button>
@@ -253,7 +253,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
               </div>
             </div>
 
-            <div className="flex justify-center gap-3 sm:gap-4 w-full px-2 mt-2">
+            <div className="mt-2 flex w-full justify-center gap-3 px-2 sm:gap-4">
               <MuteDropdown conversationId={conversation._id}>
                 <ActionBtnLocal icon={isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "messages") || isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "meetings") ? BellOff : Bell} label="Thông báo" />
               </MuteDropdown>
@@ -281,21 +281,21 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             </div>
           </div>
         </div>
-        <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />
+        <div className="h-2 w-full shrink-0 bg-muted/40 pointer-events-none" />
         <button
           onClick={() => setRemindersOpen(true)}
-          className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal cursor-pointer"
+          className="flex w-full cursor-pointer items-center gap-3 bg-card px-5 py-3.5 text-foreground transition-colors hover:bg-muted/60"
         >
-          <Clock className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
-          <span className="text-[15px]">Danh sách nhắc hẹn</span>
+          <Clock className="h-5 w-5 shrink-0 text-foreground" strokeWidth={1.65} />
+          <span className="text-[15px] font-normal">Danh sách nhắc hẹn</span>
         </button>
         <div
           role="button"
           onClick={() => setMutualPopoverOpen(true)}
-          className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal cursor-pointer"
+          className="flex w-full cursor-pointer items-center gap-3 bg-card px-5 py-3.5 text-foreground transition-colors hover:bg-muted/60"
         >
-          <Users className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
-          <span className="text-[15px]">{`${mutualGroupCount} nhóm chung`}</span>
+          <Users className="h-5 w-5 shrink-0 text-foreground" strokeWidth={1.65} />
+          <span className="text-[15px] font-normal">{`${mutualGroupCount} nhóm chung`}</span>
         </div>
         <MutualGroupsPanel open={mutualPopoverOpen} onOpenChange={setMutualPopoverOpen} otherParticipantId={otherParticipant?.userId?._id} />
         <ConversationRemindersPanel
@@ -304,7 +304,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           conversationId={conversation._id}
           conversationName={directDisplayName}
         />
-        <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />
+        <div className="h-2 w-full shrink-0 bg-muted/40 pointer-events-none" />
 
         {/* Media, Files, Links */}
         <SidebarMediaLinks conversation={conversation} />
@@ -366,14 +366,14 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const canUpdateGroupAvatar = !isDisbanded && (isGroupAdmin || conversation.group?.allowMembersChangeAvatar !== false);
 
   return (
-    <aside className="flex h-full w-full min-w-0 flex-col bg-background overflow-y-auto overflow-x-hidden beautiful-scrollbar md:min-w-[350px] md:border-l md:border-border/40">
-      <div className="flex flex-col items-center pt-6 pb-4 bg-card">
-        <div className="w-full max-w-[350px] px-4 flex flex-col items-center">
-          <div className="relative mb-1">
-            <div className="h-16 w-16 flex items-center justify-center rounded-full overflow-hidden">
+    <aside className="flex h-full w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-card beautiful-scrollbar md:min-w-[380px] md:border-l md:border-border/40">
+      <div className="flex flex-col items-center border-b border-border/40 bg-card px-5 pb-5 pt-6">
+        <div className="flex w-full max-w-[380px] flex-col items-center">
+          <div className="relative mb-2">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full">
               <GroupChatAvatar
                 participants={conversation.participants}
-                type="sidebar"
+                type="profile"
                 groupAvatarUrl={conversation.group?.avatarUrl}
               />
             </div>
@@ -382,7 +382,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 type="button"
                 onClick={handlePickGroupAvatar}
                 disabled={groupAvatarLoading}
-                className="absolute bottom-0 right-0 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-muted-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70 z-40"
+                className="absolute bottom-0 right-0 z-40 flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
                 title="Đổi ảnh đại diện nhóm"
               >
                 {groupAvatarLoading ? (
@@ -404,7 +404,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           <div className="relative w-full mt-0 mb-3">
             <div className="w-full flex justify-center">
               <div className="relative inline-block">
-                <span ref={nameRefGroup} className="font-bold text-[17px] text-foreground leading-tight block text-center">
+                  <span ref={nameRefGroup} className="block text-center text-xl font-bold leading-tight text-foreground">
                   {groupDisplayName}
                 </span>
                 <button
@@ -412,7 +412,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                   title={isDisbanded ? "Nhóm đã giải tán" : "Đổi tên nhóm"}
                   disabled={isDisbanded}
                   className={cn(
-                    "absolute left-full top-1/2 ml-3 -translate-y-1/2 flex items-center justify-center h-7 w-7 rounded-full bg-card/10 text-muted-foreground transition-colors",
+                    "absolute left-full top-1/2 ml-3 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-colors",
                     isDisbanded ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
                   )}
                 >
@@ -422,7 +422,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             </div>
           </div>
 
-          <div className="flex justify-center gap-3 sm:gap-4 w-full px-2 mt-2">
+          <div className="mt-2 flex w-full justify-center gap-3 px-2 sm:gap-4">
             <MuteDropdown conversationId={conversation._id} disabled={isDisbanded}>
               <ActionBtnLocal icon={isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "messages") || isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "meetings") ? BellOff : Bell} label="Thông báo" disabled={isDisbanded} />
             </MuteDropdown>
@@ -453,10 +453,10 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
       {!isDisbanded && (
         <button
           onClick={() => setIsLeaveGroupModalOpen(true)}
-          className="flex w-full items-center gap-3 px-4 py-3 bg-card hover:bg-muted/10 transition-colors"
+          className="flex w-full items-center gap-3 bg-card px-5 py-3.5 transition-colors hover:bg-muted/60"
         >
-          <LogOut className="h-5 w-5 text-red-500 shrink-0" strokeWidth={1.5} />
-          <span className="text-[15px] font-medium text-red-500">Rời nhóm</span>
+          <LogOut className="h-5 w-5 shrink-0 text-red-500" strokeWidth={1.65} />
+          <span className="text-[15px] font-normal text-red-500">Rời nhóm</span>
         </button>
       )}
 
