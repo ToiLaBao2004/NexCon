@@ -78,11 +78,12 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
         return (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="flex items-center gap-2 -ml-2">
-                    <Button variant="ghost" size="icon" onClick={() => setView("overview")}>
+                    <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setView("overview")}
+                    >
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
                     <div>
-                        <h3 className="text-lg font-semibold">Thiết bị đăng nhập</h3>
+                        <h3 className="text-[18px] font-semibold tracking-tight">Thiết bị đăng nhập</h3>
                         <p className="text-sm text-muted-foreground">Quản lý các phiên đang hoạt động</p>
                     </div>
                 </div>
@@ -94,17 +95,17 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                         {sessions.map((session: SessionInfo) => (
                             <div
                                 key={session.sessionId}
-                                className="flex items-center justify-between p-4 border border-border/50 rounded-lg"
+                                className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-muted rounded-full">
+                                    <div className="rounded-xl bg-muted/60 p-2">
                                         <Monitor className="w-4 h-4" />
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <p className="text-sm font-medium">{session.deviceName}</p>
+                                            <p className="text-[15px] font-semibold">{session.deviceName}</p>
                                             {session.isCurrent && (
-                                                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                                                <span className="text-[11px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold">
                                                     Thiết bị này
                                                 </span>
                                             )}
@@ -118,7 +119,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    className="rounded-full text-destructive hover:text-destructive hover:bg-destructive/10"
                                     disabled={deletingId === session.sessionId}
                                     onClick={() => handleSignOutBySession(session.sessionId)}
                                 >
@@ -134,7 +135,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
 
                 <Button
                     variant="destructive"
-                    className="w-full"
+                    className="w-full rounded-xl text-sm font-semibold"
                     onClick={signOutAll}
                 >
                     <LogOut className="w-4 h-4 mr-2" />
@@ -148,7 +149,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
         return (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
                 <div className="flex items-center gap-2 -ml-2">
-                    <Button variant="ghost" size="icon" onClick={() => {
+                    <Button variant="ghost" size="icon" className="rounded-full" onClick={() => {
                         setView("overview");
                         reset();
                         setShowCurrentPassword(false);
@@ -158,11 +159,11 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
                     <div>
-                        <h3 className="text-lg font-semibold">Đổi mật khẩu</h3>
+                        <h3 className="text-[18px] font-semibold tracking-tight">Đổi mật khẩu</h3>
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit(onSubmitPassword)} className="space-y-4 max-w-sm ml-2 mt-4">
+                <form onSubmit={handleSubmit(onSubmitPassword)} className="space-y-4 max-w-md rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm">
                     {/* Mật khẩu hiện tại */}
                     <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -248,7 +249,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                         <p className="text-sm text-destructive mt-2">{errors.root.message}</p>
                     )}
 
-                    <Button type="submit" disabled={isSubmitting} className="w-full mt-4">
+                    <Button type="submit" disabled={isSubmitting} className="w-full mt-4 rounded-xl text-sm font-semibold">
                         Xác nhận đổi mật khẩu
                     </Button>
                 </form>
@@ -259,25 +260,25 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
             <div>
-                <div className="flex items-center gap-2 mb-1">
-                    <Shield className="w-5 h-5 text-primary" />
-                    <h3 className="text-lg font-semibold">Bảo mật</h3>
+                <div className="flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-primary" />
+                    <h3 className="text-[18px] font-semibold tracking-tight">Bảo mật</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">Bảo vệ thông tin và tài khoản của bạn</p>
+                <p className="mt-1 text-sm text-muted-foreground">Bảo vệ thông tin và tài khoản của bạn</p>
             </div>
             <div className="space-y-4">
                 <div
                     className={cn(
-                        "flex items-center justify-between p-4 border border-border/50 rounded-lg transition-colors group",
+                        "flex items-center justify-between rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm transition-colors group",
                         isGoogleUser
                             ? "opacity-50 cursor-not-allowed"
-                            : "cursor-pointer hover:bg-muted/50"
+                            : "cursor-pointer hover:bg-muted/40"
                     )}
                     onClick={() => !isGoogleUser && setView("change-password")}
                 >
                     <div className="flex items-center gap-4">
                         <div className={cn(
-                            "p-2.5 rounded-full transition-colors",
+                            "rounded-xl p-2.5 transition-colors",
                             isGoogleUser
                                 ? "bg-muted text-muted-foreground"
                                 : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground"
@@ -285,7 +286,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                             <KeyRound className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="font-medium">Đổi mật khẩu</p>
+                            <p className="text-[15px] font-semibold">Đổi mật khẩu</p>
                             {isGoogleUser && (
                                 <p className="text-xs text-muted-foreground">Tài khoản Google không dùng mật khẩu</p>
                             )}
@@ -295,15 +296,15 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                 </div>
 
                 <div
-                    className="flex items-center justify-between p-4 border border-border/50 rounded-lg cursor-pointer hover:bg-muted/50 transition-colors group"
+                    className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm cursor-pointer hover:bg-muted/40 transition-colors group"
                     onClick={() => setView("sessions")}
                 >
                     <div className="flex items-center gap-4">
-                        <div className="p-2.5 bg-primary/10 rounded-full text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                        <div className="rounded-xl bg-primary/10 p-2.5 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                             <Monitor className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="font-medium">Thiết bị đăng nhập</p>
+                            <p className="text-[15px] font-semibold">Thiết bị đăng nhập</p>
                             <p className="text-sm text-muted-foreground">Quản lý các phiên đang hoạt động</p>
                         </div>
                     </div>

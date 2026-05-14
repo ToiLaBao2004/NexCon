@@ -148,9 +148,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className={cn(
-                "gap-0 border-border/40 w-screen h-[100dvh] max-w-none rounded-none border-0 top-0 left-0 translate-x-0 translate-y-0 sm:h-auto sm:rounded-lg sm:border sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]",
+                "gap-0 w-screen h-[100dvh] max-w-none rounded-none border-0 bg-background top-0 left-0 translate-x-0 translate-y-0 sm:h-auto sm:rounded-2xl sm:border sm:border-border/50 sm:shadow-xl sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]",
                 forgotPassStep === "none"
-                    ? "p-0 sm:max-w-[700px] overflow-y-auto overflow-x-hidden"
+                    ? "p-0 sm:max-w-[860px] overflow-hidden"
                     : "p-4 sm:max-w-md sm:p-6 overflow-hidden"
             )}>
                 <DialogHeader className="sr-only">
@@ -158,16 +158,16 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     <DialogDescription>Tuy chinh thong bao, bao mat va tai khoan.</DialogDescription>
                 </DialogHeader>
                 {forgotPassStep === "none" ? (
-                    <div className="flex flex-col sm:flex-row h-[calc(100dvh-32px)] sm:h-[500px] overflow-x-hidden">
+                    <div className="flex flex-col sm:flex-row h-[calc(100dvh-32px)] sm:h-[560px] overflow-hidden bg-card">
                         {/* Sidebar */}
-                        <div className="w-full sm:w-[220px] bg-muted/40 border-b sm:border-b-0 sm:border-r border-border/50 flex flex-col p-3 sm:p-4 overflow-hidden">
-                            <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-6 px-1 sm:px-2">Cài đặt</h2>
-                            <div className="beautiful-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-1 sm:overflow-visible sm:px-0 sm:pb-0">
+                        <div className="w-full sm:w-[240px] bg-muted/30 border-b sm:border-b-0 sm:border-r border-border/50 flex flex-col p-4 sm:p-5 overflow-hidden">
+                            <h2 className="text-[20px] font-bold tracking-tight mb-3 sm:mb-6 px-1">Cài đặt</h2>
+                            <div className="beautiful-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-1 sm:overflow-visible sm:px-0 sm:pb-0">
                                 <button
                                     onClick={() => setActiveTab("notifications")}
                                     className={cn(
-                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-md transition-colors sm:w-full sm:shrink",
-                                        (activeTab === "notifications") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-semibold rounded-xl transition-colors sm:w-full sm:shrink",
+                                        (activeTab === "notifications") ? "bg-primary/15 text-primary" : "hover:bg-muted/60 text-foreground/70 hover:text-foreground"
                                     )}
                                 >
                                     <Bell className="w-4 h-4 shrink-0" />
@@ -176,8 +176,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                 <button
                                     onClick={() => setActiveTab("security")}
                                     className={cn(
-                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-md transition-colors sm:w-full sm:shrink",
-                                        (activeTab === "security") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-semibold rounded-xl transition-colors sm:w-full sm:shrink",
+                                        (activeTab === "security") ? "bg-primary/15 text-primary" : "hover:bg-muted/60 text-foreground/70 hover:text-foreground"
                                     )}
                                 >
                                     <Shield className="w-4 h-4 shrink-0" />
@@ -186,8 +186,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                 <button
                                     onClick={() => setActiveTab("reports")}
                                     className={cn(
-                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-md transition-colors sm:w-full sm:shrink",
-                                        (activeTab === "reports") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-semibold rounded-xl transition-colors sm:w-full sm:shrink",
+                                        (activeTab === "reports") ? "bg-primary/15 text-primary" : "hover:bg-muted/60 text-foreground/70 hover:text-foreground"
                                     )}
                                 >
                                     <Flag className="w-4 h-4 shrink-0" />
@@ -198,7 +198,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
                         {/* Content */}
                         <div className="beautiful-scrollbar flex-1 overflow-y-auto overflow-x-hidden">
-                            <div className="p-4 sm:p-6 h-full min-w-0 overflow-x-hidden relative">
+                            <div className="p-5 sm:p-6 h-full min-w-0 overflow-x-hidden relative">
                                 {activeTab === "notifications" && <NotificationTab />}
                                 {activeTab === "security" && <SecurityTab onForgotPassword={handleForgotPassword} />}
                                 {activeTab === "reports" && <ReportHistoryContent embedded />}
@@ -207,98 +207,102 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </div>
                 ) : forgotPassStep === "otp" ? (
                     <div className="animate-in fade-in zoom-in-95 duration-300">
-                        <div className="flex flex-col items-center gap-2 mb-4">
-                            <h2 className="text-xl font-bold">Nhập mã OTP</h2>
-                            <p className="text-sm text-muted-foreground text-center">
-                                Mã đã được gửi đến <span className="font-medium">{user?.email}</span>
-                            </p>
+                        <div className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm">
+                            <div className="flex flex-col items-center gap-2 mb-4">
+                                <h2 className="text-[18px] font-semibold tracking-tight">Nhập mã OTP</h2>
+                                <p className="text-sm text-muted-foreground text-center">
+                                    Mã đã được gửi đến <span className="font-medium">{user?.email}</span>
+                                </p>
+                            </div>
+                            <form onSubmit={handleOtpSubmit} className="space-y-4">
+                                <InputOTP value={otp} onChange={setOtp} maxLength={6}>
+                                    <InputOTPGroup className="gap-2 mx-auto mt-2">
+                                        {[0, 1, 2, 3, 4, 5].map((i) => (
+                                            <InputOTPSlot key={i} index={i} />
+                                        ))}
+                                    </InputOTPGroup>
+                                </InputOTP>
+                                {otpError && <p className="text-destructive text-sm text-center">{otpError}</p>}
+                                <Button type="submit" disabled={otpLoading || otp.length < 6} className="w-full rounded-xl text-sm font-semibold">
+                                    {otpLoading ? "Đang xác thực..." : "Xác thực"}
+                                </Button>
+                                <p className="text-xs text-center text-muted-foreground mt-2">
+                                    Bạn không nhận được mã?{" "}
+                                    {countdown > 0 ? (
+                                        <span className="text-muted-foreground">Gửi lại sau {countdown}s</span>
+                                    ) : (
+                                        <span className="text-primary cursor-pointer hover:underline underline-offset-2" onClick={handleResendOtp}>
+                                            Gửi lại
+                                        </span>
+                                    )}
+                                </p>
+                            </form>
                         </div>
-                        <form onSubmit={handleOtpSubmit} className="space-y-4">
-                            <InputOTP value={otp} onChange={setOtp} maxLength={6}>
-                                <InputOTPGroup className="gap-2 mx-auto mt-2">
-                                    {[0, 1, 2, 3, 4, 5].map((i) => (
-                                        <InputOTPSlot key={i} index={i} />
-                                    ))}
-                                </InputOTPGroup>
-                            </InputOTP>
-                            {otpError && <p className="text-destructive text-sm text-center">{otpError}</p>}
-                            <Button type="submit" disabled={otpLoading || otp.length < 6} className="w-full">
-                                {otpLoading ? "Đang xác thực..." : "Xác thực"}
-                            </Button>
-                            <p className="text-xs text-center text-muted-foreground mt-2">
-                                Bạn không nhận được mã?{" "}
-                                {countdown > 0 ? (
-                                    <span className="text-muted-foreground">Gửi lại sau {countdown}s</span>
-                                ) : (
-                                    <span className="text-primary cursor-pointer hover:underline underline-offset-2" onClick={handleResendOtp}>
-                                        Gửi lại
-                                    </span>
-                                )}
-                            </p>
-                        </form>
                     </div>
                 ) : (
                     <div className="animate-in fade-in zoom-in-95 duration-300">
-                        <div className="flex flex-col items-center gap-2 mb-4">
-                            <h2 className="text-xl font-bold">Mật khẩu mới</h2>
-                            <p className="text-sm text-muted-foreground text-center">
-                                Nhập mật khẩu mới cho tài khoản của bạn.
-                            </p>
+                        <div className="rounded-2xl border border-border/60 bg-card/80 p-5 shadow-sm">
+                            <div className="flex flex-col items-center gap-2 mb-4">
+                                <h2 className="text-[18px] font-semibold tracking-tight">Mật khẩu mới</h2>
+                                <p className="text-sm text-muted-foreground text-center">
+                                    Nhập mật khẩu mới cho tài khoản của bạn.
+                                </p>
+                            </div>
+                            <form onSubmit={handleSubmitReset(onResetSubmit)} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="resetNewPassword">Mật khẩu mới</Label>
+                                    <div className="relative">
+                                        <Input
+                                            id="resetNewPassword"
+                                            type={showNewPassword ? "text" : "password"}
+                                            {...registerReset("newPassword")}
+                                            placeholder="••••••••"
+                                            className="pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowNewPassword((prev) => !prev)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                            tabIndex={-1}
+                                        >
+                                            {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                    {errorsReset.newPassword && (
+                                        <p className="text-sm text-destructive">{errorsReset.newPassword.message}</p>
+                                    )}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="resetConfirmNewPassword">Xác nhận mật khẩu mới</Label>
+                                    <div className="relative">
+                                        <Input
+                                            id="resetConfirmNewPassword"
+                                            type={showConfirmPassword ? "text" : "password"}
+                                            {...registerReset("confirmNewPassword")}
+                                            placeholder="••••••••"
+                                            className="pr-10"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                            tabIndex={-1}
+                                        >
+                                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                    </div>
+                                    {errorsReset.confirmNewPassword && (
+                                        <p className="text-sm text-destructive">{errorsReset.confirmNewPassword.message}</p>
+                                    )}
+                                </div>
+                                {errorsReset.root && (
+                                    <p className="text-sm text-destructive mt-2">{errorsReset.root.message}</p>
+                                )}
+                                <Button type="submit" disabled={isSubmittingReset} className="w-full mt-4 rounded-xl text-sm font-semibold">
+                                    Lưu mật khẩu mới
+                                </Button>
+                            </form>
                         </div>
-                        <form onSubmit={handleSubmitReset(onResetSubmit)} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="resetNewPassword">Mật khẩu mới</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="resetNewPassword"
-                                        type={showNewPassword ? "text" : "password"}
-                                        {...registerReset("newPassword")}
-                                        placeholder="••••••••"
-                                        className="pr-10"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowNewPassword((prev) => !prev)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                                        tabIndex={-1}
-                                    >
-                                        {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
-                                </div>
-                                {errorsReset.newPassword && (
-                                    <p className="text-sm text-destructive">{errorsReset.newPassword.message}</p>
-                                )}
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="resetConfirmNewPassword">Xác nhận mật khẩu mới</Label>
-                                <div className="relative">
-                                    <Input
-                                        id="resetConfirmNewPassword"
-                                        type={showConfirmPassword ? "text" : "password"}
-                                        {...registerReset("confirmNewPassword")}
-                                        placeholder="••••••••"
-                                        className="pr-10"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowConfirmPassword((prev) => !prev)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                                        tabIndex={-1}
-                                    >
-                                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
-                                </div>
-                                {errorsReset.confirmNewPassword && (
-                                    <p className="text-sm text-destructive">{errorsReset.confirmNewPassword.message}</p>
-                                )}
-                            </div>
-                            {errorsReset.root && (
-                                <p className="text-sm text-destructive mt-2">{errorsReset.root.message}</p>
-                            )}
-                            <Button type="submit" disabled={isSubmittingReset} className="w-full mt-4">
-                                Lưu mật khẩu mới
-                            </Button>
-                        </form>
                     </div>
                 )}
             </DialogContent>
