@@ -842,7 +842,7 @@ export const useCallStore = create<CallState>((set, get) => ({
       "no-answer": "Người nhận không phản hồi.",
       busy: "Người dùng đang bận.",
       "self-call": "Bạn không thể tự gọi chính mình.",
-      blocked: "Không thể gọi do trạng thái chặn.",
+      blocked: "Người dùng hiện không nhận cuộc gọi.",
       "not-friends": "Hai bạn chưa là bạn bè.",
       "already-in-call": "Bạn đang ở trong một cuộc gọi khác.",
       "already-active": "Cuộc gọi giữa hai bạn đang diễn ra.",

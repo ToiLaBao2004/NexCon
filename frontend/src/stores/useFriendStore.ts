@@ -277,7 +277,11 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 
 			set({ fetchingBlockedUsers: true });
 			const data = await friendService.fetchBlockedList();
-			set({ blockedUsers: data.blockedUsers || [], blockedUsersFetched: true });
+			set({
+				blockedUsers: data.blockedUsers || [],
+				blockedBy: (data.blockedBy || []).map((id: string) => id.toString()),
+				blockedUsersFetched: true
+			});
 		} catch (error) {
 			console.error('Lỗi khi tải danh sách chặn:', error);
 		} finally {

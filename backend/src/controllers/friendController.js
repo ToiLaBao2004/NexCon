@@ -606,11 +606,10 @@ export async function getFriendRequestsSended(req, res) {
 export async function getUserBlockedList(req, res) {
     try {
         const user = req.user;
-        const blockedUsers = await BlockUser.find({ from: user._id })
-            .populate('to', 'displayName email avatarUrl');
-        if (blockedUsers.length === 0) {
-            return res.status(200).json({ blockedUsers: [] });
-        }
+        const [blockedUsers, blockedByEntries] = await Promise.all([
+            BlockUser.find({ from: user._id }).populate('to', 'displayName email avatarUrl'),
+            BlockUser.find({ to: user._id }).select('from').lean(),
+        ]);
         const listedBlockedUsers = blockedUsers.map(entry => ({
             _id: entry.to._id,
             displayName: entry.to.displayName,
@@ -618,7 +617,10 @@ export async function getUserBlockedList(req, res) {
             avatarUrl: entry.to.avatarUrl,
             blockedAt: entry.createdAt
         }));
-        return res.status(200).json({ blockedUsers: listedBlockedUsers });
+        return res.status(200).json({
+            blockedUsers: listedBlockedUsers,
+            blockedBy: blockedByEntries.map(entry => entry.from.toString()),
+        });
     } catch (error) {
         console.error('Get blocked users error:', error);
         return res.status(500).json({ message: 'Server error' });

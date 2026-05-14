@@ -1,13 +1,13 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useFriendStore } from "@/stores/useFriendStore";
-import { UserX } from "lucide-react";
+import { UserPlus, UserX } from "lucide-react";
 import { useState } from "react";
 import { ConfirmationModal } from "../shared/ConfirmationModal";
 import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 
 export default function BlockedTab() {
-    const { blockedUsers, unblockUser, loading } = useFriendStore();
+    const { blockedUsers, unblockUser, sendFriendRequest, fetchBlockedList, loading, sendingRequest } = useFriendStore();
     const [selectedUser, setSelectedUser] = useState<any>(null);
     const [showUnblockConfirm, setShowUnblockConfirm] = useState(false);
     const [profileUser, setProfileUser] = useState<any>(null);
@@ -32,6 +32,16 @@ export default function BlockedTab() {
             console.error("Lỗi khi bỏ chặn:", error);
         } finally {
             setSelectedUser(null);
+        }
+    };
+
+    const handleUnblockAndSendRequest = async (user: any) => {
+        try {
+            await sendFriendRequest(user.email);
+            await fetchBlockedList(true);
+            setIsProfileOpen(false);
+        } catch (error) {
+            console.error("Loi khi bo chan va gui loi moi:", error);
         }
     };
 
@@ -74,6 +84,15 @@ export default function BlockedTab() {
                             >
                                 <UserX className="h-4 w-4" />
                                 Bỏ chặn
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={() => handleUnblockAndSendRequest(user)}
+                                disabled={sendingRequest}
+                                className="gap-2 rounded-xl transition-all active:scale-95"
+                            >
+                                <UserPlus className="h-4 w-4" />
+                                Kết bạn
                             </Button>
                         </div>
                     ))}
