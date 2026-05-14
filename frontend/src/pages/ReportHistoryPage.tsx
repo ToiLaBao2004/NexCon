@@ -87,7 +87,7 @@ function getMessagePreview(report: MyReport) {
 
 
 
-function ReportCard({ report, index = 0 }: { report: MyReport; index?: number }) {
+function ReportCard({ report, index = 0, embedded = false }: { report: MyReport; index?: number; embedded?: boolean }) {
   const isMessage = report.targetType === "message";
   const preview = getMessagePreview(report);
   const description = report.description?.trim();
@@ -95,9 +95,10 @@ function ReportCard({ report, index = 0 }: { report: MyReport; index?: number })
   return (
     <article
       className={cn(
-        "group relative overflow-hidden rounded-2xl border border-[hsl(var(--report-line))]",
-        "bg-[hsl(var(--report-card))] shadow-[0_12px_30px_-24px_hsl(var(--report-ink)/0.6)]",
-        "px-4 py-4 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-28px_hsl(var(--report-ink)/0.7)]",
+        "group relative overflow-hidden rounded-2xl px-4 py-4 transition-all duration-300 hover:-translate-y-0.5",
+        embedded
+          ? "border border-border/60 bg-card/80 shadow-sm hover:shadow-md"
+          : "border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card))] shadow-[0_12px_30px_-24px_hsl(var(--report-ink)/0.6)] hover:shadow-[0_18px_40px_-28px_hsl(var(--report-ink)/0.7)]",
         "animate-in fade-in slide-in-from-bottom-2 duration-500"
       )}
       style={{ animationDelay: `${Math.min(index * 40, 200)}ms` }}
@@ -107,9 +108,13 @@ function ReportCard({ report, index = 0 }: { report: MyReport; index?: number })
           <div
             className={cn(
               "flex size-10 shrink-0 items-center justify-center rounded-xl border",
-              isMessage
-                ? "border-sky-200/70 bg-sky-50/80 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/12 dark:text-sky-200"
-                : "border-rose-200/70 bg-rose-50/80 text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/12 dark:text-rose-200"
+              embedded
+                ? (isMessage
+                    ? "border-sky-500/20 bg-sky-500/10 text-sky-500"
+                    : "border-rose-500/20 bg-rose-500/10 text-rose-500")
+                : (isMessage
+                    ? "border-sky-200/70 bg-sky-50/80 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/12 dark:text-sky-200"
+                    : "border-rose-200/70 bg-rose-50/80 text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/12 dark:text-rose-200")
             )}
           >
             {isMessage ? <MessageSquare className="size-4.5" /> : <UserRound className="size-4.5" />}
@@ -117,42 +122,63 @@ function ReportCard({ report, index = 0 }: { report: MyReport; index?: number })
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="truncate text-[15px] font-semibold text-[hsl(var(--report-ink))]">
+              <h2 className={cn("truncate text-[15px] font-semibold", embedded ? "text-foreground" : "text-[hsl(var(--report-ink))]")}>
                 {isMessage ? "Báo cáo tin nhắn" : "Báo cáo người dùng"}
               </h2>
-              <span className="text-xs text-[hsl(var(--report-muted))]">•</span>
-              <span className="truncate text-[13px] text-[hsl(var(--report-muted))]">{getTargetName(report)}</span>
+              <span className={cn("text-xs", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")}>•</span>
+              <span className={cn("truncate text-[13px]", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")}>{getTargetName(report)}</span>
             </div>
 
-            <p className="mt-1 truncate text-[13px] text-[hsl(var(--report-muted))]">
+            <p className={cn("mt-1 truncate text-[13px]", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")}>
               {getTargetSubtitle(report)}
             </p>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[hsl(var(--report-chip))] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[hsl(var(--report-chip-ink))]">
+              <span className={cn(
+                "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]",
+                embedded
+                  ? "bg-muted/60 text-muted-foreground"
+                  : "bg-[hsl(var(--report-chip))] text-[hsl(var(--report-chip-ink))]"
+              )}>
                 {reasonLabels[report.reasonCategory] || "Khác"}
               </span>
             </div>
 
             {preview && (
-              <div className="mt-3 rounded-xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-soft))] px-3 py-2 text-[13px] text-[hsl(var(--report-muted))]">
+              <div className={cn(
+                "mt-3 rounded-xl border px-3 py-2 text-[13px]",
+                embedded
+                  ? "border-border/60 bg-muted/40 text-muted-foreground"
+                  : "border-[hsl(var(--report-line))] bg-[hsl(var(--report-soft))] text-[hsl(var(--report-muted))]"
+              )}>
                 <p className="line-clamp-2 break-words">{preview}</p>
               </div>
             )}
 
             {description && (
               <div className="mt-3">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[hsl(var(--report-muted))]">
+                <p className={cn(
+                  "text-[11px] font-semibold uppercase tracking-[0.12em]",
+                  embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]"
+                )}>
                   Ghi chú của bạn
                 </p>
-                <p className="mt-1 text-[14px] leading-relaxed text-[hsl(var(--report-ink)/0.78)]">
+                <p className={cn(
+                  "mt-1 text-[14px] leading-relaxed",
+                  embedded ? "text-foreground/80" : "text-[hsl(var(--report-ink)/0.78)]"
+                )}>
                   {description}
                 </p>
               </div>
             )}
 
             {report.resolution?.reporterMessage && (
-              <p className="mt-3 rounded-xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-soft))] px-3 py-2 text-[13px] leading-relaxed text-[hsl(var(--report-ink)/0.78)]">
+              <p className={cn(
+                "mt-3 rounded-xl border px-3 py-2 text-[13px] leading-relaxed",
+                embedded
+                  ? "border-border/60 bg-muted/40 text-foreground/80"
+                  : "border-[hsl(var(--report-line))] bg-[hsl(var(--report-soft))] text-[hsl(var(--report-ink)/0.78)]"
+              )}>
                 {report.resolution.reporterMessage}
               </p>
             )}
@@ -169,20 +195,23 @@ function ReportCard({ report, index = 0 }: { report: MyReport; index?: number })
           >
             {statusLabels[report.status] || report.status}
           </Badge>
-          <span className="text-[12px] text-[hsl(var(--report-muted))]">{formatReportTime(report.createdAt)}</span>
+          <span className={cn("text-[12px]", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")}>{formatReportTime(report.createdAt)}</span>
         </div>
       </div>
     </article>
   );
 }
 
-function ReportSkeleton() {
+function ReportSkeleton({ embedded = false }: { embedded?: boolean }) {
   return (
     <div className="grid gap-3">
       {Array.from({ length: 4 }).map((_, index) => (
         <div
           key={index}
-          className="flex gap-4 rounded-2xl border border-border/60 bg-card/80 px-4 py-4"
+          className={cn(
+            "flex gap-4 rounded-2xl border px-4 py-4",
+            embedded ? "border-border/60 bg-card/80" : "border-border/60 bg-card/80"
+          )}
         >
           <div className="size-10 shrink-0 animate-pulse rounded-xl bg-muted" />
           <div className="flex-1 space-y-2">
@@ -229,22 +258,21 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
   return (
     <div
       className={cn(
-        "relative flex h-full min-h-0 flex-col overflow-x-hidden font-[\"Space Grotesk\"]",
-        "[--report-ink:222_47%_11%] [--report-muted:215_18%_40%] [--report-line:214_32%_88%]",
-        "[--report-card:0_0%_100%] [--report-soft:210_40%_96%] [--report-chip:210_50%_96%] [--report-chip-ink:210_40%_25%]",
-        "dark:[--report-ink:210_40%_96%] dark:[--report-muted:215_20%_72%] dark:[--report-line:217_32%_22%]",
-        "dark:[--report-card:222_47%_9%] dark:[--report-soft:222_47%_14%] dark:[--report-chip:217_32%_18%] dark:[--report-chip-ink:210_40%_88%]",
-        embedded ? "bg-transparent" : "bg-[hsl(var(--report-soft))]"
+        "relative flex h-full min-h-0 flex-col overflow-x-hidden",
+        embedded
+          ? "[--report-ink:var(--foreground)] [--report-muted:var(--muted-foreground)] [--report-line:var(--border)] [--report-card:var(--card)] [--report-soft:var(--muted)] [--report-chip:var(--muted)] [--report-chip-ink:var(--foreground)] bg-transparent"
+          : "font-[\"Space Grotesk\"] [--report-ink:222_47%_11%] [--report-muted:215_18%_40%] [--report-line:214_32%_88%] [--report-card:0_0%_100%] [--report-soft:210_40%_96%] [--report-chip:210_50%_96%] [--report-chip-ink:210_40%_25%] dark:[--report-ink:210_40%_96%] dark:[--report-muted:215_20%_72%] dark:[--report-line:217_32%_22%] dark:[--report-card:222_47%_9%] dark:[--report-soft:222_47%_14%] dark:[--report-chip:217_32%_18%] dark:[--report-chip-ink:210_40%_88%] bg-[hsl(var(--report-soft))]"
       )}
     >
-      <div className={cn("pointer-events-none absolute inset-0 -z-10", embedded ? "opacity-40" : "opacity-70")}>
+      <div className={cn("pointer-events-none absolute inset-0 -z-10", embedded ? "opacity-0" : "opacity-70")}>
         <div className="absolute inset-0 bg-[radial-gradient(80%_120%_at_20%_0%,hsl(210_90%_56%/0.18)_0%,transparent_60%)]" />
       </div>
 
       <header className={cn("sticky top-0 z-20 shrink-0", embedded ? "px-0 pb-4" : "px-4 py-4 md:px-6")}>
         <div className={cn(
-          "rounded-2xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] backdrop-blur-xl",
-          embedded ? "px-3 py-3" : "px-4 py-4 md:px-5"
+          embedded
+            ? "rounded-2xl border border-border/60 bg-card/80 px-4 py-4 shadow-sm"
+            : "rounded-2xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] px-4 py-4 md:px-5 backdrop-blur-xl"
         )}>
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-start gap-3">
@@ -255,17 +283,28 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
               )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="flex size-8 items-center justify-center rounded-xl bg-[hsl(var(--report-soft))] text-[hsl(var(--report-ink))]">
+                  <span className={cn(
+                    "flex size-8 items-center justify-center rounded-xl",
+                    embedded ? "bg-muted/60 text-foreground" : "bg-[hsl(var(--report-soft))] text-[hsl(var(--report-ink))]}"
+                  )}>
                     <Flag className="size-4" />
                   </span>
-                  <h1 className={cn("truncate font-semibold text-[hsl(var(--report-ink))]", embedded ? "text-lg" : "text-xl md:text-2xl")}>
+                  <h1 className={cn(
+                    "truncate font-semibold",
+                    embedded ? "text-[18px] tracking-tight text-foreground" : "text-xl md:text-2xl text-[hsl(var(--report-ink))]"
+                  )}>
                     Lịch sử báo cáo
                   </h1>
                 </div>
-                <p className="mt-2 text-[13px] text-[hsl(var(--report-muted))]">
+                <p className={cn("mt-2 text-[13px]", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")}>
                   Theo dõi các báo cáo bạn đã gửi và trạng thái xử lý.
                 </p>
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card))] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--report-muted))]">
+                <div className={cn(
+                  "mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                  embedded
+                    ? "border border-border/60 bg-muted/50 text-muted-foreground"
+                    : "border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card))] text-[hsl(var(--report-muted))]"
+                )}>
                   {reports.length} báo cáo gần nhất
                 </div>
               </div>
@@ -274,7 +313,12 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
             <Button
               variant="outline"
               size="sm"
-              className="h-9 shrink-0 rounded-full border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] text-[12px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--report-ink))]"
+              className={cn(
+                "h-9 shrink-0 rounded-full",
+                embedded
+                  ? "border-border/60 bg-card/80 text-[12px] font-semibold uppercase tracking-[0.16em] text-foreground"
+                  : "border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] text-[12px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--report-ink))]"
+              )}
               disabled={loading || refreshing}
               onClick={() => void loadReports("refresh")}
             >
@@ -288,11 +332,16 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
       <main className={cn("beautiful-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden", embedded ? "pt-4" : "p-4 md:p-6")}>
         <div className={cn("mx-auto w-full min-w-0", embedded ? "max-w-none" : "max-w-5xl")}>
           {loading ? (
-            <ReportSkeleton />
+            <ReportSkeleton embedded={embedded} />
           ) : error ? (
-            <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-2xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] px-6 py-12 text-center">
-              <FileText className="size-8 text-[hsl(var(--report-muted))]" />
-              <p className="text-[13px] text-[hsl(var(--report-muted))]">{error}</p>
+            <div className={cn(
+              "flex min-h-72 flex-col items-center justify-center gap-3 rounded-2xl border px-6 py-12 text-center",
+              embedded
+                ? "border-border/60 bg-card/80"
+                : "border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)]"
+            )}>
+              <FileText className={cn("size-8", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")} />
+              <p className={cn("text-[13px]", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")}>{error}</p>
               <Button variant="outline" onClick={() => void loadReports("refresh")}>
                 Thử lại
               </Button>
@@ -300,16 +349,26 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
           ) : reports.length > 0 ? (
             <div className="grid gap-3">
               {reports.map((report, index) => (
-                <ReportCard key={report._id} report={report} index={index} />
+                <ReportCard key={report._id} report={report} index={index} embedded={embedded} />
               ))}
             </div>
           ) : (
-            <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] px-6 py-12 text-center">
-              <div className="mb-3 flex size-12 items-center justify-center rounded-xl bg-[hsl(var(--report-soft))]">
-                <Inbox className="size-6 text-[hsl(var(--report-muted))]" />
+            <div className={cn(
+              "flex min-h-72 flex-col items-center justify-center rounded-2xl border px-6 py-12 text-center",
+              embedded
+                ? "border-border/60 bg-card/80"
+                : "border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)]"
+            )}>
+              <div className={cn(
+                "mb-3 flex size-12 items-center justify-center rounded-xl",
+                embedded ? "bg-muted/60" : "bg-[hsl(var(--report-soft))]"
+              )}>
+                <Inbox className={cn("size-6", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")} />
               </div>
-              <h3 className="text-[14px] font-semibold text-[hsl(var(--report-ink))]">Không có báo cáo nào</h3>
-              <p className="mt-1 max-w-sm text-[13px] text-[hsl(var(--report-muted))]">
+              <h3 className={cn("text-[14px] font-semibold", embedded ? "text-foreground" : "text-[hsl(var(--report-ink))]")}>
+                Không có báo cáo nào
+              </h3>
+              <p className={cn("mt-1 max-w-sm text-[13px]", embedded ? "text-muted-foreground" : "text-[hsl(var(--report-muted))]")}>
                 Các báo cáo bạn đã gửi sẽ xuất hiện tại đây.
               </p>
             </div>
