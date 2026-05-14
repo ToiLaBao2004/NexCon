@@ -2348,8 +2348,8 @@ const MessageItem = ({
 									: (isVisualOnly || hasLinkPreview)
 										? "bg-transparent border-0 shadow-none"
 										: isOwn
-											? "bg-blue-500 text-white border-0 rounded-2xl rounded-br-none"
-											: "bg-gray-100 dark:bg-gray-800 text-foreground border-0 rounded-2xl rounded-bl-none"
+											? "bg-blue-500 text-white border border-blue-600/30 shadow-[0_1px_2px_rgba(37,99,235,0.18)] rounded-2xl rounded-br-none"
+											: "bg-white dark:bg-gray-800 text-foreground border border-slate-200/90 dark:border-slate-700/80 shadow-[0_1px_2px_rgba(15,23,42,0.08)] rounded-2xl rounded-bl-none"
 							)}
 						>
 							{message.replyTo && !isRecalled && !isViolationMessage && (
