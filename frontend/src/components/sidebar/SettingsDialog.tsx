@@ -150,7 +150,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <DialogContent className={cn(
                 "gap-0 border-border/40 w-screen h-[100dvh] max-w-none rounded-none border-0 top-0 left-0 translate-x-0 translate-y-0 sm:h-auto sm:rounded-lg sm:border sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]",
                 forgotPassStep === "none"
-                    ? "p-0 sm:max-w-[700px] overflow-y-auto"
+                    ? "p-0 sm:max-w-[700px] overflow-y-auto overflow-x-hidden"
                     : "p-4 sm:max-w-md sm:p-6 overflow-hidden"
             )}>
                 <DialogHeader className="sr-only">
@@ -158,47 +158,47 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     <DialogDescription>Tuy chinh thong bao, bao mat va tai khoan.</DialogDescription>
                 </DialogHeader>
                 {forgotPassStep === "none" ? (
-                    <div className="flex flex-col sm:flex-row h-[calc(100dvh-32px)] sm:h-[500px]">
+                    <div className="flex flex-col sm:flex-row h-[calc(100dvh-32px)] sm:h-[500px] overflow-x-hidden">
                         {/* Sidebar */}
-                        <div className="w-full sm:w-[220px] bg-muted/40 border-b sm:border-b-0 sm:border-r border-border/50 flex flex-col p-3 sm:p-4">
+                        <div className="w-full sm:w-[220px] bg-muted/40 border-b sm:border-b-0 sm:border-r border-border/50 flex flex-col p-3 sm:p-4 overflow-hidden">
                             <h2 className="text-lg sm:text-xl font-bold mb-3 sm:mb-6 px-1 sm:px-2">Cài đặt</h2>
-                            <div className="grid grid-cols-3 sm:grid-cols-1 gap-1">
+                            <div className="beautiful-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-1 sm:overflow-visible sm:px-0 sm:pb-0">
                                 <button
                                     onClick={() => setActiveTab("notifications")}
                                     className={cn(
-                                        "flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-md transition-colors sm:w-full sm:shrink",
                                         (activeTab === "notifications") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    <Bell className="w-4 h-4" />
+                                    <Bell className="w-4 h-4 shrink-0" />
                                     Thông báo
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("security")}
                                     className={cn(
-                                        "flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-md transition-colors sm:w-full sm:shrink",
                                         (activeTab === "security") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    <Shield className="w-4 h-4" />
+                                    <Shield className="w-4 h-4 shrink-0" />
                                     Bảo mật
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("reports")}
                                     className={cn(
-                                        "flex items-center gap-3 w-full px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-medium rounded-md transition-colors sm:w-full sm:shrink",
                                         (activeTab === "reports") ? "bg-primary text-primary-foreground shadow-sm" : "hover:bg-muted text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    <Flag className="w-4 h-4" />
+                                    <Flag className="w-4 h-4 shrink-0" />
                                     Báo cáo
                                 </button>
                             </div>
                         </div>
 
                         {/* Content */}
-                        <div className="beautiful-scrollbar flex-1 overflow-y-auto">
-                            <div className="p-4 sm:p-6 h-full relative">
+                        <div className="beautiful-scrollbar flex-1 overflow-y-auto overflow-x-hidden">
+                            <div className="p-4 sm:p-6 h-full min-w-0 overflow-x-hidden relative">
                                 {activeTab === "notifications" && <NotificationTab />}
                                 {activeTab === "security" && <SecurityTab onForgotPassword={handleForgotPassword} />}
                                 {activeTab === "reports" && <ReportHistoryContent embedded />}
