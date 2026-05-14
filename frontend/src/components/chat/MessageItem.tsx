@@ -120,7 +120,7 @@ function renderMentionedText(
 			tokenParts.push(<span key={`token-tail-${tokenCursor}`}>{safeText.slice(tokenCursor)}</span>);
 		}
 
-		return <span className="text-base whitespace-pre-wrap break-words">{tokenParts}</span>;
+		return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{tokenParts}</span>;
 	}
 
 	const validMentions = (mentions ?? [])
@@ -128,7 +128,7 @@ function renderMentionedText(
 		.sort((a, b) => a.offset - b.offset);
 
 	if (!validMentions.length) {
-		return <span className="text-base whitespace-pre-wrap break-words">{safeText}</span>;
+		return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{safeText}</span>;
 	}
 
 	const parts: React.ReactNode[] = [];
@@ -156,7 +156,7 @@ function renderMentionedText(
 		parts.push(<span key={`text-tail-${cursor}`}>{safeText.slice(cursor)}</span>);
 	}
 
-	return <span className="text-base whitespace-pre-wrap break-words">{parts}</span>;
+	return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{parts}</span>;
 }
 
 function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
@@ -498,7 +498,7 @@ function ImageBatchGrid({
 				))}
 			</div>
 			{items[0]?.content && !items[0]?.isRecalled && !items[0]?.reportStatus && (
-				<p className="px-2 text-base leading-relaxed sm:text-[17px]">
+				<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
 					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
 				</p>
 			)}
@@ -582,7 +582,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					</button>
 				)}
 				{message.content && (
-					<p className="px-2 text-base leading-relaxed sm:text-[17px]">
+					<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
 						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
 					</p>
 				)}
@@ -651,7 +651,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<FileText className={cn("size-5", isOwn ? "text-white" : "text-primary")} />
 					</div>
 					<div className="flex flex-col min-w-0">
-						<span className="max-w-[180px] truncate text-base font-medium sm:text-[17px]">{message.fileName ?? "File"}</span>
+						<span className="max-w-[180px] truncate text-[14px] font-medium sm:text-[15px]">{message.fileName ?? "File"}</span>
 						<span className={cn("text-[12px] sm:text-[13px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
 							{message.fileSize ? formatBytes(message.fileSize) : (message.mimeType ?? "")}
 						</span>
@@ -659,7 +659,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					<ExternalLink className={cn("size-3.5 shrink-0 ml-1 opacity-0 group-hover/file:opacity-70 transition-opacity", isOwn ? "text-white" : "text-muted-foreground")} />
 				</a>
 				{message.content && (
-					<div className="px-2 text-base leading-relaxed whitespace-pre-wrap break-words sm:text-[17px]">
+					<div className="px-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words sm:text-[15px]">
 						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
 					</div>
 				)}
@@ -708,7 +708,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						</div>
 
 						{preview.title && (
-							<div className="line-clamp-2 text-base font-semibold sm:text-[17px]">
+							<div className="line-clamp-2 text-[14px] font-semibold sm:text-[15px]">
 								{preview.title}
 							</div>
 						)}
@@ -738,7 +738,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				)}
 			>
 				<Link2 className="size-3.5 shrink-0" />
-				<span className="break-all text-base sm:text-[17px]">{message.content}</span>
+				<span className="break-all text-[14px] sm:text-[15px]">{message.content}</span>
 			</a>
 		);
 	}
@@ -2338,7 +2338,7 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-base leading-relaxed sm:text-[17px]" : "px-4 py-2.5 text-base leading-relaxed sm:text-[17px]"),
+								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[14px] leading-relaxed sm:text-[15px]" : "px-4 py-2.5 text-[14px] leading-relaxed sm:text-[15px]"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
 								(isRecalled && !isImageBatch)
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
