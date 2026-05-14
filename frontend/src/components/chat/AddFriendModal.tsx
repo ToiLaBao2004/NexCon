@@ -10,7 +10,7 @@ const AddFriendModal = () => {
   };
 
   return (
-    <UserSearch className="shrink-0 px-2 py-3" onOpenChat={handleOpenChat} />
+    <UserSearch className="shrink-0 border-b-0 px-2 pt-2 pb-3" onOpenChat={handleOpenChat} />
   );
 };
 

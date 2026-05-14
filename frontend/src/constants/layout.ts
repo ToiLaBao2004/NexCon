@@ -1,4 +1,4 @@
-export const MAIN_SIDEBAR_WIDTH_REM = 4.5;
+export const MAIN_SIDEBAR_WIDTH_REM = 4;
 export const APP_SIDEBAR_WIDTH_PX = 300;
 export const APP_SHELL_GAP_PX = 0;
 

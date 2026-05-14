@@ -130,8 +130,8 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   };
 
   return (
-    <header className="sticky top-0 z-10 px-2 md:px-4 py-2 flex items-center bg-background">
-      <div className="flex items-center gap-1 md:gap-2 w-full">
+    <header className="sticky top-0 z-10 px-2 md:px-4 py-1.5 flex min-w-0 items-center bg-background border-b border-border/80">
+      <div className="flex min-w-0 items-center gap-1 md:gap-2 w-full">
         {/* Mobile: back button to conversation list */}
         {isMobile ? (
           <Button

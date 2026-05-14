@@ -51,11 +51,11 @@ const ChatAppPageContent = ({
         <AppSidebar
           collapsible={isMobile ? "none" : "offcanvas"}
           className={`
-            md:left-[72px]
-            top-0 md:top-2 bottom-0 md:bottom-2 
-            ${isMobile ? 'h-full w-full' : 'h-[calc(100vh-16px)]'}
+            md:left-16 md:group-data-[collapsible=offcanvas]:left-[calc(4rem-var(--sidebar-width))]
+            top-0 bottom-0 
+            ${isMobile ? 'h-full w-full' : 'h-full'}
             bg-card
-            border-0 md:border-y md:border-r md:border-l-0 md:border-border/50
+            border-0 md:border-r md:border-border/80
             rounded-none
             shadow-none
           `}
@@ -63,14 +63,14 @@ const ChatAppPageContent = ({
       )}
 
       {showChatWindow && (
-        <main className="flex-1 min-w-0 bg-card rounded-none md:rounded-l-none md:rounded-r-2xl overflow-hidden shadow-none border-0 md:border-y md:border-r md:border-l-0 md:border-border/50 h-full flex">
+        <main className="flex-1 min-w-0 bg-card rounded-none overflow-hidden shadow-none border-0 h-full flex">
           <div className="flex-1 min-w-0 flex flex-col">
             <ChatWindowLayout />
           </div>
 
           {/* Right info sidebar – hidden on mobile, full-screen overlay handled separately */}
           {!useOverlayInfoSidebar && showInfo && selectedConvo && (
-            <div className="w-[350px] shrink-0 border-l border-border/40 overflow-hidden bg-card/10">
+            <div className="w-[350px] shrink-0 border-l border-border/70 overflow-hidden bg-card/10">
               <ConversationInfoSidebar conversation={selectedConvo} />
             </div>
           )}
@@ -92,7 +92,7 @@ const ChatAppPageContent = ({
               onClick={() => setShowSidebar(null)}
               className="text-foreground p-1"
             >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
             </button>
             <span className="font-semibold text-foreground">Thông tin hội thoại</span>
           </div>
