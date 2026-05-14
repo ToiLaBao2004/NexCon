@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { v2 as cloudinary } from 'cloudinary';
 import { connectDB } from '../config/db.js';
-import { startGroupCleanupWorker } from './groupCleanupWorker.js';
+import { reloadPendingGroupCleanups, startGroupCleanupWorker } from './groupCleanupWorker.js';
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -10,8 +10,9 @@ cloudinary.config({
 });
 
 connectDB().then(() => {
-    startGroupCleanupWorker();
     console.log('[GroupCleanupWorker] Worker dang chay va cho job cleanup.');
+    startGroupCleanupWorker();
+    reloadPendingGroupCleanups();
 }).catch((error) => {
     console.error('[GroupCleanupWorker] Khong the khoi dong worker:', error);
     process.exit(1);

@@ -39,6 +39,15 @@ function maskPopulatedSender(message) {
     };
 }
 
+function getMessageVisibleToUserIds(message) {
+    const metadata = message?.metadata instanceof Map
+        ? Object.fromEntries(message.metadata)
+        : (message?.metadata || {});
+    return Array.isArray(metadata.visibleToUserIds)
+        ? metadata.visibleToUserIds.map((id) => id.toString())
+        : [];
+}
+
 async function respondWithModerationBlock(req, res, moderationResult, message, messageType) {
     const violation = await registerViolation({
         userId: req.user._id,
@@ -1189,6 +1198,17 @@ export async function getSignedMediaUrl(req, res) {
 
         if (!conversation) {
             return res.status(403).json({ message: 'Bạn không có quyền xem ảnh này.' });
+        }
+
+        const userId = req.user._id.toString();
+        const participant = conversation.participants.find((p) => p.userId.toString() === userId);
+        if (participant?.clearedAt && new Date(message.createdAt).getTime() <= new Date(participant.clearedAt).getTime()) {
+            return res.status(404).json({ message: 'Tai nguyen khong con ton tai trong cuoc tro chuyen cua ban.' });
+        }
+
+        const visibleToUserIds = getMessageVisibleToUserIds(message);
+        if (visibleToUserIds.length > 0 && !visibleToUserIds.includes(userId)) {
+            return res.status(403).json({ message: 'Ban khong co quyen xem tai nguyen nay.' });
         }
 
         const signedUrl = generateSignedUrl(message.filePublicId, message.type);

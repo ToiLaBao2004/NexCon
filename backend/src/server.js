@@ -20,7 +20,8 @@ import adminRouter from './routes/adminRoute.js';
 import { app, server } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { startReminderWorker, reloadPendingReminders } from './workers/reminderWorker.js';
-import { startGroupCleanupWorker } from './workers/groupCleanupWorker.js';
+import { reloadPendingGroupCleanups, startGroupCleanupWorker } from './workers/groupCleanupWorker.js';
+import { reloadPendingConversationClearCleanups, startConversationClearCleanupWorker } from './workers/conversationClearCleanupWorker.js';
 import { apiLimiter } from './middlewares/rateLimiters.js';
 import { auditLogMiddleware } from './middlewares/auditLogMiddleware.js';
 import { requireUser } from './middlewares/roleMiddleware.js';
@@ -75,7 +76,12 @@ connectDB().then(() => {
         if (process.env.ENABLE_INLINE_GROUP_CLEANUP_WORKER !== 'false') {
             startGroupCleanupWorker();
         }
+        if (process.env.ENABLE_INLINE_CONVERSATION_CLEAR_CLEANUP_WORKER !== 'false') {
+            startConversationClearCleanupWorker();
+        }
         reloadPendingReminders();
+        reloadPendingGroupCleanups();
+        reloadPendingConversationClearCleanups();
     } catch (err) {
         console.error('[Server] Không thể khởi tạo Reminder Worker (Redis có thể chưa sẵn sàng):', err.message);
     }

@@ -1,10 +1,11 @@
 import { Worker } from 'bullmq';
-import redisIOClient from '../config/redisIOClient.js';
+import redisIOClient, { isRedisIOReady } from '../config/redisIOClient.js';
 import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import Reminder from '../models/reminderModel.js';
 import { deleteCloudinaryResource } from '../middlewares/uploadMiddleware.js';
 import { removeReminderJob } from '../config/reminderQueue.js';
+import { enqueueGroupCleanup } from '../config/groupCleanupQueue.js';
 
 const MESSAGE_BATCH_SIZE = 50;
 const REMINDER_BATCH_SIZE = 100;
@@ -193,4 +194,55 @@ export function startGroupCleanupWorker() {
     });
 
     return workerInstance;
+}
+
+export async function reloadPendingGroupCleanups() {
+    const runReload = async () => {
+        try {
+            const conversations = await Conversation.find({
+                type: 'group',
+                disbanded: true,
+                $or: [
+                    { 'cleanup.status': { $exists: false } },
+                    { 'cleanup.status': { $in: ['idle', 'queued', 'processing', 'failed', 'completed'] } },
+                ],
+            }).select('_id cleanup.status').lean();
+
+            let count = 0;
+            for (const conversation of conversations) {
+                const job = await enqueueGroupCleanup(conversation._id);
+                if (!job) continue;
+                count += 1;
+
+                if (conversation.cleanup?.status !== 'completed') {
+                    await Conversation.updateOne(
+                        { _id: conversation._id },
+                        {
+                            $set: {
+                                'cleanup.status': 'queued',
+                                'cleanup.queuedAt': new Date(),
+                            },
+                            $unset: {
+                                'cleanup.error': 1,
+                                'cleanup.failedAt': 1,
+                            },
+                        },
+                    );
+                }
+            }
+
+            console.log(`[GroupCleanupMigration] Da reload ${count}/${conversations.length} job cleanup nhom vao Queue.`);
+        } catch (error) {
+            console.error('[GroupCleanupMigration] Loi reload cleanup nhom:', error);
+        }
+    };
+
+    if (isRedisIOReady) {
+        await runReload();
+    } else {
+        console.log('[GroupCleanupMigration] Cho RedisIO san sang de reload...');
+        redisIOClient.once('ready', () => {
+            void runReload();
+        });
+    }
 }

@@ -1320,13 +1320,19 @@ export const useChatStore = create<ChatState>()(
                         const isFocused = state.focusedConversationId === conversationId;
 
                         const nextMessages = { ...state.messages };
+                        const nextMedia = { ...state.media };
+                        const nextMediaPagination = { ...state.mediaPagination };
                         delete nextMessages[conversationId];
+                        delete nextMedia[conversationId];
+                        delete nextMediaPagination[conversationId];
 
                         return {
                             conversations: nextConversations,
                             activeConversationId: isActive ? null : state.activeConversationId,
                             focusedConversationId: isFocused ? null : state.focusedConversationId,
                             messages: nextMessages,
+                            media: nextMedia,
+                            mediaPagination: nextMediaPagination,
                         };
                     });
                 } catch (error) {
