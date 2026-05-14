@@ -121,7 +121,8 @@ export async function sendFriendRequest(req, res) {
             await createNotification(receiver._id,
                 "Friend Request Resent",
                 `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${message ? `"${message}"` : ""}`,
-                `${process.env.FRONTEND_URL}/people?tab=requests`);
+                `${process.env.FRONTEND_URL}/people?tab=requests`,
+                { actorId: sender._id });
             const populatedRequest = await FriendRequest.findById(rejectedRequest._id)
                 .populate('from', 'displayName email avatarUrl');
             await emitSentRequestUpdated(sender._id, rejectedRequest._id);
@@ -149,7 +150,8 @@ export async function sendFriendRequest(req, res) {
             await createNotification(receiver._id,
                 "Friend Request Accepted",
                 `${sender.displayName} đã chấp nhận lời mời kết bạn của bạn.`,
-                `${process.env.FRONTEND_URL}/people?tab=friends`);
+                `${process.env.FRONTEND_URL}/people?tab=friends`,
+                { actorId: sender._id });
             const receiverSocketId = getReceiverSocketId(receiver._id.toString());
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit("friend-request-accepted", {
@@ -175,7 +177,8 @@ export async function sendFriendRequest(req, res) {
         await createNotification(receiver._id,
             "New Friend Request",
             `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${message ? `"${message}"` : ""}`,
-            `${process.env.FRONTEND_URL}/people?tab=requests`);
+            `${process.env.FRONTEND_URL}/people?tab=requests`,
+            { actorId: sender._id });
         const populatedRequest = await FriendRequest.findById(friendRequest._id)
             .populate('from', 'displayName email avatarUrl bio phone');
         await emitSentRequestUpdated(sender._id, friendRequest._id);
@@ -223,7 +226,8 @@ export async function acceptFriendRequest(req, res) {
         await createNotification(sender._id,
             "Friend Request Accepted",
             `${receiver.displayName} đã chấp nhận lời mời kết bạn của bạn.`,
-            `${process.env.FRONTEND_URL}/people?tab=friends`);
+            `${process.env.FRONTEND_URL}/people?tab=friends`,
+            { actorId: receiver._id });
         const senderSocketId = getReceiverSocketId(sender._id.toString());
         if (senderSocketId) {
             io.to(senderSocketId).emit("friend-request-accepted", {
@@ -325,7 +329,8 @@ export async function resendFriendRequest(req, res) {
         await createNotification(receiver._id,
             "Friend Request Resent",
             `${sender.displayName} đã gửi lại lời mời kết bạn.`,
-            `${process.env.FRONTEND_URL}/people?tab=requests`);
+            `${process.env.FRONTEND_URL}/people?tab=requests`,
+            { actorId: sender._id });
         return res.status(200).json({ message: `Đã gửi lại lời mời kết bạn đến ${receiver.displayName}.` });
     } catch (error) {
         console.error('Accept friend request error:', error);
@@ -601,11 +606,10 @@ export async function getFriendRequestsSended(req, res) {
 export async function getUserBlockedList(req, res) {
     try {
         const user = req.user;
-        const blockedUsers = await BlockUser.find({ from: user._id })
-            .populate('to', 'displayName email avatarUrl');
-        if (blockedUsers.length === 0) {
-            return res.status(200).json({ blockedUsers: [] });
-        }
+        const [blockedUsers, blockedByEntries] = await Promise.all([
+            BlockUser.find({ from: user._id }).populate('to', 'displayName email avatarUrl'),
+            BlockUser.find({ to: user._id }).select('from').lean(),
+        ]);
         const listedBlockedUsers = blockedUsers.map(entry => ({
             _id: entry.to._id,
             displayName: entry.to.displayName,
@@ -613,7 +617,10 @@ export async function getUserBlockedList(req, res) {
             avatarUrl: entry.to.avatarUrl,
             blockedAt: entry.createdAt
         }));
-        return res.status(200).json({ blockedUsers: listedBlockedUsers });
+        return res.status(200).json({
+            blockedUsers: listedBlockedUsers,
+            blockedBy: blockedByEntries.map(entry => entry.from.toString()),
+        });
     } catch (error) {
         console.error('Get blocked users error:', error);
         return res.status(500).json({ message: 'Server error' });

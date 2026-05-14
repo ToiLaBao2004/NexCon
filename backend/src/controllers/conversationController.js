@@ -16,6 +16,8 @@ import {
 } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
+import { enqueueGroupCleanup } from '../config/groupCleanupQueue.js';
+import { enqueueConversationClearCleanup } from '../config/conversationClearCleanupQueue.js';
 
 const MUTE_DURATION_MS = {
 	'1h': 60 * 60 * 1000,
@@ -92,6 +94,16 @@ function sanitizeModeratedMessage(message) {
 
 function sanitizeMessages(messages = []) {
 	return messages.map((message) => sanitizeModeratedMessage(message));
+}
+
+function getClearCleanupCutoff(conversation) {
+	const clearTimes = (conversation.participants || [])
+		.map((participant) => participant.clearedAt ? new Date(participant.clearedAt) : null);
+	if (clearTimes.length === 0 || clearTimes.some((date) => !date || Number.isNaN(date.getTime()))) {
+		return null;
+	}
+
+	return new Date(Math.min(...clearTimes.map((date) => date.getTime())));
 }
 
 export async function createConversation(req, res) {
@@ -254,6 +266,7 @@ export async function getConversations(req, res) {
 		conversations = conversations.filter(c => {
 			const me = c.participants?.find(p => p.userId?._id?.toString() === myId);
 			if (!me || !me.clearedAt) return true;
+			if (!c.lastMessage) return false;
 
 			const compareTime = c.lastMessage?.createdAt
 				? new Date(c.lastMessage.createdAt).getTime()
@@ -852,13 +865,33 @@ export async function getMediaByType(req, res) {
 	try {
 		const { conversationId } = req.params;
 		const { type, limit = 8, cursor } = req.query;
+		const userId = req.user._id.toString();
 
 		const allowedTypes = ['image', 'file', 'link'];
 		if (!type || !allowedTypes.includes(type)) {
 			return res.status(400).json({ message: 'Invalid type. Must be one of: image, file, link' });
 		}
 
-		const query = { conversationId, isRecalled: { $ne: true }, reportStatus: { $ne: true } };
+		const conversation = await Conversation.findById(conversationId).select('participants').lean();
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found' });
+		}
+
+		const me = conversation.participants?.find((p) => p.userId.toString() === userId);
+		if (!me) {
+			return res.status(403).json({ message: 'You are not a participant in this conversation.' });
+		}
+
+		const query = {
+			conversationId,
+			isRecalled: { $ne: true },
+			reportStatus: { $ne: true },
+			$or: [
+				{ 'metadata.visibleToUserIds': { $exists: false } },
+				{ 'metadata.visibleToUserIds': { $size: 0 } },
+				{ 'metadata.visibleToUserIds': userId },
+			],
+		};
 
 		if (type === 'image') {
 			query.type = 'image';
@@ -871,8 +904,12 @@ export async function getMediaByType(req, res) {
 			query.content = { $ne: null };
 		}
 
+		if (me.clearedAt) {
+			query.createdAt = { $gt: new Date(me.clearedAt) };
+		}
+
 		if (cursor) {
-			query.createdAt = { $lt: new Date(cursor) };
+			query.createdAt = { ...query.createdAt, $lt: new Date(cursor) };
 		}
 
 		const numLimit = Number(limit);
@@ -1077,6 +1114,7 @@ export async function updateGroupAvatar(req, res) {
 
 async function disbandGroup(conversation, adminUser) {
 	conversation.disbanded = true;
+	conversation.disbandedAt = new Date();
 
 	const systemMessage = new Message({
 		conversationId: conversation._id,
@@ -1096,8 +1134,36 @@ async function disbandGroup(conversation, adminUser) {
 	updateConversationLastMessage(conversation, finalMsg, adminUser._id);
 	await conversation.save();
 
+	const cleanupResult = await queueDisbandCleanup(conversation);
+
 	io.to(conversation._id.toString()).emit('group-disbanded', { conversationId: conversation._id });
 	emitNewMessage(io, conversation, finalMsg);
+	return cleanupResult;
+}
+
+async function queueDisbandCleanup(conversation) {
+	conversation.cleanup = {
+		...(conversation.cleanup?.toObject?.() || conversation.cleanup || {}),
+		status: 'queued',
+		queuedAt: new Date(),
+		error: undefined,
+		failedAt: undefined,
+	};
+
+	try {
+		const cleanupJob = await enqueueGroupCleanup(conversation._id);
+		if (cleanupJob?.id) {
+			conversation.cleanup.jobId = cleanupJob.id.toString();
+		}
+		await conversation.save();
+		return { status: 'queued', job: cleanupJob };
+	} catch (error) {
+		conversation.cleanup.status = 'failed';
+		conversation.cleanup.failedAt = new Date();
+		conversation.cleanup.error = error?.message || 'Cannot enqueue cleanup job';
+		await conversation.save();
+		return { status: 'failed', error: conversation.cleanup.error };
+	}
 }
 export async function disbandGroupByAdmin(req, res) {
 	try {
@@ -1117,8 +1183,31 @@ export async function disbandGroupByAdmin(req, res) {
 			return res.status(403).json({ message: 'Only admins can disband the group.' });
 		}
 
-		await disbandGroup(conversation, req.user);
-		res.status(200).json({ message: 'Group disbanded successfully.' });
+		if (conversation.disbanded === true) {
+			const cleanupStatus = conversation.cleanup?.status || 'idle';
+			if (['idle', 'failed'].includes(cleanupStatus)) {
+				const cleanupResult = await queueDisbandCleanup(conversation);
+				return res.status(202).json({
+					message: cleanupResult?.status === 'queued'
+						? 'Group already disbanded. Cleanup job queued.'
+						: 'Group already disbanded. Cleanup job will be retried when Redis is available.',
+					cleanupStatus: cleanupResult?.status || 'failed',
+				});
+			}
+
+			return res.status(200).json({
+				message: 'Group already disbanded.',
+				cleanupStatus,
+			});
+		}
+
+		const cleanupResult = await disbandGroup(conversation, req.user);
+		res.status(202).json({
+			message: cleanupResult?.status === 'queued'
+				? 'Group disbanded. Cleanup job queued.'
+				: 'Group disbanded. Cleanup job will be retried when Redis is available.',
+			cleanupStatus: cleanupResult?.status || 'failed',
+		});
 	} catch (error) {
 		console.error('Error disbanding group:', error);
 		res.status(500).json({ message: 'Internal server error' });
@@ -1143,6 +1232,13 @@ export async function clearConversation(req, res) {
 		participant.clearedAt = Date.now();
 		conversation.markModified('participants');
 		await conversation.save();
+
+		const cleanupBefore = getClearCleanupCutoff(conversation);
+		if (cleanupBefore) {
+			enqueueConversationClearCleanup(conversation._id, cleanupBefore).catch((cleanupError) => {
+				console.error('[ConversationClearCleanupQueue] Cannot enqueue cleanup job:', cleanupError?.message || cleanupError);
+			});
+		}
 
 		const receiverSocketId = getReceiverSocketId(userId.toString());
 		if (receiverSocketId) {

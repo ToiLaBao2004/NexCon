@@ -57,7 +57,7 @@
     --destructive-foreground: 0 0% 100%;
 
     /* Border & input */
-    --border: 214 32% 90%;
+    --border: 214 32% 84%;
     --input: 214 32% 95%;
     --ring: 217 91% 60%;
 
@@ -138,7 +138,7 @@
     --chat-bubble-sent: 217 100% 65%;
     --chat-bubble-received: 222 47% 15%;
 
-    --border: 217 32% 22%;
+    --border: 217 32% 28%;
     --input: 222 47% 15%;
     --ring: 217 100% 70%;
 

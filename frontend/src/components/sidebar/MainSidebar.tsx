@@ -87,12 +87,18 @@ const MainSidebar = () => {
     return (
         <aside
             onClick={handleSidebarClick}
-            className="hidden md:flex flex-col items-center w-16 h-full py-4 bg-white dark:bg-[#081c36] border-r border-border/50 shadow-none shrink-0 cursor-default transition-colors duration-300"
+            className="hidden md:flex flex-col items-center w-16 h-full pt-3 pb-4 bg-white dark:bg-[#081c36] border-r border-border/80 shadow-none shrink-0 cursor-default transition-colors duration-300"
         >
             <TooltipProvider delayDuration={0}>
                 {/* Top Section: Avatar and Main Nav */}
                 <div
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            setFocusedConversation(null);
+                            return;
+                        }
+                        e.stopPropagation();
+                    }}
                     className="flex flex-col items-center gap-2 w-full flex-1"
                 >
                     {/* User Avatar */}

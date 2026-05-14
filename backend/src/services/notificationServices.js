@@ -17,6 +17,8 @@ export async function createNotification(userId, title, content, linkUrl, option
     });
     await notification.save();
 
+    await notification.populate('actorId', 'displayName avatarUrl');
+
     const delivered = emitToUser(userId.toString(), 'new-notification', { notification });
 
     if (!delivered) {

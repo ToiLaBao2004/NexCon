@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowLeft,
@@ -40,10 +40,10 @@ const statusLabels: Record<ReportStatus, string> = {
 };
 
 const statusClassNames: Record<ReportStatus, string> = {
-  pending: "border-amber-200/70 bg-amber-50/80 text-amber-700",
-  reviewing: "border-sky-200/70 bg-sky-50/80 text-sky-700",
-  resolved: "border-emerald-200/70 bg-emerald-50/80 text-emerald-700",
-  dismissed: "border-slate-200/70 bg-slate-50/80 text-slate-600",
+  pending: "border-amber-200/70 bg-amber-50/80 text-amber-700 dark:border-amber-400/25 dark:bg-amber-400/12 dark:text-amber-200",
+  reviewing: "border-sky-200/70 bg-sky-50/80 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/12 dark:text-sky-200",
+  resolved: "border-emerald-200/70 bg-emerald-50/80 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-400/12 dark:text-emerald-200",
+  dismissed: "border-slate-200/70 bg-slate-50/80 text-slate-600 dark:border-slate-400/25 dark:bg-slate-400/12 dark:text-slate-200",
 };
 
 function formatReportTime(dateString?: string) {
@@ -108,8 +108,8 @@ function ReportCard({ report, index = 0 }: { report: MyReport; index?: number })
             className={cn(
               "flex size-10 shrink-0 items-center justify-center rounded-xl border",
               isMessage
-                ? "border-sky-200/70 bg-sky-50/80 text-sky-700"
-                : "border-rose-200/70 bg-rose-50/80 text-rose-700"
+                ? "border-sky-200/70 bg-sky-50/80 text-sky-700 dark:border-sky-400/25 dark:bg-sky-400/12 dark:text-sky-200"
+                : "border-rose-200/70 bg-rose-50/80 text-rose-700 dark:border-rose-400/25 dark:bg-rose-400/12 dark:text-rose-200"
             )}
           >
             {isMessage ? <MessageSquare className="size-4.5" /> : <UserRound className="size-4.5" />}
@@ -135,7 +135,7 @@ function ReportCard({ report, index = 0 }: { report: MyReport; index?: number })
             </div>
 
             {preview && (
-              <div className="mt-3 rounded-xl border border-[hsl(var(--report-line))] bg-white/70 px-3 py-2 text-[13px] text-[hsl(var(--report-muted))]">
+              <div className="mt-3 rounded-xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-soft))] px-3 py-2 text-[13px] text-[hsl(var(--report-muted))]">
                 <p className="line-clamp-2 break-words">{preview}</p>
               </div>
             )}
@@ -226,33 +226,24 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
     void loadReports();
   }, []);
 
-  const themeStyle = {
-    "--report-ink": "222 47% 11%",
-    "--report-muted": "215 18% 40%",
-    "--report-line": "214 32% 88%",
-    "--report-card": "0 0% 100%",
-    "--report-soft": "210 40% 96%",
-    "--report-chip": "210 50% 96%",
-    "--report-chip-ink": "210 40% 25%",
-  } as CSSProperties;
-
   return (
     <div
       className={cn(
-        "relative flex h-full min-h-0 flex-col font-[\"Space Grotesk\"]",
+        "relative flex h-full min-h-0 flex-col overflow-x-hidden font-[\"Space Grotesk\"]",
+        "[--report-ink:222_47%_11%] [--report-muted:215_18%_40%] [--report-line:214_32%_88%]",
+        "[--report-card:0_0%_100%] [--report-soft:210_40%_96%] [--report-chip:210_50%_96%] [--report-chip-ink:210_40%_25%]",
+        "dark:[--report-ink:210_40%_96%] dark:[--report-muted:215_20%_72%] dark:[--report-line:217_32%_22%]",
+        "dark:[--report-card:222_47%_9%] dark:[--report-soft:222_47%_14%] dark:[--report-chip:217_32%_18%] dark:[--report-chip-ink:210_40%_88%]",
         embedded ? "bg-transparent" : "bg-[hsl(var(--report-soft))]"
       )}
-      style={themeStyle}
     >
       <div className={cn("pointer-events-none absolute inset-0 -z-10", embedded ? "opacity-40" : "opacity-70")}>
         <div className="absolute inset-0 bg-[radial-gradient(80%_120%_at_20%_0%,hsl(210_90%_56%/0.18)_0%,transparent_60%)]" />
-        <div className="absolute -top-24 right-[-20%] h-72 w-72 rounded-full bg-[radial-gradient(circle,hsl(199_100%_70%/0.45)_0%,transparent_60%)] blur-3xl" />
-        <div className="absolute -bottom-28 left-[-15%] h-80 w-80 rounded-full bg-[radial-gradient(circle,hsl(210_70%_70%/0.35)_0%,transparent_60%)] blur-3xl" />
       </div>
 
       <header className={cn("sticky top-0 z-20 shrink-0", embedded ? "px-0 pb-4" : "px-4 py-4 md:px-6")}>
         <div className={cn(
-          "rounded-2xl border border-[hsl(var(--report-line))] bg-white/80 backdrop-blur-xl",
+          "rounded-2xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] backdrop-blur-xl",
           embedded ? "px-3 py-3" : "px-4 py-4 md:px-5"
         )}>
           <div className="flex items-start justify-between gap-3">
@@ -274,7 +265,7 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
                 <p className="mt-2 text-[13px] text-[hsl(var(--report-muted))]">
                   Theo dõi các báo cáo bạn đã gửi và trạng thái xử lý.
                 </p>
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[hsl(var(--report-line))] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--report-muted))]">
+                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card))] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[hsl(var(--report-muted))]">
                   {reports.length} báo cáo gần nhất
                 </div>
               </div>
@@ -283,7 +274,7 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
             <Button
               variant="outline"
               size="sm"
-              className="h-9 rounded-full border-[hsl(var(--report-line))] bg-white/80 text-[12px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--report-ink))]"
+              className="h-9 shrink-0 rounded-full border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] text-[12px] font-semibold uppercase tracking-[0.16em] text-[hsl(var(--report-ink))]"
               disabled={loading || refreshing}
               onClick={() => void loadReports("refresh")}
             >
@@ -294,12 +285,12 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
         </div>
       </header>
 
-      <main className={cn("beautiful-scrollbar min-h-0 flex-1 overflow-y-auto", embedded ? "pt-4" : "p-4 md:p-6")}>
-        <div className={cn("mx-auto w-full", embedded ? "max-w-none" : "max-w-5xl")}>
+      <main className={cn("beautiful-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden", embedded ? "pt-4" : "p-4 md:p-6")}>
+        <div className={cn("mx-auto w-full min-w-0", embedded ? "max-w-none" : "max-w-5xl")}>
           {loading ? (
             <ReportSkeleton />
           ) : error ? (
-            <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-2xl border border-[hsl(var(--report-line))] bg-white/80 px-6 py-12 text-center">
+            <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-2xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] px-6 py-12 text-center">
               <FileText className="size-8 text-[hsl(var(--report-muted))]" />
               <p className="text-[13px] text-[hsl(var(--report-muted))]">{error}</p>
               <Button variant="outline" onClick={() => void loadReports("refresh")}>
@@ -313,7 +304,7 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
               ))}
             </div>
           ) : (
-            <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-[hsl(var(--report-line))] bg-white/80 px-6 py-12 text-center">
+            <div className="flex min-h-72 flex-col items-center justify-center rounded-2xl border border-[hsl(var(--report-line))] bg-[hsl(var(--report-card)/0.86)] px-6 py-12 text-center">
               <div className="mb-3 flex size-12 items-center justify-center rounded-xl bg-[hsl(var(--report-soft))]">
                 <Inbox className="size-6 text-[hsl(var(--report-muted))]" />
               </div>

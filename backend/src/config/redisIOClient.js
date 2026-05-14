@@ -2,8 +2,17 @@ import Redis from 'ioredis';
 import dotenv from 'dotenv';
 
 dotenv.config();
-const redisIOClient = new Redis(process.env.REDIS_URL, {
+
+function normalizeRedisUrl(url) {
+    return (url || 'redis://127.0.0.1:6379').replace('://localhost:', '://127.0.0.1:');
+}
+
+export const REDIS_URL = normalizeRedisUrl(process.env.REDIS_URL);
+
+const redisIOClient = new Redis(REDIS_URL, {
     maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+    connectTimeout: 10000,
     retryStrategy: (times) => {
         const delay = Math.min(times * 50, 2000);
         return delay;

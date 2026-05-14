@@ -105,7 +105,6 @@ const reportSchema = new mongoose.Schema({
     expiresAt: {
         type: Date,
         default: null,
-        index: true,
     },
 }, { timestamps: true });
 

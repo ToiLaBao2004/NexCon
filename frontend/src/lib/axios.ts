@@ -2,6 +2,7 @@ import { useAuthStore } from '@/stores/useAuthStore';
 import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import axios from 'axios';
+import { useAppStatusStore } from '@/stores/useAppStatusStore';
 
 const isMobile = () => Capacitor.isNativePlatform();
 
@@ -57,11 +58,24 @@ const resolvePending = (token: string) => {
 };
 
 api.interceptors.response.use(
-    (response) => response,
+    (response) => {
+        useAppStatusStore.getState().clearMaintenance();
+        return response;
+    },
     async (error) => {
         const originalRequest = error.config;
+        const status = error.response?.status;
+        const requestUrl = originalRequest?.url || '';
 
-        if (SKIP_URLS.some(url => originalRequest.url.includes(url))) {
+        if (!navigator.onLine) {
+            useAppStatusStore.getState().setOffline(true);
+        } else if ([502, 503, 504].includes(status) || (!error.response && error.code !== 'ERR_CANCELED')) {
+            useAppStatusStore.getState().setMaintenance(
+                'Hệ thống đang bảo trì hoặc tạm thời không phản hồi. Chúng tôi sẽ quay lại sớm!'
+            );
+        }
+
+        if (!originalRequest || SKIP_URLS.some(url => requestUrl.includes(url))) {
             return Promise.reject(error);
         }
 

@@ -1,6 +1,7 @@
 import { useChatStore } from "@/stores/useChatStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { useGroupCallStore } from "@/stores/useGroupCallStore";
+import { useAppStatusStore } from "@/stores/useAppStatusStore";
 import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import ChatWindowSkeleton from "./ChatWindowSkeleton";
 import { SidebarInset } from "../ui/sidebar";
@@ -16,9 +17,10 @@ import { useMaxWidth } from "@/hooks/use-max-width";
 import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
 import { useSearchParams } from "react-router";
 
-const MAX_CACHED_CONVERSATIONS = 1;
+const MAX_CACHED_CONVERSATIONS = 10;
 
 const ChatWindowLayout = () => {
+  const isOffline = useAppStatusStore((state) => state.isOffline);
   const {
     activeConversationId,
     focusedConversationId,
@@ -42,7 +44,7 @@ const ChatWindowLayout = () => {
   const recentConversationIdsRef = useRef<string[]>([]);
   const deepLinkMessageIdRef = useRef<string | null>(null);
 
-  const selectedConvo = conversations.find((c) => c._id === activeConversationId) ?? null;
+  const selectedConvo = conversations.find((c) => c._id === activeConversationId && c.disbanded !== true) ?? null;
   const conversationIdParam = searchParams.get('conversationId')?.trim() || '';
   const messageIdParam = searchParams.get('messageId')?.trim() || '';
 
@@ -50,6 +52,9 @@ const ChatWindowLayout = () => {
   const { joinConversation } = useSocketStore();
 
   useEffect(() => {
+    // Nếu đang offline thì không xóa cache để người dùng vẫn xem được tin nhắn cũ
+    if (isOffline) return;
+
     if (!activeConversationId) {
       recentConversationIdsRef.current = [];
       clearConversationCache([]);
@@ -65,22 +70,21 @@ const ChatWindowLayout = () => {
     recentConversationIdsRef.current = keepIds;
 
     clearConversationCache(keepIds);
-  }, [activeConversationId, clearConversationCache]);
+  }, [activeConversationId, clearConversationCache, isOffline]);
 
   useEffect(() => {
-    if (activeConversationId) {
+    if (activeConversationId && selectedConvo?.disbanded === true) {
+      useChatStore.getState().markGroupAsDisbanded(activeConversationId);
+      return;
+    }
+
+    if (activeConversationId && selectedConvo) {
       joinConversation(activeConversationId);
 
-      if (!allMessages[activeConversationId] && !messageLoading) {
+      // Chỉ gọi fetch nếu ONLINE và chưa có tin nhắn, hoặc nếu bắt buộc phải load
+      if (!allMessages[activeConversationId] && !messageLoading && !isOffline) {
         fetchMessages(activeConversationId);
       }
-    }
-  }, [activeConversationId, joinConversation, fetchMessages, messageLoading]);
-
-  useEffect(() => {
-    if (!conversationIdParam) return;
-    if (activeConversationId !== conversationIdParam) {
-      useChatStore.getState().setActiveConversation(conversationIdParam);
     }
 
     if (!messageIdParam) {

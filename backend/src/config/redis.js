@@ -1,6 +1,12 @@
 import { createClient } from 'redis';
 
-const redis = createClient({ url: process.env.REDIS_URL });
+function normalizeRedisUrl(url) {
+    return (url || 'redis://127.0.0.1:6379').replace('://localhost:', '://127.0.0.1:');
+}
+
+const REDIS_URL = normalizeRedisUrl(process.env.REDIS_URL);
+
+const redis = createClient({ url: REDIS_URL });
 
 let isRedisReady = false;
 let hasLoggedError = false;

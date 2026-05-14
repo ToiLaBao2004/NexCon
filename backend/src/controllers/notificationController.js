@@ -15,6 +15,7 @@ export async function getNotifications(req, res) {
 
         const [raw, totalUnreadCount, totalCount] = await Promise.all([
             Notification.find(query)
+                .populate('actorId', 'displayName avatarUrl')
                 .sort({ createdAt: -1 })
                 .limit(limit + 1)
                 .lean(),

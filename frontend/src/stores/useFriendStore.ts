@@ -22,6 +22,7 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	fetchingSentRequests: false,
 	blockedUsers: [],
 	blockedUsersFetched: false,
+	fetchingBlockedUsers: false,
 	blockedBy: [],
 
 	reset: () => {
@@ -36,6 +37,7 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			sentRequestsFetched: false,
 			blockedUsers: [],
 			blockedUsersFetched: false,
+			fetchingBlockedUsers: false,
 			blockedBy: [],
 		});
 	},
@@ -269,14 +271,21 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 
 	fetchBlockedList: async (force = false) => {
 		try {
-			if (!force && get().blockedUsersFetched) {
+			if (!force && (get().blockedUsersFetched || get().fetchingBlockedUsers)) {
 				return;
 			}
 
+			set({ fetchingBlockedUsers: true });
 			const data = await friendService.fetchBlockedList();
-			set({ blockedUsers: data.blockedUsers || [], blockedUsersFetched: true });
+			set({
+				blockedUsers: data.blockedUsers || [],
+				blockedBy: (data.blockedBy || []).map((id: string) => id.toString()),
+				blockedUsersFetched: true
+			});
 		} catch (error) {
 			console.error('Lỗi khi tải danh sách chặn:', error);
+		} finally {
+			set({ fetchingBlockedUsers: false });
 		}
 	},
 
@@ -285,7 +294,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			set({ loading: true });
 			const data = await friendService.blockUser(userId);
 			set((state) => ({
-				blockedUsers: [...state.blockedUsers, data.blockedUser],
+				blockedUsers: state.blockedUsers.some(u => u._id === userId)
+					? state.blockedUsers.map(u => u._id === userId ? data.blockedUser : u)
+					: [...state.blockedUsers, data.blockedUser],
+				blockedUsersFetched: true,
 				friends: state.friends.filter(f => f.friendId !== userId)
 			}));
 			toast.success(data.message || 'Đã chặn.');
@@ -302,7 +314,8 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			set({ loading: true });
 			const data = await friendService.unblockUser(userId);
 			set((state) => ({
-				blockedUsers: state.blockedUsers.filter(u => u._id !== userId)
+				blockedUsers: state.blockedUsers.filter(u => u._id !== userId),
+				blockedUsersFetched: true,
 			}));
 			toast.success(data.message || 'Đã bỏ chặn.');
 		} catch (error: any) {

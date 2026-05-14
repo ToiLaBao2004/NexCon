@@ -28,6 +28,15 @@ const getImageBatchIndex = (message: Message) => {
   return Number(metadata.clientBatchIndex ?? 0);
 };
 
+const SCROLL_TO_BOTTOM_BUTTON_THRESHOLD = 800;
+const NEAR_BOTTOM_THRESHOLD = 96;
+
+const getMessageSenderId = (message?: Message | null) => {
+  if (!message?.senderId) return "";
+  const senderObj = typeof message.senderId === "object" ? (message.senderId as any) : null;
+  return String(senderObj?._id || message.senderId || "");
+};
+
 const ChatWindowBody: React.FC = () => {
   const {
     activeConversationId,
@@ -133,6 +142,8 @@ const ChatWindowBody: React.FC = () => {
 
   const loadingMoreRef = useRef(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [pendingNewMessageIds, setPendingNewMessageIds] = useState<string[]>([]);
+  const distanceFromBottomRef = useRef(0);
   const scrollToBottom = useCallback((instant: boolean = false) => {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
@@ -142,23 +153,46 @@ const ChatWindowBody: React.FC = () => {
     }
   }, []);
 
+  const syncScrollState = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const distanceFromBottom = Math.max(0, scrollHeight - scrollTop - clientHeight);
+    distanceFromBottomRef.current = distanceFromBottom;
+    setShowScrollToBottom(distanceFromBottom > SCROLL_TO_BOTTOM_BUTTON_THRESHOLD);
+
+    setPendingNewMessageIds((current) => {
+      if (current.length === 0) return current;
+      if (distanceFromBottom <= NEAR_BOTTOM_THRESHOLD) return [];
+
+      const containerRect = container.getBoundingClientRect();
+      const reachedLine = containerRect.bottom - 48;
+      const reachedIds = new Set<string>();
+
+      container.querySelectorAll<HTMLElement>("[data-message-ids]").forEach((element) => {
+        const rect = element.getBoundingClientRect();
+        if (rect.top >= reachedLine) return;
+
+        const messageIds = element.dataset.messageIds?.split(" ").filter(Boolean) ?? [];
+        messageIds.forEach((id) => reachedIds.add(id));
+      });
+
+      const next = current.filter((id) => !reachedIds.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, []);
+
   // Track scroll position to show "Back to latest" button in normal mode
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
 
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      // Show button if we are more than 800px away from bottom
-      const isFarFromBottom = scrollHeight - scrollTop - clientHeight > 800;
-      setShowScrollToBottom(isFarFromBottom);
-    };
+    container.addEventListener('scroll', syncScrollState, { passive: true });
+    syncScrollState(); // Check initial state
 
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll(); // Check initial state
-
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [convoId]);
+    return () => container.removeEventListener('scroll', syncScrollState);
+  }, [convoId, syncScrollState]);
 
 
   // IntersectionObserver for top sentinel (load older)
@@ -233,14 +267,20 @@ const ChatWindowBody: React.FC = () => {
     prevLastItemIdRef.current = lastItemId;
 
     const lastMessage = messages[messages.length - 1];
-    const lastSenderObj = typeof lastMessage?.senderId === "object" ? (lastMessage?.senderId as any) : null;
-    const lastSenderId = lastSenderObj ? lastSenderObj._id : lastMessage?.senderId;
+    const lastSenderId = getMessageSenderId(lastMessage);
     const isSystemNonCall = lastMessage?.type === "system" && lastMessage?.systemType !== "call";
     const isOwnLastMessage = Boolean(
       !isSystemNonCall &&
       lastSenderId &&
       user?._id &&
       lastSenderId?.toString?.() === user._id.toString()
+    );
+    const isIncomingLastMessage = Boolean(
+      !isSystemNonCall &&
+      lastMessage?._id &&
+      lastSenderId &&
+      user?._id &&
+      lastSenderId !== user._id.toString()
     );
     const shouldFollowImage = lastMessage?.type === "image";
 
@@ -267,18 +307,32 @@ const ChatWindowBody: React.FC = () => {
         isFirstLoad.current = false;
       }
     } else if (convoId && isNewMessageAtBottom) {
+      const wasNearBottom = distanceFromBottomRef.current <= NEAR_BOTTOM_THRESHOLD;
+
+      if (isIncomingLastMessage && !wasNearBottom && lastMessage?._id) {
+        setPendingNewMessageIds((current) =>
+          current.includes(lastMessage._id) ? current : [...current, lastMessage._id]
+        );
+        setShowScrollToBottom(true);
+        return;
+      }
+
       if (isOwnLastMessage) {
         pendingImageScrollRef.current = shouldFollowImage;
         scrollToBottom(true);
         return;
       }
 
-      if (!showScrollToBottom) {
+      if (wasNearBottom) {
         pendingImageScrollRef.current = shouldFollowImage;
         scrollToBottom();
       }
     }
-  }, [lastItemId, messages.length, convoId, isJumpMode, showScrollToBottom, user?._id, exitJumpMode, scrollToBottom, messages]);
+  }, [lastItemId, messages.length, convoId, isJumpMode, user?._id, exitJumpMode, scrollToBottom, messages]);
+
+  useEffect(() => {
+    requestAnimationFrame(syncScrollState);
+  }, [lastItemId, syncScrollState]);
 
   useEffect(() => {
     if (!convoId || messages.length === 0) return;
@@ -400,6 +454,8 @@ const ChatWindowBody: React.FC = () => {
     prevMessageCount.current = 0;
     loadingMoreRef.current = false;
     prevScrollHeightRef.current = 0;
+    distanceFromBottomRef.current = 0;
+    setPendingNewMessageIds([]);
   }, [convoId]);
 
 
@@ -456,6 +512,7 @@ const ChatWindowBody: React.FC = () => {
             <div
               key={`msg-${message._id ?? originalIndex}`}
               id={`message-${message._id}`}
+              data-message-ids={(imageBatchItems ?? [message]).map((item) => item._id).filter(Boolean).join(" ")}
             >
               <MessageItem
                 message={message}
@@ -494,16 +551,18 @@ const ChatWindowBody: React.FC = () => {
         </div>
       )}
 
-      {(isJumpMode || showScrollToBottom) && (
+      {(isJumpMode || showScrollToBottom || pendingNewMessageIds.length > 0) && (
         <button
           onClick={async () => {
             if (isJumpMode) {
               await exitJumpMode(convoId);
               setTimeout(() => {
                 scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
+                setPendingNewMessageIds([]);
               }, 150);
             } else {
               scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'auto' });
+              setPendingNewMessageIds([]);
             }
           }}
           className="absolute bottom-6 right-6 z-20 flex h-11 w-11 items-center justify-center 
@@ -511,6 +570,11 @@ const ChatWindowBody: React.FC = () => {
                      hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-90
                      animate-in fade-in slide-in-from-bottom-4 zoom-in-50 duration-300 group"
         >
+          {!isJumpMode && pendingNewMessageIds.length > 0 && (
+            <span className="absolute -top-2 -right-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold leading-none text-primary-foreground shadow-lg ring-2 ring-background">
+              {pendingNewMessageIds.length > 99 ? "99+" : pendingNewMessageIds.length}
+            </span>
+          )}
           <ChevronsDown className="h-9 w-9 text-slate-600 dark:text-slate-300 group-hover:translate-y-0.5 transition-transform stroke-[1.5px]" />
         </button>
       )}

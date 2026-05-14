@@ -23,7 +23,7 @@ const AppLayout = () => {
     }, [fetchUpcomingCount]);
 
     return (
-        <div className="flex bg-background h-svh w-full overflow-hidden p-0 md:p-2 md:gap-0 relative">
+        <div className="flex bg-background h-svh w-full overflow-hidden p-0 relative">
             <div className="z-[100] shrink-0 h-full">
                 <MainSidebar />
             </div>

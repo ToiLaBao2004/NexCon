@@ -38,12 +38,24 @@ const sortConversations = (conversations: any[]) => {
     });
 };
 
+const isVisibleConversation = (conversation: any) => {
+    return !(conversation?.type === 'group' && conversation?.disbanded === true);
+};
+
+const filterVisibleConversations = (conversations: any[]) => {
+    return conversations.filter(isVisibleConversation);
+};
+
 const CONVERSATION_PAGE_LIMIT = 50;
 
 const mergeConversations = (current: any[], incoming: any[]) => {
     const byId = new Map<string, any>();
     [...current, ...incoming].forEach((conversation) => {
         if (!conversation?._id) return;
+        if (!isVisibleConversation(conversation)) {
+            byId.delete(conversation._id);
+            return;
+        }
         byId.set(conversation._id, { ...(byId.get(conversation._id) || {}), ...conversation });
     });
     return sortConversations(Array.from(byId.values()));
@@ -80,6 +92,12 @@ export const useChatStore = create<ChatState>()(
             },
 
             setActiveConversation: (id: string | null) => {
+                if (id) {
+                    const targetConversation = get().conversations.find((conversation) => conversation._id === id);
+                    if (targetConversation && !isVisibleConversation(targetConversation)) {
+                        id = null;
+                    }
+                }
 
                 const prevId = get().activeConversationId;
                 set((state) => {
@@ -214,19 +232,24 @@ export const useChatStore = create<ChatState>()(
 
                     const activeId = get().activeConversationId;
                     const activeConvoBeforeSync = activeId ? get().conversations.find(c => c._id === activeId) : null;
+                    const visibleConversations = filterVisibleConversations(conversations as any);
 
                     set({
-                        conversations: sortConversations(conversations as any),
+                        conversations: sortConversations(visibleConversations),
                         conversationsFetched: true,
                         conversationsHasMore: hasMore ?? false,
                         conversationsNextCursor: nextCursor ?? null,
                         convoLoading: false,
                     });
 
-                    if (activeConvoBeforeSync && !get().conversations.find(c => c._id === activeId)) {
-                        set(state => ({
-                            conversations: [activeConvoBeforeSync, ...state.conversations]
-                        }));
+                    if (activeId && !get().conversations.find(c => c._id === activeId)) {
+                        if (activeConvoBeforeSync && isVisibleConversation(activeConvoBeforeSync)) {
+                            set(state => ({
+                                conversations: [activeConvoBeforeSync, ...state.conversations]
+                            }));
+                        } else {
+                            set({ activeConversationId: null, focusedConversationId: null });
+                        }
                     }
                 } catch (error) {
                     console.error('Lỗi khi tải danh sách cuộc trò chuyện:', error);
@@ -260,7 +283,7 @@ export const useChatStore = create<ChatState>()(
                     set({ groupsLoading: true });
                     const { groups, hasMore, nextCursor } = await chatService.fetchGroups({ limit: CONVERSATION_PAGE_LIMIT });
                     set({
-                        groupConversations: sortConversations(groups as any),
+                        groupConversations: sortConversations(filterVisibleConversations(groups as any)),
                         groupsFetched: true,
                         groupsHasMore: hasMore ?? false,
                         groupsNextCursor: nextCursor ?? null,
@@ -294,7 +317,7 @@ export const useChatStore = create<ChatState>()(
             searchGroups: async (query: string) => {
                 try {
                     const { groups } = await chatService.fetchGroups({ search: query, limit: 50 });
-                    return groups as any[];
+                    return filterVisibleConversations(groups as any);
                 } catch (error) {
                     console.error('Lỗi khi tìm kiếm nhóm:', error);
                     return [];
@@ -307,6 +330,12 @@ export const useChatStore = create<ChatState>()(
                 const convoId = conversationId ?? activeConversationId;
 
                 if (!convoId) return;
+
+                const targetConversation = get().conversations.find((conversation) => conversation._id === convoId);
+                if (targetConversation && !isVisibleConversation(targetConversation)) {
+                    get().markGroupAsDisbanded(convoId);
+                    return;
+                }
 
                 const current = messages?.[convoId];
                 const nextCursor = current?.nextCursor === undefined ? "" : current?.nextCursor;
@@ -929,6 +958,11 @@ export const useChatStore = create<ChatState>()(
                 }
             },
             updateConversation: (conversation) => {
+                if (!isVisibleConversation(conversation)) {
+                    get().markGroupAsDisbanded(conversation._id);
+                    return;
+                }
+
                 const { conversations, fetchConversations } = get();
                 const exists = conversations.some((c) => c._id === conversation._id);
 
@@ -1286,13 +1320,19 @@ export const useChatStore = create<ChatState>()(
                         const isFocused = state.focusedConversationId === conversationId;
 
                         const nextMessages = { ...state.messages };
+                        const nextMedia = { ...state.media };
+                        const nextMediaPagination = { ...state.mediaPagination };
                         delete nextMessages[conversationId];
+                        delete nextMedia[conversationId];
+                        delete nextMediaPagination[conversationId];
 
                         return {
                             conversations: nextConversations,
                             activeConversationId: isActive ? null : state.activeConversationId,
                             focusedConversationId: isFocused ? null : state.focusedConversationId,
                             messages: nextMessages,
+                            media: nextMedia,
+                            mediaPagination: nextMediaPagination,
                         };
                     });
                 } catch (error) {
@@ -1793,11 +1833,32 @@ export const useChatStore = create<ChatState>()(
                 }
             },
             markGroupAsDisbanded: (conversationId: string) => {
-                set((state) => ({
-                    conversations: state.conversations.map((c) =>
-                        c._id === conversationId ? { ...c, disbanded: true } : c
-                    )
-                }));
+                set((state) => {
+                    const nextMessages = { ...state.messages };
+                    const nextMedia = { ...state.media };
+                    const nextMediaPagination = { ...state.mediaPagination };
+                    const nextDrafts = { ...state.drafts };
+                    delete nextMessages[conversationId];
+                    delete nextMedia[conversationId];
+                    delete nextMediaPagination[conversationId];
+                    delete nextDrafts[conversationId];
+
+                    const isActive = state.activeConversationId === conversationId;
+                    const isFocused = state.focusedConversationId === conversationId;
+
+                    return {
+                        conversations: state.conversations.filter((c) => c._id !== conversationId),
+                        groupConversations: state.groupConversations.filter((c) => c._id !== conversationId),
+                        activeConversationId: isActive ? null : state.activeConversationId,
+                        focusedConversationId: isFocused ? null : state.focusedConversationId,
+                        activeSidebar: isActive ? null : state.activeSidebar,
+                        replyingTo: isActive ? null : state.replyingTo,
+                        messages: nextMessages,
+                        media: nextMedia,
+                        mediaPagination: nextMediaPagination,
+                        drafts: nextDrafts,
+                    };
+                });
             },
             disbandGroup: async (conversationId: string) => {
                 get().markGroupAsDisbanded(conversationId);
@@ -1899,7 +1960,7 @@ export const useChatStore = create<ChatState>()(
             name: "chat-storage",
             storage: createJSONStorage(() => sessionStorage),
             partialize: (state) => ({
-                conversations: state.conversations,
+                conversations: filterVisibleConversations(state.conversations),
                 drafts: Object.fromEntries(
                     Object.entries(state.drafts).map(([id, draft]) => [
                         id,

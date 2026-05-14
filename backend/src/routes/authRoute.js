@@ -14,6 +14,10 @@ import {
 
 const authRouter = express.Router();
 
+authRouter.get('/health', (_req, res) => {
+    res.status(200).json({ ok: true });
+});
+
 authRouter.post('/verify-valid-fields-signup', signupIpLimiter, signupEmailLimiter, verifyValidFieldsSignUp);
 authRouter.post('/signup', signupIpLimiter, signupEmailLimiter, signUp);
 authRouter.post('/signin', signinIpLimiter, signinEmailLimiter, signIn);

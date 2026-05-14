@@ -193,6 +193,7 @@ export interface ChatState {
 export interface SocketState {
   socket: Socket | null;
   onlineUsers: string[];
+  connectionStatus: 'idle' | 'connected' | 'reconnecting' | 'disconnected';
   connectSocket: () => void;
   joinConversation: (conversationId: string) => void;
   disconnectSocket: () => void;
@@ -230,6 +231,7 @@ export interface FriendState {
   unfriendUser: (friendId: string) => Promise<void>;
   blockedUsers: any[];
   blockedUsersFetched: boolean;
+  fetchingBlockedUsers: boolean;
   blockedBy: string[];
   fetchBlockedList: (force?: boolean) => Promise<void>;
   blockUser: (userId: string) => Promise<void>;
@@ -247,7 +249,7 @@ export interface Notification {
   linkUrl: string;
   type?: string;
   targetId?: string;
-  actorId?: string;
+  actorId?: string | RemoteUser;
   recipientId?: string;
   metadata?: {
     conversationId?: string;

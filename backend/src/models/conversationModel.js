@@ -123,7 +123,36 @@ const conversationSchema = new mongoose.Schema({
         of: Number,
         default: () => new Map(),
     },
-    disbanded: { type: Boolean, default: false }
+    disbanded: { type: Boolean, default: false },
+    disbandedAt: {
+        type: Date,
+    },
+    cleanup: {
+        status: {
+            type: String,
+            enum: ['idle', 'queued', 'processing', 'completed', 'failed'],
+            default: 'idle',
+            index: true,
+        },
+        jobId: {
+            type: String,
+        },
+        queuedAt: {
+            type: Date,
+        },
+        startedAt: {
+            type: Date,
+        },
+        completedAt: {
+            type: Date,
+        },
+        failedAt: {
+            type: Date,
+        },
+        error: {
+            type: String,
+        },
+    },
 }, { timestamps: true });
 
 conversationSchema.index({ 'participants.userId': 1, 'lastMessage.createdAt': -1 });

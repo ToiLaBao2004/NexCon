@@ -37,6 +37,8 @@ import SessionsPage from "./pages/SessionsPage"
 import { Capacitor } from '@capacitor/core';
 import { useBackButton } from "./hooks/useBackButton";
 import { listenForNativeFcmOpen, registerNativeFcm } from "@/lib/nativeFcm";
+import AppStatusLayer from "@/components/system/AppStatusLayer";
+import { useAppStatusStore } from "./stores/useAppStatusStore";
 
 function BackButtonHandler() {
   useBackButton();
@@ -207,10 +209,14 @@ function App() {
     };
   }, [accessToken, isAdmin, isSupported, requestPermission, subscribe]);
 
+  const serverStatus = useAppStatusStore((state) => state.serverStatus);
+  const isMaintenance = serverStatus === 'maintenance';
+
   return (
     <BrowserRouter>
       <BackButtonHandler />
       <NativeFcmHandler enabled={isAuth && !isAdmin} />
+      <AppStatusLayer />
       <Toaster
         richColors
         expand
@@ -222,44 +228,49 @@ function App() {
           style: { zIndex: 2147483647 },
         }}
       />
-      {isAuth && !isAdmin && (
+      
+      {!isMaintenance && (
         <>
-          <CallManager />
-          <GroupCallManager />
-          <MeetManager />
-          <ImageViewerModal />
+          {isAuth && !isAdmin && (
+            <>
+              <CallManager />
+              <GroupCallManager />
+              <MeetManager />
+              <ImageViewerModal />
+            </>
+          )}
+          <Routes>
+            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/otp" element={<OtpPage />} />
+            <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
+            <Route path="/reset-password" element={<ResetPassPage />} />
+            <Route path="/oauth-success" element={<OAuthSuccess />} />
+            <Route element={<AdminRoute />}>
+              <Route element={<AdminLayout />}>
+                <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
+                <Route path="/admin/overview" element={<AdminOverviewPage />} />
+                <Route path="/admin/reports/messages" element={<AdminReportsPage targetType="message" />} />
+                <Route path="/admin/reports/users" element={<AdminReportsPage targetType="user" />} />
+                <Route path="/admin/appeals" element={<AdminAppealsPage />} />
+              </Route>
+            </Route>
+            <Route element={<ProtectedRoute />}>
+              <Route element={<AppLayout />}>
+                <Route path="/chat" element={<ChatAppPage />} />
+                <Route path="/meet" element={<MeetPage />} />
+                <Route path="/people" element={<PeoplePage />} />
+                <Route path="/reminder" element={<ReminderPage />} />
+                <Route path="/reminders" element={<ReminderPage />} />
+                <Route path="/notification" element={<NotificationPage />} />
+                <Route path="/reports/my" element={<ReportHistoryPage />} />
+                <Route path="/settings/sessions" element={<SessionsPage />} />
+                <Route path="/" element={<Navigate to="/chat" replace />} />
+              </Route>
+            </Route>
+          </Routes>
         </>
       )}
-      <Routes>
-        <Route path="/signin" element={<SignInPage />} />
-        <Route path="/signup" element={<SignUpPage />} />
-        <Route path="/otp" element={<OtpPage />} />
-        <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
-        <Route path="/reset-password" element={<ResetPassPage />} />
-        <Route path="/oauth-success" element={<OAuthSuccess />} />
-        <Route element={<AdminRoute />}>
-          <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
-            <Route path="/admin/overview" element={<AdminOverviewPage />} />
-            <Route path="/admin/reports/messages" element={<AdminReportsPage targetType="message" />} />
-            <Route path="/admin/reports/users" element={<AdminReportsPage targetType="user" />} />
-            <Route path="/admin/appeals" element={<AdminAppealsPage />} />
-          </Route>
-        </Route>
-        <Route element={<ProtectedRoute />}>
-          <Route element={<AppLayout />}>
-            <Route path="/chat" element={<ChatAppPage />} />
-            <Route path="/meet" element={<MeetPage />} />
-            <Route path="/people" element={<PeoplePage />} />
-            <Route path="/reminder" element={<ReminderPage />} />
-            <Route path="/reminders" element={<ReminderPage />} />
-            <Route path="/notification" element={<NotificationPage />} />
-            <Route path="/reports/my" element={<ReportHistoryPage />} />
-            <Route path="/settings/sessions" element={<SessionsPage />} />
-            <Route path="/" element={<Navigate to="/chat" replace />} />
-          </Route>
-        </Route>
-      </Routes>
     </BrowserRouter>
   );
 }

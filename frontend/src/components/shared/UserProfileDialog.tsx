@@ -42,7 +42,8 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     const {
         friends, sentRequests, incomingRequests,
         sendFriendRequest, cancelFriendRequest, unfriendUser,
-        fetchSentRequests, acceptFriendRequest, rejectFriendRequest
+        fetchSentRequests, acceptFriendRequest, rejectFriendRequest,
+        blockedUsers, blockedBy, fetchBlockedList, unblockUser
     } = useFriendStore();
 
     const [actionLoading, setActionLoading] = useState(false);
@@ -51,11 +52,16 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     const [fullUser, setFullUser] = useState<User | null>(null);
     const [albumArt, setAlbumArt] = useState<string | null>(null);
     const [reportOpen, setReportOpen] = useState(false);
+    const [profileAccessBlocked, setProfileAccessBlocked] = useState(false);
+    const [profileLoading, setProfileLoading] = useState(false);
 
     useEffect(() => {
         if (open && user?._id) {
             setFullUser(null);
             setAlbumArt(null);
+            setProfileAccessBlocked(false);
+            setProfileLoading(true);
+            void fetchBlockedList();
             getUserById(user._id).then((u) => {
                 setFullUser(u);
                 if (u?.music?.trackId) {
@@ -64,9 +70,18 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                         .then((data) => setAlbumArt(data.thumbnail_url ?? null))
                         .catch(() => null);
                 }
-            }).catch(console.error);
+                setProfileLoading(false);
+            }).catch((error) => {
+                if (error?.response?.status === 403 || error?.response?.status === 404) {
+                    setProfileAccessBlocked(true);
+                    setProfileLoading(false);
+                    return;
+                }
+                setProfileLoading(false);
+                console.error(error);
+            });
         }
-    }, [open, user?._id]);
+    }, [fetchBlockedList, getUserById, open, user?._id]);
 
     if (!user) return null;
 
@@ -74,6 +89,10 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     const isFriend = !!friends.find(f => f.friendId === user._id);
     const pendingRequest = sentRequests.find((r) => r.to._id === user._id);
     const receivedRequest = incomingRequests.find((r) => r.from._id === user._id);
+    const isBlockedByMe = blockedUsers.some((blockedUser) => blockedUser._id === user._id);
+    const isBlockedByOther = blockedBy.includes(user._id);
+    const isBlockedRelation = !isSelf && (profileAccessBlocked || isBlockedByMe || isBlockedByOther);
+    const shouldHideProfileDetails = profileLoading || isBlockedRelation;
 
     const handleAction = async (action: () => Promise<void>) => {
         try {
@@ -97,8 +116,59 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
         handleAction(() => cancelFriendRequest(pendingRequest._id));
     };
 
+    const onUnblock = async () => {
+        await handleAction(async () => {
+            await unblockUser(user._id);
+            await fetchBlockedList(true);
+            setProfileAccessBlocked(false);
+        });
+    };
+
+    const onUnblockAndSendRequest = async () => {
+        await handleAction(async () => {
+            await sendFriendRequest(user.email, requestMessage);
+            await fetchSentRequests();
+            await fetchBlockedList(true);
+            setRequestMessage("");
+            setProfileAccessBlocked(false);
+            onOpenChange(false);
+        });
+    };
+
     const renderActions = () => {
         if (isSelf) return null;
+
+        if (isBlockedRelation) {
+            if (!isBlockedByMe) {
+                return (
+                    <div className="mt-6 w-full rounded-xl border border-border/40 bg-muted/20 p-4 text-center text-sm text-muted-foreground">
+                        Không thể xem thông tin hoặc tương tác với người dùng này.
+                    </div>
+                );
+            }
+
+            return (
+                <div className="w-full flex flex-col gap-2 mt-6">
+                    <Button
+                        onClick={onUnblock}
+                        variant="outline"
+                        disabled={actionLoading}
+                        className="w-full gap-2 rounded-xl h-10 font-semibold border-primary/20 text-primary hover:bg-primary/10"
+                    >
+                        {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}
+                        Bỏ chặn
+                    </Button>
+                    <Button
+                        onClick={onUnblockAndSendRequest}
+                        disabled={actionLoading}
+                        className="w-full gap-2 rounded-xl h-10 font-semibold shadow-glow"
+                    >
+                        {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                        Bỏ chặn và gửi lời mời kết bạn
+                    </Button>
+                </div>
+            );
+        }
 
         if (isFriend) {
             return (
@@ -194,7 +264,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
             <DialogContent className="sm:max-w-md border-primary/10 shadow-2xl p-0 overflow-hidden rounded-2xl bg-background z-[210]">
 
                 {/* Banner */}
-                <div className="relative overflow-hidden" style={{ height: fullUser?.music?.trackId ? "152px" : "128px" }}>
+                <div className="relative overflow-hidden" style={{ height: !isBlockedRelation && fullUser?.music?.trackId ? "152px" : "128px" }}>
                     {/* Background: album art blur hoặc gradient */}
                     {albumArt ? (
                         <>
@@ -210,7 +280,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                         <DialogDescription className="opacity-0">.</DialogDescription>
                     </DialogHeader>
 
-                    {fullUser?.music?.trackId && (
+                    {!isBlockedRelation && fullUser?.music?.trackId && (
                         <div className="absolute bottom-4 left-0 right-1 px-4 pb-0">
                             <iframe
                                 src={`https://open.spotify.com/embed/track/${fullUser.music.trackId}?utm_source=generator&theme=0`}
@@ -237,34 +307,36 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                             {user.displayName} {isSelf && <span className="text-sm font-normal text-muted-foreground ml-1">(Bạn)</span>}
                         </h3>
 
-                        <div className="flex flex-col gap-3 mt-6 w-full text-left bg-muted/20 p-4 rounded-xl border border-border/40">
-                            <div className="flex items-center gap-3 text-sm">
-                                <Mail className="h-4 w-4 text-primary shrink-0" />
-                                <span className="text-foreground/80 truncate" title={user.email}>{user.email}</span>
-                            </div>
-
-                            {user.phone && (
+                        {!shouldHideProfileDetails && (
+                            <div className="flex flex-col gap-3 mt-6 w-full text-left bg-muted/20 p-4 rounded-xl border border-border/40">
                                 <div className="flex items-center gap-3 text-sm">
-                                    <Phone className="h-4 w-4 text-primary shrink-0" />
-                                    <span className="text-foreground/80">{user.phone}</span>
+                                    <Mail className="h-4 w-4 text-primary shrink-0" />
+                                    <span className="text-foreground/80 truncate" title={user.email}>{user.email}</span>
                                 </div>
-                            )}
 
-                            <div className="flex gap-3 text-sm pt-2 border-t border-border/40">
-                                <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                                <div className="flex-1">
-                                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Tiểu sử</p>
-                                    <p className="text-foreground/90 italic leading-relaxed">
-                                        {user.bio || "Chưa có tiểu sử."}
-                                    </p>
+                                {user.phone && (
+                                    <div className="flex items-center gap-3 text-sm">
+                                        <Phone className="h-4 w-4 text-primary shrink-0" />
+                                        <span className="text-foreground/80">{user.phone}</span>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-3 text-sm pt-2 border-t border-border/40">
+                                    <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Tiểu sử</p>
+                                        <p className="text-foreground/90 italic leading-relaxed">
+                                            {user.bio || "Chưa có tiểu sử."}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
                     </div>
 
                     {renderActions()}
 
-                    {!isSelf && (
+                    {!isSelf && !isBlockedRelation && (
                         <Button
                             type="button"
                             variant="ghost"

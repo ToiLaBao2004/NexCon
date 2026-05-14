@@ -161,7 +161,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const { user } = useAuthStore();
 	const { emitTyping, emitStopTyping } = useSocketStore();
 	const { sendMessage, markAsSeen, replyingTo, setReplyingTo, setDraft, clearDraft } = useChatStore();
-	const { blockedUsers, blockedBy } = useFriendStore();
+	const { blockedUsers, blockedBy, fetchBlockedList } = useFriendStore();
 	const currentUserId = user?._id ?? "";
 
 	const [value, setValue] = useState("");
@@ -201,6 +201,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				return participant.displayName.toLowerCase().includes(keyword);
 			});
 	}, [currentUserId, mentionQuery, participants]);
+
+	useEffect(() => {
+		if (selectedConvo.type !== "direct") return;
+		void fetchBlockedList();
+	}, [fetchBlockedList, selectedConvo.type]);
 
 	if (!user) return null;
 
@@ -788,21 +793,21 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	if (selectedConvo.type === "direct") {
 		if (isOtherUserLocked) {
 			return (
-				<div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/50">
+				<div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/80">
 					<p className="text-sm text-muted-foreground italic">Không thể gửi tin nhắn tới tài khoản đã bị khóa.</p>
 				</div>
 			);
 		}
 		if (isBlockedByMe) {
 			return (
-				<div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/50">
+				<div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/80">
 					<p className="text-sm text-muted-foreground italic">Bạn đã chặn người dùng này.</p>
 				</div>
 			);
 		}
 		if (isBlockedByOther) {
 			return (
-				<div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/50">
+				<div className="flex items-center justify-center p-4 bg-muted/30 border-t border-border/80">
 					<p className="text-sm text-muted-foreground italic">Bạn không thể gửi tin nhắn cho người này.</p>
 				</div>
 			);
@@ -821,7 +826,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const showTextLimit = value.length >= MAX_TEXT_MESSAGE_LENGTH - 100;
 
 	return (
-		<div className="flex flex-col bg-background border-t border-border/50">
+		<div className="flex min-w-0 flex-col bg-background border-t border-border/80">
 
 			{replyingTo && (
 				<div className="flex items-center gap-2 px-3 pt-2.5 pb-1 animate-in slide-in-from-bottom-2 duration-200">
@@ -874,7 +879,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					{attachments.every((item) => item.type === "image") ? (
 						<div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
 							{attachments.map((item, index) => (
-								<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/50 shrink-0">
+								<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/80 shrink-0">
 									{item.preview && <img src={item.preview} alt="preview" className="w-full h-full object-cover" />}
 									<button
 										type="button"
@@ -913,7 +918,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				</div>
 			)}
 
-			<div className="flex items-center gap-1.5 p-2 bg-background border-t border-border/40 relative z-10">
+			<div className="relative z-10 flex min-w-0 items-center gap-1.5 border-t border-border/70 bg-background p-2">
 
 				<input
 					ref={imageInputRef}
@@ -973,7 +978,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						onCancel={() => setIsRecording(false)}
 					/>
 				) : (
-					<div className="flex-1 relative flex items-center">
+					<div className="relative flex min-w-0 flex-1 items-center">
 						<textarea
 							ref={textInputRef}
 							onKeyDown={handleKeyDown}
@@ -988,7 +993,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									? ""
 									: ""
 							}
-							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/50 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
+							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
 							disabled={sending}
 						/>
 						{mentionOpen && (
