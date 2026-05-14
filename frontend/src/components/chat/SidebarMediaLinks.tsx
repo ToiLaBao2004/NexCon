@@ -1,4 +1,4 @@
-import { Image as ImageIcon, CheckCircle2, Link2, FileText, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2, Copy } from "lucide-react";
+import { CheckCircle2, Link2, FileText, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2, Copy } from "lucide-react";
 import { useState, useEffect } from "react";
 import type { ReactNode, UIEvent } from "react";
 import type { Conversation, Message } from "@/types/chat";
@@ -25,6 +25,11 @@ const VIEW_ALL_LIMIT: Record<MediaKind, number> = {
   image: 24,
   file: 20,
   link: 20,
+};
+const PREVIEW_LIMIT: Record<MediaKind, number> = {
+  image: 8,
+  file: 3,
+  link: 3,
 };
 
 function ThickDivider() {
@@ -100,7 +105,9 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   const imageMessages = mediaState?.images ?? [];
   const fileMessages = mediaState?.files ?? [];
   const linkMessages = mediaState?.links ?? [];
-  const placeholdersCount = Math.max(0, 8 - imageMessages.length);
+  const shouldShowImageViewerButton = imageMessages.length >= PREVIEW_LIMIT.image;
+  const shouldShowFileViewerButton = fileMessages.length >= PREVIEW_LIMIT.file;
+  const shouldShowLinkViewerButton = linkMessages.length >= PREVIEW_LIMIT.link;
 
   // helpers for thumbnails
   const getExt = (name: string = "") => name.split(".").pop()?.toLowerCase() || "";
@@ -480,6 +487,9 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   return (
     <div className="w-full flex flex-col gap-0">
       <Section title="Ảnh/Video" defaultOpen={true}>
+        {imageMessages.length === 0 ? (
+          <div className="text-sm text-muted-foreground/90 py-2">Không có ảnh nào</div>
+        ) : (
         <div className="grid grid-cols-4 gap-[6px]">
           {imageMessages.map((msg, i) => (
             <button
@@ -504,18 +514,11 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
             </button>
           ))}
 
-          {[...Array(placeholdersCount)].map((_, i) => (
-            <div
-              key={`placeholder-${i}`}
-              className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30"
-            >
-              <ImageIcon className="h-6 w-6 text-[#9ca3af]/30" strokeWidth={1} />
-            </div>
-          ))}
         </div>
+        )}
         <button
           onClick={() => openViewer("image")}
-          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
+          className={`${shouldShowImageViewerButton ? "" : "hidden "}mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer`}
         >
           Xem tất cả
         </button>
@@ -531,7 +534,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         </div>
         <button
           onClick={() => openViewer("file")}
-          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
+          className={`${shouldShowFileViewerButton ? "" : "hidden "}mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer`}
         >
           Xem tất cả
         </button>
@@ -545,7 +548,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         </div>
         <button
           onClick={() => openViewer("link")}
-          className="mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer"
+          className={`${shouldShowLinkViewerButton ? "" : "hidden "}mt-4 w-full py-[10px] rounded-[6px] border border-border/60 bg-background text-[14px] font-semibold text-foreground hover:bg-muted/20 transition-colors cursor-pointer`}
         >
           Xem tất cả
         </button>
