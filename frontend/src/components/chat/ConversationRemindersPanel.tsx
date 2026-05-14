@@ -49,7 +49,7 @@ const STATUS_CONFIG: Record<
     bar: "bg-emerald-500",
     dot: "bg-emerald-500",
     label: "Sắp đến",
-    labelClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    labelClass: "bg-primary/10 text-primary",
   },
   snoozed: {
     bar: "bg-amber-400",
@@ -61,7 +61,7 @@ const STATUS_CONFIG: Record<
     bar: "bg-sky-400/60",
     dot: "bg-sky-400/60",
     label: "Đã nhắc",
-    labelClass: "bg-sky-400/10 text-sky-600 dark:text-sky-400",
+    labelClass: "bg-primary/10 text-primary",
   },
   dismissed: {
     bar: "bg-muted-foreground/30",
@@ -81,7 +81,7 @@ function ParticipationBadge({ status }: { status?: Reminder["participationStatus
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-medium",
         isJoined
-          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+          ? "bg-primary/10 text-primary"
           : "bg-rose-500/10 text-rose-500"
       )}
     >
@@ -142,30 +142,29 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
       type="button"
       onClick={onClick}
       className={cn(
-        "group w-full text-left flex items-stretch gap-0 rounded-xl border bg-card overflow-hidden",
-        "shadow-sm hover:shadow-md transition-all duration-150 active:scale-[0.99]",
-        "border-border/60 hover:border-border"
+        "group w-full text-left flex items-stretch gap-0 rounded-xl border border-border/50 bg-card font-sans overflow-hidden",
+        "transition-colors duration-150 hover:bg-muted/60 active:scale-[0.99]"
       )}
     >
       {/* Left status bar */}
       <div className={cn("w-[3px] shrink-0", cfg.bar)} />
 
       {/* Calendar block */}
-      <div className="w-[58px] shrink-0 flex flex-col items-center justify-center border-r border-border/50 bg-muted/25 py-2.5 px-1 gap-0.5">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/80 leading-none">
+      <div className="w-[58px] shrink-0 flex flex-col items-center justify-center border-r border-border/50 bg-muted/30 py-2.5 px-1 gap-0.5">
+        <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground leading-none">
           {calendarWeekday}
         </span>
-        <span className="text-[22px] font-extrabold leading-none text-foreground">
+        <span className="text-[22px] font-semibold leading-none text-foreground">
           {calendarDay}
         </span>
-        <span className="text-[10px] font-semibold text-rose-500 leading-none">
+        <span className="text-[10px] font-semibold text-muted-foreground leading-none">
           Th.{calendarMonth}
         </span>
       </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1 flex flex-col justify-center px-3 py-2.5 gap-1.5">
-        <p className="text-[13px] font-semibold text-foreground leading-snug line-clamp-2 break-words">
+        <p className="text-[15px] font-semibold text-foreground leading-snug line-clamp-2 break-words">
           {content}
         </p>
 
@@ -175,7 +174,7 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
             className="flex items-center gap-1.5 rounded-md border border-primary/20 bg-primary/5 px-2 py-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <Video className="h-3 w-3 shrink-0 text-primary" />
+            <Video className="h-3.5 w-3.5 shrink-0 text-primary" strokeWidth={1.65} />
             <Link
               to={`/meet?code=${reminder.meetingRoomName}`}
               className="flex-1 truncate text-[11px] font-medium text-primary underline-offset-2 hover:underline transition-colors"
@@ -192,14 +191,14 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
                 toast.success('Đã sao chép link cuộc họp');
               }}
             >
-              <Copy className="h-3 w-3" />
+              <Copy className="h-3.5 w-3.5" strokeWidth={1.65} />
             </button>
           </div>
         )}
 
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-            <Clock3 className="h-3 w-3 shrink-0" />
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock3 className="h-3.5 w-3.5 shrink-0" strokeWidth={1.65} />
             {formatClock(reminder.remindAt)}
           </span>
           <span
@@ -213,7 +212,7 @@ function ReminderRow({ reminder, onClick }: ReminderRowProps) {
           </span>
           <ParticipationBadge status={reminder.participationStatus} />
           {reminder.createdBy && (
-            <span className="inline-flex items-center gap-1 rounded-full pr-1.5 pl-0.5 py-0.5 text-[10px] font-medium bg-muted text-muted-foreground border border-border/40">
+            <span className="inline-flex items-center gap-1 rounded-full pr-1.5 pl-0.5 py-0.5 text-[10px] font-medium bg-muted/70 text-muted-foreground border border-border/40">
               <UserAvatar
                 type="seen"
                 name={creatorNameDisplay}
@@ -333,13 +332,13 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
     <Dialog open={!!reminder} onOpenChange={(open) => !open && onClose()}>
       <DialogPortal>
         {/* Backdrop */}
-        <DialogOverlay className="z-[60] bg-black/40" />
+        <DialogOverlay className="z-[260] bg-black/40" />
 
         {/* Dialog Content Wrapper */}
         <DialogPrimitive.Content
           onPointerDownOutside={onClose}
           onEscapeKeyDown={onClose}
-          className="fixed z-[61] inset-0 flex items-end sm:items-center justify-center pointer-events-none px-4 pb-6 sm:pb-0 outline-none"
+          className="fixed z-[261] inset-0 flex items-end sm:items-center justify-center pointer-events-none px-4 pb-6 sm:pb-0 outline-none"
         >
           <div
             className="pointer-events-auto w-full max-w-sm rounded-2xl border border-border/60 bg-card shadow-2xl overflow-hidden"
@@ -351,15 +350,15 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
             <div className="p-5 flex flex-col gap-4">
               {/* Close button + title row */}
               <div className="flex items-start justify-between gap-3">
-                <h3 className="text-[15px] font-bold text-foreground leading-snug flex-1 min-w-0">
+                <h3 className="text-base font-semibold text-foreground leading-snug flex-1 min-w-0">
                   {content}
                 </h3>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1 rounded-full hover:bg-muted/60 text-muted-foreground transition-colors shrink-0"
+                  className="p-1.5 rounded-xl hover:bg-muted/60 text-foreground transition-colors shrink-0"
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-4 w-4" strokeWidth={1.65} />
                 </button>
               </div>
 
@@ -369,7 +368,7 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
                   className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <Video className="h-4 w-4 shrink-0 text-primary" />
+                  <Video className="h-4 w-4 shrink-0 text-primary" strokeWidth={1.65} />
                   <Link
                     to={`/meet?code=${reminder.meetingRoomName}`}
                     className="flex-1 truncate text-[13px] font-medium text-primary underline-offset-2 hover:underline transition-colors"
@@ -386,7 +385,7 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
                       toast.success('Đã sao chép link cuộc họp');
                     }}
                   >
-                    <Copy className="h-4 w-4" />
+                    <Copy className="h-4 w-4" strokeWidth={1.65} />
                   </button>
                 </div>
               )}
@@ -395,12 +394,12 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
               <div className="flex flex-col gap-2 rounded-xl bg-muted/30 px-4 py-3 border border-border/40">
                 {/* Date */}
                 <div className="flex items-center gap-2.5 text-[13px] text-foreground">
-                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Calendar className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.65} />
                   <span className="capitalize">{fullDate}</span>
                 </div>
                 {/* Time */}
                 <div className="flex items-center gap-2.5 text-[13px] text-foreground">
-                  <Clock3 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <Clock3 className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.65} />
                   <span>{formatClock(reminder.remindAt)}</span>
                   {/* Status */}
                   <span
@@ -455,9 +454,9 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
                         )}
                       >
                         {isActing ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.65} />
                         ) : (
-                          <UserPlus className="h-4 w-4" />
+                          <UserPlus className="h-4 w-4" strokeWidth={1.65} />
                         )}
                         {isDeclined ? "Tham gia lại" : "Tham gia"}
                       </button>
@@ -465,7 +464,7 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
 
                     {isJoined && !isDeclined && (
                       <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4" strokeWidth={1.65} />
                         Đang tham gia
                       </span>
                     )}
@@ -481,9 +480,9 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
                       )}
                     >
                       {isActing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.65} />
                       ) : (
-                        <X className="h-4 w-4" />
+                        <X className="h-4 w-4" strokeWidth={1.65} />
                       )}
                       Hủy cho tất cả
                     </button>
@@ -502,9 +501,9 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
                         )}
                       >
                         {isActing ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.65} />
                         ) : (
-                          <UserPlus className="h-4 w-4" />
+                          <UserPlus className="h-4 w-4" strokeWidth={1.65} />
                         )}
                         {isDeclined ? "Tham gia lại" : "Tham gia"}
                       </button>
@@ -522,9 +521,9 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
                         )}
                       >
                         {isActing ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.65} />
                         ) : (
-                          <UserMinus className="h-4 w-4" />
+                          <UserMinus className="h-4 w-4" strokeWidth={1.65} />
                         )}
                         Không tham gia
                       </button>
@@ -532,7 +531,7 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
 
                     {isJoined && !isDeclined && (
                       <span className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4" strokeWidth={1.65} />
                         Đang tham gia
                       </span>
                     )}
@@ -552,10 +551,10 @@ export function DetailDialog({ reminder, onClose, onUpdate, currentUserId, onCan
 function DateGroupHeader({ dateKey }: { dateKey: string }) {
   return (
     <div className="flex items-center gap-2 px-1 pt-3 pb-1 first:pt-1">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 whitespace-nowrap">
+      <span className="text-sm font-semibold text-foreground whitespace-nowrap">
         {formatDayLabel(dateKey)}
       </span>
-      <div className="flex-1 h-px bg-border/50" />
+      <div className="flex-1 h-px bg-border/40" />
     </div>
   );
 }
@@ -575,8 +574,8 @@ function FilterTabs({ value, onChange, counts }: FilterTabsProps) {
   ];
 
   return (
-    <div className="px-3 py-2.5 border-b border-border/40 bg-card shrink-0">
-      <div className="inline-flex w-full items-center rounded-lg bg-muted p-1">
+    <div className="px-4 py-3 border-b border-border/40 bg-card shrink-0">
+      <div className="inline-flex w-full items-center rounded-xl bg-muted/60 p-1">
         {tabs.map((tab) => {
           const active = value === tab.key;
           return (
@@ -585,10 +584,10 @@ function FilterTabs({ value, onChange, counts }: FilterTabsProps) {
               type="button"
               onClick={() => onChange(tab.key)}
               className={[
-                "flex-1 h-8 rounded-md px-3 text-sm transition-colors inline-flex items-center justify-center gap-1.5",
+                "flex-1 h-9 rounded-lg px-3 text-sm transition-colors inline-flex items-center justify-center gap-1.5",
                 active
-                  ? "bg-background text-foreground shadow-sm font-normal"
-                  : "text-muted-foreground hover:text-foreground hover:bg-transparent",
+                  ? "bg-background text-foreground shadow-sm font-semibold"
+                  : "text-foreground/75 hover:text-foreground hover:bg-background/50",
               ].join(" ")}
             >
               {tab.label}
@@ -640,12 +639,12 @@ function EmptyState({ filter }: { filter: ParticipationFilter }) {
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-20 px-6 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/50 ring-4 ring-muted/20">
-        <Bell className="h-7 w-7 text-muted-foreground/50" strokeWidth={1.4} />
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/40 text-foreground">
+        <Bell className="h-7 w-7" strokeWidth={1.65} />
       </div>
       <div className="space-y-1.5">
-        <p className="text-[14px] font-semibold text-foreground">{title}</p>
-        <p className="text-[12px] text-muted-foreground leading-relaxed max-w-[220px]">{desc}</p>
+        <p className="text-base font-semibold text-foreground">{title}</p>
+        <p className="text-sm text-muted-foreground leading-relaxed max-w-[240px]">{desc}</p>
       </div>
     </div>
   );
@@ -828,25 +827,25 @@ export function ConversationRemindersPanel({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         {/* Backdrop — click to close */}
-        <DialogOverlay className="z-[51] bg-transparent" />
+        <DialogOverlay className="z-[200] bg-transparent" />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 right-0 w-screen md:w-[350px] z-[51] flex flex-col rounded-none shadow-2xl bg-card border-l border-border/40 focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
+          className="fixed inset-y-0 right-0 z-[201] flex w-screen flex-col rounded-none border-l border-border/40 bg-card font-sans shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
         >
           {/*  Header  */}
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-card shrink-0">
+          <div className="flex items-center gap-2 px-4 py-4 border-b border-border/40 bg-card shrink-0">
             <button
               onClick={() => onOpenChange(false)}
-              className="p-1.5 rounded-md hover:bg-muted/60 transition-colors text-foreground"
+              className="p-2 rounded-xl hover:bg-muted/60 transition-colors text-foreground"
               aria-label="Quay lại"
             >
-              <ChevronLeft className="h-[18px] w-[18px]" />
+              <ChevronLeft className="h-5 w-5" strokeWidth={1.65} />
             </button>
             <DialogHeader className="p-0 flex-1 min-w-0">
-              <DialogTitle className="text-[15px] font-semibold text-foreground truncate leading-tight">
+              <DialogTitle className="text-lg font-semibold text-foreground truncate leading-tight">
                 Nhắc hẹn chung
               </DialogTitle>
               {conversationName && (
-                <p className="text-[12px] text-muted-foreground truncate leading-tight mt-0.5">
+                <p className="mt-0.5 truncate text-sm leading-tight text-muted-foreground">
                   {conversationName}
                 </p>
               )}
@@ -865,7 +864,7 @@ export function ConversationRemindersPanel({
           {/*  Scrollable body  */}
           <div
             ref={scrollContainerRef}
-            className="flex-1 min-h-0 overflow-y-auto overscroll-contain beautiful-scrollbar px-3 pb-4"
+            className="flex-1 min-h-0 overflow-y-auto overscroll-contain beautiful-scrollbar px-4 pb-4"
             // Ensure the div captures wheel events even when inner content
             // is shorter — avoids the "scroll doesn't work" symptom.
             style={{ scrollbarGutter: "stable" }}
@@ -905,7 +904,7 @@ export function ConversationRemindersPanel({
             {/* Sentinel — always present so IntersectionObserver can attach */}
             <div ref={sentinelRef} className="flex justify-center py-3" aria-hidden>
               {isLoadingMore && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/60" />
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/60" strokeWidth={1.65} />
               )}
             </div>
           </div>

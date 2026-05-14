@@ -71,13 +71,13 @@ export default function ReminderCalendarView({
   return (
     <div className="h-full min-h-0">
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-        <div className="relative z-30 flex flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-card px-3 py-3 md:px-4">
+        <div className="relative z-30 flex flex-wrap items-center justify-between gap-3 border-b border-border/50 bg-card px-4 py-3 md:px-5">
           <div className="relative flex items-center gap-1.5">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="h-9 rounded-lg border-border/70 bg-background px-4 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/60"
+              className="h-10 rounded-xl border-border/70 bg-background px-4 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/60"
               onClick={onJumpCalendarToToday}
             >
               Hôm nay
@@ -86,19 +86,19 @@ export default function ReminderCalendarView({
               type="button"
               size="icon"
               variant="ghost"
-              className="h-8 w-8 rounded-lg"
+              className="h-10 w-10 rounded-xl text-foreground hover:bg-muted/60"
               onClick={() => onShiftCalendarWeek(-1)}
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" strokeWidth={1.65} />
             </Button>
             <Button
               type="button"
               size="icon"
               variant="ghost"
-              className="h-8 w-8 rounded-lg"
+              className="h-10 w-10 rounded-xl text-foreground hover:bg-muted/60"
               onClick={() => onShiftCalendarWeek(1)}
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4" strokeWidth={1.65} />
             </Button>
 
             <Popover open={isMonthPickerOpen} onOpenChange={onMonthPickerOpenChange}>
@@ -107,17 +107,17 @@ export default function ReminderCalendarView({
                   type="button"
                   size="sm"
                   variant="ghost"
-                  className="h-8 rounded-lg px-2.5 text-base font-semibold text-foreground transition-colors hover:bg-muted/50"
+                  className="h-10 rounded-xl px-3 text-base font-semibold text-foreground transition-colors hover:bg-muted/60"
                 >
                   {calendarHeaderLabel}
-                  <ChevronDown className={`h-4 w-4 ml-1.5 transition-transform duration-200 ${isMonthPickerOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 ml-1.5 transition-transform duration-200 ${isMonthPickerOpen ? 'rotate-180' : ''}`} strokeWidth={1.65} />
                 </Button>
               </PopoverTrigger>
 
               <PopoverContent
                 align="start"
                 sideOffset={8}
-                className="z-[400] w-[320px] rounded-xl border border-border bg-background p-3 shadow-2xl"
+                className="z-[400] w-[320px] rounded-xl border border-border/70 bg-card p-3 shadow-2xl"
               >
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <p className="font-semibold text-base">{monthPickerTitle}</p>
@@ -126,19 +126,19 @@ export default function ReminderCalendarView({
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 rounded-lg"
+                      className="h-9 w-9 rounded-xl"
                       onClick={onMonthPrev}
                     >
-                      <ChevronLeft className="h-4 w-4" />
+                      <ChevronLeft className="h-4 w-4" strokeWidth={1.65} />
                     </Button>
                     <Button
                       type="button"
                       size="icon"
                       variant="ghost"
-                      className="h-8 w-8 rounded-lg"
+                      className="h-9 w-9 rounded-xl"
                       onClick={onMonthNext}
                     >
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-4 w-4" strokeWidth={1.65} />
                     </Button>
                   </div>
                 </div>
@@ -194,7 +194,7 @@ export default function ReminderCalendarView({
             <select
               value={calendarDensity}
               onChange={(event) => onCalendarDensityChange(event.target.value as CalendarDensity)}
-              className="h-9 rounded-lg border border-input bg-background px-3 text-xs font-medium"
+              className="h-10 rounded-xl border border-input bg-background px-3 text-sm font-semibold text-foreground"
             >
               <option value="workweek">Tuần làm việc</option>
               <option value="week">Cả tuần</option>
@@ -220,7 +220,7 @@ export default function ReminderCalendarView({
                     key={day.key}
                     type="button"
                     onClick={() => onSelectCalendarDay(day.key)}
-                    className={`relative h-16 border-b border-border/40 bg-card/95 px-4 text-left transition-colors hover:bg-muted/30 ${active ? 'after:absolute after:top-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary' : ''}`}
+                    className={`relative h-16 border-b border-border/40 bg-card px-4 text-left transition-colors hover:bg-muted/40 ${active ? 'bg-primary/5 after:absolute after:top-0 after:left-0 after:right-0 after:h-0.5 after:bg-primary' : ''}`}
                   >
                     <p className={`text-2xl font-normal leading-none ${isToday || active ? 'text-primary' : 'text-muted-foreground'}`}>
                       {new Intl.DateTimeFormat('vi-VN', { day: '2-digit' }).format(day.date)}
@@ -309,7 +309,7 @@ export default function ReminderCalendarView({
                               onCalendarEventClick(entry, day.key);
                             }
                           }}
-                          className="group pointer-events-auto absolute overflow-hidden rounded-md border border-primary/25 border-l-4 border-l-primary bg-primary/10 px-2 py-1 pr-6 text-left shadow-sm transition-colors hover:bg-primary/15"
+                          className="group pointer-events-auto absolute overflow-hidden rounded-lg border border-primary/25 border-l-4 border-l-primary bg-primary/10 px-2.5 py-1.5 pr-7 text-left shadow-sm transition-colors hover:bg-primary/15"
                           style={{
                             top: `${entry.topPx}px`,
                             left: `calc(${leftOffset}% + 2px)`,
@@ -318,10 +318,10 @@ export default function ReminderCalendarView({
                           }}
                         >
                           <div className="flex flex-col text-foreground">
-                             <span className="block text-[11px] font-semibold leading-tight truncate">
+                             <span className="block truncate text-xs font-semibold leading-tight">
                                {entry.preview}
                              </span>
-                             <span className="block text-[10px] font-medium opacity-80">
+                             <span className="block text-[11px] font-medium opacity-80">
                                {entry.timeLabel}
                              </span>
                           </div>
@@ -337,7 +337,7 @@ export default function ReminderCalendarView({
                                 className="rounded-sm bg-foreground/10 p-0.5 text-primary transition-colors hover:bg-foreground/20"
                                 aria-label="Mở link"
                               >
-                                <Link2 className="h-3 w-3" />
+                                <Link2 className="h-3 w-3" strokeWidth={1.65} />
                               </button>
                             )}
                             <button
@@ -349,7 +349,7 @@ export default function ReminderCalendarView({
                               className="rounded-sm bg-foreground/10 p-0.5 text-rose-600 transition-colors hover:bg-foreground/20"
                               aria-label="Xóa"
                             >
-                              <Trash2 className="h-3 w-3" />
+                              <Trash2 className="h-3 w-3" strokeWidth={1.65} />
                             </button>
                           </div>
                         </div>

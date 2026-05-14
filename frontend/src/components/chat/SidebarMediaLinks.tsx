@@ -33,7 +33,7 @@ const PREVIEW_LIMIT: Record<MediaKind, number> = {
 };
 
 function ThickDivider() {
-  return <div className="h-2 w-full bg-background shrink-0 pointer-events-none" />;
+  return <div className="h-2 w-full shrink-0 bg-muted/40 pointer-events-none" />;
 }
 
 function Section({
@@ -47,19 +47,19 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bg-card w-full">
+    <div className="w-full bg-card">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-[14px] text-[15px] font-bold text-foreground hover:bg-muted/10 transition-colors"
+        className="flex w-full items-center justify-between px-5 py-3.5 text-[15px] font-semibold text-foreground transition-colors hover:bg-muted/60"
       >
         {title}
         {open ? (
-          <ChevronUp className="h-[18px] w-[18px] text-muted-foreground/60" strokeWidth={2} />
+          <ChevronUp className="h-[18px] w-[18px] text-muted-foreground" strokeWidth={1.65} />
         ) : (
-          <ChevronDown className="h-[18px] w-[18px] text-muted-foreground/60" strokeWidth={2} />
+          <ChevronDown className="h-[18px] w-[18px] text-muted-foreground" strokeWidth={1.65} />
         )}
       </button>
-      {open && <div className="px-4 pb-4">{children}</div>}
+      {open && <div className="px-5 pb-5">{children}</div>}
     </div>
   );
 }
@@ -490,7 +490,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         {imageMessages.length === 0 ? (
           <div className="text-sm text-muted-foreground/90 py-2">Không có ảnh nào</div>
         ) : (
-        <div className="grid grid-cols-4 gap-[6px]">
+        <div className="grid grid-cols-3 gap-[6px] sm:grid-cols-4">
           {imageMessages.map((msg, i) => (
             <button
               key={`img-${msg._id || i}`}

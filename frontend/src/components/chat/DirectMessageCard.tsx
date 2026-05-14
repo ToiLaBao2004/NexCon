@@ -58,7 +58,7 @@ const decodeMentionTokens = (text: string, convo: Conversation) => {
   });
 };
 
-const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
+const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation; density?: "default" | "people" }) => {
   const { user } = useAuthStore();
   const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation, toggleConversationPin, markAsUnread, markAsSeen, drafts } = useChatStore();
   const { onlineUsers } = useSocketStore();
@@ -375,12 +375,14 @@ const DirectMessageCard = ({ convo }: { convo: Conversation }) => {
       titleAccessory={isPartiallyMuted && <span title="Đã tắt thông báo" className="flex items-center"><BellOff className="size-3.5 text-muted-foreground shrink-0" /></span>}
       rightSection={menuNode}
       statusIcon={statusIcon}
+      density={density}
       leftSection={
         <>
           <UserAvatar
             type="sidebar"
             name={displayName}
             avatarUrl={otherUser.userId?.avatarUrl ?? undefined}
+            className={density === "people" ? "!h-14 !w-14 !text-lg" : undefined}
           />
           {onlineUsers.includes(otherUser?.userId?._id ?? "") && <StatusBadge status="online" />}
           {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}

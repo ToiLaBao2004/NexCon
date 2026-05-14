@@ -127,9 +127,9 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                         {/* Avatar */}
                         <div className="flex flex-col items-center gap-2">
                             <div className="relative group">
-                                <Avatar className="h-20 w-20 border-4 border-primary/10 shadow-md">
+                                <Avatar className="h-24 w-24 border-4 border-primary/10 shadow-md">
                                     <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
-                                    <AvatarFallback className="text-3xl font-bold bg-primary/10 text-primary">
+                                    <AvatarFallback className="text-4xl font-bold bg-primary/10 text-primary">
                                         {user?.displayName?.charAt(0) || "?"}
                                     </AvatarFallback>
                                 </Avatar>

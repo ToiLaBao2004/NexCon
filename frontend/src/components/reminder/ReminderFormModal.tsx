@@ -269,29 +269,29 @@ export default function ReminderFormModal({
           <div className="flex-1 min-h-0 space-y-4 overflow-y-auto bg-muted/20 px-4 py-4">
             {!isNotifyOnlyEdit && (
               <>
-                <div className="space-y-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm">
-                  <Label htmlFor="reminder-content">Nội dung</Label>
-                  <Textarea id="reminder-content" maxLength={1200} rows={3} {...register('content')} />
+                <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                  <Label htmlFor="reminder-content" className="text-[15px] font-semibold text-foreground">Nội dung</Label>
+                  <Textarea id="reminder-content" maxLength={1200} rows={3} className="rounded-xl text-[15px]" {...register('content')} />
                   {errors.content && <p className="text-sm text-destructive">{errors.content.message}</p>}
                 </div>
 
-                <div className="space-y-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm">
-                  <Label htmlFor="reminder-datetime" className="inline-flex items-center gap-1.5">
-                    <CalendarClock className="h-3.5 w-3.5" />
+                <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                  <Label htmlFor="reminder-datetime" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground">
+                    <CalendarClock className="h-4 w-4" strokeWidth={1.65} />
                     Thời gian nhắc
                   </Label>
-                  <Input id="reminder-datetime" type="datetime-local" min={minRemindAt} {...register('remindAt')} />
+                  <Input id="reminder-datetime" type="datetime-local" min={minRemindAt} className="h-11 rounded-xl text-[15px]" {...register('remindAt')} />
                   {errors.remindAt && <p className="text-sm text-destructive">{errors.remindAt.message}</p>}
                 </div>
 
-                <div className="space-y-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm">
-                  <Label htmlFor="reminder-repeat" className="inline-flex items-center gap-1.5">
-                    <Repeat2 className="h-3.5 w-3.5" />
+                <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+                  <Label htmlFor="reminder-repeat" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground">
+                    <Repeat2 className="h-4 w-4" strokeWidth={1.65} />
                     Lặp lại
                   </Label>
                   <select
                     id="reminder-repeat"
-                    className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
+                    className="h-11 w-full rounded-xl border border-input bg-background px-3 text-[15px] outline-none transition-colors focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
                     {...register('repeatRule')}
                   >
                     <option value="none">Không lặp</option>
@@ -303,8 +303,8 @@ export default function ReminderFormModal({
               </>
             )}
 
-            <div className="space-y-2 rounded-xl border border-border/60 bg-background p-4 shadow-sm">
-              <Label>Kênh thông báo</Label>
+            <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+              <Label className="text-[15px] font-semibold text-foreground">Kênh thông báo</Label>
               <div className="grid grid-cols-1 gap-2">
                 {CHANNEL_OPTIONS.map((option) => {
                   const active = currentChannels.includes(option.value);
@@ -314,14 +314,14 @@ export default function ReminderFormModal({
                       type="button"
                       onClick={() => toggleChannel(option.value)}
                       className={cn(
-                        'rounded-lg border px-3 py-2.5 text-left transition-colors',
+                        'rounded-xl border px-3 py-2.5 text-left transition-colors',
                         active
                           ? 'border-primary/40 bg-primary/10'
                           : 'border-border/60 bg-background hover:bg-muted/40'
                       )}
                     >
-                      <p className="text-sm font-medium">{option.label}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{option.description}</p>
+                      <p className="text-[15px] font-semibold text-foreground">{option.label}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{option.description}</p>
                     </button>
                   );
                 })}
@@ -330,17 +330,17 @@ export default function ReminderFormModal({
             </div>
 
             {serverError && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {serverError}
               </div>
             )}
           </div>
 
           <DialogFooter className="flex-row justify-end gap-2 border-t border-border/50 bg-card px-4 py-4 shrink-0">
-            <Button type="button" variant="outline" className="rounded-lg font-semibold" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="h-10 rounded-xl font-semibold" disabled={isSubmitting} onClick={() => onOpenChange(false)}>
               Hủy bỏ
             </Button>
-            <Button type="submit" className="rounded-lg bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
+            <Button type="submit" className="h-10 rounded-xl bg-primary px-6 font-semibold text-primary-foreground hover:bg-primary/90" disabled={isSubmitting}>
               {isSubmitting
                 ? 'Đang lưu...'
                 : mode === 'create'

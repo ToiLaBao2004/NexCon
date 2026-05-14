@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { CalendarClock, Video } from 'lucide-react';
+import { CalendarClock } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,39 +85,39 @@ export default function ScheduleMeetingModal({ open, onOpenChange, conversationI
       <DialogContent
         showCloseButton={!isMobile}
         className={cn(
-          'gap-0 p-0 overflow-hidden border-border/40 flex flex-col',
+          'gap-0 p-0 overflow-hidden border-border/50 bg-card shadow-2xl flex flex-col',
           isMobile
             ? 'w-screen h-svh max-w-none rounded-none top-0 left-0 translate-x-0 translate-y-0'
-            : 'max-w-[540px] max-h-[86vh]'
+            : 'max-w-[540px] max-h-[86vh] rounded-xl'
         )}
       >
-        <DialogHeader className="border-b border-border/40 bg-card/80 px-6 py-4">
-          <DialogTitle className="text-xl font-semibold text-foreground flex items-center gap-2">
-            <Video className="h-5 w-5 text-primary" />
+        <DialogHeader className="border-b border-border/50 bg-card px-6 py-5">
+          <DialogTitle className="text-xl font-semibold text-foreground">
             Lên lịch họp
           </DialogTitle>
-          <p className="text-[11px] text-muted-foreground mt-1">
+          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
             Tạo cuộc họp và thông báo tự động cho mọi thành viên trong cuộc trò chuyện.
           </p>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1 min-h-0 bg-gradient-to-b from-background to-muted/10">
-            <div className="space-y-1.5 rounded-md border border-border/40 bg-card/70 p-3">
-              <Label htmlFor="schedule-meeting-name">Tên buổi họp</Label>
+          <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1 min-h-0 bg-muted/20">
+            <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+              <Label htmlFor="schedule-meeting-name" className="text-[15px] font-semibold text-foreground">Tên buổi họp</Label>
               <Input
                 id="schedule-meeting-name"
                 placeholder="VD: Họp tiến độ dự án..."
                 maxLength={200}
                 value={meetingName}
                 onChange={(e) => setMeetingName(e.target.value)}
+                className="h-11 rounded-xl text-[15px]"
                 autoFocus
               />
             </div>
 
-            <div className="space-y-1.5 rounded-md border border-border/40 bg-card/70 p-3">
-              <Label htmlFor="schedule-meeting-time" className="inline-flex items-center gap-1.5">
-                <CalendarClock className="h-3.5 w-3.5" />
+            <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4 shadow-sm">
+              <Label htmlFor="schedule-meeting-time" className="inline-flex items-center gap-1.5 text-[15px] font-semibold text-foreground">
+                <CalendarClock className="h-4 w-4" strokeWidth={1.65} />
                 Thời gian bắt đầu
               </Label>
               <Input
@@ -126,23 +126,24 @@ export default function ScheduleMeetingModal({ open, onOpenChange, conversationI
                 min={minRemindAt}
                 value={meetingTime}
                 onChange={(e) => setMeetingTime(e.target.value)}
+                className="h-11 rounded-xl text-[15px]"
               />
             </div>
 
             {error && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                 {error}
               </div>
             )}
           </div>
 
-          <DialogFooter className="px-6 py-3 border-t border-border/40 bg-card/30 flex-row justify-end gap-2 shrink-0">
-            <Button type="button" variant="outline" className="rounded-md font-semibold" disabled={isSubmitting} onClick={handleClose}>
+          <DialogFooter className="px-6 py-4 border-t border-border/50 bg-card flex-row justify-end gap-2 shrink-0">
+            <Button type="button" variant="outline" className="h-10 rounded-xl font-semibold" disabled={isSubmitting} onClick={handleClose}>
               Hủy bỏ
             </Button>
             <Button
               type="submit"
-              className="rounded-md bg-primary text-white hover:bg-primary/90 font-semibold px-6"
+              className="h-10 rounded-xl bg-primary text-white hover:bg-primary/90 font-semibold px-6"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Đang tạo...' : 'Xác nhận'}

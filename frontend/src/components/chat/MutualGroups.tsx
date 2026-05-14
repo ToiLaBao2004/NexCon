@@ -65,7 +65,7 @@ export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: Pa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         <DialogOverlay className="bg-transparent" />
-        <DialogPrimitive.Content className="fixed inset-y-0 right-0 w-screen md:w-[350px] p-0 m-0 rounded-none shadow-2xl bg-card border-l border-border/40 z-[201] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
+        <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-[201] m-0 w-screen rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card">
             <button
               onClick={() => onOpenChange(false)}
@@ -122,9 +122,9 @@ export function MutualGroupsPopover({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <div className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal cursor-pointer">
-          <Users className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
-          <span className="text-[15px]">{`${mutualGroupCount} nhóm chung`}</span>
+        <div className="flex w-full cursor-pointer items-center gap-3 bg-card px-5 py-3.5 text-foreground transition-colors hover:bg-muted/60">
+          <Users className="h-5 w-5 shrink-0 text-foreground" strokeWidth={1.65} />
+          <span className="text-[15px] font-normal">{`${mutualGroupCount} nhóm chung`}</span>
         </div>
       </PopoverTrigger>
       <PopoverContent className="w-64 bg-card border border-border/40 rounded-md shadow-soft p-2">

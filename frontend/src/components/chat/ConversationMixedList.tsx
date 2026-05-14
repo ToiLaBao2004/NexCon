@@ -66,15 +66,15 @@ const ConversationMixedList = () => {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Search bar */}
-      <div className="shrink-0 px-2 pb-2 bg-card">
+      <div className="shrink-0 bg-card pb-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-foreground pointer-events-none" strokeWidth={1.65} />
           <Input
             ref={searchInputRef}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm cuộc trò chuyện (Ctrl+K)..."
-            className="pl-8 pr-8 h-8 text-[13px] rounded-xl border-border/50 bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary/40"
+            className="h-11 rounded-xl border-border/60 bg-muted/30 pl-10 pr-9 text-[15px] shadow-sm focus-visible:ring-1 focus-visible:ring-primary/40"
           />
           {searchQuery && (
             <button
@@ -90,7 +90,7 @@ const ConversationMixedList = () => {
 
       {/* Conversation list */}
       <div
-        className="flex-1 min-h-0 overflow-y-auto beautiful-scrollbar px-2 pb-2 pt-2 space-y-1"
+        className="flex-1 min-h-0 overflow-y-auto beautiful-scrollbar pb-5 pt-2 space-y-2.5"
         onScroll={handleScroll}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) {
@@ -112,9 +112,9 @@ const ConversationMixedList = () => {
         ) : (
           filtered.map((convo) =>
             convo.type === "group" ? (
-              <GroupChatCard convo={convo} key={convo._id} />
+              <GroupChatCard convo={convo} key={convo._id} density="people" />
             ) : (
-              <DirectMessageCard convo={convo} key={convo._id} />
+              <DirectMessageCard convo={convo} key={convo._id} density="people" />
             )
           )
         )}

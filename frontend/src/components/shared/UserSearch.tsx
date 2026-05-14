@@ -136,17 +136,17 @@ const UserSearchItem = ({ user, onOpenChat }: { user: SearchedUser, onOpenChat?:
                 <button
                     onClick={pendingRequest ? onCancelRequest : onSendRequest}
                     className={cn(
-                        "h-9 w-9 flex items-center justify-center rounded-xl transition-all active:scale-95 disabled:opacity-50",
-                        pendingRequest ? "hover:bg-destructive/10 text-destructive" : "hover:bg-primary/10 text-muted-foreground hover:text-primary"
+                        "h-10 w-10 flex items-center justify-center rounded-xl transition-all active:scale-95 disabled:opacity-50",
+                        pendingRequest ? "hover:bg-destructive/10 text-destructive" : "text-foreground hover:bg-primary/10 hover:text-primary"
                     )}
                     title={pendingRequest ? "Hủy lời mời" : "Gửi lời mời kết bạn"}
                 >
                     {actionLoading ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
                     ) : pendingRequest ? (
-                        <UserMinus className="h-5 w-5" />
+                        <UserMinus className="h-5 w-5" strokeWidth={1.65} />
                     ) : (
-                        <UserPlus className="h-5 w-5" />
+                        <UserPlus className="h-5 w-5" strokeWidth={1.65} />
                     )}
                 </button>
                 {blockAction}
@@ -156,15 +156,15 @@ const UserSearchItem = ({ user, onOpenChat }: { user: SearchedUser, onOpenChat?:
 
     return (
         <>
-            <div onClick={() => setIsDialogOpen(true)} className="mt-2 w-full flex flex-col gap-2 p-3 rounded-lg border border-border/60 bg-card hover:bg-muted/50 transition-all cursor-pointer group">
-                <div className="flex items-center gap-3 w-full">
-                    <Avatar className="h-8 w-8 shrink-0">
+            <div onClick={() => setIsDialogOpen(true)} className="mt-2 w-full flex flex-col gap-2 rounded-xl border border-border/60 bg-card p-4 hover:bg-muted/50 transition-all cursor-pointer group">
+                <div className="flex items-center gap-3.5 w-full">
+                    <Avatar className="h-11 w-11 shrink-0">
                         <AvatarImage src={user.avatarUrl} />
-                        <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">{user.displayName.charAt(0)}</AvatarFallback>
+                        <AvatarFallback className="text-base font-bold bg-primary/10 text-primary">{user.displayName.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{displayAlias} {isSelf && "(Bạn)"}</p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-base font-semibold text-foreground truncate">{displayAlias} {isSelf && "(Bạn)"}</p>
+                        <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                     </div>
                     <div className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
                         {renderSecondaryActions("icon")}
@@ -176,7 +176,7 @@ const UserSearchItem = ({ user, onOpenChat }: { user: SearchedUser, onOpenChat?:
                             placeholder="Nhập lời nhắn..."
                             value={requestMessage}
                             onChange={(e) => setRequestMessage(e.target.value)}
-                            className="h-8 text-xs bg-muted/20 border-border/40"
+                            className="h-9 text-sm bg-muted/20 border-border/40"
                         />
                     </div>
                 )}
@@ -248,16 +248,16 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
     }, [debouncedQuery]);
 
     return (
-        <div className={cn("w-full border-b border-border/40 pb-3", className)}>
+        <div className={cn("w-full pb-4", className)}>
             <div className="relative flex-1">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-                    {status === "searching" ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Search className="h-4 w-4 text-muted-foreground" />}
+                    {status === "searching" ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : <Search className="h-5 w-5 text-foreground" strokeWidth={1.65} />}
                 </span>
                 <input
                     placeholder="Tìm kiếm theo email..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    className="flex h-9 w-full rounded-lg border border-border/60 bg-muted/30 px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-9 pr-8"
+                    className="flex h-11 w-full rounded-xl border border-border/60 bg-muted/30 px-4 py-2 text-[15px] shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-10 pr-9"
                 />
                 {query && <button onClick={() => { setQuery(""); setUsers([]); setStatus("idle"); }} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>}
             </div>

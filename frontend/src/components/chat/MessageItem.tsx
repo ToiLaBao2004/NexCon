@@ -24,11 +24,11 @@ import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSocketStore } from "@/stores/useSocketStore";
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import ReactionDetailModal from "./ReactionDetailModal";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
-import { useSocketStore } from "@/stores/useSocketStore";
 import { useThemeStore } from "@/stores/useThemeStore";
 import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
 import ReminderFormModal from "@/components/reminder/ReminderFormModal";
@@ -120,7 +120,7 @@ function renderMentionedText(
 			tokenParts.push(<span key={`token-tail-${tokenCursor}`}>{safeText.slice(tokenCursor)}</span>);
 		}
 
-		return <span className="text-sm whitespace-pre-wrap break-words">{tokenParts}</span>;
+		return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{tokenParts}</span>;
 	}
 
 	const validMentions = (mentions ?? [])
@@ -128,7 +128,7 @@ function renderMentionedText(
 		.sort((a, b) => a.offset - b.offset);
 
 	if (!validMentions.length) {
-		return <span className="text-sm whitespace-pre-wrap break-words">{safeText}</span>;
+		return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{safeText}</span>;
 	}
 
 	const parts: React.ReactNode[] = [];
@@ -156,7 +156,7 @@ function renderMentionedText(
 		parts.push(<span key={`text-tail-${cursor}`}>{safeText.slice(cursor)}</span>);
 	}
 
-	return <span className="text-sm whitespace-pre-wrap break-words">{parts}</span>;
+	return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{parts}</span>;
 }
 
 function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
@@ -370,7 +370,7 @@ function AudioMessageBubble({
 			{hasTranscript && showTranscript && (
 				<div
 					className={cn(
-						"max-w-[320px] rounded-xl px-4 py-3 text-[15px] sm:text-[16px] leading-relaxed",
+						"max-w-[340px] rounded-xl px-4 py-3 text-base leading-relaxed sm:text-[17px]",
 						"whitespace-pre-wrap break-words animate-in fade-in slide-in-from-top-1 duration-150",
 						isOwn
 							? "bg-white/12 text-white border border-white/10"
@@ -498,7 +498,7 @@ function ImageBatchGrid({
 				))}
 			</div>
 			{items[0]?.content && !items[0]?.isRecalled && !items[0]?.reportStatus && (
-				<p className="text-[15px] sm:text-[16px] px-2 leading-relaxed">
+				<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
 					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
 				</p>
 			)}
@@ -582,7 +582,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					</button>
 				)}
 				{message.content && (
-					<p className="text-[15px] sm:text-[16px] px-2 leading-relaxed">
+					<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
 						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
 					</p>
 				)}
@@ -651,7 +651,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<FileText className={cn("size-5", isOwn ? "text-white" : "text-primary")} />
 					</div>
 					<div className="flex flex-col min-w-0">
-						<span className="text-[15px] sm:text-[16px] font-medium truncate max-w-[180px]">{message.fileName ?? "File"}</span>
+						<span className="max-w-[180px] truncate text-[14px] font-medium sm:text-[15px]">{message.fileName ?? "File"}</span>
 						<span className={cn("text-[12px] sm:text-[13px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
 							{message.fileSize ? formatBytes(message.fileSize) : (message.mimeType ?? "")}
 						</span>
@@ -659,7 +659,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 					<ExternalLink className={cn("size-3.5 shrink-0 ml-1 opacity-0 group-hover/file:opacity-70 transition-opacity", isOwn ? "text-white" : "text-muted-foreground")} />
 				</a>
 				{message.content && (
-					<div className="text-[15px] sm:text-[16px] px-2 leading-relaxed whitespace-pre-wrap break-words">
+					<div className="px-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words sm:text-[15px]">
 						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
 					</div>
 				)}
@@ -708,7 +708,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						</div>
 
 						{preview.title && (
-							<div className="line-clamp-2 text-[15px] sm:text-[16px] font-semibold">
+							<div className="line-clamp-2 text-[14px] font-semibold sm:text-[15px]">
 								{preview.title}
 							</div>
 						)}
@@ -738,7 +738,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				)}
 			>
 				<Link2 className="size-3.5 shrink-0" />
-				<span className="text-[15px] sm:text-[16px] break-all">{message.content}</span>
+				<span className="break-all text-[14px] sm:text-[15px]">{message.content}</span>
 			</a>
 		);
 	}
@@ -1696,8 +1696,8 @@ function SystemMessageComponent({
 		return (
 			<>
 				<div className="my-4 flex w-full animate-in justify-center fade-in transition-all duration-300">
-					<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-3 py-1.5 shadow-sm backdrop-blur-sm">
-						<p className="text-[13px] font-normal tracking-normal break-words">
+					<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-3 py-1.5 font-sans shadow-sm backdrop-blur-sm">
+						<p className="text-[13px] font-medium tracking-normal text-muted-foreground break-words">
 							<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
 								{systemContent}
 							</span>
@@ -1705,7 +1705,7 @@ function SystemMessageComponent({
 					</div>
 				</div>
 
-				<div className="my-2 mx-auto w-full max-w-[520px] space-y-2 animate-in fade-in duration-300">
+				<div className="my-2 mx-auto w-full max-w-[520px] space-y-2 font-sans animate-in fade-in duration-300">
 					<div
 						id={reminderAnchorId || undefined}
 						data-shared-reminder-card={isShared && sharedKey ? sharedKey : undefined}
@@ -1745,7 +1745,7 @@ function SystemMessageComponent({
 												setIsParticipantDialogOpen(true);
 												void loadSharedOverview();
 											}}
-											className="h-8 rounded-full border border-border bg-muted px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/80"
+											className="h-8 rounded-lg border border-border/70 bg-background px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/60"
 										>
 											Xem người tham gia
 										</button>
@@ -1771,7 +1771,7 @@ function SystemMessageComponent({
 										<button
 											type="button"
 											onClick={openReminderEdit}
-											className="w-full rounded-xl border border-border bg-muted/50 py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted"
+											className="w-full rounded-lg border border-border/70 bg-background py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/60"
 										>
 											Chỉnh sửa
 										</button>
@@ -1783,7 +1783,7 @@ function SystemMessageComponent({
 												type="button"
 												disabled={isUpdatingParticipation}
 												onClick={() => void updateParticipation(true)}
-												className="w-full rounded-xl border border-emerald-200 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 disabled:opacity-60"
+												className="w-full rounded-lg border border-primary/25 bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60"
 											>
 												Tham gia lại
 											</button>
@@ -1792,7 +1792,7 @@ function SystemMessageComponent({
 												type="button"
 												disabled={isUpdatingParticipation}
 												onClick={() => void updateParticipation(false)}
-												className="w-full rounded-xl border border-amber-200 bg-amber-50 py-2.5 text-sm font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-60"
+												className="w-full rounded-lg border border-rose-500/45 bg-background py-2.5 text-sm font-semibold text-rose-500 transition-colors hover:bg-rose-500/10 disabled:opacity-60"
 											>
 												Không tham gia
 											</button>
@@ -1802,7 +1802,7 @@ function SystemMessageComponent({
 									<button
 										type="button"
 										onClick={openReminder}
-										className="w-full rounded-xl border border-border bg-muted py-2.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/80"
+										className="w-full rounded-lg border border-primary/25 bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
 									>
 										Xem chi tiết
 									</button>
@@ -2012,7 +2012,6 @@ const MessageItem = ({
 		item.isRecalled !== true && item.reportStatus !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
 	);
 	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
-
 	// Automatically fetch signed URL for files and audio if not cached
 	useEffect(() => {
 		if (
@@ -2322,7 +2321,7 @@ const MessageItem = ({
 								name={participant?.userId.nickname ?? participant?.userId.displayName ?? "User"}
 								avatarUrl={participant?.userId.avatarUrl ?? undefined}
 								className="size-10 text-base"
-								status={isSenderOnline ? "online" : "offline"}
+								status={selectedConvo.type === "group" && isSenderOnline ? "online" : undefined}
 							/>
 						)}
 					</div>
@@ -2339,7 +2338,7 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit",
 								isOwn && "ms-auto",
-								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[15px] sm:text-[16px] leading-relaxed" : "px-4 py-2.5 text-[15px] sm:text-[16px] leading-relaxed"),
+								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[14px] leading-relaxed sm:text-[15px]" : "px-4 py-2.5 text-[14px] leading-relaxed sm:text-[15px]"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
 								(isRecalled && !isImageBatch)
 									? "bg-muted text-muted-foreground border border-dashed border-border italic rounded-2xl"
@@ -2393,7 +2392,7 @@ const MessageItem = ({
 												disabled={isBlocked}
 											/>
 										)}
-										<span className="text-[12px] sm:text-[13px] font-medium leading-none whitespace-nowrap">
+										<span className="text-[13px] font-medium leading-none whitespace-nowrap sm:text-sm">
 											{formatMessageTime(new Date(message.createdAt))}
 										</span>
 										{isOwn && message.status === "error" && (
@@ -2412,7 +2411,7 @@ const MessageItem = ({
 							)}>
 								<div className="flex items-center gap-1.5 bg-black/20 dark:bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 h-5">
 									<Clock className="size-3 text-white/80 animate-spin" />
-									<span className="text-[12px] sm:text-[13px] font-medium text-white/90">Đang gửi</span>
+									<span className="text-[13px] font-medium text-white/90 sm:text-sm">Đang gửi</span>
 								</div>
 							</div>
 						)}

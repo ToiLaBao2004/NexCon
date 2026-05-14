@@ -39,9 +39,9 @@ export const FriendActionButtons = ({
             title="Hủy kết bạn"
             onClick={onUnfriend}
             disabled={isProcessing}
-            className="p-2 rounded-xl hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all active:scale-95 disabled:opacity-50"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-foreground hover:bg-destructive/10 hover:text-destructive transition-all active:scale-95 disabled:opacity-50"
         >
-            {isProcessing ? <Loader2 className="h-5 w-5 animate-spin text-destructive" /> : <UserMinus className="h-5 w-5" />}
+            {isProcessing ? <Loader2 className="h-5 w-5 animate-spin text-destructive" /> : <UserMinus className="h-5 w-5" strokeWidth={1.65} />}
         </button>
     );
 

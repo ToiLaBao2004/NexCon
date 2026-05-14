@@ -13,29 +13,33 @@ interface CharCardProps {
 	rightSection?: React.ReactNode;
 	statusIcon?: React.ReactNode;
 	titleAccessory?: React.ReactNode;
+	density?: "default" | "people";
 }
 
 const ChatCard = (
 	{
-		convoId, name, timestamp, isActive, onSelect, unreadCount, leftSection, subtitle, rightSection, statusIcon, titleAccessory
+		convoId, name, timestamp, isActive, onSelect, unreadCount, leftSection, subtitle, rightSection, statusIcon, titleAccessory, density = "default"
 	}: CharCardProps) => {
+	const isPeopleDensity = density === "people";
 
 	return (
 		<Card
 			key={convoId}
-			className={cn("border border-transparent p-3 cursor-pointer transition-colors bg-transparent shadow-none hover:bg-muted/60 group",
+			className={cn(
+				"border border-transparent cursor-pointer transition-colors bg-transparent shadow-none hover:bg-muted/60 group",
+				isPeopleDensity ? "min-h-[84px] rounded-xl px-4 py-3.5" : "p-3",
 				isActive &&
 				"bg-primary/15 border-primary/25 shadow-[inset_3px_0_0_hsl(var(--primary))]"
 			)}
 			onClick={() => onSelect(convoId)}
 		>
-			<div className="flex items-center gap-3">
+			<div className={cn("flex items-center", isPeopleDensity ? "gap-4" : "gap-3")}>
 				<div className="relative">{leftSection}</div>
 
 				<div className="flex-1 min-w-0">
 					<div className="flex items-center justify-between mb-1">
 						<div className="flex items-center gap-1 min-w-0 overflow-hidden">
-							<h3 className={cn("text-sm truncate",
+							<h3 className={cn(isPeopleDensity ? "text-base truncate" : "text-sm truncate",
 								unreadCount && unreadCount > 0 ? "font-bold text-foreground" : "font-semibold text-slate-800 dark:text-zinc-200"
 							)}
 							>

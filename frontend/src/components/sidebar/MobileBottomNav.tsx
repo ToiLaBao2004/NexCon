@@ -64,8 +64,8 @@ const MobileBottomNav = () => {
 
     return (
         <>
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border/40 safe-area-bottom">
-                <div className="flex items-center justify-around h-14">
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-card/95 backdrop-blur-md safe-area-bottom">
+                <div className="flex h-14 items-center justify-around gap-1.5 px-2 py-1">
                 {navItems.map((item) => {
                     const active = isPathActive(item.path);
                     return (
@@ -76,22 +76,19 @@ const MobileBottomNav = () => {
                                 navigate(item.path);
                             }}
                             className={cn(
-                                "flex flex-col items-center justify-center gap-0.5 flex-1 h-full relative transition-colors",
-                                active ? "text-primary" : "text-muted-foreground"
+                                "relative flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition-colors",
+                                active ? "bg-primary/15 text-primary font-semibold" : "text-foreground/75 hover:bg-muted/50 hover:text-foreground"
                             )}
                         >
                             <div className="relative">
-                                <item.icon className="h-5 w-5" strokeWidth={active ? 2 : 1.5} />
+                                <item.icon className="h-5 w-5" strokeWidth={active ? 1.85 : 1.65} />
                                 {item.badge > 0 && (
                                     <span className="absolute -top-1.5 -right-2.5 min-w-4 h-4 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold border border-card">
                                         {item.badge > 99 ? "99+" : item.badge}
                                     </span>
                                 )}
                             </div>
-                            <span className="text-[10px] font-medium leading-none">{item.label}</span>
-                            {active && (
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-primary rounded-full" />
-                            )}
+                            <span className="text-[10.5px] font-medium leading-none">{item.label}</span>
                         </button>
                     );
                 })}
@@ -99,7 +96,7 @@ const MobileBottomNav = () => {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <button
-                            className="flex flex-col items-center justify-center gap-0.5 flex-1 h-full relative transition-colors text-muted-foreground"
+                            className="relative flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-2xl text-foreground/75 transition-colors hover:bg-muted/50 hover:text-foreground"
                             aria-label="Tài khoản"
                         >
                             <Avatar className="h-5 w-5 rounded-full border border-border/60">
@@ -108,7 +105,7 @@ const MobileBottomNav = () => {
                                     {user?.displayName?.charAt(0) || "U"}
                                 </AvatarFallback>
                             </Avatar>
-                            <span className="text-[10px] font-medium leading-none">Tài khoản</span>
+                            <span className="text-[10.5px] font-medium leading-none">Tài khoản</span>
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-64 mr-1" align="end" side="top" sideOffset={8}>

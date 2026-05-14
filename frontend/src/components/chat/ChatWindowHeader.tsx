@@ -28,11 +28,11 @@ const PanelRightIcon = ({ className, filled }: { className?: string; filled?: bo
     xmlns="http://www.w3.org/2000/svg"
     className={className}
   >
-    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
+    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="1.65" />
     {filled ? (
       <path d="M15 3V21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3H15Z" fill="currentColor" />
     ) : (
-      <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" strokeWidth="2" />
+      <line x1="15" y1="3" x2="15" y2="21" stroke="currentColor" strokeWidth="1.65" />
     )}
   </svg>
 );
@@ -130,28 +130,28 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   };
 
   return (
-    <header className="sticky top-0 z-10 px-2 md:px-4 py-1.5 flex min-w-0 items-center bg-background border-b border-border/80">
-      <div className="flex min-w-0 items-center gap-1 md:gap-2 w-full">
+    <header className="sticky top-0 z-10 flex min-h-[72px] min-w-0 items-center border-b border-border/70 bg-card px-3 py-2 md:px-5">
+      <div className="flex min-w-0 items-center gap-2 md:gap-3 w-full">
         {/* Mobile: back button to conversation list */}
         {isMobile ? (
           <Button
             variant="ghost"
             size="icon"
-            className="shrink-0 h-9 w-9 md:hidden"
+            className="h-10 w-10 shrink-0 rounded-xl md:hidden"
             onClick={() => setActiveConversation(null)}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
         ) : (
           <>
-            <SidebarTrigger className="-ml-1 text-foreground" />
+            <SidebarTrigger className="-ml-1 h-10 w-10 rounded-xl text-foreground hover:bg-muted/60" />
             <Separator
               orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
+              className="mr-2 data-[orientation=vertical]:h-5"
             />
           </>
         )}
-        <div className="px-1 md:p-2 w-full min-w-0 flex items-center gap-2 md:gap-3">
+        <div className="flex w-full min-w-0 items-center gap-3 px-1 md:gap-4">
           {/* avatar */}
           <div
             className="relative cursor-pointer hover:opacity-80 transition-opacity"
@@ -163,6 +163,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                   type={"card"}
                   name={displayName}
                   avatarUrl={otherUser?.userId?.avatarUrl || undefined}
+                  className="!h-[52px] !w-[52px] !text-lg"
                 />
                 {onlineUsers.includes(otherUser?.userId?._id ?? "") && (
                   <StatusBadge status="online" />
@@ -171,7 +172,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
             ) : (
               <GroupChatAvatar
                 participants={chat.participants}
-                type="card"
+                type="people"
                 groupAvatarUrl={chat.group?.avatarUrl}
               />
             )}
@@ -179,7 +180,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
           {/* name */}
           <h2
             className={cn(
-              "font-medium text-foreground flex-1 truncate",
+              "flex-1 truncate text-lg font-semibold leading-tight text-foreground",
               chat.type === "direct" &&
               "cursor-pointer hover:text-primary transition-colors",
             )}
@@ -187,38 +188,38 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
           >
             {displayName}
           </h2>
-          <div className="flex items-center gap-0 md:gap-1 ml-0.5 md:ml-2 shrink-0">
+          <div className="ml-0.5 flex shrink-0 items-center gap-1 md:ml-2 md:gap-1.5">
             {/* call buttons */}
             {chat.type === "direct" && (
               <>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                  className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
                   title="Lên lịch họp"
                   onClick={() => setIsScheduleOpen(true)}
                 >
-                  <CalendarClock className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
+                  <CalendarClock className="h-5 w-5" strokeWidth={1.65} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                  className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
                   disabled={!canCall}
                   title="Gọi thoại"
                   onClick={handleVoiceCall}
                 >
-                  <Phone className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
+                  <Phone className="h-5 w-5" strokeWidth={1.65} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                  className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
                   disabled={!canCall}
                   title="Gọi video"
                   onClick={handleVideoCall}
                 >
-                  <Video className="h-[19px] w-[19px] md:h-[22px] md:w-[22px]" strokeWidth={1.5} />
+                  <Video className="h-5 w-5" strokeWidth={1.65} />
                 </Button>
               </>
             )}
@@ -229,22 +230,22 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                  className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
                   disabled={chat.disbanded === true}
                   title={chat.disbanded === true ? "Nhóm đã giải tán" : "Lên lịch họp"}
                   onClick={() => setIsScheduleOpen(true)}
                 >
-                  <CalendarClock className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
+                  <CalendarClock className="h-5 w-5" strokeWidth={1.65} />
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="inline-flex rounded-md hover:bg-muted hover:text-foreground fade-in transition-colors h-8 w-8 md:h-9 md:w-9"
+                  className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
                   disabled={groupCallStatus !== "idle" || callStatus !== "idle" || chat.disbanded === true}
                   title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi nhóm"}
                   onClick={() => startGroupCall(chat._id, "video")}
                 >
-                  <Video className="h-[19px] w-[19px] md:h-[22px] md:w-[22px]" strokeWidth={1.5} />
+                  <Video className="h-5 w-5" strokeWidth={1.65} />
                 </Button>
               </>
             )}
@@ -254,15 +255,15 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
               variant="ghost"
               size="icon"
               className={cn(
-                "rounded-md transition-colors h-8 w-8 md:h-9 md:w-9",
+                "h-10 w-10 rounded-xl transition-colors",
                 activeSidebar === 'search'
-                  ? "bg-primary/10 text-primary hover:bg-primary/20"
-                  : "hover:bg-muted hover:text-foreground"
+                  ? "bg-primary/15 text-primary hover:bg-primary/20"
+                  : "text-foreground hover:bg-muted/60 hover:text-foreground"
               )}
               onClick={handleToggleSearch}
               title="Tìm kiếm trong trò chuyện"
             >
-              <Search className="h-[18px] w-[18px] md:h-[20px] md:w-[20px]" strokeWidth={1.5} />
+              <Search className="h-5 w-5" strokeWidth={1.65} />
             </Button>
 
             {/* info toggle button */}
@@ -271,10 +272,10 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                 variant="ghost"
                 size="icon"
                 className={cn(
-                  "rounded-md transition-colors h-8 w-8 md:h-9 md:w-9",
+                  "h-10 w-10 rounded-xl transition-colors",
                   showInfo
-                    ? "bg-primary/10 text-primary hover:bg-primary/20"
-                    : "hover:bg-muted hover:text-foreground"
+                    ? "bg-primary/15 text-primary hover:bg-primary/20"
+                    : "text-foreground hover:bg-muted/60 hover:text-foreground"
                 )}
                 onClick={onToggleInfo}
                 title={showInfo ? "Ẩn thông tin" : "Thông tin hội thoại"}

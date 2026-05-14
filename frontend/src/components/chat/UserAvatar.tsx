@@ -34,7 +34,7 @@ const UserAvatar = ({ type, name, avatarUrl, className, status }: IUserAvatarPro
                 </AvatarFallback>
 
             </Avatar>
-            {status && type !== "seen" && <StatusBadge status={status} />}
+            {status === "online" && type !== "seen" && <StatusBadge status="online" />}
         </span>
     );
 };

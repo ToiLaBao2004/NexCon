@@ -105,14 +105,14 @@ const MainSidebar = () => {
                     <div className="mb-4">
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="relative h-12 w-12 rounded-full p-0 hover:bg-slate-100 dark:hover:bg-white/10 transition-all border-none bg-transparent shadow-none">
-                                    <Avatar className="h-10 w-10 border-2 border-slate-200 dark:border-white/20">
+                                <Button variant="ghost" className="relative h-14 w-14 rounded-full p-0 hover:bg-slate-100 dark:hover:bg-white/10 transition-all border-none bg-transparent shadow-none">
+                                    <Avatar className="h-12 w-12 border-2 border-slate-200 dark:border-white/20">
                                         <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
                                         <AvatarFallback className="bg-primary/10 text-primary font-bold">
                                             {user?.displayName?.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <div className="absolute bottom-1 right-1 h-3 w-3 rounded-full bg-green-500 border-2 border-white dark:border-[#081c36]" />
+                                    <div className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-white dark:border-[#081c36]" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-80 ml-2" align="start" side="right" sideOffset={15}>

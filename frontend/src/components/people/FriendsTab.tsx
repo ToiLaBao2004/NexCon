@@ -59,30 +59,28 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
     return (
         <div className="space-y-3">
             {friends.length > 0 ? (
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2.5">
                     {friends.map((friend) => {
                         const isOnline = onlineUsers.includes(friend.friendId);
                         const isProcessing = processingId === friend.friendId;
 
                         return (
-                            <div key={friend._id} className="group flex min-h-[68px] items-center gap-3 rounded-lg border border-transparent bg-transparent p-3 transition-colors hover:bg-muted/60">
+                            <div key={friend._id} className="group flex min-h-[84px] items-center gap-4 rounded-xl border border-transparent bg-transparent px-4 py-3.5 transition-colors hover:bg-muted/60">
                                 <div className="relative cursor-pointer" onClick={() => handleOpenProfile(friend)}>
-                                    <Avatar className="h-11 w-11 shrink-0">
+                                    <Avatar className="h-14 w-14 shrink-0">
                                         <AvatarImage src={friend.avatarUrl} />
-                                        <AvatarFallback className="bg-primary/10 text-base font-bold text-primary">
+                                        <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">
                                             {friend.displayName.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <div className={`absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card ${isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-muted-foreground/30'}`} />
+                                    {isOnline && (
+                                        <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-2 border-card bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
+                                    )}
                                 </div>
 
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProfile(friend)}>
-                                    <p className="truncate text-sm font-semibold text-slate-800 dark:text-zinc-200">
+                                    <p className="truncate text-base font-semibold text-foreground">
                                         {friend.nickname || friend.displayName}
-                                    </p>
-                                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                                        <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
-                                        {isOnline ? 'Đang hoạt động' : 'Ngoại tuyến'}
                                     </p>
                                 </div>
 

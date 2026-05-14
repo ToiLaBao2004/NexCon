@@ -59,7 +59,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
         <DialogPortal>
           <DialogOverlay className="bg-transparent" />
           <DialogPrimitive.Content
-            className="fixed inset-y-0 right-0 w-screen md:w-[350px] p-0 m-0 rounded-none shadow-2xl bg-card border-l border-border/40 z-[201] flex flex-col focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
+            className="fixed inset-y-0 right-0 z-[201] m-0 flex w-screen flex-col rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
           >
             <div className="flex items-center gap-3 px-4 py-4 border-b border-border/40 bg-card shrink-0">
               <button

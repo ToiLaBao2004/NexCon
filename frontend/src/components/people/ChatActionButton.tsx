@@ -37,11 +37,11 @@ export const ChatActionButton = ({
             title={title}
             onClick={onClick}
             className={cn(
-                "p-2 rounded-xl hover:bg-primary/10 hover:text-primary text-muted-foreground transition-all active:scale-95",
+                "flex h-10 w-10 items-center justify-center rounded-xl text-foreground hover:bg-primary/10 hover:text-primary transition-all active:scale-95",
                 className
             )}
         >
-            <MessageSquare className="h-5 w-5" />
+            <MessageSquare className="h-5 w-5" strokeWidth={1.65} />
         </button>
     );
 };

@@ -101,11 +101,11 @@ export default function MembersPanel({ conversationId, participants, memberCount
       <div
         role="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-foreground hover:bg-muted/10 transition-colors bg-card font-normal cursor-pointer"
+        className="flex w-full cursor-pointer items-center gap-3 bg-card px-5 py-3.5 text-foreground transition-colors hover:bg-muted/60"
       >
-        <Users className="h-5 w-5 text-muted-foreground/70 shrink-0" strokeWidth={1.5} />
+        <Users className="h-5 w-5 shrink-0 text-foreground" strokeWidth={1.65} />
         <div className="flex flex-1 items-center justify-between">
-          <span className="text-[15px]">{memberCount ?? participants.length} thành viên</span>
+          <span className="text-[15px] font-normal">{memberCount ?? participants.length} thành viên</span>
           {isGroupAdmin && approvalQueue?.length > 0 && (
             <span className="flex h-5 items-center justify-center rounded-full bg-red-500 px-2 text-[11px] font-medium text-white shadow-sm">
               {approvalQueue.length} chờ duyệt
@@ -117,7 +117,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogPortal>
           <DialogOverlay className="bg-transparent" />
-          <DialogPrimitive.Content className="fixed inset-y-0 right-0 w-screen md:w-[350px] p-0 m-0 rounded-none shadow-2xl bg-card border-l border-border/40 z-[201] focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
+          <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-[201] m-0 w-screen rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card">
               <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-muted/10">
                 <ChevronLeft className="h-5 w-5" />
@@ -204,10 +204,6 @@ export default function MembersPanel({ conversationId, participants, memberCount
                               Trưởng nhóm
                             </span>
                           )}
-                        </div>
-                        <div className="text-[11.5px] text-muted-foreground truncate leading-tight flex items-center gap-1.5">
-                          <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? "bg-emerald-500" : "bg-muted-foreground/40"}`} />
-                          {isOnline ? "Đang hoạt động" : "Ngoại tuyến"}
                         </div>
                       </div>
 
