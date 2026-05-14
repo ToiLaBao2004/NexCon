@@ -249,7 +249,7 @@ export interface Notification {
   linkUrl: string;
   type?: string;
   targetId?: string;
-  actorId?: string;
+  actorId?: string | RemoteUser;
   recipientId?: string;
   metadata?: {
     conversationId?: string;
