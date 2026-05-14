@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,11 +20,15 @@ export const UserActionDropdown = ({
     trigger,
     mode = "dropdown",
 }: UserActionDropdownProps) => {
-    const { blockedUsers, blockUser, unblockUser, loading } = useFriendStore();
+    const { blockedUsers, blockUser, unblockUser, loading, fetchBlockedList } = useFriendStore();
     const [showBlockConfirm, setShowBlockConfirm] = useState(false);
     const [showUnblockConfirm, setShowUnblockConfirm] = useState(false);
 
     const isBlockedByMe = blockedUsers.some((u) => u._id === userId);
+
+    useEffect(() => {
+        void fetchBlockedList();
+    }, [fetchBlockedList]);
 
     const handleBlock = async () => {
         try {

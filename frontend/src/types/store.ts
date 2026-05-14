@@ -231,6 +231,7 @@ export interface FriendState {
   unfriendUser: (friendId: string) => Promise<void>;
   blockedUsers: any[];
   blockedUsersFetched: boolean;
+  fetchingBlockedUsers: boolean;
   blockedBy: string[];
   fetchBlockedList: (force?: boolean) => Promise<void>;
   blockUser: (userId: string) => Promise<void>;

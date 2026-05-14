@@ -161,7 +161,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const { user } = useAuthStore();
 	const { emitTyping, emitStopTyping } = useSocketStore();
 	const { sendMessage, markAsSeen, replyingTo, setReplyingTo, setDraft, clearDraft } = useChatStore();
-	const { blockedUsers, blockedBy } = useFriendStore();
+	const { blockedUsers, blockedBy, fetchBlockedList } = useFriendStore();
 	const currentUserId = user?._id ?? "";
 
 	const [value, setValue] = useState("");
@@ -201,6 +201,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				return participant.displayName.toLowerCase().includes(keyword);
 			});
 	}, [currentUserId, mentionQuery, participants]);
+
+	useEffect(() => {
+		if (selectedConvo.type !== "direct") return;
+		void fetchBlockedList();
+	}, [fetchBlockedList, selectedConvo.type]);
 
 	if (!user) return null;
 
