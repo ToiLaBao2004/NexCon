@@ -92,7 +92,13 @@ const MainSidebar = () => {
             <TooltipProvider delayDuration={0}>
                 {/* Top Section: Avatar and Main Nav */}
                 <div
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) {
+                            setFocusedConversation(null);
+                            return;
+                        }
+                        e.stopPropagation();
+                    }}
                     className="flex flex-col items-center gap-2 w-full flex-1"
                 >
                     {/* User Avatar */}

@@ -7,7 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Search, X, Loader2 } from "lucide-react";
 
 const ConversationMixedList = () => {
-  const { conversations, fetchConversations, fetchMoreConversations, conversationsHasMore, convoLoading } = useChatStore();
+  const {
+    conversations,
+    fetchConversations,
+    fetchMoreConversations,
+    conversationsHasMore,
+    convoLoading,
+    setFocusedConversation,
+  } = useChatStore();
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -82,7 +89,15 @@ const ConversationMixedList = () => {
       </div>
 
       {/* Conversation list */}
-      <div className="flex-1 min-h-0 overflow-y-auto beautiful-scrollbar px-2 pb-2 pt-2 space-y-1" onScroll={handleScroll}>
+      <div
+        className="flex-1 min-h-0 overflow-y-auto beautiful-scrollbar px-2 pb-2 pt-2 space-y-1"
+        onScroll={handleScroll}
+        onPointerDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setFocusedConversation(null);
+          }
+        }}
+      >
         {filtered.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">
             {searchQuery ? (
