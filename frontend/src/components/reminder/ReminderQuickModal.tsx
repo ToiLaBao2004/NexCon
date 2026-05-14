@@ -128,37 +128,37 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
     ];
 
   const quickBody = (
-    <div className="flex-1 flex flex-col justify-between px-6 pb-6 pt-4 bg-gradient-to-b from-background to-muted/10 overflow-y-auto min-h-0">
+    <div className="flex-1 flex flex-col justify-between px-6 pb-6 pt-4 bg-card overflow-y-auto min-h-0">
       <div className="space-y-4">
         {/* Create Mode Toggle */}
-        <div className="flex items-center gap-1 rounded-xl bg-slate-100 dark:bg-slate-800/80 p-1">
+        <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-muted/40 p-1">
           <button
             type="button"
             onClick={() => setCreateMode("shared")}
-            className={`flex-1 h-9 rounded-lg text-sm font-medium transition-all duration-200 ${isSharedMode ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"}`}
+            className={`flex-1 h-9 rounded-lg text-sm transition-colors ${isSharedMode ? "bg-background text-foreground shadow-sm font-semibold" : "text-foreground/75 hover:bg-background/50 hover:text-foreground"}`}
           >
             Nhắc hẹn chung
           </button>
           <button
             type="button"
             onClick={() => setCreateMode("personal")}
-            className={`flex-1 h-9 rounded-lg text-sm font-medium transition-all duration-200 ${!isSharedMode ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"}`}
+            className={`flex-1 h-9 rounded-lg text-sm transition-colors ${!isSharedMode ? "bg-background text-foreground shadow-sm font-semibold" : "text-foreground/75 hover:bg-background/50 hover:text-foreground"}`}
           >
             Chỉ nhắc tôi
           </button>
         </div>
 
         {/* Message Preview Section */}
-        <div className="overflow-hidden rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-800/50 p-3.5">
-          <label className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <MessageSquareQuote className="h-3.5 w-3.5" />
+        <div className="overflow-hidden rounded-xl border border-border/60 bg-background p-4">
+          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+            <MessageSquareQuote className="h-4 w-4" strokeWidth={1.65} />
             Nội dung
           </label>
-          <p className="text-[14px] font-semibold leading-relaxed text-slate-900 dark:text-slate-200 line-clamp-3">
+          <p className="text-base font-semibold leading-relaxed text-foreground line-clamp-3">
             {messagePreview || "[Không có nội dung]"}
           </p>
-          <div className="mt-2.5 flex items-center gap-2 border-t border-slate-200/40 dark:border-slate-700/60 pt-2.5">
-            <p className="text-[11px] italic text-slate-500 dark:text-slate-400 leading-normal">
+          <div className="mt-2.5 flex items-center gap-2 border-t border-border/50 pt-2.5">
+            <p className="text-xs italic text-muted-foreground leading-normal">
               {isSharedMode
                 ? "Mọi thành viên trong nhóm đều nhận được thông báo."
                 : "Lời nhắc này chỉ hiển thị với riêng bạn."}
@@ -175,13 +175,13 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
                 key={action.label}
                 title={action.description}
                 disabled={isSubmitting || action.disabled}
-                className={`group relative flex flex-col items-center justify-center rounded-xl border border-slate-200 dark:border-slate-700/80 bg-white dark:bg-slate-800/80 p-4 text-center shadow-sm transition-all duration-200 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50/50 dark:hover:bg-slate-700/50 active:scale-[0.98] ${action.disabled ? "opacity-50 grayscale cursor-not-allowed" : "cursor-pointer"}`}
+                className={`group relative flex flex-col items-center justify-center rounded-xl border border-border/60 bg-background p-4 text-center shadow-none transition-colors hover:bg-muted/60 active:scale-[0.98] ${action.disabled ? "opacity-50 grayscale cursor-not-allowed" : "cursor-pointer"}`}
                 onClick={action.onClick}
               >
-                <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 transition-colors group-hover:border-slate-300 dark:group-hover:border-slate-500 group-hover:bg-white dark:group-hover:bg-slate-700 group-hover:text-slate-900 dark:group-hover:text-white">
-                  <ActionIcon className="h-4 w-4" />
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-muted/40 text-foreground transition-colors">
+                  <ActionIcon className="h-4 w-4" strokeWidth={1.65} />
                 </div>
-                <p className="text-[14px] font-bold text-slate-900 dark:text-slate-100">
+                <p className="text-[15px] font-semibold text-foreground">
                   {action.label}
                 </p>
               </button>
@@ -193,14 +193,14 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
       {/* Secondary Edit Action */}
       <div className="pt-3">
         <Button
-          className="w-full h-11 rounded-xl bg-primary text-white hover:bg-primary/90 text-sm font-bold transition-all shadow-md active:scale-[0.98]"
+          className="w-full h-11 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-semibold transition-all shadow-md active:scale-[0.98]"
           disabled={isSubmitting}
           onClick={() => {
             setOpenQuick(false);
             setOpenCustomForm(true);
           }}
         >
-          <Clock3 className="h-4 w-4 mr-2" />
+          <Clock3 className="h-4 w-4 mr-2" strokeWidth={1.65} />
           Chỉnh sửa chi tiết
         </Button>
       </div>
@@ -217,13 +217,13 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
             if (!nextOpen) onClose();
           }}
         >
-          <SheetContent side="bottom" className="rounded-t-3xl p-0 border-t-0 dark:border-slate-800 dark:bg-slate-900 shadow-2xl" showCloseButton={false}>
-            <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-slate-200 dark:bg-slate-700" />
-            <SheetHeader className="border-b border-border/40 bg-card/80 px-6 py-4">
+          <SheetContent side="bottom" className="rounded-t-2xl p-0 border-t border-border/40 bg-card shadow-2xl" showCloseButton={false}>
+            <div className="mx-auto mt-2 h-1.5 w-12 rounded-full bg-muted" />
+            <SheetHeader className="border-b border-border/40 bg-card px-6 py-4">
               <SheetTitle className="text-xl font-semibold text-foreground text-left">
                 Tạo nhắc hẹn nhanh
               </SheetTitle>
-              <p className="text-[11px] text-muted-foreground mt-1 text-left">
+            <p className="mt-1 text-left text-sm leading-relaxed text-muted-foreground">
                 {isSharedMode
                   ? "Gửi nhắc hẹn cho mọi thành viên trong hội thoại này."
                   : "Đặt một lời nhắc cá nhân dựa trên tin nhắn này."}
@@ -240,12 +240,12 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
             if (!nextOpen) onClose();
           }}
         >
-          <DialogContent className="max-w-[540px] w-[95vw] p-0 gap-0 h-[680px] max-h-[86vh] overflow-hidden border-border/40 flex flex-col shadow-2xl">
-            <DialogHeader className="border-b border-border/40 bg-card/80 px-6 py-4">
+          <DialogContent className="max-w-[540px] w-[95vw] p-0 gap-0 h-[680px] max-h-[86vh] overflow-hidden rounded-xl border-border/40 bg-card flex flex-col shadow-2xl">
+            <DialogHeader className="border-b border-border/40 bg-card px-6 py-4">
               <DialogTitle className="text-xl font-semibold text-foreground">
                 Tạo nhắc hẹn nhanh
               </DialogTitle>
-              <p className="text-[11px] text-muted-foreground mt-1">
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                 {isSharedMode
                   ? "Gửi nhắc hẹn cho mọi thành viên để cùng theo dõi sự kiện quan trọng."
                   : "Đặt nhắc hẹn riêng bảo mật cho bản thân bạn."}

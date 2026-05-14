@@ -127,21 +127,21 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
   };
 
   return (
-    <div className="relative w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border/80 bg-popover/95 p-4 font-sans text-popover-foreground shadow-[0_18px_45px_-26px_hsl(var(--foreground)/0.45)] backdrop-blur-xl antialiased animate-in slide-in-from-right-4 fade-in duration-300 sm:w-[408px]">
+    <div className="relative w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border/70 bg-card p-4 font-sans text-foreground shadow-[0_18px_45px_-26px_hsl(var(--foreground)/0.35)] antialiased animate-in slide-in-from-right-4 fade-in duration-300 sm:w-[408px]">
       <div className="absolute inset-x-0 top-0 h-1 bg-primary/85" />
 
       <button
         type="button"
         onClick={handleCloseToast}
         aria-label="Đóng"
-        className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-xl text-foreground transition-colors hover:bg-muted/60"
       >
-        <X className="h-3.5 w-3.5" strokeWidth={2.25} />
+        <X className="h-4 w-4" strokeWidth={1.65} />
       </button>
 
       <div className="flex gap-3.5 pt-1">
-        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/10 text-primary shadow-sm">
-          <Bell className="h-5 w-5" strokeWidth={2.15} />
+        <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted/40 text-foreground">
+          <Bell className="h-5 w-5" strokeWidth={1.65} />
         </div>
 
         <div className="min-w-0 flex-1 pr-7">
@@ -149,7 +149,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
             Nhắc hẹn
           </p>
 
-          <p className="mt-2 whitespace-pre-wrap break-words text-[15px] font-semibold leading-6 text-foreground">
+          <p className="mt-2 whitespace-pre-wrap break-words text-base font-semibold leading-6 text-foreground">
             {meetingUrlParts.before}
             {meetingUrlParts.url && (
               <a
@@ -174,7 +174,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
           )}
 
           <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-muted-foreground">
-            <CalendarClock className="h-4 w-4 text-primary/80" strokeWidth={2} />
+            <CalendarClock className="h-4 w-4 text-foreground" strokeWidth={1.65} />
             <span>{formatReminderTime(reminder.remindAt)}</span>
             {reminder.source?.type === 'message' && (
               <>
@@ -197,7 +197,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
                 void handleJoinMeeting();
               }}
               disabled={joiningMeeting}
-              className="mt-3 inline-flex h-8 items-center rounded-md border border-primary/30 bg-primary/10 px-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
+              className="mt-3 inline-flex h-9 items-center rounded-xl border border-primary/30 bg-primary/10 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/15 disabled:opacity-60"
             >
               {joiningMeeting ? 'Đang vào phòng...' : 'Tham gia cuộc họp'}
             </button>
@@ -209,7 +209,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
       <div ref={snoozeAreaRef}>
         <div className={`grid transition-all duration-200 ${showSnoozeOptions ? 'mt-3 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
           <div className="overflow-hidden">
-            <div className="rounded-lg border border-border/70 bg-muted/40 p-3">
+            <div className="rounded-xl border border-border/60 bg-muted/40 p-3">
               <p className="mb-2 text-[12px] font-semibold text-muted-foreground">
                 Nhắc lại sau
               </p>
@@ -220,7 +220,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
                     type="button"
                     disabled={loadingAction !== null}
                     onClick={() => void handleSnooze(minutes as 5 | 10 | 30 | 60)}
-                    className="h-8 rounded-md border border-border bg-background text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+                    className="h-9 rounded-lg border border-border bg-background text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
                   >
                     {minutes < 60 ? `${minutes}p` : '1h'}
                   </button>
@@ -237,7 +237,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
             type="button"
             onClick={handleView}
             disabled={loadingAction !== null}
-            className="flex h-10 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+            className="flex h-10 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
           >
             Xem
           </button>
@@ -247,7 +247,7 @@ export function ReminderToastCard({ reminder, toastId }: ReminderToastCardProps)
             disabled={loadingAction !== null}
             onClick={() => setShowSnoozeOptions((prev) => !prev)}
             className={cn(
-              "flex h-10 items-center justify-center rounded-lg border text-sm font-semibold transition-colors disabled:opacity-50",
+              "flex h-10 items-center justify-center rounded-xl border text-sm font-semibold transition-colors disabled:opacity-50",
               showSnoozeOptions
                 ? "border-primary/30 bg-primary/10 text-primary"
                 : "border-border bg-background text-foreground hover:bg-muted/60"
