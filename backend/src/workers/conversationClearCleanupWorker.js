@@ -4,6 +4,7 @@ import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
 import { deleteCloudinaryResource } from '../middlewares/uploadMiddleware.js';
 import { enqueueConversationClearCleanup } from '../config/conversationClearCleanupQueue.js';
+import { decryptMessagePayload, encryptText } from '../utils/messageCrypto.js';
 
 const MESSAGE_BATCH_SIZE = 50;
 
@@ -90,20 +91,22 @@ async function refreshLastMessage(conversationId) {
         return;
     }
 
+    const safeLatestMessage = decryptMessagePayload(latestMessage);
+
     await Conversation.updateOne(
         { _id: conversationId },
         {
             $set: {
                 lastMessage: {
-                    _id: latestMessage._id,
-                    content: latestMessage.content,
-                    type: latestMessage.type,
-                    systemType: latestMessage.systemType || null,
-                    metadata: latestMessage.metadata instanceof Map
-                        ? Object.fromEntries(latestMessage.metadata)
-                        : (latestMessage.metadata || null),
-                    senderId: latestMessage.senderId,
-                    createdAt: latestMessage.createdAt,
+                    _id: safeLatestMessage._id,
+                    content: encryptText(safeLatestMessage.content),
+                    type: safeLatestMessage.type,
+                    systemType: safeLatestMessage.systemType || null,
+                    metadata: safeLatestMessage.metadata instanceof Map
+                        ? Object.fromEntries(safeLatestMessage.metadata)
+                        : (safeLatestMessage.metadata || null),
+                    senderId: safeLatestMessage.senderId,
+                    createdAt: safeLatestMessage.createdAt,
                 },
             },
         },

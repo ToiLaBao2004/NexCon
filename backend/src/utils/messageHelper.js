@@ -1,6 +1,8 @@
 import { v2 as cloudinary } from 'cloudinary';
+import { decryptConversationPayload, decryptMessagePayload } from './messageCrypto.js';
 
-const resolveLastMessagePreview = (message) => {
+const resolveLastMessagePreview = (rawMessage) => {
+    const message = decryptMessagePayload(rawMessage);
     if (message.isRecalled) return 'Tin nhắn đã được thu hồi';
 
     switch (message.type) {
@@ -88,7 +90,8 @@ const resolveLastMessagePreview = (message) => {
 };
 
 export const updateConversationLastMessage = (conversation, message, senderId) => {
-    const metadata = message.metadata instanceof Map ? Object.fromEntries(message.metadata) : (message.metadata || null);
+    const safeMessage = decryptMessagePayload(message);
+    const metadata = safeMessage.metadata instanceof Map ? Object.fromEntries(safeMessage.metadata) : (safeMessage.metadata || null);
     const visibleToUserIds = Array.isArray(metadata?.visibleToUserIds)
         ? metadata.visibleToUserIds.map((id) => id.toString())
         : [];
@@ -96,13 +99,13 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
 
     conversation.set({
         lastMessage: {
-            _id: message._id,
-            content: resolveLastMessagePreview(message),
-            type: message.type ?? 'text',
-            systemType: message.systemType || null,
+            _id: safeMessage._id,
+            content: resolveLastMessagePreview(safeMessage),
+            type: safeMessage.type ?? 'text',
+            systemType: safeMessage.systemType || null,
             metadata: metadata,
             senderId: senderId,
-            createdAt: message.createdAt,
+            createdAt: safeMessage.createdAt,
         },
     });
 
@@ -124,24 +127,20 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
         (p) => (p.userId._id || p.userId).toString() === senderIdStr
     );
     if (senderParticipant) {
-        senderParticipant.lastReadMessageId = message._id;
+        senderParticipant.lastReadMessageId = safeMessage._id;
         senderParticipant.lastReadAt = new Date();
     }
     conversation.markModified('participants');
 };
 
 export const emitNewMessage = (io, conversation, message, signedUrl = null) => {
-    const payloadMessage = typeof message.toObject === 'function' ? message.toObject() : { ...message };
-    if (payloadMessage.metadata instanceof Map) {
-        payloadMessage.metadata = Object.fromEntries(payloadMessage.metadata);
-    }
+    const payloadMessage = decryptMessagePayload(message);
     payloadMessage.signedUrl = signedUrl ?? null;
 
-    const lastMsgRaw = conversation.lastMessage?.toObject?.() || conversation.lastMessage;
-    const lastMsgPayload = { ...lastMsgRaw };
-    if (lastMsgPayload?.metadata instanceof Map) {
-        lastMsgPayload.metadata = Object.fromEntries(lastMsgPayload.metadata);
-    }
+    const safeConversation = decryptConversationPayload(conversation);
+    const lastMsgPayload = safeConversation.lastMessage
+        ? { ...safeConversation.lastMessage }
+        : safeConversation.lastMessage;
 
     io.to(conversation._id.toString()).emit('new-message', {
         message: payloadMessage,

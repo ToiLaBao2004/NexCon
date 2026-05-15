@@ -27,11 +27,12 @@ import { moderateImageMessage } from '../services/moderation/imageModerationServ
 import { registerViolation } from '../services/moderation/violationService.js';
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
 import { isMuted } from '../utils/isMuted.js';
+import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
 
 function maskPopulatedSender(message) {
-    const raw = message?.toObject ? message.toObject() : message;
+    const raw = decryptMessagePayload(message);
     if (!raw?.senderId || typeof raw.senderId !== 'object') return raw;
     return {
         ...raw,
@@ -702,16 +703,12 @@ export async function createReminderSystemMessage(req, res) {
         updateConversationLastMessage(conversation, message, senderId);
         await conversation.save();
 
-        const payloadMessage = typeof message.toObject === 'function' ? message.toObject() : { ...message };
-        if (payloadMessage.metadata instanceof Map) {
-            payloadMessage.metadata = Object.fromEntries(payloadMessage.metadata);
-        }
+        const payloadMessage = decryptMessagePayload(message);
 
-        const lastMsgRaw = conversation.lastMessage?.toObject?.() || conversation.lastMessage;
-        const lastMsgPayload = { ...lastMsgRaw };
-        if (lastMsgPayload?.metadata instanceof Map) {
-            lastMsgPayload.metadata = Object.fromEntries(lastMsgPayload.metadata);
-        }
+        const safeConversation = decryptConversationPayload(conversation);
+        const lastMsgPayload = safeConversation.lastMessage
+            ? { ...safeConversation.lastMessage }
+            : safeConversation.lastMessage;
 
         const payload = {
             message: payloadMessage,
@@ -965,10 +962,11 @@ export async function searchMessages(req, res) {
             return res.status(400).json({ message: 'Thiáº¿u conversationId.' });
         }
 
-        // Build base filter
+        const normalizedKeyword = normalizeVietnamese(q);
+
+        // Build base filter. searchContent is encrypted at rest, so keyword matching happens after decrypting.
         const filter = {
             conversationId,
-            searchContent: { $regex: normalizeVietnamese(q), $options: 'i' },
             isRecalled: { $ne: true },
             reportStatus: { $ne: true },
             $or: [
@@ -996,6 +994,7 @@ export async function searchMessages(req, res) {
         }
 
         const messages = await Message.find(filter)
+            .select('+searchContent')
             .sort({ createdAt: -1 })
             .populate('senderId', 'displayName avatarUrl lock')
             .populate({
@@ -1005,11 +1004,19 @@ export async function searchMessages(req, res) {
             })
             .lean();
 
-        return res.status(200).json({
-            messages: messages.map((message) => ({
+        const matchedMessages = messages
+            .map((message) => ({
                 ...maskPopulatedSender(message),
                 replyTo: message.replyTo ? maskPopulatedSender(message.replyTo) : message.replyTo,
-            })),
+            }))
+            .filter((message) => {
+                const searchableText = message.searchContent || normalizeVietnamese(message.content || '');
+                return searchableText.includes(normalizedKeyword);
+            })
+            .map(({ searchContent, ...message }) => message);
+
+        return res.status(200).json({
+            messages: matchedMessages,
         });
     } catch (error) {
         console.error('Error searching messages:', error);

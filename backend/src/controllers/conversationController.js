@@ -15,6 +15,12 @@ import {
 	leaveUserSocketsFromRoom,
 } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
+import {
+	decryptConversationPayload,
+	decryptConversationsPayload,
+	decryptMessagePayload,
+	decryptMessagesPayload,
+} from '../utils/messageCrypto.js';
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
 import { enqueueGroupCleanup } from '../config/groupCleanupQueue.js';
 import { enqueueConversationClearCleanup } from '../config/conversationClearCleanupQueue.js';
@@ -38,7 +44,7 @@ function sanitizeParticipantUser(userObj) {
 
 function sanitizePopulatedConversation(conversation) {
 	if (!conversation) return conversation;
-	const raw = conversation?.toObject ? conversation.toObject() : conversation;
+	const raw = decryptConversationPayload(conversation);
 	return {
 		...raw,
 		participants: (raw.participants || []).map((participant) => ({
@@ -64,7 +70,7 @@ function isGroupAdmin(conversation, userId) {
 
 function sanitizeModeratedMessage(message) {
 	if (!message) return message;
-	const raw = message?.toObject ? message.toObject() : message;
+	const raw = decryptMessagePayload(message);
 	const next = {
 		...raw,
 		senderId: raw.senderId && typeof raw.senderId === 'object'
@@ -219,7 +225,7 @@ export async function getConversations(req, res) {
 			? rawConversations[rawConversations.length - 1].updatedAt
 			: null;
 
-		let conversations = rawConversations;
+		let conversations = decryptConversationsPayload(rawConversations);
 
 		conversations = await Promise.all(conversations.map(async (conversation) => {
 			const lastMetadata = conversation.lastMessage?.metadata instanceof Map
@@ -245,22 +251,23 @@ export async function getConversations(req, res) {
 				};
 			}
 
-			const fallbackMetadata = fallback.metadata instanceof Map
-				? Object.fromEntries(fallback.metadata)
-				: (fallback.metadata || null);
+			const safeFallback = decryptMessagePayload(fallback);
+			const fallbackMetadata = safeFallback.metadata instanceof Map
+				? Object.fromEntries(safeFallback.metadata)
+				: (safeFallback.metadata || null);
 
-				return {
-					...conversation,
-					lastMessage: {
-						_id: fallback._id,
-						content: fallback.content,
-						type: fallback.type,
-						systemType: fallback.systemType || null,
-						metadata: fallbackMetadata,
-						createdAt: fallback.createdAt,
-						senderId: fallback.senderId,
-					},
-				};
+			return {
+				...conversation,
+				lastMessage: {
+					_id: safeFallback._id,
+					content: safeFallback.content,
+					type: safeFallback.type,
+					systemType: safeFallback.systemType || null,
+					metadata: fallbackMetadata,
+					createdAt: safeFallback.createdAt,
+					senderId: safeFallback.senderId,
+				},
+			};
 		}));
 
 		conversations = conversations.filter(c => {
@@ -397,7 +404,7 @@ export async function getGroups(req, res) {
 			? rawGroups[rawGroups.length - 1].updatedAt
 			: null;
 
-		const formatted = rawGroups.map((c) => {
+		const formatted = decryptConversationsPayload(rawGroups).map((c) => {
 			const myParticipant = c.participants?.find((p) => {
 				const pid = p?.userId?._id?.toString?.() || p?.userId?.toString?.();
 				return pid === myId;
@@ -923,6 +930,8 @@ export async function getMediaByType(req, res) {
 			nextCursor = messages[messages.length - 1].createdAt;
 			messages.pop();
 		}
+
+		messages = decryptMessagesPayload(messages);
 
 		return res.status(200).json({ messages, nextCursor });
 	} catch (error) {
@@ -2038,16 +2047,11 @@ export async function leaveGroup(req, res) {
 			const savedSilentMsg = await silentLeaveMessage.save();
 			const finalSilentMsg = await Message.findById(savedSilentMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
 
-			const payloadMessage = typeof finalSilentMsg.toObject === 'function' ? finalSilentMsg.toObject() : { ...finalSilentMsg };
-			if (payloadMessage.metadata instanceof Map) {
-				payloadMessage.metadata = Object.fromEntries(payloadMessage.metadata);
-			}
-
-			const lastMsgRaw = updatedConversation.lastMessage?.toObject?.() || updatedConversation.lastMessage;
-			const lastMsgPayload = { ...lastMsgRaw };
-			if (lastMsgPayload?.metadata instanceof Map) {
-				lastMsgPayload.metadata = Object.fromEntries(lastMsgPayload.metadata);
-			}
+			const payloadMessage = decryptMessagePayload(finalSilentMsg);
+			const safeUpdatedConversation = decryptConversationPayload(updatedConversation);
+			const lastMsgPayload = safeUpdatedConversation.lastMessage
+				? { ...safeUpdatedConversation.lastMessage }
+				: safeUpdatedConversation.lastMessage;
 
 			adminIds.forEach((adminId) => {
 				const adminSocketId = getReceiverSocketId(adminId);

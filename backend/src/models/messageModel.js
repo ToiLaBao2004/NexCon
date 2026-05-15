@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
+import { decryptText, encryptText, isEncryptedText } from '../utils/messageCrypto.js';
 
 const MESSAGE_TYPES = ['text', 'image', 'audio', 'file', 'link', 'system', 'sticker'];
 
@@ -33,6 +34,8 @@ const messageSchema = new mongoose.Schema({
     content: {
         type: String,
         trim: true,
+        get: decryptText,
+        set: encryptText,
     },
     systemType: {
         type: String,
@@ -51,6 +54,8 @@ const messageSchema = new mongoose.Schema({
         type: String,
         trim: true,
         select: false,
+        get: decryptText,
+        set: encryptText,
     },
     filePublicId: {
         type: String,
@@ -97,12 +102,28 @@ const messageSchema = new mongoose.Schema({
         }
     ],
     deliveredTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-}, { timestamps: true });
+}, {
+    timestamps: true,
+    toJSON: { getters: true },
+    toObject: { getters: true },
+});
 
-// Pre-save hook to normalize content for search
+// Pre-save hook to normalize content for search and encrypt legacy plaintext rows on touch.
 messageSchema.pre('save', function (next) {
-    if (this.isModified('content')) {
-        this.searchContent = normalizeVietnamese(this.content || '');
+    const rawContent = this.get('content', null, { getters: false });
+    const plainContent = decryptText(rawContent || '');
+
+    if (rawContent && !isEncryptedText(rawContent)) {
+        this.content = rawContent;
+    }
+
+    if (rawContent != null) {
+        this.searchContent = normalizeVietnamese(plainContent || '');
+    } else {
+        const rawSearchContent = this.get('searchContent', null, { getters: false });
+        if (rawSearchContent && !isEncryptedText(rawSearchContent)) {
+            this.searchContent = rawSearchContent;
+        }
     }
     next();
 });

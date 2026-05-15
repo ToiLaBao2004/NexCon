@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { decryptText, encryptText, isEncryptedText } from '../utils/messageCrypto.js';
 
 const participantSchema = new mongoose.Schema({
     userId: {
@@ -77,6 +78,8 @@ const lastMessageSchema = new mongoose.Schema({
     },
     content: {
         type: String,
+        get: decryptText,
+        set: encryptText,
     },
     type: {
         type: String,
@@ -100,7 +103,11 @@ const lastMessageSchema = new mongoose.Schema({
     createdAt: {
         type: Date
     }
-}, { _id: false });
+}, {
+    _id: false,
+    toJSON: { getters: true },
+    toObject: { getters: true },
+});
 
 const conversationSchema = new mongoose.Schema({
     type: {
@@ -153,7 +160,19 @@ const conversationSchema = new mongoose.Schema({
             type: String,
         },
     },
-}, { timestamps: true });
+}, {
+    timestamps: true,
+    toJSON: { getters: true },
+    toObject: { getters: true },
+});
+
+conversationSchema.pre('save', function (next) {
+    const rawLastMessageContent = this.get('lastMessage.content', null, { getters: false });
+    if (rawLastMessageContent && !isEncryptedText(rawLastMessageContent)) {
+        this.set('lastMessage.content', rawLastMessageContent);
+    }
+    next();
+});
 
 conversationSchema.index({ 'participants.userId': 1, 'lastMessage.createdAt': -1 });
 

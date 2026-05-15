@@ -14,6 +14,7 @@ import {
     unlockAccount,
 } from '../services/moderation/violationService.js';
 import { io, isUserOnline } from '../socket/index.js';
+import { decryptMessagePayload } from '../utils/messageCrypto.js';
 
 const COMPLETED_REPORT_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const COMPLETED_APPEAL_TTL_MS = 180 * 24 * 60 * 60 * 1000;
@@ -91,7 +92,7 @@ function violationEvidencePreview(message) {
 }
 
 function serializeMessage(message) {
-    const raw = message?.toObject ? message.toObject() : message;
+    const raw = decryptMessagePayload(message);
     if (!raw) return null;
 
     return {
@@ -833,6 +834,7 @@ export async function resolveAdminReport(req, res) {
                 ).lean();
 
                 if (moderatedMessage) {
+                    moderatedMessage = decryptMessagePayload(moderatedMessage);
                     evidencePreview = violationEvidencePreview(moderatedMessage);
                     const conversation = await Conversation.findById(moderatedMessage.conversationId);
                     if (conversation?.lastMessage?._id?.toString?.() === moderatedMessage._id.toString()) {
