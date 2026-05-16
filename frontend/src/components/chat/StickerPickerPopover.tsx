@@ -23,7 +23,7 @@ type StickerSetConfig = {
 };
 
 const DEFAULT_STICKER_SET_CONFIGS: StickerSetConfig[] = [
-  { id: "bu-mat-ngao", name: "Bu Mat Ngao", folder: "bu_mat_ngao", prefix: "bu", count: 9 },
+  { id: "bu-mat-ngao", name: "Bu Mat Ngao", folder: "bu_mat_ngao", prefix: "Bu", count: 9 },
   { id: "zapy-do-tri", name: "Zapy Do Tri", folder: "zapy_do_tri", prefix: "zapy", count: 9 },
   { id: "tonton", name: "Tonton", folder: "tonton", prefix: "tonton", count: 9 },
   { id: "meo-meo", name: "Meo Meo", folder: "meo_meo", prefix: "meomeo", count: 9 },
