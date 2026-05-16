@@ -4,72 +4,64 @@ import { Button } from "@/components/ui/button";
 import { StickerIcon } from "@/components/shared/StickerIcon";
 import { cn } from "@/lib/utils";
 
-const STICKER_SETS = [
+const CLOUDINARY_CLOUD_NAME = "df1iezypb";
+const CLOUDINARY_IMAGE_BASE_URL = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload`;
+
+type StickerSet = {
+  id: string;
+  name: string;
+  iconUrl: string;
+  stickers: string[];
+};
+
+type StickerSetConfig = {
+  id: string;
+  name: string;
+  folder: string;
+  prefix: string;
+  count: number;
+};
+
+const DEFAULT_STICKER_SET_CONFIGS: StickerSetConfig[] = [
+  { id: "bu-mat-ngao", name: "Bu Mat Ngao", folder: "bu_mat_ngao", prefix: "bu", count: 9 },
+  { id: "zapy-do-tri", name: "Zapy Do Tri", folder: "zapy_do_tri", prefix: "zapy", count: 9 },
+  { id: "tonton", name: "Tonton", folder: "tonton", prefix: "tonton", count: 9 },
+  { id: "meo-meo", name: "Meo Meo", folder: "meo_meo", prefix: "meomeo", count: 9 },
   {
-    id: "bu-mat-ngao",
-    name: "Bư Mặt Ngáo",
-    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1777003934/icon_e56jol.png",
-    stickers: [
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003897/bu1_lz84qm.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003901/bu2_xnypab.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003905/bu3_l80qom.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003909/bu4_fipqmi.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003913/bu5_fgfnzc.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003917/bu6_mrjnsf.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003922/bu7_lcdgpz.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003926/bu8_rmabg2.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003930/bu9_sr0gjp.png"
-    ]
+    id: "hand-drawn-emotes",
+    name: "Hand Drawn Emotes",
+    folder: "hand-drawn-emotes-elements-collection",
+    prefix: "handdrawn",
+    count: 9,
   },
-  {
-    id: "zapy-do-tri",
-    name: "Zapy Dô Tri",
-    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1777003621/icon_oniljk.png",
-    stickers: [
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003624/zapy1_yxn521.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003628/zapy2_zfqkef.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003632/zapy3_jofbj0.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003636/zapy4_ppyyul.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003640/zapy5_iizy7r.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003644/zapy6_aznnup.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003648/zapy7_ezygkx.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003652/zapy8_a1sjej.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777003656/zapy9_ydgstc.png"
-    ]
-  },
-  {
-    id: "tonton",
-    name: "Tonton",
-    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1777001926/icon_smyotr.png",
-    stickers: [
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001929/tonton1_v74rei.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001936/tonton2_xgt3en.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001940/tonton3_xwn8t1.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001945/tonton4_qfbpbx.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001949/tonton5_uc4jmy.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001956/tonton6_mjhslb.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001958/tonton7_t3jngs.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001961/tonton8_s0y3bj.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777001965/tonton9_vlvuvf.png"
-    ]
-  },
-  {
-    id: "meo-meo",
-    name: "Mèo Mèo",
-    iconUrl: "https://res.cloudinary.com/df1iezypb/image/upload/v1777004779/icon_bbemow.png",
-    stickers: [
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004782/meomeo1_im6ntl.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004786/meomeo2_pk6mty.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004791/meomeo3_agzobv.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004795/meomeo4_vx3znt.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004799/meomeo5_fp3bgg.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004803/meomeo6_sigx00.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004808/meomeo7_f7ewje.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004813/meomeo8_opgue5.png",
-      "https://res.cloudinary.com/df1iezypb/image/upload/v1777004816/meomeo9_rsrubu.png"
-    ]
-  }
+  { id: "sticker-1", name: "Sticker 1", folder: "sticker1", prefix: "sticker1", count: 9 },
+  { id: "sticker-2", name: "Sticker 2", folder: "sticker2", prefix: "sticker2", count: 9 },
+  { id: "sticker-3", name: "Sticker 3", folder: "sticker3", prefix: "sticker3", count: 9 },
+  { id: "sticker-5", name: "Sticker 5", folder: "sticker5", prefix: "sticker5", count: 22 },
+  { id: "sticker-6", name: "Sticker 6", folder: "sticker6", prefix: "sticker6", count: 15 },
+  { id: "sticker-7", name: "Sticker 7", folder: "sticker7", prefix: "sticker7", count: 20 },
+  { id: "sticker-9", name: "Sticker 9", folder: "sticker9", prefix: "sticker9", count: 40 },
+  { id: "sticker-10", name: "Sticker 10", folder: "sticker10", prefix: "sticker10", count: 17 },
+  { id: "sticker-12", name: "Sticker 12", folder: "sticker12", prefix: "sticker12", count: 9 },
 ];
+
+function getStickerAssetUrl(folder: string, fileName: string) {
+  return `${CLOUDINARY_IMAGE_BASE_URL}/stickers/${folder}/${fileName}.png`;
+}
+
+function buildStickerSet(config: StickerSetConfig): StickerSet {
+  return {
+    id: config.id,
+    name: config.name,
+    iconUrl: getStickerAssetUrl(config.folder, "icon"),
+    stickers: Array.from(
+      { length: config.count },
+      (_, index) => getStickerAssetUrl(config.folder, `${config.prefix}${index + 1}`),
+    ),
+  };
+}
+
+const STICKER_SETS = DEFAULT_STICKER_SET_CONFIGS.map(buildStickerSet);
 
 interface StickerPickerPopoverProps {
   onSelect: (url: string) => void;
@@ -78,8 +70,7 @@ interface StickerPickerPopoverProps {
 export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverProps) {
   const [activeTab, setActiveTab] = useState(STICKER_SETS[0].id);
   const [isOpen, setIsOpen] = useState(false);
-
-  const currentSet = STICKER_SETS.find(set => set.id === activeTab);
+  const currentSet = STICKER_SETS.find((set) => set.id === activeTab) ?? STICKER_SETS[0];
 
   const handleSelect = (url: string) => {
     onSelect(url);
@@ -108,13 +99,12 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
         className="w-[320px] p-0 shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl overflow-hidden rounded-2xl animate-in fade-in zoom-in-95 duration-200"
       >
         <div className="flex flex-col h-[360px]">
-          {/* Sticker Grid */}
           <div className="flex-1 overflow-hidden bg-background/50">
             <div className="h-full overflow-y-auto beautiful-scrollbar">
               <div className="grid grid-cols-3 gap-3 p-4">
-                {currentSet?.stickers.map((url, idx) => (
+                {currentSet.stickers.map((url) => (
                   <button
-                    key={idx}
+                    key={`${currentSet.id}-${url}`}
                     onClick={() => handleSelect(url)}
                     className="relative aspect-square flex items-center justify-center p-1 rounded-xl hover:bg-primary/5 transition-all duration-200 group active:scale-90"
                   >
@@ -131,7 +121,6 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
             </div>
           </div>
 
-          {/* Footer / Tabs with Images */}
           <div className="p-2 bg-muted/30 border-t border-border/40">
             <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 px-1">
               {STICKER_SETS.map((set) => (
