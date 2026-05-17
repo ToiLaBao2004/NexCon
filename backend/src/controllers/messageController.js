@@ -962,6 +962,17 @@ export async function searchMessages(req, res) {
             return res.status(400).json({ message: 'Thiáº¿u conversationId.' });
         }
 
+        const conversation = await Conversation.findById(conversationId).select('participants').lean();
+        if (!conversation) {
+            return res.status(404).json({ message: 'Conversation not found.' });
+        }
+        const isMember = conversation.participants?.some(
+            (participant) => participant.userId.toString() === userId
+        );
+        if (!isMember) {
+            return res.status(403).json({ message: 'You are not a participant in this conversation.' });
+        }
+
         const normalizedKeyword = normalizeVietnamese(q);
 
         // Build base filter. searchContent is encrypted at rest, so keyword matching happens after decrypting.
