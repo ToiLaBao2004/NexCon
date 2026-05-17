@@ -50,7 +50,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
     try {
       await updateGroupSettings(conversationId, { allowMembersChangeAvatar: checked });
     } catch (error) {
-      console.error("Lỗi khi thay đổi quyền đổi ảnh nhóm:", error);
+      console.error("Lỗi khi thay đổi quyền đổi tên và ảnh đại diện của nhóm:", error);
     }
   };
 
@@ -108,7 +108,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-medium text-foreground">Cho phép thành viên đổi ảnh nhóm</span>
+                      <span className="text-[15px] font-medium text-foreground">Cho phép thành viên đổi tên và ảnh đại diện của nhóm</span>
                     </div>
                     <div onClick={(e) => e.stopPropagation()}>
                       <Switch

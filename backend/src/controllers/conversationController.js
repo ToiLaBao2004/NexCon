@@ -990,6 +990,10 @@ export async function updateGroupName(req, res) {
 		if (!conversation.participants.some(p => p.userId.toString() === userId)) {
 			return res.status(403).json({ message: "Only group participants can rename the group" });
 		}
+		const canUpdateGroupInfo = isGroupAdmin(conversation, userId) || conversation.group?.allowMembersChangeAvatar !== false;
+		if (!canUpdateGroupInfo) {
+			return res.status(403).json({ message: 'Chỉ quản trị viên mới có thể đổi tên hoặc ảnh nhóm lúc này.' });
+		}
 
 		const oldName = (conversation.group?.name || '').trim();
 		if (oldName === normalizedName) {
@@ -1084,9 +1088,9 @@ export async function updateGroupAvatar(req, res) {
 			return res.status(403).json({ message: 'Only group participants can update group avatar.' });
 		}
 
-		const canUpdateAvatar = isGroupAdmin(conversation, userId) || conversation.group?.allowMembersChangeAvatar !== false;
-		if (!canUpdateAvatar) {
-			return res.status(403).json({ message: 'Chỉ quản trị viên mới có thể đổi ảnh nhóm lúc này.' });
+		const canUpdateGroupInfo = isGroupAdmin(conversation, userId) || conversation.group?.allowMembersChangeAvatar !== false;
+		if (!canUpdateGroupInfo) {
+			return res.status(403).json({ message: 'Chỉ quản trị viên mới có thể đổi tên hoặc ảnh nhóm lúc này.' });
 		}
 
 		const previousAvatarId = conversation.group?.avatarId || null;
@@ -1572,8 +1576,8 @@ export async function updateSettings(req, res) {
 					allowMembersChangeAvatar: canMembersChangeAvatar,
 				},
 				content: canMembersChangeAvatar
-					? `Đã bật quyền cho thành viên đổi ảnh đại diện nhóm`
-					: `Đã tắt quyền cho thành viên đổi ảnh đại diện nhóm`
+					? `Đã bật quyền cho thành viên đổi tên và ảnh nhóm`
+					: `Đã tắt quyền cho thành viên đổi tên và ảnh đại diện nhóm`
 			});
 
 			const savedMsg = await systemMessage.save();

@@ -1361,8 +1361,8 @@ function SystemMessageComponent({
 			);
 			if (changedByActor) {
 				const actionText = metadata.allowMembersChangeAvatar
-					? "đã bật quyền cho thành viên đổi ảnh đại diện nhóm"
-					: "đã tắt quyền cho thành viên đổi ảnh đại diện nhóm";
+					? "đã bật quyền cho thành viên đổi tên và ảnh nhóm"
+					: "đã tắt quyền cho thành viên đổi tên và ảnh nhóm";
 				return (
 					<>
 						{actorBadge(changedByActor)} {textPart(actionText)}

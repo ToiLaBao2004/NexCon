@@ -178,7 +178,7 @@ export const getSystemMessageText = (
             const name = isMe ? "Bạn" : changedByName;
             const statusStr = allowMembersChangeAvatar ? "bật" : "tắt";
 
-            return `${name} đã ${statusStr} quyền cho thành viên đổi ảnh đại diện nhóm`;
+            return `${name} đã ${statusStr} quyền cho thành viên đổi tên và ảnh nhóm`;
         }
 
         case "reminder_created_local": {
