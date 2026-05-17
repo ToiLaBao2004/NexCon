@@ -708,15 +708,23 @@ export async function markAsUnread(req, res) {
 		const { conversationId } = req.params;
 		const userId = req.user._id.toString();
 
-		const conversation = await Conversation.findById(conversationId).lean();
+		const conversation = await Conversation.findOne({
+			_id: conversationId,
+			'participants.userId': userId,
+		}).lean();
 		if (!conversation) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
 
-		const updated = await Conversation.findByIdAndUpdate(conversationId,
+		const updated = await Conversation.findOneAndUpdate(
+			{
+				_id: conversationId,
+				'participants.userId': userId,
+			},
 			{
 				$set: { [`unreadCounts.${userId}`]: 1 },
-			}, { new: true }
+			},
+			{ new: true }
 		);
 
 		if (!updated) {
