@@ -111,6 +111,10 @@ const reminderSchema = new mongoose.Schema({
         default: 'pending',
         index: true,
     },
+    dismissedAt: {
+        type: Date,
+        default: null,
+    },
     source: reminderSourceSchema,
     notifyChannels: {
         type: [{
@@ -174,6 +178,16 @@ reminderSchema.index(
     {
         expireAfterSeconds: 2592000, // 30 days
         partialFilterExpression: { status: 'triggered', scope: 'personal' },
+    }
+);
+
+// Auto delete personal dismissed reminders after 30 days
+reminderSchema.index(
+    { dismissedAt: 1 },
+    {
+        name: 'personal_dismissed_reminder_ttl',
+        expireAfterSeconds: 2592000, // 30 days
+        partialFilterExpression: { status: 'dismissed', scope: 'personal' },
     }
 );
 

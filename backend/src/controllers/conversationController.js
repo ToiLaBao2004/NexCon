@@ -32,10 +32,21 @@ const MUTE_DURATION_MS = {
 };
 const MAX_GROUP_MEMBERS = 100;
 const MAX_PINNED_CONVERSATIONS = 5;
+const MAX_SEARCH_QUERY_LENGTH = 100;
 
 const PARTICIPANT_SELECT = 'displayName avatarUrl email bio phone lock';
 const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
 const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname email bio phone status lastSeen about lock';
+
+function clampPageLimit(value, defaultLimit = 50, maxLimit = 100) {
+	const parsed = Number.parseInt(value, 10);
+	if (!Number.isFinite(parsed)) return defaultLimit;
+	return Math.min(Math.max(parsed, 1), maxLimit);
+}
+
+function escapeRegex(value) {
+	return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function sanitizeParticipantUser(userObj) {
 	if (!userObj) return userObj;
@@ -195,7 +206,7 @@ export async function createConversation(req, res) {
 export async function getConversations(req, res) {
 	try {
 		const myId = req.user._id.toString();
-		const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+		const limit = clampPageLimit(req.query.limit, 50, 100);
 		const cursor = req.query.cursor;
 
 		const matchQuery = { "participants.userId": myId };
@@ -378,9 +389,13 @@ export async function getConversations(req, res) {
 export async function getGroups(req, res) {
 	try {
 		const myId = req.user._id.toString();
-		const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+		const limit = clampPageLimit(req.query.limit, 50, 100);
 		const cursor = req.query.cursor;
-		const search = (req.query.search || '').trim();
+		const searchValue = Array.isArray(req.query.search) ? req.query.search[0] : req.query.search;
+		const search = String(searchValue || '').trim();
+		if (search.length > MAX_SEARCH_QUERY_LENGTH) {
+			return res.status(400).json({ message: `Search query must not exceed ${MAX_SEARCH_QUERY_LENGTH} characters.` });
+		}
 
 		const matchQuery = { 'participants.userId': myId, type: 'group' };
 		if (cursor) {
@@ -388,7 +403,7 @@ export async function getGroups(req, res) {
 			if (!isNaN(d.getTime())) matchQuery.updatedAt = { $lt: d };
 		}
 		if (search) {
-			matchQuery['group.name'] = { $regex: search, $options: 'i' };
+			matchQuery['group.name'] = { $regex: escapeRegex(search), $options: 'i' };
 		}
 
 		let rawGroups = await Conversation.find(matchQuery)
@@ -932,7 +947,7 @@ export async function getMediaByType(req, res) {
 			query.createdAt = { ...query.createdAt, $lt: new Date(cursor) };
 		}
 
-		const numLimit = Number(limit);
+		const numLimit = clampPageLimit(limit, 8, 100);
 		let messages = await Message.find(query)
 			.sort({ createdAt: -1 })
 			.limit(numLimit + 1)

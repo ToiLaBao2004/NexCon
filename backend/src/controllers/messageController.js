@@ -30,6 +30,7 @@ import { isMuted } from '../utils/isMuted.js';
 import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
+const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
 const SEARCH_MAX_SCANNED_MESSAGES = 500;
@@ -959,12 +960,16 @@ export async function pinMessage(req, res) {
 export async function searchMessages(req, res) {
     try {
         const { conversationId, senderId, fromDate, toDate, cursor } = req.query;
-        const q = req.query.keyword || req.query.q;
+        const rawKeyword = req.query.keyword ?? req.query.q ?? '';
+        const q = String(Array.isArray(rawKeyword) ? rawKeyword[0] : rawKeyword).trim();
         const userId = req.user._id.toString();
         const limitNumber = clampSearchLimit(req.query.limit);
 
-        if (!q || !q.trim()) {
+        if (!q) {
             return res.status(400).json({ message: 'ChÆ°a nháº­p tá»« khÃ³a tÃ¬m kiáº¿m.' });
+        }
+        if (q.length > MAX_SEARCH_QUERY_LENGTH) {
+            return res.status(400).json({ message: `Search query must not exceed ${MAX_SEARCH_QUERY_LENGTH} characters.` });
         }
 
         if (!conversationId) {

@@ -1031,10 +1031,11 @@ export async function updateReminder(req, res) {
                             status: 'pending',
                             snoozeCount: 0,
                         },
-                        $unset: { snoozeUntil: 1 },
+                        $unset: { snoozeUntil: 1, dismissedAt: 1 },
                     }
                 );
 
+                const dismissedAt = new Date();
                 await Reminder.updateMany(
                     {
                         ...sharedQuery,
@@ -1045,6 +1046,7 @@ export async function updateReminder(req, res) {
                             remindAt,
                             status: 'dismissed',
                             snoozeCount: 0,
+                            dismissedAt,
                         },
                         $unset: { snoozeUntil: 1 },
                     }
@@ -1127,9 +1129,10 @@ export async function updateReminder(req, res) {
         Object.assign(reminder, updates);
 
         if (updates.remindAt !== undefined) {
-            reminder.status = 'pending';
-            reminder.snoozeUntil = undefined;
-            reminder.snoozeCount = 0;
+        reminder.status = 'pending';
+        reminder.dismissedAt = undefined;
+        reminder.snoozeUntil = undefined;
+        reminder.snoozeCount = 0;
         }
 
         await reminder.save();
@@ -1220,6 +1223,7 @@ export async function dismissReminder(req, res) {
         }
 
         reminder.status = 'dismissed';
+        reminder.dismissedAt = new Date();
         reminder.snoozeUntil = undefined;
         await reminder.save();
 
@@ -1282,9 +1286,11 @@ export async function updateSharedReminderParticipation(req, res) {
             reminder.participationStatus = 'joined';
             reminder.snoozeUntil = undefined;
             reminder.status = desiredStatus;
+            reminder.dismissedAt = undefined;
         } else {
             reminder.participationStatus = 'declined';
             reminder.status = 'dismissed';
+            reminder.dismissedAt = new Date();
             reminder.snoozeUntil = undefined;
         }
 
@@ -1515,6 +1521,7 @@ export async function deleteReminder(req, res) {
             const previousParticipation = reminder.participationStatus;
             reminder.participationStatus = 'declined';
             reminder.status = 'dismissed';
+            reminder.dismissedAt = new Date();
             reminder.snoozeUntil = undefined;
             await reminder.save();
 

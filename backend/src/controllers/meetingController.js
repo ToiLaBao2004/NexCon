@@ -9,6 +9,8 @@ const API_SECRET = process.env.LIVEKIT_API_SECRET;
 
 const ROOM_CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz';
 const MEETING_CODE_REGEX = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+export const MAX_MEETING_PARTICIPANTS = 100;
+export const MAX_MEETING_WAITING_USERS = 100;
 
 export const waitingTimeouts = new Map();
 
@@ -330,6 +332,10 @@ export async function joinMeeting(req, res) {
         }
 
         if (!meeting.requireApproval) {
+            if (meeting.participants.length >= MAX_MEETING_PARTICIPANTS) {
+                return res.status(409).json({ message: 'Phòng họp đã đạt giới hạn người tham gia.' });
+            }
+
             await Meeting.findByIdAndUpdate(meeting._id, {
                 $push: {
                     participants: {
@@ -350,6 +356,10 @@ export async function joinMeeting(req, res) {
 
         if (!requestApproval) {
             return res.json({ status: 'needs_approval', isHost: false });
+        }
+
+        if (meeting.waitingRoom.length >= MAX_MEETING_WAITING_USERS) {
+            return res.status(429).json({ message: 'Phòng chờ đã đạt giới hạn.' });
         }
 
         await Meeting.findByIdAndUpdate(meeting._id, {

@@ -17,6 +17,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
+const MAX_ACTIVE_SESSIONS_PER_USER = 20;
 
 function hashRefreshToken(token) {
     return crypto.createHash('sha256').update(String(token || '')).digest('hex');
@@ -51,6 +52,23 @@ function createSessionPayload({ userId, refreshToken, expiresAt, deviceInfo }) {
         expiresAt,
         deviceInfo,
     };
+}
+
+async function enforceSessionLimit(userId, currentSessionId) {
+    const overflowSessions = await Session.find({
+        userId,
+        _id: { $ne: currentSessionId },
+    })
+        .select('_id')
+        .sort({ createdAt: -1 })
+        .skip(MAX_ACTIVE_SESSIONS_PER_USER - 1)
+        .lean();
+
+    if (!overflowSessions.length) return;
+
+    const overflowIds = overflowSessions.map((session) => session._id);
+    await Session.deleteMany({ _id: { $in: overflowIds } });
+    overflowIds.forEach((sessionId) => disconnectSessionSockets(sessionId, 'session-limit'));
 }
 
 function parseIp(req) {
@@ -232,6 +250,8 @@ export async function signIn(req, res) {
                 }
             );
         }
+
+        await enforceSessionLimit(user._id, session._id);
 
         const isMobile = req.headers['x-client-type'] === 'mobile';
 
@@ -446,6 +466,8 @@ export async function googleAuthCallback(req, res) {
             );
         }
 
+        await enforceSessionLimit(user._id, session._id);
+
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
             secure: true,
@@ -570,6 +592,8 @@ export async function googleMobileAuth(req, res) {
             expiresAt: Date.now() + REFRESH_TOKEN_TTL,
             deviceInfo: { userAgent, ip, deviceName }
         }));
+
+        await enforceSessionLimit(user._id, session._id);
 
         const accessToken = jwt.sign(
             { userId: user._id, sessionId: session._id },

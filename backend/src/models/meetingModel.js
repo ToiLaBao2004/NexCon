@@ -1,5 +1,8 @@
 import mongoose from 'mongoose';
 
+const MAX_MEETING_PARTICIPANTS = 100;
+const MAX_MEETING_WAITING_USERS = 100;
+
 const participantSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -50,13 +53,25 @@ const meetingSchema = new mongoose.Schema({
         type: Date,
         default: null,
     },
-    participants: [participantSchema],
-    waitingRoom: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
+    participants: {
+        type: [participantSchema],
+        validate: {
+            validator: (items) => !Array.isArray(items) || items.length <= MAX_MEETING_PARTICIPANTS,
+            message: `Meeting can have at most ${MAX_MEETING_PARTICIPANTS} participants.`,
         },
-    ],
+    },
+    waitingRoom: {
+        type: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'User',
+            },
+        ],
+        validate: {
+            validator: (items) => !Array.isArray(items) || items.length <= MAX_MEETING_WAITING_USERS,
+            message: `Meeting waiting room can have at most ${MAX_MEETING_WAITING_USERS} users.`,
+        },
+    },
     requireApproval: {
         type: Boolean,
         default: true,

@@ -7,6 +7,8 @@ import {
     generateParticipantToken,
     getMeeting,
     joinMeeting,
+    MAX_MEETING_PARTICIPANTS,
+    MAX_MEETING_WAITING_USERS,
     normalizeRoomName,
     scheduleWaitingTimeout,
 } from './meetingController.js';
@@ -152,6 +154,10 @@ export async function getLivekitToken(req, res) {
         }
 
         if (!meeting.requireApproval) {
+            if (meeting.participants.length >= MAX_MEETING_PARTICIPANTS) {
+                return res.status(409).json({ message: 'Phong hop da dat gioi han nguoi tham gia.' });
+            }
+
             await Meeting.findByIdAndUpdate(meeting._id, {
                 $push: {
                     participants: {
@@ -167,6 +173,10 @@ export async function getLivekitToken(req, res) {
                 isHost: false,
                 waitingRoom: [],
             });
+        }
+
+        if (meeting.waitingRoom.length >= MAX_MEETING_WAITING_USERS) {
+            return res.status(429).json({ message: 'Phong cho da dat gioi han.' });
         }
 
         await Meeting.findByIdAndUpdate(meeting._id, {
