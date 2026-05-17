@@ -1499,6 +1499,7 @@ export async function updateSettings(req, res) {
 		const {
 			isApprovalRequired,
 			allowMembersChangeAvatar,
+			allowMembersCreateSharedReminder,
 		} = req.body;
 		const userId = req.user._id.toString();
 
@@ -1518,6 +1519,9 @@ export async function updateSettings(req, res) {
 		}
 		if (allowMembersChangeAvatar !== undefined) {
 			conversation.group.allowMembersChangeAvatar = Boolean(allowMembersChangeAvatar);
+		}
+		if (allowMembersCreateSharedReminder !== undefined) {
+			conversation.group.allowMembersCreateSharedReminder = Boolean(allowMembersCreateSharedReminder);
 		}
 
 		await conversation.save();
@@ -1570,6 +1574,38 @@ export async function updateSettings(req, res) {
 				content: canMembersChangeAvatar
 					? `Đã bật quyền cho thành viên đổi ảnh đại diện nhóm`
 					: `Đã tắt quyền cho thành viên đổi ảnh đại diện nhóm`
+			});
+
+			const savedMsg = await systemMessage.save();
+			const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
+
+			updateConversationLastMessage(conversation, finalMsg, userId);
+			await conversation.save();
+
+			const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
+				path: 'participants.userId',
+				select: CLIENT_PARTICIPANT_SELECT
+			}));
+
+			emitNewMessage(io, updatedConversation, finalMsg);
+		}
+
+		if (allowMembersCreateSharedReminder !== undefined) {
+			const canMembersCreateSharedReminder = Boolean(allowMembersCreateSharedReminder);
+			const systemMessage = new Message({
+				conversationId,
+				senderId: userId,
+				senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+				type: 'system',
+				systemType: 'shared_reminder_permission_changed',
+				metadata: {
+					changedBy: userId,
+					changedByName: req.user.displayName,
+					allowMembersCreateSharedReminder: canMembersCreateSharedReminder,
+				},
+				content: canMembersCreateSharedReminder
+					? `Đã bật quyền cho thành viên tạo nhắc hẹn chung`
+					: `Đã tắt quyền cho thành viên tạo nhắc hẹn chung`
 			});
 
 			const savedMsg = await systemMessage.save();

@@ -142,6 +142,7 @@ export interface ChatState {
     settings: {
       isApprovalRequired?: boolean;
       allowMembersChangeAvatar?: boolean;
+      allowMembersCreateSharedReminder?: boolean;
     }
   ) => Promise<void>;
   handleApproval: (conversationId: string, userId: string, action: 'approve' | 'reject') => Promise<void>;

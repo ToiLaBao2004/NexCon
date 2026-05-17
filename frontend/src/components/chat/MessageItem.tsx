@@ -1371,6 +1371,24 @@ function SystemMessageComponent({
 			}
 		}
 
+		if (message.systemType === "shared_reminder_permission_changed") {
+			const changedByActor = makeActor(
+				metadata.changedBy,
+				metadata.changedByName || message.senderInfo?.displayName || "Quản trị viên",
+				metadata.changedByInfo?.avatarUrl || message.senderInfo?.avatarUrl
+			);
+			if (changedByActor) {
+				const actionText = metadata.allowMembersCreateSharedReminder
+					? "đã bật quyền cho thành viên tạo nhắc hẹn chung"
+					: "đã tắt quyền cho thành viên tạo nhắc hẹn chung";
+				return (
+					<>
+						{actorBadge(changedByActor)} {textPart(actionText)}
+					</>
+				);
+			}
+		}
+
 		if (message.systemType === "reminder_created_local") {
 			const creatorActor = makeActor(
 				metadata.creatorId || message.senderId,
@@ -2290,6 +2308,11 @@ const MessageItem = ({
 	};
 
 	const canCreateReminder = !isDisbanded && !isRecalled && !isViolationMessage && message.type === "text";
+	const isCurrentUserGroupAdmin = selectedConvo.type === "group"
+		&& (selectedConvo.group?.admins || []).some((adminId: any) => String(adminId?._id || adminId) === String(currentUserId));
+	const canCreateSharedReminder = selectedConvo.type !== "group"
+		|| selectedConvo.group?.allowMembersCreateSharedReminder !== false
+		|| isCurrentUserGroupAdmin;
 	const canReportMessage = !isOwn && !isDisbanded && !isRecalled && !isViolationMessage && (!message.status || message.status === "sent");
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
@@ -2911,6 +2934,8 @@ const MessageItem = ({
 					conversationId={message.conversationId}
 					messageId={reminderTargetMessage.messageId}
 					messagePreview={reminderTargetMessage.messagePreview}
+					sharedDisabled={!canCreateSharedReminder}
+					sharedDisabledReason="Chỉ quản trị viên nhóm có thể tạo nhắc hẹn chung lúc này."
 					onClose={() => setReminderTargetMessage(null)}
 					onCreated={(createdReminder) => {
 						if (createdReminder.scope !== 'personal') return;

@@ -93,6 +93,11 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
     !isOtherUserLocked &&
     callStatus === "idle" &&
     groupCallStatus === "idle";
+  const isGroupAdmin = chat.type === "group"
+    && (chat.group?.admins || []).some((adminId: any) => String(adminId?._id || adminId) === String(user?._id));
+  const canScheduleSharedMeeting = chat.type !== "group"
+    || chat.group?.allowMembersCreateSharedReminder !== false
+    || isGroupAdmin;
 
   const handleVoiceCall = () => {
     if (!canCall || !otherUser) return;
@@ -231,8 +236,8 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                   variant="ghost"
                   size="icon"
                   className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
-                  disabled={chat.disbanded === true}
-                  title={chat.disbanded === true ? "Nhóm đã giải tán" : "Lên lịch họp"}
+                  disabled={chat.disbanded === true || !canScheduleSharedMeeting}
+                  title={chat.disbanded === true ? "Nhóm đã giải tán" : (!canScheduleSharedMeeting ? "Chỉ quản trị viên nhóm có thể lên lịch họp chung lúc này" : "Lên lịch họp")}
                   onClick={() => setIsScheduleOpen(true)}
                 >
                   <CalendarClock className="h-5 w-5" strokeWidth={1.65} />

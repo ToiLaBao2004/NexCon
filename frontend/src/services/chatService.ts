@@ -259,6 +259,7 @@ export const chatService = {
 		settings: {
 			isApprovalRequired?: boolean;
 			allowMembersChangeAvatar?: boolean;
+			allowMembersCreateSharedReminder?: boolean;
 		}
 	) {
 		try {

@@ -44,7 +44,8 @@ const messageSchema = new mongoose.Schema({
             'group_avatar_permission_changed',
             'call', 'admin_transferred', 'group_avatar_updated', 'group_name_updated',
             'message_pinned', 'message_unpinned',
-            'reminder_created_local', 'shared_reminder_created', 'shared_reminder_participation_changed', 'shared_reminder_cancelled', 'shared_reminder_updated'],
+            'reminder_created_local', 'shared_reminder_created', 'shared_reminder_participation_changed', 'shared_reminder_cancelled', 'shared_reminder_updated',
+            'shared_reminder_permission_changed'],
     },
     metadata: {
         type: Map,

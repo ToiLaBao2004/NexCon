@@ -58,6 +58,17 @@ const toObjectId = (value) => {
     return new mongoose.Types.ObjectId(String(value));
 };
 
+const isGroupAdmin = (conversation, userId) => {
+    const userIdStr = toObjectIdString(userId);
+    return (conversation?.group?.admins || []).some((adminId) => toObjectIdString(adminId) === userIdStr);
+};
+
+const canCreateSharedReminderInConversation = (conversation, userId) => {
+    if (conversation?.type !== 'group') return true;
+    if (isGroupAdmin(conversation, userId)) return true;
+    return conversation.group?.allowMembersCreateSharedReminder !== false;
+};
+
 const countUniquePendingReminders = async (match, session = null) => {
     const query = Reminder.aggregate([
         { $match: match },
@@ -325,6 +336,10 @@ export async function createSharedReminderFromMessage(req, res) {
                 throw buildHttpError(403, 'Bạn không thuộc cuộc trò chuyện này.');
             }
 
+            if (!canCreateSharedReminderInConversation(conversation, userId)) {
+                throw buildHttpError(403, 'Chỉ quản trị viên nhóm có thể tạo nhắc hẹn chung lúc này.');
+            }
+
             if (conversation.type === 'direct') {
                 const otherUserId = participantIds.find(id => id !== userIdStr);
                 if (otherUserId) {
@@ -531,6 +546,10 @@ export async function scheduleMeeting(req, res) {
 
         if (!participantIds.includes(userIdStr)) {
             return res.status(403).json({ message: 'Bạn không thuộc cuộc trò chuyện này.' });
+        }
+
+        if (!canCreateSharedReminderInConversation(conversation, userId)) {
+            return res.status(403).json({ message: 'Chỉ quản trị viên nhóm có thể lên lịch họp chung lúc này.' });
         }
 
         if (conversation.type === 'direct') {

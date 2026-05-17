@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Clock3, Hourglass, MessageSquareQuote, MoonStar, Sunrise, Timer } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -13,6 +13,8 @@ interface ReminderQuickModalProps {
   conversationId: string;
   messageId: string;
   messagePreview: string;
+  sharedDisabled?: boolean;
+  sharedDisabledReason?: string;
   onClose: () => void;
   onCreated?: (reminder: Reminder) => void;
 }
@@ -38,7 +40,7 @@ const getTomorrowAt8 = (): Date => {
   return date;
 };
 
-export default function ReminderQuickModal({ conversationId, messageId, messagePreview, onClose, onCreated }: ReminderQuickModalProps) {
+export default function ReminderQuickModal({ conversationId, messageId, messagePreview, sharedDisabled = false, sharedDisabledReason, onClose, onCreated }: ReminderQuickModalProps) {
   const isMobile = useIsMobile();
   const createReminderAsync = useReminderStore((state) => state.createReminderAsync);
   const createSharedReminderFromMessageAsync = useReminderStore((state) => state.createSharedReminderFromMessageAsync);
@@ -46,11 +48,17 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
   const [openQuick, setOpenQuick] = useState(true);
   const [openCustomForm, setOpenCustomForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [createMode, setCreateMode] = useState<ReminderCreateMode>('shared');
+  const [createMode, setCreateMode] = useState<ReminderCreateMode>(sharedDisabled ? 'personal' : 'shared');
 
   const normalizedContent = useMemo(() => truncateContent(messagePreview || 'Tin nhắn'), [messagePreview]);
   const disableTonight = useMemo(() => new Date() > getTonightAt20(), []);
   const isSharedMode = createMode === 'shared';
+
+  useEffect(() => {
+    if (sharedDisabled && createMode === 'shared') {
+      setCreateMode('personal');
+    }
+  }, [createMode, sharedDisabled]);
 
   const closeAll = () => {
     setOpenQuick(false);
@@ -61,6 +69,11 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
   const createFromDate = async (date: Date) => {
     try {
       setIsSubmitting(true);
+      if (isSharedMode && sharedDisabled) {
+        toast.error(sharedDisabledReason || 'Bạn không có quyền tạo nhắc hẹn chung trong nhóm này.');
+        return;
+      }
+
       const payload: CreateReminderPayload = {
         content: normalizedContent,
         remindAt: date.toISOString(),
@@ -134,8 +147,10 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
         <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-muted/40 p-1">
           <button
             type="button"
+            disabled={sharedDisabled}
             onClick={() => setCreateMode("shared")}
-            className={`flex-1 h-9 rounded-lg text-sm transition-colors ${isSharedMode ? "bg-background text-foreground shadow-sm font-semibold" : "text-foreground/75 hover:bg-background/50 hover:text-foreground"}`}
+            title={sharedDisabled ? (sharedDisabledReason || 'Bạn không có quyền tạo nhắc hẹn chung trong nhóm này.') : undefined}
+            className={`flex-1 h-9 rounded-lg text-sm transition-colors ${sharedDisabled ? "cursor-not-allowed opacity-50" : ""} ${isSharedMode ? "bg-background text-foreground shadow-sm font-semibold" : "text-foreground/75 hover:bg-background/50 hover:text-foreground"}`}
           >
             Nhắc hẹn chung
           </button>
@@ -268,6 +283,10 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
           source: { type: 'message', refId: messageId },
         }}
         onCreateSubmit={async (payload) => {
+          if (isSharedMode && sharedDisabled) {
+            throw new Error(sharedDisabledReason || 'Bạn không có quyền tạo nhắc hẹn chung trong nhóm này.');
+          }
+
           const reminder = isSharedMode
             ? await createSharedReminderFromMessageAsync({
               conversationId,
