@@ -214,14 +214,17 @@ export const chatService = {
 	async searchMessages(
 		conversationId: string,
 		keyword: string,
-		filters?: { senderId?: string; fromDate?: string; toDate?: string }
+		filters?: { senderId?: string; fromDate?: string; toDate?: string },
+		options?: { limit?: number; cursor?: string | null }
 	) {
 		const params = new URLSearchParams({ conversationId, keyword });
 		if (filters?.senderId) params.set('senderId', filters.senderId);
 		if (filters?.fromDate) params.set('fromDate', filters.fromDate);
 		if (filters?.toDate) params.set('toDate', filters.toDate);
+		if (options?.limit) params.set('limit', String(options.limit));
+		if (options?.cursor) params.set('cursor', options.cursor);
 		const res = await api.get(`/messages/search?${params.toString()}`);
-		return res.data as { messages: Message[] };
+		return res.data as { messages: Message[]; hasMore?: boolean; nextCursor?: string | null };
 	},
 
 	async reactToMessage(messageId: string, emoji: string) {

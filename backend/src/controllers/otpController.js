@@ -58,7 +58,7 @@ export async function sendOtpResetPassword(req, res) {
         email = email?.trim();
         const existingEmail = await User.findOne({ email: email });
         if (!existingEmail) {
-            return res.status(404).json({ message: "User with this email does not exist." });
+            return res.json({ message: "If this email exists, an OTP will be sent." });
         }
         const latestOtp = await Otp.findOne({ email: email, type: 'reset_password' }).sort({ createdAt: -1 });
         const cooldownMessage = checkOtpCooldown(latestOtp);
@@ -97,6 +97,7 @@ export async function verifyOtpResetPassword(req, res) {
             process.env.ACCESS_TOKEN_SECRET,
             { expiresIn: '10m' }
         );
+        await Otp.deleteOne({ _id: otpRecord._id });
         return res.status(200).json({ resetToken })
     } catch (error) {
         console.error('Error during OTP verification for password reset:', error);

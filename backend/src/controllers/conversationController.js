@@ -505,7 +505,8 @@ export async function getMessages(req, res) {
 				return res.status(403).json({ message: "Message does not belong to this conversation" });
 			}
 
-			const limitNumber = Math.min(Number(limit), 100);
+			const requestedAroundLimit = Number(limit);
+			const limitNumber = Math.max(1, Math.min(100, Number.isFinite(requestedAroundLimit) ? requestedAroundLimit : 50));
 			const half = Math.floor(limitNumber / 2);
 
 			const [olderMessages, newerMessages] = await Promise.all([
@@ -544,7 +545,8 @@ export async function getMessages(req, res) {
 				hasMoreNewer: newerMessages.length === half,
 			});
 		}
-		const limitNumber = Number(limit);
+		const requestedLimit = Number(limit);
+		const limitNumber = Math.max(1, Math.min(100, Number.isFinite(requestedLimit) ? requestedLimit : 50));
 		let query = { ...baseFilter };
 		let sortDirection = -1; // Default: newest first
 

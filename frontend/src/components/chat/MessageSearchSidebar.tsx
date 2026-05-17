@@ -14,8 +14,6 @@ interface MessageSearchSidebarProps {
   onClose: () => void;
 }
 
-const PAGE_SIZE = 10;
-
 // Helpers
 const highlightKeyword = (text: string, keyword: string) => {
   if (!keyword || !text) return <>{text}</>;
@@ -164,16 +162,12 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
   const debouncedCustomFrom = useDebounce(customFrom, 300);
   const debouncedCustomTo = useDebounce(customTo, 300);
 
-  // Infinite scroll
-  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { items, isSearching } = searchResults;
-  const visibleItems = items.slice(0, displayCount);
-  const hasMore = items.length > displayCount;
+  const { items, isSearching, isLoadingMore, hasMore } = searchResults;
+  const visibleItems = items;
 
   // Auto-focus
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -182,7 +176,6 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
   useEffect(() => {
     if (!debouncedKeyword.trim()) {
       clearSearch();
-      setDisplayCount(PAGE_SIZE);
       return;
     }
     const { fromDate, toDate } = computeDateRange(debouncedDateOption, debouncedCustomFrom, debouncedCustomTo);
@@ -193,18 +186,22 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
       toDate,
     };
     searchMessages(debouncedKeyword, filters);
-    setDisplayCount(PAGE_SIZE);
-  }, [debouncedKeyword, debouncedSender, debouncedDateOption, debouncedCustomFrom, debouncedCustomTo]);
+  }, [debouncedKeyword, debouncedSender, debouncedDateOption, debouncedCustomFrom, debouncedCustomTo, clearSearch, searchMessages]);
 
   // ── Infinite scroll ──
   const loadMore = useCallback(() => {
-    if (!hasMore || isLoadingMore) return;
-    setIsLoadingMore(true);
-    setTimeout(() => {
-      setDisplayCount((prev) => prev + PAGE_SIZE);
-      setIsLoadingMore(false);
-    }, 250);
-  }, [hasMore, isLoadingMore]);
+    if (!hasMore || isLoadingMore || isSearching || !debouncedKeyword.trim()) return;
+    const { fromDate, toDate } = computeDateRange(debouncedDateOption, debouncedCustomFrom, debouncedCustomTo);
+    searchMessages(
+      debouncedKeyword,
+      {
+        senderId: debouncedSender || undefined,
+        fromDate,
+        toDate,
+      },
+      { append: true }
+    );
+  }, [hasMore, isLoadingMore, isSearching, debouncedKeyword, debouncedDateOption, debouncedCustomFrom, debouncedCustomTo, debouncedSender, searchMessages]);
 
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -222,7 +219,6 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
   const handleClear = () => {
     setKeyword("");
     clearSearch();
-    setDisplayCount(PAGE_SIZE);
   };
 
   const handleJumpToMessage = async (messageId: string) => {
@@ -458,6 +454,18 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
           </div>
         ) : debouncedKeyword.trim() ? (
           <div className="px-6 py-14 text-center">
+            {hasMore && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mb-4 h-8 text-xs"
+                onClick={loadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+                TÃ¬m thÃªm
+              </Button>
+            )}
             <p className="text-[14px] font-medium text-foreground mb-1">Không tìm thấy tin nhắn nào</p>
             <p className="text-[12px] text-muted-foreground">Hãy thử từ khóa khác.</p>
           </div>

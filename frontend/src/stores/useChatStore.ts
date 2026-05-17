@@ -88,6 +88,9 @@ export const useChatStore = create<ChatState>()(
             searchResults: {
                 items: [] as import('@/types/chat').Message[],
                 isSearching: false,
+                isLoadingMore: false,
+                hasMore: false,
+                nextCursor: null,
                 query: '',
             },
 
@@ -156,30 +159,50 @@ export const useChatStore = create<ChatState>()(
             },
             setActiveSidebar: (sidebar) => set({ activeSidebar: sidebar }),
             clearSearch: () => set({
-                searchResults: { items: [], isSearching: false, query: '' },
+                searchResults: { items: [], isSearching: false, isLoadingMore: false, hasMore: false, nextCursor: null, query: '' },
             }),
-            searchMessages: async (query: string, filters?: { senderId?: string; fromDate?: string; toDate?: string }) => {
-                const { activeConversationId } = get();
+            searchMessages: async (query: string, filters?: { senderId?: string; fromDate?: string; toDate?: string }, options?: { append?: boolean }) => {
+                const { activeConversationId, searchResults } = get();
                 if (!activeConversationId || !query.trim()) return;
+                if (options?.append && (!searchResults.hasMore || !searchResults.nextCursor || searchResults.isLoadingMore)) return;
 
                 set((state) => ({
-                    searchResults: { ...state.searchResults, isSearching: true, query },
+                    searchResults: {
+                        ...state.searchResults,
+                        isSearching: !options?.append,
+                        isLoadingMore: Boolean(options?.append),
+                        query,
+                    },
                 }));
 
                 try {
-                    const { messages } = await chatService.searchMessages(activeConversationId, query, filters);
+                    const { messages, hasMore, nextCursor } = await chatService.searchMessages(
+                        activeConversationId,
+                        query,
+                        filters,
+                        { limit: 20, cursor: options?.append ? searchResults.nextCursor : null }
+                    );
                     const { user } = useAuthStore.getState();
                     const processed = messages.map((m: any) => ({
                         ...m,
                         isOwn: m.senderId?._id === user?._id || m.senderId === user?._id,
                     }));
                     set((state) => ({
-                        searchResults: { ...state.searchResults, items: processed, isSearching: false },
+                        searchResults: {
+                            ...state.searchResults,
+                            items: options?.append
+                                ? Array.from(new Map([...state.searchResults.items, ...processed].map((item) => [item._id, item])).values())
+                                : processed,
+                            isSearching: false,
+                            isLoadingMore: false,
+                            hasMore: Boolean(hasMore),
+                            nextCursor: nextCursor ?? null,
+                        },
                     }));
                 } catch (error) {
                     console.error('Lỗi khi tìm kiếm tin nhắn:', error);
                     set((state) => ({
-                        searchResults: { ...state.searchResults, isSearching: false },
+                        searchResults: { ...state.searchResults, isSearching: false, isLoadingMore: false },
                     }));
                 }
             },
@@ -202,7 +225,7 @@ export const useChatStore = create<ChatState>()(
                     convoLoading: false,
                     replyingTo: null,
                     activeSidebar: null,
-                    searchResults: { items: [], isSearching: false, query: '' },
+                    searchResults: { items: [], isSearching: false, isLoadingMore: false, hasMore: false, nextCursor: null, query: '' },
                     drafts: {},
                 });
             },
