@@ -25,22 +25,6 @@ const CallMessageItem = ({
   isLastMyMessage,
 }: CallMessageItemProps) => {
   const snapshot = parseCallSnapshot(message);
-  if (!snapshot) return null;
-
-  const isInitiator = snapshot.initiatorUser._id === currentUserId;
-
-  const otherCallParticipant = snapshot.participants.find(
-    (p) => (p.userId?._id || p.userId)?.toString?.() !== currentUserId?.toString()
-  )?.userId;
-  const otherConversationParticipant = selectedConvo.participants.find(
-    (p: Participant) => p.userId?._id?.toString() !== currentUserId
-  )?.userId;
-
-  const avatarUser = !isInitiator
-    ? (snapshot.initiatorUser || otherCallParticipant || otherConversationParticipant)
-    : (otherCallParticipant || otherConversationParticipant || snapshot.initiatorUser);
-
-
   const seenUsersForThisMessage = useMemo(() => {
     const users: { _id: string; displayName: string; avatarUrl?: string | null }[] = [];
     if (!selectedConvo.participants) return users;
@@ -57,6 +41,21 @@ const CallMessageItem = ({
     }
     return users;
   }, [selectedConvo.participants, currentUserId, message._id]);
+
+  if (!snapshot) return null;
+
+  const isInitiator = snapshot.initiatorUser._id === currentUserId;
+
+  const otherCallParticipant = snapshot.participants.find(
+    (p) => (p.userId?._id || p.userId)?.toString?.() !== currentUserId?.toString()
+  )?.userId;
+  const otherConversationParticipant = selectedConvo.participants.find(
+    (p: Participant) => p.userId?._id?.toString() !== currentUserId
+  )?.userId;
+
+  const avatarUser = !isInitiator
+    ? (snapshot.initiatorUser || otherCallParticipant || otherConversationParticipant)
+    : (otherCallParticipant || otherConversationParticipant || snapshot.initiatorUser);
 
   return (
     <div

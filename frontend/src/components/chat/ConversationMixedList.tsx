@@ -18,6 +18,7 @@ const ConversationMixedList = () => {
   const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const conversationItems = useMemo(() => conversations ?? [], [conversations]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -31,10 +32,10 @@ const ConversationMixedList = () => {
   }, []);
 
   useEffect(() => {
-    if (conversations.length === 0) {
+    if (conversationItems.length === 0) {
       fetchConversations();
     }
-  }, [conversations.length, fetchConversations]);
+  }, [conversationItems.length, fetchConversations]);
 
   const handleScroll = (e: UIEvent<HTMLDivElement>) => {
     if (searchQuery.trim() || convoLoading || !conversationsHasMore) return;
@@ -44,13 +45,11 @@ const ConversationMixedList = () => {
     }
   };
 
-  if (!conversations) return null;
-
   const filtered = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
-    if (!keyword) return conversations;
+    if (!keyword) return conversationItems;
 
-    return conversations.filter((c) => {
+    return conversationItems.filter((c) => {
       if (c.type === "group") {
         return (c.group?.name ?? "").toLowerCase().includes(keyword);
       }
@@ -61,7 +60,7 @@ const ConversationMixedList = () => {
       const name = other?.userId?.nickname?.trim() || other?.userId?.displayName || "";
       return name.toLowerCase().includes(keyword);
     });
-  }, [conversations, searchQuery, user?._id]);
+  }, [conversationItems, searchQuery, user?._id]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -118,7 +117,7 @@ const ConversationMixedList = () => {
             )
           )
         )}
-        {convoLoading && conversations.length > 0 && (
+        {convoLoading && conversationItems.length > 0 && (
           <div className="flex justify-center py-3">
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           </div>
