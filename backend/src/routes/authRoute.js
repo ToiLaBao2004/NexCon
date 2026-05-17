@@ -11,6 +11,7 @@ import {
     signinIpLimiter,
     signinEmailLimiter
 } from '../middlewares/rateLimiters.js';
+import { authMiddleware } from '../middlewares/authMiddleware.js';
 
 const authRouter = express.Router();
 
@@ -22,11 +23,11 @@ authRouter.post('/verify-valid-fields-signup', signupIpLimiter, signupEmailLimit
 authRouter.post('/signup', signupIpLimiter, signupEmailLimiter, signUp);
 authRouter.post('/signin', signinIpLimiter, signinEmailLimiter, signIn);
 authRouter.post('/locked-appeals', submitLockedAppeal);
-authRouter.post('/signout', signOut);
-authRouter.post('/signout-all', signOutAll);
+authRouter.post('/signout', authMiddleware, signOut);
+authRouter.post('/signout-all', authMiddleware, signOutAll);
 authRouter.post('/sessions', getSessions); // mobile
 authRouter.get('/sessions', getSessions); // web
-authRouter.delete('/sessions/:sessionId', signOutBySession);
+authRouter.delete('/sessions/:sessionId', authMiddleware, signOutBySession);
 authRouter.put('/reset-new-password', signupIpLimiter, resetNewPassword)
 
 authRouter.get(

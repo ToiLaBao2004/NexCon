@@ -1,6 +1,7 @@
 import { AccessToken } from 'livekit-server-sdk';
 import Meeting from '../models/meetingModel.js';
 import BlockUser from '../models/blockUserModel.js';
+import Conversation from '../models/conversationModel.js';
 import { getSocketGateway } from '../socket/socketGateway.js';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
@@ -209,9 +210,17 @@ export async function createMeeting(req, res) {
         const isImmediate = !scheduledAt;
 
         if (conversationId) {
-            const { default: Conversation } = await import('../models/conversationModel.js');
             const conversation = await Conversation.findById(conversationId);
-            if (conversation && conversation.type === 'group' && conversation.disbanded) {
+            if (!conversation) {
+                return res.status(404).json({ message: 'Conversation not found.' });
+            }
+            const isMember = conversation.participants.some(
+                (participant) => participant.userId.toString() === userId.toString()
+            );
+            if (!isMember) {
+                return res.status(403).json({ message: 'You are not a participant in this conversation.' });
+            }
+            if (conversation.type === 'group' && conversation.disbanded) {
                 return res.status(403).json({ message: 'Không thể tạo cuộc họp trong nhóm đã giải tán.' });
             }
         }

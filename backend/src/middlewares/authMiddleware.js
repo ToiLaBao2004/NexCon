@@ -26,6 +26,8 @@ export async function authMiddleware(req, res, next) {
             return res.status(401).json({ message: 'Session expired or not found.' });
         }
         req.user = user;
+        req.session = session;
+        req.sessionId = session._id.toString();
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {
