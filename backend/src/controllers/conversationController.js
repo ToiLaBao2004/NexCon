@@ -453,6 +453,9 @@ export async function getMessages(req, res) {
 		}
 
 		const me = conversation.participants?.find(p => p.userId.toString() === userId);
+		if (!me) {
+			return res.status(403).json({ message: "You are not a participant in this conversation." });
+		}
 		const clearedAt = me?.clearedAt ? new Date(me.clearedAt) : null;
 
 		const baseFilter = {
