@@ -1,18 +1,28 @@
-import { FirebaseMessaging, Importance } from '@capacitor-firebase/messaging';
 import type { Notification } from '@capacitor-firebase/messaging';
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 import api from '@/lib/axios';
 
 type NativeFcmOpenHandler = (path: string) => void;
+type FirebaseMessagingModule = typeof import('@capacitor-firebase/messaging');
 
 let tokenRefreshListener: PluginListenerHandle | null = null;
 let notificationActionListener: PluginListenerHandle | null = null;
 let notificationOpenHandler: NativeFcmOpenHandler | null = null;
 let lastSavedToken: string | null = null;
+let firebaseMessagingModulePromise: Promise<FirebaseMessagingModule> | null = null;
 
 function isNativeFcmAvailable() {
   return Capacitor.isNativePlatform();
+}
+
+async function loadNativeFirebaseMessaging() {
+  if (!isNativeFcmAvailable()) {
+    return null;
+  }
+
+  firebaseMessagingModulePromise ??= import('@capacitor-firebase/messaging');
+  return firebaseMessagingModulePromise;
 }
 
 function normalizePath(rawUrl?: string | null) {
@@ -45,8 +55,8 @@ function readDataString(data: unknown, key: string) {
 function resolveNotificationPath(notification: Notification) {
   return normalizePath(
     readDataString(notification.data, 'url')
-      || readDataString(notification.data, 'linkUrl')
-      || notification.link
+    || readDataString(notification.data, 'linkUrl')
+    || notification.link
   );
 }
 
@@ -62,7 +72,10 @@ async function saveTokenToBackend(token: string) {
   lastSavedToken = token;
 }
 
-async function ensureNotificationChannel() {
+async function ensureNotificationChannel({
+  FirebaseMessaging,
+  Importance,
+}: FirebaseMessagingModule) {
   await FirebaseMessaging.createChannel({
     id: 'messages',
     name: 'Messages',
@@ -72,10 +85,12 @@ async function ensureNotificationChannel() {
 }
 
 export async function registerNativeFcm() {
-  if (!isNativeFcmAvailable()) {
+  const messagingModule = await loadNativeFirebaseMessaging();
+  if (!messagingModule) {
     return null;
   }
 
+  const { FirebaseMessaging } = messagingModule;
   const support = await FirebaseMessaging.isSupported();
   if (!support.isSupported) {
     return null;
@@ -86,7 +101,7 @@ export async function registerNativeFcm() {
     return null;
   }
 
-  await ensureNotificationChannel();
+  await ensureNotificationChannel(messagingModule);
 
   const { token } = await FirebaseMessaging.getToken();
   await saveTokenToBackend(token);
@@ -107,20 +122,28 @@ export async function registerNativeFcm() {
 export async function listenForNativeFcmOpen(onOpen: NativeFcmOpenHandler) {
   notificationOpenHandler = onOpen;
 
-  if (!isNativeFcmAvailable() || notificationActionListener) {
+  if (notificationActionListener) {
     return;
   }
 
+  const messagingModule = await loadNativeFirebaseMessaging();
+  if (!messagingModule) {
+    return;
+  }
+
+  const { FirebaseMessaging } = messagingModule;
   notificationActionListener = await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
     notificationOpenHandler?.(resolveNotificationPath(event.notification));
   });
 }
 
 export async function unregisterNativeFcmOnLogout() {
-  if (!isNativeFcmAvailable()) {
+  const messagingModule = await loadNativeFirebaseMessaging();
+  if (!messagingModule) {
     return;
   }
 
+  const { FirebaseMessaging } = messagingModule;
   try {
     const { token } = await FirebaseMessaging.getToken();
     if (token) {
