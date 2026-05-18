@@ -15,6 +15,7 @@ import type { Message, Conversation } from "@/types/chat";
 import SecureImage from "@/components/SecureImage";
 import UserAvatar from "./UserAvatar";
 import GroupChatAvatar from "./GroupChatAvatar";
+import CachedStickerImage from "./CachedStickerImage";
 import { toast } from "sonner";
 
 const createClientBatchId = () => {
@@ -257,7 +258,7 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
             <p className="text-[11px] font-medium text-muted-foreground mb-0.5">Tin nhắn gốc</p>
             {message.type === 'sticker' && message.content ? (
               <div className="mt-1">
-                <img 
+                <CachedStickerImage
                   src={message.content} 
                   alt="sticker-preview" 
                   className="size-16 object-contain rounded-lg bg-background/50 p-1 border border-border/40" 

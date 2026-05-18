@@ -10,6 +10,7 @@ import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
+import CachedStickerImage from "./CachedStickerImage";
 import { isUrl, formatBytes } from "@/lib/utils";
 import { draftStorage } from "@/lib/draftStorage";
 
@@ -842,7 +843,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							</span>
 							<div className="flex items-center gap-2">
 								{replyingTo.type === "sticker" && replyingTo.content && (
-									<img
+									<CachedStickerImage
 										src={replyingTo.content}
 										alt="sticker-reply"
 										className="size-8 rounded-md object-contain bg-white/10"

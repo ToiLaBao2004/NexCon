@@ -1,67 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { StickerIcon } from "@/components/shared/StickerIcon";
 import { cn } from "@/lib/utils";
-
-const CLOUDINARY_CLOUD_NAME = "df1iezypb";
-const CLOUDINARY_IMAGE_BASE_URL = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload`;
-
-type StickerSet = {
-  id: string;
-  name: string;
-  iconUrl: string;
-  stickers: string[];
-};
-
-type StickerSetConfig = {
-  id: string;
-  name: string;
-  folder: string;
-  prefix: string;
-  count: number;
-};
-
-const DEFAULT_STICKER_SET_CONFIGS: StickerSetConfig[] = [
-  { id: "bu-mat-ngao", name: "Bu Mat Ngao", folder: "bu_mat_ngao", prefix: "Bu", count: 9 },
-  { id: "zapy-do-tri", name: "Zapy Do Tri", folder: "zapy_do_tri", prefix: "zapy", count: 9 },
-  { id: "tonton", name: "Tonton", folder: "tonton", prefix: "tonton", count: 9 },
-  { id: "meo-meo", name: "Meo Meo", folder: "meo_meo", prefix: "meomeo", count: 9 },
-  {
-    id: "hand-drawn-emotes",
-    name: "Hand Drawn Emotes",
-    folder: "hand-drawn-emotes-elements-collection",
-    prefix: "handdrawn",
-    count: 9,
-  },
-  { id: "sticker-1", name: "Sticker 1", folder: "sticker1", prefix: "sticker1", count: 9 },
-  { id: "sticker-2", name: "Sticker 2", folder: "sticker2", prefix: "sticker2", count: 9 },
-  { id: "sticker-3", name: "Sticker 3", folder: "sticker3", prefix: "sticker3", count: 9 },
-  { id: "sticker-5", name: "Sticker 5", folder: "sticker5", prefix: "sticker5", count: 22 },
-  { id: "sticker-6", name: "Sticker 6", folder: "sticker6", prefix: "sticker6", count: 15 },
-  { id: "sticker-7", name: "Sticker 7", folder: "sticker7", prefix: "sticker7", count: 20 },
-  { id: "sticker-9", name: "Sticker 9", folder: "sticker9", prefix: "sticker9", count: 40 },
-  { id: "sticker-10", name: "Sticker 10", folder: "sticker10", prefix: "sticker10", count: 17 },
-  { id: "sticker-12", name: "Sticker 12", folder: "sticker12", prefix: "sticker12", count: 9 },
-];
-
-function getStickerAssetUrl(folder: string, fileName: string) {
-  return `${CLOUDINARY_IMAGE_BASE_URL}/stickers/${folder}/${fileName}.png`;
-}
-
-function buildStickerSet(config: StickerSetConfig): StickerSet {
-  return {
-    id: config.id,
-    name: config.name,
-    iconUrl: getStickerAssetUrl(config.folder, "icon"),
-    stickers: Array.from(
-      { length: config.count },
-      (_, index) => getStickerAssetUrl(config.folder, `${config.prefix}${index + 1}`),
-    ),
-  };
-}
-
-const STICKER_SETS = DEFAULT_STICKER_SET_CONFIGS.map(buildStickerSet);
+import { preloadStickerSet, preloadStickerUrls, STICKER_SETS } from "@/lib/stickerAssets";
+import CachedStickerImage from "./CachedStickerImage";
 
 interface StickerPickerPopoverProps {
   onSelect: (url: string) => void;
@@ -71,6 +14,12 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
   const [activeTab, setActiveTab] = useState(STICKER_SETS[0].id);
   const [isOpen, setIsOpen] = useState(false);
   const currentSet = STICKER_SETS.find((set) => set.id === activeTab) ?? STICKER_SETS[0];
+
+  useEffect(() => {
+    if (!isOpen) return;
+    preloadStickerUrls(STICKER_SETS.map((set) => set.iconUrl));
+    preloadStickerSet(currentSet);
+  }, [currentSet, isOpen]);
 
   const handleSelect = (url: string) => {
     onSelect(url);
@@ -109,7 +58,7 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
                     className="relative aspect-square flex items-center justify-center p-1 rounded-xl hover:bg-primary/5 transition-all duration-200 group active:scale-90"
                   >
                     <div className="absolute inset-0 bg-primary/0 group-hover:bg-primary/5 rounded-xl transition-colors" />
-                    <img
+                    <CachedStickerImage
                       src={url}
                       alt="sticker"
                       className="w-full h-full object-contain relative z-10 group-hover:scale-110 transition-transform duration-300"
@@ -135,7 +84,7 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
                   )}
                   title={set.name}
                 >
-                  <img
+                  <CachedStickerImage
                     src={set.iconUrl}
                     alt={set.name}
                     className="size-7 object-contain"
