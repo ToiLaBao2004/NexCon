@@ -515,7 +515,7 @@ export async function sendMessage(req, res) {
                     });
                 }
 
-                const moderationResult = await moderateTextMessage(cleanTranscript);
+                const moderationResult = await moderateTextMessage(cleanTranscript, { modality: 'voice_transcript' });
 
                 if (moderationResult.blocked) {
                     return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn thoại vi phạm tiêu chuẩn cộng đồng.', 'audio');

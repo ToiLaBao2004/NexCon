@@ -13,6 +13,11 @@ import {
     registerViolation,
     unlockAccount,
 } from '../services/moderation/violationService.js';
+import {
+    moderateStoredMessage,
+    shouldAutoConfirmModeration,
+} from '../services/moderation/messageModerationReviewService.js';
+import { recordConfirmedViolationContext } from '../services/moderation/violationTrainingService.js';
 import { io, isUserOnline } from '../socket/index.js';
 import { decryptMessagePayload } from '../utils/messageCrypto.js';
 
@@ -164,6 +169,170 @@ function handleAdminError(res, error, label) {
     }
 
     return res.status(statusCode).json({ message: error.message || 'Yêu cầu không hợp lệ.' });
+}
+
+function normalizeAiModerationForReport(aiModeration) {
+    if (!aiModeration) return null;
+
+    const confidence = Number(aiModeration.confidence);
+    return {
+        reviewedAt: new Date(),
+        blocked: Boolean(aiModeration.blocked),
+        category: String(aiModeration.category || 'unknown').slice(0, 80),
+        confidence: Number.isFinite(confidence) ? confidence : null,
+        reason: String(aiModeration.reason || '').slice(0, 1000),
+        source: String(aiModeration.source || 'unknown').slice(0, 80),
+    };
+}
+
+async function markReportedMessageAsViolation({ report, adminId, note }) {
+    let moderatedMessage = null;
+    let evidencePreview = '';
+
+    if (report.targetType !== 'message' || !report.targetMessageId) {
+        return { moderatedMessage, evidencePreview };
+    }
+
+    moderatedMessage = await Message.findByIdAndUpdate(
+        report.targetMessageId,
+        {
+            $set: {
+                reportStatus: true,
+                'reportReview.reportId': report._id,
+                'reportReview.reviewedBy': adminId,
+                'reportReview.reviewedAt': new Date(),
+                'reportReview.note': note,
+            },
+        },
+        { new: true }
+    ).lean();
+
+    if (!moderatedMessage) {
+        return { moderatedMessage, evidencePreview };
+    }
+
+    moderatedMessage = decryptMessagePayload(moderatedMessage);
+    evidencePreview = violationEvidencePreview(moderatedMessage);
+
+    const conversation = await Conversation.findById(moderatedMessage.conversationId);
+    if (conversation?.lastMessage?._id?.toString?.() === moderatedMessage._id.toString()) {
+        conversation.lastMessage.content = 'Tin nhắn vi phạm tiêu chuẩn cộng đồng';
+        conversation.lastMessage.type = moderatedMessage.type;
+        await conversation.save();
+    }
+
+    io.to(moderatedMessage.conversationId.toString()).emit('message-moderated', {
+        conversationId: moderatedMessage.conversationId.toString(),
+        messageId: moderatedMessage._id.toString(),
+        reportStatus: true,
+        content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
+    });
+
+    return { moderatedMessage, evidencePreview };
+}
+
+async function applyReportResolution({ report, decision, note, adminId, aiModeration = null }) {
+    let actionTaken = '';
+    let targetViolationCount = null;
+    let targetLocked = false;
+    let reporterMessage = '';
+    let targetMessage = '';
+    let evidencePreview = '';
+    let moderatedMessage = null;
+
+    if (decision === 'violation') {
+        const messageResult = await markReportedMessageAsViolation({ report, adminId, note });
+        moderatedMessage = messageResult.moderatedMessage;
+        evidencePreview = messageResult.evidencePreview;
+
+        const violation = await registerViolation({
+            userId: report.targetUserId,
+            actorId: adminId,
+            source: `admin_report_${report.targetType}`,
+            reason: note || 'Báo cáo đã được xác nhận là vi phạm.',
+            metadata: {
+                reportId: report._id.toString(),
+                targetType: report.targetType,
+                targetMessageId: report.targetMessageId?.toString?.() || null,
+                aiModeration: normalizeAiModerationForReport(aiModeration),
+            },
+            notify: false,
+        });
+
+        if (report.targetType === 'message') {
+            await recordConfirmedViolationContext({
+                report,
+                message: moderatedMessage,
+                adminId,
+                note,
+                aiModeration,
+            });
+        }
+
+        targetViolationCount = violation.count;
+        targetLocked = violation.locked;
+        actionTaken = violation.locked
+            ? 'Đã xác nhận vi phạm và khóa tài khoản theo chính sách kiểm duyệt.'
+            : 'Đã xác nhận vi phạm và ghi nhận vào hồ sơ kiểm duyệt.';
+        reporterMessage = 'Chúng tôi đã xem xét và xác nhận rằng người dùng bạn báo cáo đã vi phạm tiêu chuẩn cộng đồng. Cảm ơn bạn đã giúp giữ cộng đồng an toàn.';
+        targetMessage = report.targetType === 'message'
+            ? `Một tin nhắn từ tài khoản của bạn đã bị xác nhận vi phạm tiêu chuẩn cộng đồng. Nội dung: ${evidencePreview || 'tin nhắn được báo cáo trong đoạn chat.'} Vui lòng xem lại nội dung trước khi gửi và không tái phạm.`
+            : 'Tài khoản của bạn đã bị xác nhận có hành vi vi phạm tiêu chuẩn cộng đồng. Vui lòng điều chỉnh cách sử dụng NexCon và không tái phạm.';
+    } else {
+        actionTaken = 'Không xác nhận vi phạm sau khi xem xét.';
+        reporterMessage = 'Chúng tôi đã xem xét báo cáo của bạn nhưng chưa đủ cơ sở xác nhận vi phạm trong trường hợp này. Cảm ơn bạn đã báo cáo để giúp NexCon an toàn hơn.';
+    }
+
+    const resolution = {
+        decision,
+        actionTaken,
+        targetViolationCount,
+        targetLocked,
+        reporterMessage,
+        targetMessage,
+    };
+    const normalizedAiModeration = normalizeAiModerationForReport(aiModeration);
+    if (normalizedAiModeration) {
+        resolution.aiModeration = normalizedAiModeration;
+    }
+
+    report.status = decision === 'violation' ? 'resolved' : 'dismissed';
+    report.review = {
+        reviewedBy: adminId,
+        reviewedAt: new Date(),
+        note,
+    };
+    report.resolution = resolution;
+    report.expiresAt = new Date(Date.now() + COMPLETED_REPORT_TTL_MS);
+    await report.save();
+
+    await createNotification(
+        report.reporterId,
+        'Kết quả báo cáo của bạn',
+        reporterMessage,
+        `${process.env.FRONTEND_URL}/reports/my`,
+        {
+            type: 'report-result',
+            actorId: adminId,
+            metadata: { reportId: report._id, decision },
+        }
+    );
+
+    if (decision === 'violation') {
+        await createNotification(
+            report.targetUserId,
+            'Cảnh báo vi phạm tiêu chuẩn cộng đồng',
+            targetMessage,
+            `${process.env.FRONTEND_URL}/notification`,
+            {
+                type: 'report-violation',
+                actorId: adminId,
+                metadata: { reportId: report._id, targetLocked },
+            }
+        );
+    }
+
+    return report;
 }
 
 export async function getAdminStats(req, res) {
@@ -789,6 +958,108 @@ export async function markAdminReportReviewing(req, res) {
     }
 }
 
+export async function aiReviewMessageReports(req, res) {
+    try {
+        const rawReportIds = Array.isArray(req.body?.reportIds) ? req.body.reportIds : [];
+        const reportIds = rawReportIds
+            .map((id) => String(id || '').trim())
+            .filter(Boolean);
+
+        reportIds.forEach((reportId) => requireObjectId(reportId, 'reportId'));
+
+        const status = String(req.body?.status || 'pending').trim();
+        const allowedStatusFilters = ['pending', 'reviewing', 'all'];
+        if (!allowedStatusFilters.includes(status)) {
+            return res.status(400).json({ message: 'Bộ lọc trạng thái AI không hợp lệ.' });
+        }
+
+        const limit = Math.min(100, Math.max(1, Number.parseInt(req.body?.limit || '50', 10) || 50));
+        const note = String(req.body?.note || 'AI đã kiểm duyệt lại và xác nhận vi phạm.').trim();
+        const filter = {
+            targetType: 'message',
+            targetMessageId: { $ne: null },
+            status: { $in: ['pending', 'reviewing'] },
+        };
+
+        if (reportIds.length > 0) {
+            filter._id = { $in: reportIds };
+        } else if (status !== 'all') {
+            filter.status = status;
+        }
+
+        const reports = await Report.find(filter)
+            .sort({ createdAt: 1 })
+            .limit(limit);
+
+        const results = [];
+
+        for (const report of reports) {
+            const item = {
+                reportId: report._id.toString(),
+                targetMessageId: report.targetMessageId?.toString?.() || null,
+                status: 'skipped',
+                category: null,
+                confidence: null,
+                reason: '',
+                source: null,
+            };
+
+            try {
+                const message = await Message.findById(report.targetMessageId).lean();
+                if (!message) {
+                    item.status = 'missing_message';
+                    item.reason = 'Không tìm thấy tin nhắn.';
+                    results.push(item);
+                    continue;
+                }
+
+                const moderation = await moderateStoredMessage(message, { forceAI: true });
+                item.category = moderation.category || null;
+                item.confidence = moderation.confidence ?? null;
+                item.reason = moderation.reason || '';
+                item.source = moderation.source || null;
+
+                if (shouldAutoConfirmModeration(moderation)) {
+                    await applyReportResolution({
+                        report,
+                        decision: 'violation',
+                        note,
+                        adminId: req.user._id,
+                        aiModeration: moderation,
+                    });
+                    item.status = 'resolved_violation';
+                } else if (moderation.blocked) {
+                    item.status = 'needs_admin_review';
+                } else {
+                    item.status = moderation.skipped ? 'skipped' : 'safe_or_uncertain';
+                }
+            } catch (error) {
+                item.status = 'error';
+                item.reason = error?.message || 'Không thể kiểm duyệt lại bằng AI.';
+            }
+
+            results.push(item);
+        }
+
+        const summary = results.reduce((acc, item) => {
+            acc[item.status] = (acc[item.status] || 0) + 1;
+            return acc;
+        }, {});
+
+        return res.status(200).json({
+            scanned: results.length,
+            resolved: summary.resolved_violation || 0,
+            needsReview: summary.needs_admin_review || 0,
+            safeOrUncertain: summary.safe_or_uncertain || 0,
+            skipped: summary.skipped || 0,
+            errors: summary.error || 0,
+            results,
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error running AI report review:');
+    }
+}
+
 export async function resolveAdminReport(req, res) {
     try {
         const { reportId } = req.params;
@@ -809,120 +1080,15 @@ export async function resolveAdminReport(req, res) {
             return res.status(409).json({ message: 'Báo cáo này đã hoàn tất vòng đời xử lý.' });
         }
 
-        let actionTaken = '';
-        let targetViolationCount = null;
-        let targetLocked = false;
-        let reporterMessage = '';
-        let targetMessage = '';
-        let evidencePreview = '';
-
-        if (decision === 'violation') {
-            let moderatedMessage = null;
-            if (report.targetType === 'message' && report.targetMessageId) {
-                moderatedMessage = await Message.findByIdAndUpdate(
-                    report.targetMessageId,
-                    {
-                        $set: {
-                            reportStatus: true,
-                            'reportReview.reportId': report._id,
-                            'reportReview.reviewedBy': req.user._id,
-                            'reportReview.reviewedAt': new Date(),
-                            'reportReview.note': note,
-                        },
-                    },
-                    { new: true }
-                ).lean();
-
-                if (moderatedMessage) {
-                    moderatedMessage = decryptMessagePayload(moderatedMessage);
-                    evidencePreview = violationEvidencePreview(moderatedMessage);
-                    const conversation = await Conversation.findById(moderatedMessage.conversationId);
-                    if (conversation?.lastMessage?._id?.toString?.() === moderatedMessage._id.toString()) {
-                        conversation.lastMessage.content = 'Tin nhắn vi phạm tiêu chuẩn cộng đồng';
-                        conversation.lastMessage.type = moderatedMessage.type;
-                        await conversation.save();
-                    }
-
-                    io.to(moderatedMessage.conversationId.toString()).emit('message-moderated', {
-                        conversationId: moderatedMessage.conversationId.toString(),
-                        messageId: moderatedMessage._id.toString(),
-                        reportStatus: true,
-                        content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
-                    });
-                }
-            }
-
-            const violation = await registerViolation({
-                userId: report.targetUserId,
-                actorId: req.user._id,
-                source: `admin_report_${report.targetType}`,
-                reason: note || 'Báo cáo đã được xác nhận là vi phạm.',
-                metadata: {
-                    reportId: report._id.toString(),
-                    targetType: report.targetType,
-                    targetMessageId: report.targetMessageId?.toString?.() || null,
-                },
-                notify: false,
-            });
-
-            targetViolationCount = violation.count;
-            targetLocked = violation.locked;
-            actionTaken = violation.locked
-                ? 'Đã xác nhận vi phạm và khóa tài khoản theo chính sách kiểm duyệt.'
-                : 'Đã xác nhận vi phạm và ghi nhận vào hồ sơ kiểm duyệt.';
-            reporterMessage = 'Chúng tôi đã xem xét và xác nhận rằng người dùng bạn báo cáo đã vi phạm tiêu chuẩn cộng đồng. Cảm ơn bạn đã giúp giữ cộng đồng an toàn.';
-            targetMessage = report.targetType === 'message'
-                ? `Một tin nhắn từ tài khoản của bạn đã bị xác nhận vi phạm tiêu chuẩn cộng đồng. Nội dung: ${evidencePreview || 'tin nhắn được báo cáo trong đoạn chat.'} Vui lòng xem lại nội dung trước khi gửi và không tái phạm.`
-                : 'Tài khoản của bạn đã bị xác nhận có hành vi vi phạm tiêu chuẩn cộng đồng. Vui lòng điều chỉnh cách sử dụng NexCon và không tái phạm.';
-        } else {
-            actionTaken = 'Không xác nhận vi phạm sau khi xem xét.';
-            reporterMessage = 'Chúng tôi đã xem xét báo cáo của bạn nhưng chưa đủ cơ sở xác nhận vi phạm trong trường hợp này. Cảm ơn bạn đã báo cáo để giúp NexCon an toàn hơn.';
-        }
-
-        report.status = decision === 'violation' ? 'resolved' : 'dismissed';
-        report.review = {
-            reviewedBy: req.user._id,
-            reviewedAt: new Date(),
-            note,
-        };
-        report.resolution = {
+        await applyReportResolution({
+            report,
             decision,
-            actionTaken,
-            targetViolationCount,
-            targetLocked,
-            reporterMessage,
-            targetMessage,
-        };
-        report.expiresAt = new Date(Date.now() + COMPLETED_REPORT_TTL_MS);
-        await report.save();
-
-        await createNotification(
-            report.reporterId,
-            'Kết quả báo cáo của bạn',
-            reporterMessage,
-            `${process.env.FRONTEND_URL}/reports/my`,
-            {
-                type: 'report-result',
-                actorId: req.user._id,
-                metadata: { reportId: report._id, decision },
-            }
-        );
-
-        if (decision === 'violation') {
-            await createNotification(
-                report.targetUserId,
-                'Cảnh báo vi phạm tiêu chuẩn cộng đồng',
-                targetMessage,
-                `${process.env.FRONTEND_URL}/notification`,
-                {
-                    type: 'report-violation',
-                    actorId: req.user._id,
-                    metadata: { reportId: report._id, targetLocked },
-                }
-            );
-        }
+            note,
+            adminId: req.user._id,
+        });
 
         return res.status(200).json({ report });
+
     } catch (error) {
         return handleAdminError(res, error, 'Error resolving report:');
     }

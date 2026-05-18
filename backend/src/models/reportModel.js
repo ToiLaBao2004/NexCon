@@ -101,6 +101,14 @@ const reportSchema = new mongoose.Schema({
         targetLocked: { type: Boolean, default: false },
         reporterMessage: { type: String, trim: true, maxlength: 1000, default: '' },
         targetMessage: { type: String, trim: true, maxlength: 1000, default: '' },
+        aiModeration: {
+            reviewedAt: { type: Date, default: null },
+            blocked: { type: Boolean, default: null },
+            category: { type: String, trim: true, maxlength: 80, default: '' },
+            confidence: { type: Number, default: null },
+            reason: { type: String, trim: true, maxlength: 1000, default: '' },
+            source: { type: String, trim: true, maxlength: 80, default: '' },
+        },
     },
     expiresAt: {
         type: Date,

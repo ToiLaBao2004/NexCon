@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { CheckCircle2, Loader2, MessageSquareWarning, RefreshCw, UserRoundX, XCircle } from "lucide-react";
+import { Bot, CheckCircle2, Loader2, MessageSquareWarning, RefreshCw, UserRoundX, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import AdminEvidencePreview from "@/components/admin/AdminEvidencePreview";
 import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
@@ -68,6 +68,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
   const [drawerUserId, setDrawerUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [aiReviewing, setAiReviewing] = useState(false);
   const [note, setNote] = useState("");
 
   const selectedReport = useMemo(
@@ -122,6 +123,39 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
     }
   };
 
+  const handleAiBatchReview = async () => {
+    if (!isMessagePage) return;
+
+    const reportIds = reports
+      .filter((report) => ["pending", "reviewing"].includes(report.status))
+      .map((report) => report._id);
+
+    if (reportIds.length === 0) {
+      toast.info("Không có báo cáo tin nhắn đang chờ để AI lọc lại.");
+      return;
+    }
+
+    try {
+      setAiReviewing(true);
+      const result = await adminService.aiReviewMessageReports({
+        reportIds,
+        note: "Admin dùng AI lọc hàng loạt và AI xác nhận nội dung vi phạm.",
+      });
+
+      toast.success(`AI đã quét ${result.scanned} báo cáo, tự xác nhận ${result.resolved} vi phạm.`);
+
+      if (result.needsReview || result.safeOrUncertain || result.errors) {
+        toast.info(`${result.needsReview + result.safeOrUncertain + result.errors} báo cáo còn lại cần admin xem tiếp.`);
+      }
+
+      await loadReports();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || "Không thể lọc báo cáo bằng AI");
+    } finally {
+      setAiReviewing(false);
+    }
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header className="shrink-0 border-b border-border/70 px-4 py-4 md:px-6">
@@ -137,10 +171,23 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
               Admin chỉ xem nội dung đã được báo cáo. Nhấn vào email để mở hồ sơ người dùng trong drawer mà không rời trang.
             </p>
           </div>
-          <Button variant="outline" className="rounded-md" onClick={() => void loadReports()}>
-            <RefreshCw className="size-4" />
-            Làm mới
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {isMessagePage && (
+              <Button
+                variant="secondary"
+                className="rounded-md"
+                disabled={loading || aiReviewing || reports.every((report) => !["pending", "reviewing"].includes(report.status))}
+                onClick={() => void handleAiBatchReview()}
+              >
+                {aiReviewing ? <Loader2 className="size-4 animate-spin" /> : <Bot className="size-4" />}
+                AI lọc hàng loạt
+              </Button>
+            )}
+            <Button variant="outline" className="rounded-md" onClick={() => void loadReports()} disabled={aiReviewing}>
+              <RefreshCw className="size-4" />
+              Làm mới
+            </Button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -266,7 +313,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                     <Button
                       variant="outline"
                       className="rounded-md"
-                      disabled={submitting || completed}
+                      disabled={submitting || aiReviewing || completed}
                       onClick={() => void handleReviewing()}
                     >
                       Đánh dấu đang xem xét
@@ -274,7 +321,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                     <Button
                       variant="destructive"
                       className="rounded-md"
-                      disabled={submitting || completed}
+                      disabled={submitting || aiReviewing || completed}
                       onClick={() => void handleResolve("violation")}
                     >
                       <CheckCircle2 className="size-4" />
@@ -283,7 +330,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                     <Button
                       variant="secondary"
                       className="rounded-md"
-                      disabled={submitting || completed}
+                      disabled={submitting || aiReviewing || completed}
                       onClick={() => void handleResolve("no_violation")}
                     >
                       <XCircle className="size-4" />
