@@ -1,6 +1,7 @@
-let originalTitle = "Next Connection";
+let originalTitle = typeof document !== 'undefined' ? document.title || "Next Connection" : "Next Connection";
 let flashInterval: ReturnType<typeof setInterval> | null = null;
 let isFlashing = false;
+let titleStopHandler: (() => void) | null = null;
 const ORIGINAL_FAVICON = "/logo.svg";
 
 const getFaviconEl = (): HTMLLinkElement => {
@@ -69,11 +70,15 @@ export const flashTabTitle = async (message: string) => {
         showMessage = !showMessage;
     }, 1200);
 
-    const stopOnFocus = () => {
-        stopFlashTabTitle();
-        window.removeEventListener("focus", stopOnFocus);
+    const stopOnChange = () => {
+        if (document.visibilityState === "visible" || document.hasFocus()) {
+            stopFlashTabTitle();
+        }
     };
-    window.addEventListener("focus", stopOnFocus);
+
+    titleStopHandler = stopOnChange;
+    window.addEventListener("focus", stopOnChange);
+    document.addEventListener("visibilitychange", stopOnChange);
 };
 
 export const stopFlashTabTitle = () => {
@@ -84,4 +89,10 @@ export const stopFlashTabTitle = () => {
     isFlashing = false;
     document.title = originalTitle;
     clearFaviconBadge();
+
+    if (titleStopHandler) {
+        window.removeEventListener("focus", titleStopHandler);
+        document.removeEventListener("visibilitychange", titleStopHandler);
+        titleStopHandler = null;
+    }
 };

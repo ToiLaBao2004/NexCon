@@ -7,6 +7,7 @@ import { useFriendStore } from "./useFriendStore";
 import { useNotificationStore } from "./useNotificationStore";
 import { useCallStore } from "./useCallStore";
 import { useGroupCallStore } from "./useGroupCallStore";
+import { Capacitor } from '@capacitor/core';
 import { toast } from "sonner";
 import { playMessageSound, playNotificationSound } from "@/utils/sound";
 import { isMuted } from "@/utils/isMuted";
@@ -23,8 +24,31 @@ const canShowBrowserNotification = () => {
   return typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
 };
 
+const canFlashTabTitle = () => {
+  return Capacitor.isNativePlatform() || canShowBrowserNotification();
+};
+
 const isAppVisible = () => {
   return typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
+};
+
+const getMessageTabTitle = (message: any, conversation: any) => {
+  const senderId = message.senderId || message.sender?._id;
+  const senderParticipant = conversation?.participants?.find(
+    (participant: any) => String(participant.userId?._id || participant.userId) === String(senderId),
+  );
+
+  const senderName =
+    senderParticipant?.userId?.nickname?.trim() ||
+    senderParticipant?.userId?.displayName?.trim() ||
+    message.senderInfo?.displayName?.trim() ||
+    "Tin nhắn mới";
+
+  if (conversation?.type === "group") {
+    return conversation?.group?.name?.trim() || "Nhóm";
+  }
+
+  return senderName;
 };
 
 const showBrowserNotification = (payload: {
@@ -362,7 +386,12 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       if (!isMine && !mutedMessages) {
         void playMessageSound();
 
-        flashTabTitle("💬 Bạn có tin nhắn mới 💬");
+        const conversationForTitle = conversation || currentConversation;
+        const tabTitle = getMessageTabTitle(message, conversationForTitle);
+
+        if (!isAppVisible() && canFlashTabTitle()) {
+          flashTabTitle(`💬 ${tabTitle}`);
+        }
 
         void (async () => {
           const { Capacitor } = await import('@capacitor/core');
