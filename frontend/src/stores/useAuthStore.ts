@@ -15,6 +15,10 @@ import { clearRefreshToken } from '@/lib/axios';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { unregisterNativeFcmOnLogout } from '@/lib/nativeFcm';
 
+const clearAuthStorage = () => {
+  localStorage.removeItem('auth-storage');
+};
+
 export const useAuthStore = create<AuthState>()(
   persist((set, get) => ({
     accessToken: null,
@@ -33,14 +37,14 @@ export const useAuthStore = create<AuthState>()(
       useChatStore.getState().reset();
       useNotificationStore.getState().reset();
       useFriendStore.getState().reset();
-      localStorage.clear();
+      clearAuthStorage();
       clearRefreshToken();
     },
 
     verifyValidFieldsSignUp: async (email, password, confirmPassword) => {
       try {
         set({ loading: true });
-        localStorage.clear();
+        clearAuthStorage();
         useChatStore.getState().reset();
         useNotificationStore.getState().reset();
         useFriendStore.getState().reset();
@@ -81,7 +85,7 @@ export const useAuthStore = create<AuthState>()(
     signIn: async (email, password) => {
       try {
         set({ loading: true });
-        localStorage.clear();
+        clearAuthStorage();
         useChatStore.getState().reset();
         useNotificationStore.getState().reset();
         useFriendStore.getState().reset();

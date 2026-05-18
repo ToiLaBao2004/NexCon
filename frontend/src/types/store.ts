@@ -142,6 +142,7 @@ export interface ChatState {
     settings: {
       isApprovalRequired?: boolean;
       allowMembersChangeAvatar?: boolean;
+      allowMembersCreateSharedReminder?: boolean;
     }
   ) => Promise<void>;
   handleApproval: (conversationId: string, userId: string, action: 'approve' | 'reject') => Promise<void>;
@@ -172,12 +173,16 @@ export interface ChatState {
   searchResults: {
     items: Message[];
     isSearching: boolean;
+    isLoadingMore: boolean;
+    hasMore: boolean;
+    nextCursor: string | null;
     query: string;
   };
   clearSearch: () => void;
   searchMessages: (
     query: string,
-    filters?: { senderId?: string; fromDate?: string; toDate?: string }
+    filters?: { senderId?: string; fromDate?: string; toDate?: string },
+    options?: { append?: boolean }
   ) => Promise<void>;
 
   // Jump Mode Actions

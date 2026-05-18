@@ -25,6 +25,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
   const conversation = conversations.find(c => c._id === conversationId);
   const isApprovalRequired = conversation?.group?.isApprovalRequired || false;
   const allowMembersChangeAvatar = conversation?.group?.allowMembersChangeAvatar !== false;
+  const allowMembersCreateSharedReminder = conversation?.group?.allowMembersCreateSharedReminder !== false;
   const participants = conversation?.participants || [];
 
   const handleDisband = async () => {
@@ -49,7 +50,15 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
     try {
       await updateGroupSettings(conversationId, { allowMembersChangeAvatar: checked });
     } catch (error) {
-      console.error("Lỗi khi thay đổi quyền đổi ảnh nhóm:", error);
+      console.error("Lỗi khi thay đổi quyền đổi tên và ảnh đại diện của nhóm:", error);
+    }
+  };
+
+  const handleToggleSharedReminder = async (checked: boolean) => {
+    try {
+      await updateGroupSettings(conversationId, { allowMembersCreateSharedReminder: checked });
+    } catch (error) {
+      console.error("Lỗi khi thay đổi quyền tạo nhắc hẹn chung:", error);
     }
   };
 
@@ -99,12 +108,23 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-[15px] font-medium text-foreground">Cho phép thành viên đổi ảnh nhóm</span>
+                      <span className="text-[15px] font-medium text-foreground">Cho phép thành viên đổi tên và ảnh đại diện của nhóm</span>
                     </div>
                     <div onClick={(e) => e.stopPropagation()}>
                       <Switch
                         checked={allowMembersChangeAvatar}
                         onCheckedChange={handleToggleMemberAvatar}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[15px] font-medium text-foreground">Cho phép thành viên tạo nhắc hẹn chung</span>
+                    </div>
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={allowMembersCreateSharedReminder}
+                        onCheckedChange={handleToggleSharedReminder}
                       />
                     </div>
                   </div>

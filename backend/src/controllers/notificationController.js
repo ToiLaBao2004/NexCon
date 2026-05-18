@@ -1,10 +1,16 @@
 import Notification from '../models/notificationModel.js';
 import { emitToUser } from '../socket/index.js';
 
+function clampPageLimit(value, defaultLimit = 20, maxLimit = 100) {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) return defaultLimit;
+    return Math.min(Math.max(parsed, 1), maxLimit);
+}
+
 export async function getNotifications(req, res) {
     try {
         const userId = req.user._id;
-        const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+        const limit = clampPageLimit(req.query.limit, 20, 100);
         const cursor = req.query.cursor;
 
         const query = { userId };

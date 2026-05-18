@@ -52,6 +52,7 @@ export interface Group {
   admins?: string[];
   isApprovalRequired?: boolean;
   allowMembersChangeAvatar?: boolean;
+  allowMembersCreateSharedReminder?: boolean;
   approvalQueue?: any[];
 }
 

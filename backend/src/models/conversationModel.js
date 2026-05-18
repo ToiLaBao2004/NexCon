@@ -64,6 +64,10 @@ const groupSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    allowMembersCreateSharedReminder: {
+        type: Boolean,
+        default: true
+    },
     approvalQueue: [{
         userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
         addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

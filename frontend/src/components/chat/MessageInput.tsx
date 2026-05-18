@@ -10,6 +10,7 @@ import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
+import CachedStickerImage from "./CachedStickerImage";
 import { isUrl, formatBytes } from "@/lib/utils";
 import { draftStorage } from "@/lib/draftStorage";
 
@@ -204,10 +205,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	useEffect(() => {
 		if (selectedConvo.type !== "direct") return;
+		if (!user) return;
 		void fetchBlockedList();
-	}, [fetchBlockedList, selectedConvo.type]);
-
-	if (!user) return null;
+	}, [fetchBlockedList, selectedConvo.type, user]);
 
 	const otherUser = participants.find((p) => p.userId?._id?.toString() !== currentUserId);
 	const otherUserId = otherUser?.userId?._id;
@@ -466,6 +466,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	useEffect(() => {
+		if (!user) return;
 		if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
 
 		draftTimeoutRef.current = setTimeout(() => {
@@ -495,7 +496,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		return () => {
 			if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
 		};
-	}, [value, attachments, selectedConvo._id, setDraft, clearDraft]);
+	}, [value, attachments, selectedConvo._id, setDraft, clearDraft, user]);
 
 	useEffect(() => {
 		attachmentsRef.current = attachments;
@@ -506,6 +507,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}, []);
 
 	useEffect(() => {
+		if (!user) return;
 		const rawDraft = useChatStore.getState().drafts[selectedConvo._id];
 		const existingDraft = typeof rawDraft === "string" ? rawDraft : (rawDraft?.content || "");
 		const draftAttachment = (rawDraft && typeof rawDraft === 'object') ? rawDraft.attachment : null;
@@ -557,16 +559,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				}
 			}, 0);
 		}
-	}, [selectedConvo._id]);
+	}, [selectedConvo._id, user]);
 
 	useEffect(() => {
+		if (!user) return;
 		if (replyingTo && textInputRef.current) {
 			const timer = setTimeout(() => {
 				textInputRef.current?.focus();
 			}, 100);
 			return () => clearTimeout(timer);
 		}
-	}, [replyingTo]);
+	}, [replyingTo, user]);
 
 	const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
 		const items = Array.from(e.clipboardData?.items || []);
@@ -790,6 +793,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		});
 	};
 
+	if (!user) return null;
+
 	if (selectedConvo.type === "direct") {
 		if (isOtherUserLocked) {
 			return (
@@ -838,7 +843,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							</span>
 							<div className="flex items-center gap-2">
 								{replyingTo.type === "sticker" && replyingTo.content && (
-									<img
+									<CachedStickerImage
 										src={replyingTo.content}
 										alt="sticker-reply"
 										className="size-8 rounded-md object-contain bg-white/10"

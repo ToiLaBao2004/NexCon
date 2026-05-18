@@ -368,9 +368,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const isGroup = conversation.type === "group";
   const isDisbanded = isGroup && conversation.disbanded === true;
   const isGroupAdmin = !!(isGroup && conversation.group?.admins?.some(
-    (adminId: any) => adminId?.toString?.() === user?._id?.toString()
+    (adminId: any) => String(adminId?._id || adminId) === String(user?._id)
   ));
-  const canUpdateGroupAvatar = !isDisbanded && (isGroupAdmin || conversation.group?.allowMembersChangeAvatar !== false);
+  const canUpdateGroupInfo = !isDisbanded && (isGroupAdmin || conversation.group?.allowMembersChangeAvatar !== false);
 
   return (
     <aside className="flex h-full w-full min-w-0 flex-col overflow-y-auto overflow-x-hidden bg-card beautiful-scrollbar md:border-l md:border-border/40">
@@ -384,7 +384,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 groupAvatarUrl={conversation.group?.avatarUrl}
               />
             </div>
-            {canUpdateGroupAvatar && (
+            {canUpdateGroupInfo && (
               <button
                 type="button"
                 onClick={handlePickGroupAvatar}
@@ -415,12 +415,12 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                   {groupDisplayName}
                 </span>
                 <button
-                  onClick={() => { if (!isDisbanded) setOpenGroupRename(true); }}
-                  title={isDisbanded ? "Nhóm đã giải tán" : "Đổi tên nhóm"}
-                  disabled={isDisbanded}
+                  onClick={() => { if (canUpdateGroupInfo) setOpenGroupRename(true); }}
+                  title={isDisbanded ? "Nhóm đã giải tán" : (!canUpdateGroupInfo ? "Chỉ quản trị viên mới có thể đổi tên nhóm lúc này" : "Đổi tên nhóm")}
+                  disabled={!canUpdateGroupInfo}
                   className={cn(
                     "absolute left-full top-1/2 ml-3 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-colors",
-                    isDisbanded ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
+                    !canUpdateGroupInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
                   )}
                 >
                   <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />

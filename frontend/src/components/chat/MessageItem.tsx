@@ -36,6 +36,7 @@ import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder"
 import ForwardMessageModal from "./ForwardMessageModal";
 import { DetailDialog } from "./ConversationRemindersPanel";
 import { ReportDialog } from "@/components/shared/ReportDialog";
+import CachedStickerImage from "./CachedStickerImage";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -594,7 +595,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 		return (
 			<div className="group/sticker relative">
 				<div className="relative transition-all duration-300 group-hover/sticker:scale-110 drop-shadow-sm group-hover/sticker:drop-shadow-md">
-					<img
+					<CachedStickerImage
 						src={message.content}
 						alt="sticker"
 						className="w-32 h-32 sm:w-40 sm:h-40 object-contain animate-in zoom-in-50 duration-300"
@@ -808,7 +809,7 @@ function ReplyQuoteInline({
 		preview = (
 			<span className="flex items-center gap-2">
 				{replyTo.content && (
-					<img
+					<CachedStickerImage
 						src={replyTo.content}
 						alt="reply-sticker-thumbnail"
 						className="w-8 h-8 rounded-md object-contain bg-white/10 border border-blue-200 dark:border-blue-400"
@@ -1361,8 +1362,26 @@ function SystemMessageComponent({
 			);
 			if (changedByActor) {
 				const actionText = metadata.allowMembersChangeAvatar
-					? "đã bật quyền cho thành viên đổi ảnh đại diện nhóm"
-					: "đã tắt quyền cho thành viên đổi ảnh đại diện nhóm";
+					? "đã bật quyền cho thành viên đổi tên và ảnh nhóm"
+					: "đã tắt quyền cho thành viên đổi tên và ảnh nhóm";
+				return (
+					<>
+						{actorBadge(changedByActor)} {textPart(actionText)}
+					</>
+				);
+			}
+		}
+
+		if (message.systemType === "shared_reminder_permission_changed") {
+			const changedByActor = makeActor(
+				metadata.changedBy,
+				metadata.changedByName || message.senderInfo?.displayName || "Quản trị viên",
+				metadata.changedByInfo?.avatarUrl || message.senderInfo?.avatarUrl
+			);
+			if (changedByActor) {
+				const actionText = metadata.allowMembersCreateSharedReminder
+					? "đã bật quyền cho thành viên tạo nhắc hẹn chung"
+					: "đã tắt quyền cho thành viên tạo nhắc hẹn chung";
 				return (
 					<>
 						{actorBadge(changedByActor)} {textPart(actionText)}
@@ -2290,6 +2309,11 @@ const MessageItem = ({
 	};
 
 	const canCreateReminder = !isDisbanded && !isRecalled && !isViolationMessage && message.type === "text";
+	const isCurrentUserGroupAdmin = selectedConvo.type === "group"
+		&& (selectedConvo.group?.admins || []).some((adminId: any) => String(adminId?._id || adminId) === String(currentUserId));
+	const canCreateSharedReminder = selectedConvo.type !== "group"
+		|| selectedConvo.group?.allowMembersCreateSharedReminder !== false
+		|| isCurrentUserGroupAdmin;
 	const canReportMessage = !isOwn && !isDisbanded && !isRecalled && !isViolationMessage && (!message.status || message.status === "sent");
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
@@ -2911,6 +2935,8 @@ const MessageItem = ({
 					conversationId={message.conversationId}
 					messageId={reminderTargetMessage.messageId}
 					messagePreview={reminderTargetMessage.messagePreview}
+					sharedDisabled={!canCreateSharedReminder}
+					sharedDisabledReason="Chỉ quản trị viên nhóm có thể tạo nhắc hẹn chung lúc này."
 					onClose={() => setReminderTargetMessage(null)}
 					onCreated={(createdReminder) => {
 						if (createdReminder.scope !== 'personal') return;

@@ -1066,21 +1066,6 @@ const ReminderPage = () => {
                 }
                 onScroll={handleScroll}
             >
-                {false && viewMode === 'list' && (
-                    <div className="mb-4 flex justify-end">
-                        <Button
-                            size="icon"
-                            variant="outline"
-                            className="h-9 w-9 rounded-lg border-border/70 bg-background text-muted-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-500"
-                            disabled={isLoading || !includePersonalReminders || visiblePersonalReminderCount === 0}
-                            onClick={() => setDeleteScope(activeTab)}
-                            title="Xóa tất cả"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
-                    </div>
-                )}
-
                 {isLoading ? (
                     <div className="flex items-center justify-center py-14">
                         <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />

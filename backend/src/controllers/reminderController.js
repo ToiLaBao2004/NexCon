@@ -58,6 +58,17 @@ const toObjectId = (value) => {
     return new mongoose.Types.ObjectId(String(value));
 };
 
+const isGroupAdmin = (conversation, userId) => {
+    const userIdStr = toObjectIdString(userId);
+    return (conversation?.group?.admins || []).some((adminId) => toObjectIdString(adminId) === userIdStr);
+};
+
+const canCreateSharedReminderInConversation = (conversation, userId) => {
+    if (conversation?.type !== 'group') return true;
+    if (isGroupAdmin(conversation, userId)) return true;
+    return conversation.group?.allowMembersCreateSharedReminder !== false;
+};
+
 const countUniquePendingReminders = async (match, session = null) => {
     const query = Reminder.aggregate([
         { $match: match },
@@ -325,6 +336,10 @@ export async function createSharedReminderFromMessage(req, res) {
                 throw buildHttpError(403, 'Bạn không thuộc cuộc trò chuyện này.');
             }
 
+            if (!canCreateSharedReminderInConversation(conversation, userId)) {
+                throw buildHttpError(403, 'Chỉ quản trị viên nhóm có thể tạo nhắc hẹn chung lúc này.');
+            }
+
             if (conversation.type === 'direct') {
                 const otherUserId = participantIds.find(id => id !== userIdStr);
                 if (otherUserId) {
@@ -531,6 +546,10 @@ export async function scheduleMeeting(req, res) {
 
         if (!participantIds.includes(userIdStr)) {
             return res.status(403).json({ message: 'Bạn không thuộc cuộc trò chuyện này.' });
+        }
+
+        if (!canCreateSharedReminderInConversation(conversation, userId)) {
+            return res.status(403).json({ message: 'Chỉ quản trị viên nhóm có thể lên lịch họp chung lúc này.' });
         }
 
         if (conversation.type === 'direct') {
@@ -1031,10 +1050,11 @@ export async function updateReminder(req, res) {
                             status: 'pending',
                             snoozeCount: 0,
                         },
-                        $unset: { snoozeUntil: 1 },
+                        $unset: { snoozeUntil: 1, dismissedAt: 1 },
                     }
                 );
 
+                const dismissedAt = new Date();
                 await Reminder.updateMany(
                     {
                         ...sharedQuery,
@@ -1045,6 +1065,7 @@ export async function updateReminder(req, res) {
                             remindAt,
                             status: 'dismissed',
                             snoozeCount: 0,
+                            dismissedAt,
                         },
                         $unset: { snoozeUntil: 1 },
                     }
@@ -1127,9 +1148,10 @@ export async function updateReminder(req, res) {
         Object.assign(reminder, updates);
 
         if (updates.remindAt !== undefined) {
-            reminder.status = 'pending';
-            reminder.snoozeUntil = undefined;
-            reminder.snoozeCount = 0;
+        reminder.status = 'pending';
+        reminder.dismissedAt = undefined;
+        reminder.snoozeUntil = undefined;
+        reminder.snoozeCount = 0;
         }
 
         await reminder.save();
@@ -1220,6 +1242,7 @@ export async function dismissReminder(req, res) {
         }
 
         reminder.status = 'dismissed';
+        reminder.dismissedAt = new Date();
         reminder.snoozeUntil = undefined;
         await reminder.save();
 
@@ -1282,9 +1305,11 @@ export async function updateSharedReminderParticipation(req, res) {
             reminder.participationStatus = 'joined';
             reminder.snoozeUntil = undefined;
             reminder.status = desiredStatus;
+            reminder.dismissedAt = undefined;
         } else {
             reminder.participationStatus = 'declined';
             reminder.status = 'dismissed';
+            reminder.dismissedAt = new Date();
             reminder.snoozeUntil = undefined;
         }
 
@@ -1515,6 +1540,7 @@ export async function deleteReminder(req, res) {
             const previousParticipation = reminder.participationStatus;
             reminder.participationStatus = 'declined';
             reminder.status = 'dismissed';
+            reminder.dismissedAt = new Date();
             reminder.snoozeUntil = undefined;
             await reminder.save();
 

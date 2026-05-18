@@ -32,10 +32,21 @@ const MUTE_DURATION_MS = {
 };
 const MAX_GROUP_MEMBERS = 100;
 const MAX_PINNED_CONVERSATIONS = 5;
+const MAX_SEARCH_QUERY_LENGTH = 100;
 
 const PARTICIPANT_SELECT = 'displayName avatarUrl email bio phone lock';
 const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
 const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname email bio phone status lastSeen about lock';
+
+function clampPageLimit(value, defaultLimit = 50, maxLimit = 100) {
+	const parsed = Number.parseInt(value, 10);
+	if (!Number.isFinite(parsed)) return defaultLimit;
+	return Math.min(Math.max(parsed, 1), maxLimit);
+}
+
+function escapeRegex(value) {
+	return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 function sanitizeParticipantUser(userObj) {
 	if (!userObj) return userObj;
@@ -195,7 +206,7 @@ export async function createConversation(req, res) {
 export async function getConversations(req, res) {
 	try {
 		const myId = req.user._id.toString();
-		const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+		const limit = clampPageLimit(req.query.limit, 50, 100);
 		const cursor = req.query.cursor;
 
 		const matchQuery = { "participants.userId": myId };
@@ -378,9 +389,13 @@ export async function getConversations(req, res) {
 export async function getGroups(req, res) {
 	try {
 		const myId = req.user._id.toString();
-		const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+		const limit = clampPageLimit(req.query.limit, 50, 100);
 		const cursor = req.query.cursor;
-		const search = (req.query.search || '').trim();
+		const searchValue = Array.isArray(req.query.search) ? req.query.search[0] : req.query.search;
+		const search = String(searchValue || '').trim();
+		if (search.length > MAX_SEARCH_QUERY_LENGTH) {
+			return res.status(400).json({ message: `Search query must not exceed ${MAX_SEARCH_QUERY_LENGTH} characters.` });
+		}
 
 		const matchQuery = { 'participants.userId': myId, type: 'group' };
 		if (cursor) {
@@ -388,7 +403,7 @@ export async function getGroups(req, res) {
 			if (!isNaN(d.getTime())) matchQuery.updatedAt = { $lt: d };
 		}
 		if (search) {
-			matchQuery['group.name'] = { $regex: search, $options: 'i' };
+			matchQuery['group.name'] = { $regex: escapeRegex(search), $options: 'i' };
 		}
 
 		let rawGroups = await Conversation.find(matchQuery)
@@ -453,6 +468,9 @@ export async function getMessages(req, res) {
 		}
 
 		const me = conversation.participants?.find(p => p.userId.toString() === userId);
+		if (!me) {
+			return res.status(403).json({ message: "You are not a participant in this conversation." });
+		}
 		const clearedAt = me?.clearedAt ? new Date(me.clearedAt) : null;
 
 		const baseFilter = {
@@ -502,7 +520,8 @@ export async function getMessages(req, res) {
 				return res.status(403).json({ message: "Message does not belong to this conversation" });
 			}
 
-			const limitNumber = Math.min(Number(limit), 100);
+			const requestedAroundLimit = Number(limit);
+			const limitNumber = Math.max(1, Math.min(100, Number.isFinite(requestedAroundLimit) ? requestedAroundLimit : 50));
 			const half = Math.floor(limitNumber / 2);
 
 			const [olderMessages, newerMessages] = await Promise.all([
@@ -541,7 +560,8 @@ export async function getMessages(req, res) {
 				hasMoreNewer: newerMessages.length === half,
 			});
 		}
-		const limitNumber = Number(limit);
+		const requestedLimit = Number(limit);
+		const limitNumber = Math.max(1, Math.min(100, Number.isFinite(requestedLimit) ? requestedLimit : 50));
 		let query = { ...baseFilter };
 		let sortDirection = -1; // Default: newest first
 
@@ -705,15 +725,23 @@ export async function markAsUnread(req, res) {
 		const { conversationId } = req.params;
 		const userId = req.user._id.toString();
 
-		const conversation = await Conversation.findById(conversationId).lean();
+		const conversation = await Conversation.findOne({
+			_id: conversationId,
+			'participants.userId': userId,
+		}).lean();
 		if (!conversation) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
 
-		const updated = await Conversation.findByIdAndUpdate(conversationId,
+		const updated = await Conversation.findOneAndUpdate(
+			{
+				_id: conversationId,
+				'participants.userId': userId,
+			},
 			{
 				$set: { [`unreadCounts.${userId}`]: 1 },
-			}, { new: true }
+			},
+			{ new: true }
 		);
 
 		if (!updated) {
@@ -919,7 +947,7 @@ export async function getMediaByType(req, res) {
 			query.createdAt = { ...query.createdAt, $lt: new Date(cursor) };
 		}
 
-		const numLimit = Number(limit);
+		const numLimit = clampPageLimit(limit, 8, 100);
 		let messages = await Message.find(query)
 			.sort({ createdAt: -1 })
 			.limit(numLimit + 1)
@@ -961,6 +989,10 @@ export async function updateGroupName(req, res) {
 		}
 		if (!conversation.participants.some(p => p.userId.toString() === userId)) {
 			return res.status(403).json({ message: "Only group participants can rename the group" });
+		}
+		const canUpdateGroupInfo = isGroupAdmin(conversation, userId) || conversation.group?.allowMembersChangeAvatar !== false;
+		if (!canUpdateGroupInfo) {
+			return res.status(403).json({ message: 'Chỉ quản trị viên mới có thể đổi tên hoặc ảnh nhóm lúc này.' });
 		}
 
 		const oldName = (conversation.group?.name || '').trim();
@@ -1056,9 +1088,9 @@ export async function updateGroupAvatar(req, res) {
 			return res.status(403).json({ message: 'Only group participants can update group avatar.' });
 		}
 
-		const canUpdateAvatar = isGroupAdmin(conversation, userId) || conversation.group?.allowMembersChangeAvatar !== false;
-		if (!canUpdateAvatar) {
-			return res.status(403).json({ message: 'Chỉ quản trị viên mới có thể đổi ảnh nhóm lúc này.' });
+		const canUpdateGroupInfo = isGroupAdmin(conversation, userId) || conversation.group?.allowMembersChangeAvatar !== false;
+		if (!canUpdateGroupInfo) {
+			return res.status(403).json({ message: 'Chỉ quản trị viên mới có thể đổi tên hoặc ảnh nhóm lúc này.' });
 		}
 
 		const previousAvatarId = conversation.group?.avatarId || null;
@@ -1471,6 +1503,7 @@ export async function updateSettings(req, res) {
 		const {
 			isApprovalRequired,
 			allowMembersChangeAvatar,
+			allowMembersCreateSharedReminder,
 		} = req.body;
 		const userId = req.user._id.toString();
 
@@ -1490,6 +1523,9 @@ export async function updateSettings(req, res) {
 		}
 		if (allowMembersChangeAvatar !== undefined) {
 			conversation.group.allowMembersChangeAvatar = Boolean(allowMembersChangeAvatar);
+		}
+		if (allowMembersCreateSharedReminder !== undefined) {
+			conversation.group.allowMembersCreateSharedReminder = Boolean(allowMembersCreateSharedReminder);
 		}
 
 		await conversation.save();
@@ -1540,8 +1576,40 @@ export async function updateSettings(req, res) {
 					allowMembersChangeAvatar: canMembersChangeAvatar,
 				},
 				content: canMembersChangeAvatar
-					? `Đã bật quyền cho thành viên đổi ảnh đại diện nhóm`
-					: `Đã tắt quyền cho thành viên đổi ảnh đại diện nhóm`
+					? `Đã bật quyền cho thành viên đổi tên và ảnh nhóm`
+					: `Đã tắt quyền cho thành viên đổi tên và ảnh đại diện nhóm`
+			});
+
+			const savedMsg = await systemMessage.save();
+			const finalMsg = await Message.findById(savedMsg._id).populate('senderId', MESSAGE_SENDER_SELECT);
+
+			updateConversationLastMessage(conversation, finalMsg, userId);
+			await conversation.save();
+
+			const updatedConversation = sanitizePopulatedConversation(await Conversation.findById(conversationId).populate({
+				path: 'participants.userId',
+				select: CLIENT_PARTICIPANT_SELECT
+			}));
+
+			emitNewMessage(io, updatedConversation, finalMsg);
+		}
+
+		if (allowMembersCreateSharedReminder !== undefined) {
+			const canMembersCreateSharedReminder = Boolean(allowMembersCreateSharedReminder);
+			const systemMessage = new Message({
+				conversationId,
+				senderId: userId,
+				senderInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl },
+				type: 'system',
+				systemType: 'shared_reminder_permission_changed',
+				metadata: {
+					changedBy: userId,
+					changedByName: req.user.displayName,
+					allowMembersCreateSharedReminder: canMembersCreateSharedReminder,
+				},
+				content: canMembersCreateSharedReminder
+					? `Đã bật quyền cho thành viên tạo nhắc hẹn chung`
+					: `Đã tắt quyền cho thành viên tạo nhắc hẹn chung`
 			});
 
 			const savedMsg = await systemMessage.save();

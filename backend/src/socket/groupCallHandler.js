@@ -10,6 +10,7 @@ import {
     clearWaitingTimeout,
     emitWaitingRoomUpdate,
     generateParticipantToken,
+    MAX_MEETING_PARTICIPANTS,
     normalizeRoomName,
     waitingTimeouts,
 } from '../controllers/meetingController.js';
@@ -597,6 +598,23 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 (participant) => participant.userId.toString() === waiterUserId
             );
 
+            if (!alreadyParticipant && meeting.participants.length >= MAX_MEETING_PARTICIPANTS) {
+                await Meeting.findByIdAndUpdate(meeting._id, {
+                    $pull: { waitingRoom: waiterUserId },
+                });
+
+                const targetSocketId = getReceiverSocketId(waiterUserId);
+                if (targetSocketId) {
+                    io.to(targetSocketId).emit('participant-rejected', {
+                        roomName: normalizedRoomName,
+                        reason: 'room-full',
+                    });
+                }
+
+                await emitWaitingRoomUpdate(normalizedRoomName, userId);
+                return;
+            }
+
             const update = {
                 $pull: { waitingRoom: waiterUserId },
             };
@@ -694,9 +712,15 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
             const existingParticipantSet = new Set(
                 meeting.participants.map((participant) => participant.userId.toString())
             );
-            const participantsToInsert = toAdmit
-                .filter((targetId) => !existingParticipantSet.has(targetId))
-                .map((targetId) => ({ userId: targetId, joinedAt: now }));
+            const openSlots = Math.max(0, MAX_MEETING_PARTICIPANTS - meeting.participants.length);
+            const newParticipantIds = toAdmit.filter((targetId) => !existingParticipantSet.has(targetId));
+            const admittedNewIds = newParticipantIds.slice(0, openSlots);
+            const rejectedIds = newParticipantIds.slice(openSlots);
+            const participantsToInsert = admittedNewIds.map((targetId) => ({ userId: targetId, joinedAt: now }));
+            const admittedIds = new Set([
+                ...toAdmit.filter((targetId) => existingParticipantSet.has(targetId)),
+                ...admittedNewIds,
+            ]);
 
             const update = {
                 $set: { waitingRoom: [] },
@@ -712,7 +736,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
 
             await Meeting.findByIdAndUpdate(meeting._id, update);
 
-            for (const targetId of toAdmit) {
+            for (const targetId of admittedIds) {
                 const token = await generateParticipantToken(normalizedRoomName, targetId, userMap.get(targetId));
                 const targetSocketId = getReceiverSocketId(targetId);
                 if (!targetSocketId) {
@@ -723,6 +747,18 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                     roomName: normalizedRoomName,
                     token,
                     isHost: false,
+                });
+            }
+
+            for (const targetId of rejectedIds) {
+                const targetSocketId = getReceiverSocketId(targetId);
+                if (!targetSocketId) {
+                    continue;
+                }
+
+                io.to(targetSocketId).emit('participant-rejected', {
+                    roomName: normalizedRoomName,
+                    reason: 'room-full',
                 });
             }
 

@@ -17,6 +17,59 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
+const MAX_ACTIVE_SESSIONS_PER_USER = 20;
+
+function hashRefreshToken(token) {
+    return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
+async function findSessionByRefreshToken(token, select = '') {
+    if (!token) return null;
+
+    const tokenHash = hashRefreshToken(token);
+    let query = Session.findOne({ refreshToken: tokenHash });
+    if (select) query = query.select(select);
+    let session = await query;
+    if (session) return session;
+
+    let legacyQuery = Session.findOne({ refreshToken: token });
+    if (select) legacyQuery = legacyQuery.select(select);
+    session = await legacyQuery;
+    if (session) {
+        await Session.updateOne(
+            { _id: session._id, refreshToken: token },
+            { $set: { refreshToken: tokenHash } }
+        );
+    }
+
+    return session;
+}
+
+function createSessionPayload({ userId, refreshToken, expiresAt, deviceInfo }) {
+    return {
+        userId,
+        refreshToken: hashRefreshToken(refreshToken),
+        expiresAt,
+        deviceInfo,
+    };
+}
+
+async function enforceSessionLimit(userId, currentSessionId) {
+    const overflowSessions = await Session.find({
+        userId,
+        _id: { $ne: currentSessionId },
+    })
+        .select('_id')
+        .sort({ createdAt: -1 })
+        .skip(MAX_ACTIVE_SESSIONS_PER_USER - 1)
+        .lean();
+
+    if (!overflowSessions.length) return;
+
+    const overflowIds = overflowSessions.map((session) => session._id);
+    await Session.deleteMany({ _id: { $in: overflowIds } });
+    overflowIds.forEach((sessionId) => disconnectSessionSockets(sessionId, 'session-limit'));
+}
 
 function parseIp(req) {
     const raw = req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress || '';
@@ -160,16 +213,16 @@ export async function signIn(req, res) {
 
         const refreshToken = crypto.randomBytes(64).toString('hex');
 
-        const session = await Session.create({
+        const session = await Session.create(createSessionPayload({
             userId: user._id,
-            refreshToken: refreshToken,
+            refreshToken,
             expiresAt: Date.now() + REFRESH_TOKEN_TTL,
             deviceInfo: {
                 userAgent,
                 ip,
                 deviceName
             }
-        });
+        }));
 
         const accessToken = jwt.sign({ userId: user._id, sessionId: session._id }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 
@@ -198,6 +251,8 @@ export async function signIn(req, res) {
             );
         }
 
+        await enforceSessionLimit(user._id, session._id);
+
         const isMobile = req.headers['x-client-type'] === 'mobile';
 
         return res.status(200).json({
@@ -220,12 +275,16 @@ export async function signOut(req, res) {
         }
 
         const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
-        if (!refreshToken) {
-            return res.status(200).json({ message: 'User logged out (session already cleared).' });
+        const requestedSession = refreshToken
+            ? await findSessionByRefreshToken(refreshToken, '_id userId')
+            : null;
+        if (requestedSession && requestedSession.userId?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Cannot sign out another user session.' });
         }
-
-        const session = await Session.findOne({ refreshToken }).select('_id');
-        await Session.deleteOne({ refreshToken: refreshToken });
+        const session = requestedSession || req.session;
+        if (session) {
+            await Session.deleteOne({ _id: session._id });
+        }
         if (session) {
             disconnectSessionSockets(session._id, 'signed-out');
         }
@@ -243,16 +302,9 @@ export async function signOut(req, res) {
 
 export async function signOutAll(req, res) {
     try {
-        const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
-        if (!refreshToken) {
-            return res.status(400).json({ message: 'Refresh token not found.' });
-        }
-        const session = await Session.findOne({ refreshToken });
-        if (!session) {
-            return res.status(401).json({ message: 'Invalid session.' });
-        }
-        await Session.deleteMany({ userId: session.userId });
-        disconnectUserSockets(session.userId, 'signed-out-all');
+        const userId = req.user._id;
+        await Session.deleteMany({ userId });
+        disconnectUserSockets(userId, 'signed-out-all');
         res.clearCookie('refreshToken', { httpOnly: true, secure: true, sameSite: 'none' });
         return res.status(200).json({ message: 'Logged out from all devices successfully.' });
     } catch (error) {
@@ -267,7 +319,7 @@ export async function getSessions(req, res) {
         if (!refreshToken) {
             return res.status(401).json({ message: 'Unauthorized.' });
         }
-        const currentSession = await Session.findOne({ refreshToken });
+        const currentSession = await findSessionByRefreshToken(refreshToken);
         if (!currentSession) {
             return res.status(401).json({ message: 'Invalid session.' });
         }
@@ -296,11 +348,8 @@ export async function signOutBySession(req, res) {
         const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         const { sessionId } = req.params;
 
-        if (!refreshToken) {
-            return res.status(401).json({ message: 'Unauthorized.' });
-        }
-        const currentSession = await Session.findOne({ refreshToken });
-        if (!currentSession) {
+        const currentSession = req.session || await findSessionByRefreshToken(refreshToken);
+        if (!currentSession || currentSession.userId.toString() !== req.user._id.toString()) {
             return res.status(401).json({ message: 'Invalid session.' });
         }
 
@@ -359,12 +408,15 @@ export async function resetNewPassword(req, res) {
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
         await User.updateOne({ _id: user._id }, { password: hashedPassword });
-        const currentRefreshToken = req.cookies?.refreshToken;
+        const currentRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
+        const currentSession = currentRefreshToken
+            ? await findSessionByRefreshToken(currentRefreshToken, '_id')
+            : null;
 
-        if (currentRefreshToken) {
+        if (currentSession) {
             await Session.deleteMany({
                 userId: user._id,
-                refreshToken: { $ne: currentRefreshToken }
+                _id: { $ne: currentSession._id }
             });
         } else {
             await Session.deleteMany({ userId: user._id });
@@ -385,16 +437,16 @@ export async function googleAuthCallback(req, res) {
         const userAgent = req.headers['user-agent'] || '';
         const ip = parseIp(req);
         const deviceName = parseDeviceName(userAgent);
-        const session = await Session.create({
+        const session = await Session.create(createSessionPayload({
             userId: user._id,
-            refreshToken: refreshToken,
+            refreshToken,
             expiresAt: Date.now() + REFRESH_TOKEN_TTL,
             deviceInfo: {
                 userAgent,
                 ip,
                 deviceName
             }
-        });
+        }));
 
         const existingSessionCount = await Session.countDocuments({
             userId: user._id,
@@ -413,6 +465,8 @@ export async function googleAuthCallback(req, res) {
                 }
             );
         }
+
+        await enforceSessionLimit(user._id, session._id);
 
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
@@ -439,7 +493,7 @@ export async function googleSuccess(req, res) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
 
-        const session = await Session.findOne({ refreshToken });
+        const session = await findSessionByRefreshToken(refreshToken);
         if (!session || session.expiresAt < Date.now()) {
             return res.status(401).json({ message: 'Session expired' });
         }
@@ -469,7 +523,7 @@ export async function refreshToken(req, res) {
         if (!token) {
             return res.status(400).json({ message: 'Token not found.' });
         }
-        const session = await Session.findOne({ refreshToken: token });
+        const session = await findSessionByRefreshToken(token);
         if (!session || session.expiresAt < Date.now()) {
             return res.status(401).json({ message: 'Invalid or expired refresh token.' });
         }
@@ -532,12 +586,14 @@ export async function googleMobileAuth(req, res) {
         const ip = parseIp(req);
         const deviceName = parseDeviceName(userAgent);
 
-        const session = await Session.create({
+        const session = await Session.create(createSessionPayload({
             userId: user._id,
             refreshToken: refreshTokenValue,
             expiresAt: Date.now() + REFRESH_TOKEN_TTL,
             deviceInfo: { userAgent, ip, deviceName }
-        });
+        }));
+
+        await enforceSessionLimit(user._id, session._id);
 
         const accessToken = jwt.sign(
             { userId: user._id, sessionId: session._id },

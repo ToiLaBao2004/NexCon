@@ -100,6 +100,11 @@ const GroupChatCard = ({
 
 	const unreadCount = convo.unreadCounts?.[user._id] ?? 0;
 	const unreadMentionCount = myParticipant?.unreadMentionCount ?? 0;
+	const isDisbanded = convo.disbanded === true;
+	const isGroupAdmin = !!convo.group?.admins?.some(
+		(adminId: any) => String(adminId?._id || adminId) === String(user._id)
+	);
+	const canUpdateGroupInfo = !isDisbanded && (isGroupAdmin || convo.group?.allowMembersChangeAvatar !== false);
 
 	const handleSelectConversation = async (id: string) => {
 		const currentConversations = useChatStore.getState().conversations;
@@ -118,6 +123,7 @@ const GroupChatCard = ({
 	};
 
 	const onOpenRename = () => {
+		if (!canUpdateGroupInfo) return;
 		setDropdownOpen(false);
 		if (document.activeElement instanceof HTMLElement) {
 			document.activeElement.blur();
@@ -212,13 +218,14 @@ const GroupChatCard = ({
 							onPointerDown={(e) => e.stopPropagation()}
 						>
 							<DropdownMenuItem
+								disabled={!canUpdateGroupInfo}
 								onSelect={(e) => {
 									e.preventDefault();
 									onOpenRename();
 								}}
 							>
 								<PencilLine className="size-4 mr-2" />
-								Đổi group name
+								Đổi tên nhóm
 							</DropdownMenuItem>
 							<MuteSubMenu conversationId={convo._id} />
 							<DropdownMenuItem
@@ -269,7 +276,7 @@ const GroupChatCard = ({
 					onPointerDown={(e) => e.stopPropagation()}
 				>
 					<DialogHeader>
-						<DialogTitle>Đổi group name</DialogTitle>
+						<DialogTitle>Đổi tên nhóm</DialogTitle>
 						<DialogDescription>Tên mới sẽ hiển thị cho tất cả thành viên trong nhóm.</DialogDescription>
 					</DialogHeader>
 

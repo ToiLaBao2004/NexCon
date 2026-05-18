@@ -1,6 +1,7 @@
 import { AccessToken } from 'livekit-server-sdk';
 import Meeting from '../models/meetingModel.js';
 import BlockUser from '../models/blockUserModel.js';
+import Conversation from '../models/conversationModel.js';
 import { getSocketGateway } from '../socket/socketGateway.js';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
@@ -8,6 +9,8 @@ const API_SECRET = process.env.LIVEKIT_API_SECRET;
 
 const ROOM_CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz';
 const MEETING_CODE_REGEX = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+export const MAX_MEETING_PARTICIPANTS = 100;
+export const MAX_MEETING_WAITING_USERS = 100;
 
 export const waitingTimeouts = new Map();
 
@@ -209,9 +212,17 @@ export async function createMeeting(req, res) {
         const isImmediate = !scheduledAt;
 
         if (conversationId) {
-            const { default: Conversation } = await import('../models/conversationModel.js');
             const conversation = await Conversation.findById(conversationId);
-            if (conversation && conversation.type === 'group' && conversation.disbanded) {
+            if (!conversation) {
+                return res.status(404).json({ message: 'Conversation not found.' });
+            }
+            const isMember = conversation.participants.some(
+                (participant) => participant.userId.toString() === userId.toString()
+            );
+            if (!isMember) {
+                return res.status(403).json({ message: 'You are not a participant in this conversation.' });
+            }
+            if (conversation.type === 'group' && conversation.disbanded) {
                 return res.status(403).json({ message: 'Không thể tạo cuộc họp trong nhóm đã giải tán.' });
             }
         }
@@ -321,6 +332,10 @@ export async function joinMeeting(req, res) {
         }
 
         if (!meeting.requireApproval) {
+            if (meeting.participants.length >= MAX_MEETING_PARTICIPANTS) {
+                return res.status(409).json({ message: 'Phòng họp đã đạt giới hạn người tham gia.' });
+            }
+
             await Meeting.findByIdAndUpdate(meeting._id, {
                 $push: {
                     participants: {
@@ -341,6 +356,10 @@ export async function joinMeeting(req, res) {
 
         if (!requestApproval) {
             return res.json({ status: 'needs_approval', isHost: false });
+        }
+
+        if (meeting.waitingRoom.length >= MAX_MEETING_WAITING_USERS) {
+            return res.status(429).json({ message: 'Phòng chờ đã đạt giới hạn.' });
         }
 
         await Meeting.findByIdAndUpdate(meeting._id, {
