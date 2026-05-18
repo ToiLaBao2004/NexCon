@@ -38,6 +38,8 @@ const GENERIC_EMAIL_DOMAINS = new Set([
     'protonmail.com',
 ]);
 
+const NON_ADMIN_USER_FILTER = { role: { $ne: 'admin' } };
+
 const getIdString = (value) => {
     if (!value) return '';
     return (value._id || value).toString();
@@ -758,7 +760,8 @@ export async function getFriendSuggestions(req, res) {
             const sameDomainUsers = await User.find({
                 _id: { $nin: Array.from(excludedIds) },
                 email: { $regex: new RegExp(`@${escapeRegex(currentDomain)}$`, 'i') },
-                'lock.isLocked': { $ne: true }
+                'lock.isLocked': { $ne: true },
+                ...NON_ADMIN_USER_FILTER
             }).select('_id').sort({ createdAt: -1 }).limit(limit * 3).lean();
 
             sameDomainUsers.forEach((sameDomainUser) => {
@@ -770,7 +773,8 @@ export async function getFriendSuggestions(req, res) {
         if (candidateStats.size < limit) {
             const fallbackUsers = await User.find({
                 _id: { $nin: Array.from(excludedIds) },
-                'lock.isLocked': { $ne: true }
+                'lock.isLocked': { $ne: true },
+                ...NON_ADMIN_USER_FILTER
             }).select('_id').sort({ createdAt: -1 }).limit(limit * 3).lean();
 
             fallbackUsers.forEach((fallbackUser) => {
@@ -786,7 +790,8 @@ export async function getFriendSuggestions(req, res) {
 
         const candidateUsers = await User.find({
             _id: { $in: candidateIds },
-            'lock.isLocked': { $ne: true }
+            'lock.isLocked': { $ne: true },
+            ...NON_ADMIN_USER_FILTER
         }).select('displayName email avatarUrl bio phone createdAt lock').lean();
 
         const rankedCandidates = candidateUsers.map((candidateUser) => {
@@ -839,7 +844,7 @@ export async function getFriendSuggestions(req, res) {
             ...new Set(rankedCandidates.flatMap(({ stats }) => Array.from(stats.mutualFriendIds)))
         ];
         const mutualFriendDocs = mutualFriendIds.length > 0
-            ? await User.find({ _id: { $in: mutualFriendIds } }).select('displayName avatarUrl lock').lean()
+            ? await User.find({ _id: { $in: mutualFriendIds }, ...NON_ADMIN_USER_FILTER }).select('displayName avatarUrl lock').lean()
             : [];
         const mutualFriendById = new Map(mutualFriendDocs.map((friend) => [getIdString(friend._id), maskLockedUserDoc(friend)]));
 
