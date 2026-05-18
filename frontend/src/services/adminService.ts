@@ -113,9 +113,43 @@ export interface AdminReport {
     targetLocked?: boolean;
     reporterMessage?: string;
     targetMessage?: string;
+    aiModeration?: {
+      reviewedAt?: string | null;
+      blocked?: boolean | null;
+      category?: string;
+      confidence?: number | null;
+      reason?: string;
+      source?: string;
+    };
   };
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface AdminAiReviewResult {
+  reportId: string;
+  targetMessageId?: string | null;
+  status:
+    | "resolved_violation"
+    | "needs_admin_review"
+    | "safe_or_uncertain"
+    | "missing_message"
+    | "skipped"
+    | "error";
+  category?: string | null;
+  confidence?: number | null;
+  reason?: string;
+  source?: string | null;
+}
+
+export interface AdminAiReviewResponse {
+  scanned: number;
+  resolved: number;
+  needsReview: number;
+  safeOrUncertain: number;
+  skipped: number;
+  errors: number;
+  results: AdminAiReviewResult[];
 }
 
 export interface AdminAppeal {
@@ -197,6 +231,11 @@ export const adminService = {
     if (params.status && params.status !== "all") query.set("status", params.status);
     const res = await api.get(`/admin/reports?${query.toString()}`);
     return res.data as { reports: AdminReport[]; pagination: Pagination };
+  },
+
+  async aiReviewMessageReports(params: { reportIds?: string[]; status?: ReportStatus | "all"; note?: string; limit?: number } = {}) {
+    const res = await api.post("/admin/reports/messages/ai-review", params);
+    return res.data as AdminAiReviewResponse;
   },
 
   async markReportReviewing(reportId: string) {

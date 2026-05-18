@@ -1,4 +1,5 @@
 import { getGeminiModelForText } from '../getGeminiModelService.js';
+import { buildLinkModerationPrompt } from './moderationPromptService.js';
 
 const BLOCKED_LINK_HOSTS = [
     'xvideos.com',
@@ -175,30 +176,7 @@ async function checkLinkWithGemini(url) {
         };
     }
 
-    const prompt = `Bạn là AI kiểm duyệt link chat tiếng Việt.
-
-        Nhiệm vụ: Phân tích URL sau và đánh giá xem link này có khả năng cao dẫn tới nội dung vi phạm tiêu chuẩn cộng đồng hay không.
-
-        Chặn (blocked = true) nếu URL có dấu hiệu rõ ràng thuộc một trong các nhóm:
-            - Nội dung khiêu dâm / gợi dục / 18+
-            - Lừa đảo, phishing, dụ bấm link
-            - Ma túy, hack, khủng bố, tự hại
-            - Nội dung nguy hiểm hoặc bất hợp pháp
-
-        Lưu ý:
-            - Chỉ dựa trên chính chuỗi URL, domain, path, query.
-            - Nếu không đủ cơ sở rõ ràng thì ưu tiên blocked = false.
-            - Không suy diễn quá mức.
-            - Trả về đúng JSON, không thêm gì khác.
-
-        {
-            "blocked": true/false,
-            "category": "sexual"|"scam"|"dangerous"|"unsafe_link"|"safe",
-            "confidence": number,
-            "reason": "Giải thích ngắn gọn bằng tiếng Việt"
-        }
-
-        URL: """${url}"""`;
+    const prompt = await buildLinkModerationPrompt(url);
 
     try {
         const result = await geminiModel.generateContent({
@@ -242,7 +220,8 @@ async function checkLinkWithGemini(url) {
     }
 }
 
-export async function moderateLinkMessage(url) {
+export async function moderateLinkMessage(url, options = {}) {
+    const { forceAI = false } = options;
     const localResult = containsBlockedLink(url);
 
     if (localResult.matched) {
@@ -257,7 +236,7 @@ export async function moderateLinkMessage(url) {
         };
     }
 
-    if (shouldUseAIForLink(url)) {
+    if (forceAI || shouldUseAIForLink(url)) {
         console.log(`[Moderation] Calling Gemini for LINK: ${String(url).slice(0, 120)}`);
 
         const aiResult = await checkLinkWithGemini(url);

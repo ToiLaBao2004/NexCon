@@ -1,6 +1,7 @@
 import express from 'express';
 import {
     addAdminUserViolation,
+    aiReviewMessageReports,
     getAdminStats,
     getAdminUserAssets,
     getAdminUserAuditLogs,
@@ -36,6 +37,7 @@ adminRouter.post('/users/:userId/lock', lockAdminUser);
 adminRouter.post('/users/:userId/unlock', unlockAdminUser);
 
 adminRouter.get('/reports', listAdminReports);
+adminRouter.post('/reports/messages/ai-review', aiReviewMessageReports);
 adminRouter.patch('/reports/:reportId/reviewing', markAdminReportReviewing);
 adminRouter.patch('/reports/:reportId/resolve', resolveAdminReport);
 
