@@ -1,5 +1,5 @@
 import { useFriendStore } from "@/stores/useFriendStore";
-import { Users, UserX, MessageSquare, UserPlus } from "lucide-react";
+import { MessageSquare, Sparkles, UserPlus, Users, UserX } from "lucide-react";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { useState, useEffect, type ElementType, type CSSProperties } from "react";
 import { useSearchParams } from "react-router";
@@ -8,13 +8,15 @@ import FriendsTab from "@/components/people/FriendsTab";
 import RequestsTab from "@/components/people/RequestsTab";
 import GroupsTab from "@/components/people/GroupsTab";
 import BlockedTab from "@/components/people/BlockedTab";
+import SuggestionsTab from "@/components/people/SuggestionsTab";
 import UserSearch from "@/components/shared/UserSearch";
 import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { MOBILE_BOTTOM_NAV_HEIGHT_REM } from "@/constants/layout";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import type { FriendSuggestion } from "@/types/user";
 
-type PeopleTabKey = "friends" | "requests" | "groups" | "blocked";
+type PeopleTabKey = "friends" | "suggestions" | "requests" | "groups" | "blocked";
 
 interface TabItem {
 	key: PeopleTabKey;
@@ -25,6 +27,7 @@ interface TabItem {
 
 const PEOPLE_TABS: TabItem[] = [
 	{ key: "friends", label: "Danh sách bạn bè", shortLabel: "Bạn bè", icon: Users },
+	{ key: "suggestions", label: "Gợi ý kết bạn", shortLabel: "Gợi ý", icon: Sparkles },
 	{ key: "requests", label: "Lời mời kết bạn", shortLabel: "Lời mời", icon: UserPlus },
 	{ key: "groups", label: "Quản lý nhóm", shortLabel: "Nhóm", icon: MessageSquare },
 	{ key: "blocked", label: "Danh sách bị chặn", shortLabel: "Bị chặn", icon: UserX },
@@ -33,6 +36,9 @@ const PEOPLE_TABS: TabItem[] = [
 const PeoplePage = () => {
 	const {
 		friends,
+		friendSuggestions,
+		fetchFriendSuggestions,
+		fetchingFriendSuggestions,
 		incomingRequests,
 		sentRequests,
 		fetchIncomingRequests,
@@ -44,6 +50,7 @@ const PeoplePage = () => {
 		cancelFriendRequest,
 		unfriendUser,
 		blockedUsers,
+		sendFriendRequest,
 	} = useFriendStore();
 
 	const { onlineUsers } = useSocketStore();
@@ -66,7 +73,10 @@ const PeoplePage = () => {
 		if (tab === "blocked") {
 			fetchBlockedList();
 		}
-	}, [tab, fetchBlockedList]);
+		if (tab === "suggestions") {
+			fetchFriendSuggestions();
+		}
+	}, [tab, fetchBlockedList, fetchFriendSuggestions]);
 
 	useEffect(() => {
 		const urlTab = searchParams.get("tab") as PeopleTabKey | null;
@@ -92,6 +102,12 @@ const PeoplePage = () => {
 		setShowChat(true);
 	};
 
+	const handleSendSuggestionRequest = async (suggestion: FriendSuggestion) => {
+		await sendFriendRequest(suggestion.email);
+		await fetchSentRequests(true);
+		await fetchFriendSuggestions(true);
+	};
+
 	const getTabBadge = (key: PeopleTabKey): number => {
 		if (key === "requests") return incomingRequests.length;
 		return 0;
@@ -101,6 +117,10 @@ const PeoplePage = () => {
 		friends: {
 			title: "Bạn bè",
 			count: friends.length,
+		},
+		suggestions: {
+			title: "Gợi ý kết bạn",
+			count: friendSuggestions.length,
 		},
 		requests: {
 			title: "Lời mời kết bạn",
@@ -188,6 +208,15 @@ const PeoplePage = () => {
 									/>
 								)}
 
+								{tab === 'suggestions' && (
+									<SuggestionsTab
+										suggestions={friendSuggestions}
+										loading={fetchingFriendSuggestions}
+										onRefresh={() => fetchFriendSuggestions(true)}
+										onSendRequest={handleSendSuggestionRequest}
+									/>
+								)}
+
 								{tab === 'requests' && (
 									<RequestsTab
 										sentRequests={sentRequests}
@@ -220,7 +249,7 @@ const PeoplePage = () => {
 					className="fixed left-0 right-0 z-40 border-t border-border/40 bg-card/95 backdrop-blur-md"
 					style={{ bottom: `calc(${MOBILE_BOTTOM_NAV_HEIGHT_REM}rem + env(safe-area-inset-bottom, 0px))` }}
 				>
-					<div className="grid grid-cols-4 gap-1.5 p-2">
+					<div className="grid grid-cols-5 gap-1.5 p-2">
 						{PEOPLE_TABS.map((item) => {
 							const Icon = item.icon;
 							const badge = getTabBadge(item.key);

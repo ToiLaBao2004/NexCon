@@ -1,7 +1,7 @@
 import type { Socket } from "socket.io-client";
 import type { Room } from "livekit-client";
 import type { Conversation, Mention, Message, MessageType } from "./chat";
-import type { FriendRequest, FriendItem, SentFriendRequest } from "./user";
+import type { FriendRequest, FriendItem, FriendSuggestion, SentFriendRequest } from "./user";
 import type {
   Reminder,
   GetRemindersParams,
@@ -213,6 +213,9 @@ export interface FriendState {
   sendingRequest: boolean;
   friends: FriendItem[];
   friendsFetched: boolean;
+  friendSuggestions: FriendSuggestion[];
+  friendSuggestionsFetched: boolean;
+  fetchingFriendSuggestions: boolean;
   incomingRequests: FriendRequest[];
   incomingRequestsFetched: boolean;
   fetchingIncomingRequests: boolean;
@@ -220,6 +223,7 @@ export interface FriendState {
   sentRequestsFetched: boolean;
   fetchingSentRequests: boolean;
   fetchFriends: (force?: boolean) => Promise<void>;
+  fetchFriendSuggestions: (force?: boolean) => Promise<void>;
   fetchIncomingRequests: (force?: boolean) => Promise<void>;
   fetchSentRequests: (force?: boolean) => Promise<void>;
   setNickName: (friendId: string, nickName: string) => Promise<void>;

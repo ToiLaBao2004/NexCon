@@ -903,6 +903,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           ? state.blockedUsers.map((item) => String(item._id) === String(blockedUserId) ? blockedUser : item)
           : [...state.blockedUsers, blockedUser],
         friends: state.friends.filter((friend) => String(friend.friendId) !== String(blockedUserId)),
+        friendSuggestions: state.friendSuggestions.filter((suggestion) => String(suggestion._id) !== String(blockedUserId)),
+        friendSuggestionsFetched: false,
         incomingRequests: state.incomingRequests.filter(
           (request) => String(request.from?._id) !== String(blockedUserId),
         ),

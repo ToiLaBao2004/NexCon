@@ -39,6 +39,34 @@ export interface FriendItem {
   updatedAt?: string;
 }
 
+export interface FriendSuggestion {
+  _id: string;
+  displayName: string;
+  email: string;
+  avatarUrl?: string;
+  bio?: string;
+  phone?: string;
+  score: number;
+  reasons: {
+    mutualFriendsCount: number;
+    mutualFriends: {
+      _id: string;
+      displayName: string;
+      avatarUrl?: string;
+    }[];
+    commonGroupsCount: number;
+    commonGroups: {
+      _id: string;
+      name: string;
+      avatarUrl?: string;
+      memberCount?: number;
+    }[];
+    sameEmailDomain?: boolean;
+    activeInCommonGroups?: boolean;
+    recentlyJoined?: boolean;
+  };
+}
+
 export interface FriendRequest {
   _id: string;
   from: {

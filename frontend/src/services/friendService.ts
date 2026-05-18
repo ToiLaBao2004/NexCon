@@ -36,6 +36,11 @@ export const friendService = {
 		return response.data;
 	},
 
+	fetchFriendSuggestions: async () => {
+		const response = await api.get('/friends/suggestions');
+		return response.data;
+	},
+
 	setNickName: async (friendId: string, nickname: string) => {
 		const response = await api.post(`/friends/set-nickname/${friendId}`, { nickname });
 		return response.data;
