@@ -2,8 +2,8 @@ import { getGeminiModelForText } from '../getGeminiModelService.js';
 import { buildTextModerationPrompt } from './moderationPromptService.js';
 
 const LOCAL_BLOCKLIST = [
-    'địt', 'đụ', 'lồn', 'cặc', 'buồi', 'đéo', 'dm', 'vkl', 'cc', 'cút mẹ',
-    'óc chó', 'súc vật', 'vl', 'vcl', 'clgt', 'đmm',
+    'địt', 'đụ', 'lồn', 'cặc', 'buồi', 'đéo', 'dm', 'vkl', 'cút mẹ',
+    'óc chó', 'súc vật', 'vcl', 'clgt', 'đmm',
     'đĩ', 'con đĩ', 'đĩ mẹ', 'mẹ đĩ', 'đĩ thả', 'đĩ già', 'đĩ đực'
 ];
 
