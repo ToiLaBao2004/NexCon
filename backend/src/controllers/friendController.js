@@ -3,6 +3,7 @@ import User from '../models/userModel.js';
 import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
+import Conversation from "../models/conversationModel.js";
 import { io, getReceiverSocketId, emitToUser, emitOnlineUsers } from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
 import { checkFieldFormat } from "../utils/fieldFormat.js";
@@ -23,6 +24,56 @@ const MAX_FRIENDS = 500;
 const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
 const MAX_PENDING_SENT_REQUESTS = 100;
 const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX_PENDING_SENT_REQUESTS} lời mời kết bạn đang chờ xử lý.`;
+const DEFAULT_SUGGESTION_LIMIT = 20;
+const MAX_SUGGESTION_LIMIT = 50;
+const GENERIC_EMAIL_DOMAINS = new Set([
+    'gmail.com',
+    'googlemail.com',
+    'yahoo.com',
+    'hotmail.com',
+    'outlook.com',
+    'live.com',
+    'icloud.com',
+    'proton.me',
+    'protonmail.com',
+]);
+
+const getIdString = (value) => {
+    if (!value) return '';
+    return (value._id || value).toString();
+};
+
+const normalizeEmailDomain = (email = '') => {
+    const domain = email.split('@')[1]?.trim().toLowerCase();
+    if (!domain || !domain.includes('.')) return null;
+    if (GENERIC_EMAIL_DOMAINS.has(domain)) return null;
+    return domain;
+};
+
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const getGroupName = (conversation) => {
+    const name = conversation?.group?.name?.trim();
+    return name || 'Nhóm chung';
+};
+
+const recencyScoreFromDate = (dateValue) => {
+    if (!dateValue) return 0;
+    const timestamp = new Date(dateValue).getTime();
+    if (Number.isNaN(timestamp)) return 0;
+    const days = (Date.now() - timestamp) / (1000 * 60 * 60 * 24);
+    if (days <= 7) return 5;
+    if (days <= 30) return 3;
+    if (days <= 90) return 1;
+    return 0;
+};
+
+const isRecentlyJoined = (dateValue) => {
+    if (!dateValue) return false;
+    const timestamp = new Date(dateValue).getTime();
+    if (Number.isNaN(timestamp)) return false;
+    return Date.now() - timestamp <= 30 * 24 * 60 * 60 * 1000;
+};
 
 async function hasReachedFriendLimit(userId) {
     const count = await Friend.countDocuments({
@@ -577,6 +628,256 @@ export async function getAllFriends(req, res) {
         return res.status(200).json({ listedFriends });
     } catch (error) {
         console.error('Get all friends error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function getFriendSuggestions(req, res) {
+    try {
+        const user = req.user;
+        const userId = user._id;
+        const currentUserId = userId.toString();
+        const limit = Math.min(
+            Math.max(Number.parseInt(req.query.limit, 10) || DEFAULT_SUGGESTION_LIMIT, 1),
+            MAX_SUGGESTION_LIMIT
+        );
+
+        const [friendships, relatedRequests, blockEntries, myGroups] = await Promise.all([
+            Friend.find({
+                $or: [
+                    { userA: userId },
+                    { userB: userId }
+                ]
+            }).select('userA userB').lean(),
+            FriendRequest.find({
+                $or: [
+                    { from: userId },
+                    { to: userId }
+                ]
+            }).select('from to').lean(),
+            BlockUser.find({
+                $or: [
+                    { from: userId },
+                    { to: userId }
+                ]
+            }).select('from to').lean(),
+            Conversation.find({
+                type: 'group',
+                disbanded: { $ne: true },
+                'participants.userId': userId
+            }).select('group.name group.avatarUrl participants.userId participants.userInfo lastMessage.createdAt updatedAt createdAt').lean()
+        ]);
+
+        const friendIds = friendships.map((friendship) => {
+            const userA = getIdString(friendship.userA);
+            const userB = getIdString(friendship.userB);
+            return userA === currentUserId ? userB : userA;
+        }).filter(Boolean);
+
+        const friendIdSet = new Set(friendIds);
+        const excludedIds = new Set([currentUserId, ...friendIds]);
+
+        relatedRequests.forEach((request) => {
+            excludedIds.add(getIdString(request.from));
+            excludedIds.add(getIdString(request.to));
+        });
+
+        blockEntries.forEach((entry) => {
+            excludedIds.add(getIdString(entry.from));
+            excludedIds.add(getIdString(entry.to));
+        });
+
+        const candidateStats = new Map();
+        const ensureCandidate = (candidateId) => {
+            const id = candidateId?.toString();
+            if (!id || excludedIds.has(id)) return null;
+            if (!candidateStats.has(id)) {
+                candidateStats.set(id, {
+                    userId: id,
+                    mutualFriendIds: new Set(),
+                    commonGroups: new Map(),
+                    recentGroupActivityScore: 0,
+                    sameEmailDomain: false,
+                    fallbackNewUser: false,
+                });
+            }
+            return candidateStats.get(id);
+        };
+
+        if (friendIds.length > 0) {
+            const secondDegreeFriendships = await Friend.find({
+                $or: [
+                    { userA: { $in: friendIds } },
+                    { userB: { $in: friendIds } }
+                ]
+            }).select('userA userB').lean();
+
+            secondDegreeFriendships.forEach((friendship) => {
+                const userA = getIdString(friendship.userA);
+                const userB = getIdString(friendship.userB);
+
+                if (friendIdSet.has(userA)) {
+                    const candidate = ensureCandidate(userB);
+                    candidate?.mutualFriendIds.add(userA);
+                }
+                if (friendIdSet.has(userB)) {
+                    const candidate = ensureCandidate(userA);
+                    candidate?.mutualFriendIds.add(userB);
+                }
+            });
+        }
+
+        myGroups.forEach((conversation) => {
+            const groupId = getIdString(conversation._id);
+            const participants = conversation.participants || [];
+            const memberCount = participants.length;
+            const groupInfo = {
+                _id: groupId,
+                name: getGroupName(conversation),
+                avatarUrl: conversation.group?.avatarUrl,
+                memberCount,
+            };
+            const activityScore = recencyScoreFromDate(conversation.lastMessage?.createdAt || conversation.updatedAt || conversation.createdAt);
+
+            participants.forEach((participant) => {
+                const participantId = getIdString(participant.userId);
+                if (participantId === currentUserId) return;
+
+                const candidate = ensureCandidate(participantId);
+                if (!candidate) return;
+
+                if (!candidate.commonGroups.has(groupId)) {
+                    candidate.commonGroups.set(groupId, groupInfo);
+                    candidate.recentGroupActivityScore += activityScore;
+                }
+            });
+        });
+
+        const currentDomain = normalizeEmailDomain(user.email);
+        if (currentDomain) {
+            const sameDomainUsers = await User.find({
+                _id: { $nin: Array.from(excludedIds) },
+                email: { $regex: new RegExp(`@${escapeRegex(currentDomain)}$`, 'i') },
+                'lock.isLocked': { $ne: true }
+            }).select('_id').sort({ createdAt: -1 }).limit(limit * 3).lean();
+
+            sameDomainUsers.forEach((sameDomainUser) => {
+                const candidate = ensureCandidate(getIdString(sameDomainUser._id));
+                if (candidate) candidate.sameEmailDomain = true;
+            });
+        }
+
+        if (candidateStats.size < limit) {
+            const fallbackUsers = await User.find({
+                _id: { $nin: Array.from(excludedIds) },
+                'lock.isLocked': { $ne: true }
+            }).select('_id').sort({ createdAt: -1 }).limit(limit * 3).lean();
+
+            fallbackUsers.forEach((fallbackUser) => {
+                const candidate = ensureCandidate(getIdString(fallbackUser._id));
+                if (candidate) candidate.fallbackNewUser = true;
+            });
+        }
+
+        const candidateIds = Array.from(candidateStats.keys());
+        if (candidateIds.length === 0) {
+            return res.status(200).json({ suggestions: [] });
+        }
+
+        const candidateUsers = await User.find({
+            _id: { $in: candidateIds },
+            'lock.isLocked': { $ne: true }
+        }).select('displayName email avatarUrl bio phone createdAt lock').lean();
+
+        const rankedCandidates = candidateUsers.map((candidateUser) => {
+            const candidateId = getIdString(candidateUser._id);
+            const stats = candidateStats.get(candidateId);
+            const commonGroups = Array.from(stats.commonGroups.values());
+            let groupStrengthScore = 0;
+
+            commonGroups.forEach((group) => {
+                if (group.memberCount <= 10) groupStrengthScore += 4;
+                else if (group.memberCount <= 25) groupStrengthScore += 2;
+                else groupStrengthScore += 1;
+            });
+
+            const recentlyJoined = isRecentlyJoined(candidateUser.createdAt);
+            const sameEmailDomain = Boolean(stats.sameEmailDomain || (
+                currentDomain && normalizeEmailDomain(candidateUser.email) === currentDomain
+            ));
+            const score =
+                stats.mutualFriendIds.size * 14 +
+                commonGroups.length * 10 +
+                groupStrengthScore +
+                Math.min(stats.recentGroupActivityScore, 8) +
+                (sameEmailDomain ? 4 : 0) +
+                (recentlyJoined ? 2 : 0) +
+                (stats.fallbackNewUser ? 1 : 0);
+
+            return {
+                user: candidateUser,
+                stats: {
+                    ...stats,
+                    sameEmailDomain,
+                    recentlyJoined,
+                    commonGroups,
+                },
+                score,
+            };
+        }).sort((left, right) => {
+            if (right.score !== left.score) return right.score - left.score;
+            if (right.stats.mutualFriendIds.size !== left.stats.mutualFriendIds.size) {
+                return right.stats.mutualFriendIds.size - left.stats.mutualFriendIds.size;
+            }
+            if (right.stats.commonGroups.length !== left.stats.commonGroups.length) {
+                return right.stats.commonGroups.length - left.stats.commonGroups.length;
+            }
+            return new Date(right.user.createdAt).getTime() - new Date(left.user.createdAt).getTime();
+        }).slice(0, limit);
+
+        const mutualFriendIds = [
+            ...new Set(rankedCandidates.flatMap(({ stats }) => Array.from(stats.mutualFriendIds)))
+        ];
+        const mutualFriendDocs = mutualFriendIds.length > 0
+            ? await User.find({ _id: { $in: mutualFriendIds } }).select('displayName avatarUrl lock').lean()
+            : [];
+        const mutualFriendById = new Map(mutualFriendDocs.map((friend) => [getIdString(friend._id), maskLockedUserDoc(friend)]));
+
+        const suggestions = rankedCandidates.map(({ user: candidateUser, stats, score }) => {
+            const safeUser = maskLockedUserDoc(candidateUser);
+            const mutualFriends = Array.from(stats.mutualFriendIds)
+                .map((friendId) => mutualFriendById.get(friendId))
+                .filter(Boolean)
+                .slice(0, 5)
+                .map((friend) => ({
+                    _id: friend._id,
+                    displayName: friend.displayName,
+                    avatarUrl: friend.avatarUrl,
+                }));
+
+            return {
+                _id: safeUser._id,
+                displayName: safeUser.displayName,
+                email: safeUser.email,
+                avatarUrl: safeUser.avatarUrl,
+                bio: safeUser.bio,
+                phone: safeUser.phone,
+                score,
+                reasons: {
+                    mutualFriendsCount: stats.mutualFriendIds.size,
+                    mutualFriends,
+                    commonGroupsCount: stats.commonGroups.length,
+                    commonGroups: stats.commonGroups.slice(0, 5),
+                    sameEmailDomain: stats.sameEmailDomain,
+                    activeInCommonGroups: stats.recentGroupActivityScore > 0,
+                    recentlyJoined: stats.recentlyJoined,
+                }
+            };
+        });
+
+        return res.status(200).json({ suggestions });
+    } catch (error) {
+        console.error('Get friend suggestions error:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 }

@@ -3,7 +3,7 @@ import {
     sendFriendRequest, acceptFriendRequest, rejectFriendRequest,
     resendFriendRequest, getFriendRequests, unfriendUser, blockUser, unblockUser,
     getAllFriends, getFriendRequestsSended, getUserBlockedList,
-    setFriendNickname, cancelFriendRequest
+    setFriendNickname, cancelFriendRequest, getFriendSuggestions
 } from '../controllers/friendController.js';
 
 const friendRouter = express.Router();
@@ -18,6 +18,7 @@ friendRouter.delete('/unfriend/:friendId', unfriendUser);
 friendRouter.post('/block/:userIdBlocked', blockUser);
 friendRouter.delete('/unblock/:userIdUnblocked', unblockUser);
 friendRouter.get('/get-friends', getAllFriends);
+friendRouter.get('/suggestions', getFriendSuggestions);
 friendRouter.get('/requests-sended', getFriendRequestsSended);
 friendRouter.get('/blocked-users', getUserBlockedList);
 friendRouter.post('/set-nickname/:friendId', setFriendNickname);

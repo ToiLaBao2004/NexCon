@@ -14,6 +14,9 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	sendingRequest: false,
 	friends: [],
 	friendsFetched: false,
+	friendSuggestions: [],
+	friendSuggestionsFetched: false,
+	fetchingFriendSuggestions: false,
 	incomingRequests: [],
 	incomingRequestsFetched: false,
 	fetchingIncomingRequests: false,
@@ -31,6 +34,9 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			sendingRequest: false,
 			friends: [],
 			friendsFetched: false,
+			friendSuggestions: [],
+			friendSuggestionsFetched: false,
+			fetchingFriendSuggestions: false,
 			incomingRequests: [],
 			incomingRequestsFetched: false,
 			sentRequests: [],
@@ -52,6 +58,22 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			set({ friends: data.listedFriends || [], friendsFetched: true });
 		} catch (error) {
 			console.error('Lỗi khi tải danh sách bạn bè:', error);
+		}
+	},
+
+	fetchFriendSuggestions: async (force = false) => {
+		try {
+			if (!force && (get().friendSuggestionsFetched || get().fetchingFriendSuggestions)) {
+				return;
+			}
+
+			set({ fetchingFriendSuggestions: true });
+			const data = await friendService.fetchFriendSuggestions();
+			set({ friendSuggestions: data.suggestions || [], friendSuggestionsFetched: true });
+		} catch (error) {
+			console.error('Lỗi khi tải gợi ý kết bạn:', error);
+		} finally {
+			set({ fetchingFriendSuggestions: false });
 		}
 	},
 
@@ -123,7 +145,8 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			set({ sendingRequest: true });
 			const data = await friendService.sendFriendRequest(email, message);
 			set((state) => ({
-				blockedUsers: state.blockedUsers.filter(u => u.email.toLowerCase() !== email.toLowerCase())
+				blockedUsers: state.blockedUsers.filter(u => u.email.toLowerCase() !== email.toLowerCase()),
+				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion.email.toLowerCase() !== email.toLowerCase())
 			}));
 
 			toast.success(data.message || 'Đã gửi lời mời kết bạn!');
@@ -143,7 +166,8 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			set({ loading: true });
 			const data = await friendService.cancelFriendRequest(requestId);
 			set((state) => ({
-				sentRequests: state.sentRequests.filter((r) => r._id !== requestId)
+				sentRequests: state.sentRequests.filter((r) => r._id !== requestId),
+				friendSuggestionsFetched: false
 			}));
 			toast.success(data.message || 'Đã hủy lời mời kết bạn.');
 		} catch (error: any) {
@@ -205,16 +229,21 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			const exists = state.incomingRequests.some((r) => r._id === request._id);
 			if (exists) {
 				return {
-					incomingRequests: state.incomingRequests.map((r) => r._id === request._id ? request : r)
+					incomingRequests: state.incomingRequests.map((r) => r._id === request._id ? request : r),
+					friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion._id !== request.from._id)
 				};
 			}
-			return { incomingRequests: [request, ...state.incomingRequests] };
+			return {
+				incomingRequests: [request, ...state.incomingRequests],
+				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion._id !== request.from._id)
+			};
 		});
 	},
 
 	removeIncomingRequest: (requestId: string) => {
 		set((state) => ({
-			incomingRequests: state.incomingRequests.filter((r) => r._id !== requestId)
+			incomingRequests: state.incomingRequests.filter((r) => r._id !== requestId),
+			friendSuggestionsFetched: false
 		}));
 	},
 
@@ -223,16 +252,21 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			const exists = state.sentRequests.some((r) => r._id === request._id);
 			if (exists) {
 				return {
-					sentRequests: state.sentRequests.map((r) => r._id === request._id ? request : r)
+					sentRequests: state.sentRequests.map((r) => r._id === request._id ? request : r),
+					friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion._id !== request.to._id)
 				};
 			}
-			return { sentRequests: [request, ...state.sentRequests] };
+			return {
+				sentRequests: [request, ...state.sentRequests],
+				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion._id !== request.to._id)
+			};
 		});
 	},
 
 	removeSentRequest: (requestId: string) => {
 		set((state) => ({
-			sentRequests: state.sentRequests.filter((r) => r._id !== requestId)
+			sentRequests: state.sentRequests.filter((r) => r._id !== requestId),
+			friendSuggestionsFetched: false
 		}));
 	},
 
@@ -240,13 +274,18 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 		set((state) => {
 			const exists = state.friends.some((f) => f.friendId === friend.friendId);
 			if (exists) return state;
-			return { friends: [friend, ...state.friends] };
+			return {
+				friends: [friend, ...state.friends],
+				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion._id !== friend.friendId)
+			};
 		});
 	},
 
 	removeFriend: (friendId) => {
 		set((state) => ({
-			friends: state.friends.filter((f) => f.friendId !== friendId)
+			friends: state.friends.filter((f) => f.friendId !== friendId),
+			friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion._id !== friendId),
+			friendSuggestionsFetched: false
 		}));
 	},
 
@@ -255,7 +294,8 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			set({ loading: true });
 			const data = await friendService.unfriendUser(friendId);
 			set((state) => ({
-				friends: state.friends.filter((f) => f.friendId !== friendId)
+				friends: state.friends.filter((f) => f.friendId !== friendId),
+				friendSuggestionsFetched: false
 			}));
 			toast.success(data.message || 'Đã hủy kết bạn.');
 		} catch (error: any) {
@@ -298,7 +338,8 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 					? state.blockedUsers.map(u => u._id === userId ? data.blockedUser : u)
 					: [...state.blockedUsers, data.blockedUser],
 				blockedUsersFetched: true,
-				friends: state.friends.filter(f => f.friendId !== userId)
+				friends: state.friends.filter(f => f.friendId !== userId),
+				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion._id !== userId)
 			}));
 			toast.success(data.message || 'Đã chặn.');
 		} catch (error: any) {
