@@ -265,7 +265,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                                             tabIndex={-1}
                                         >
-                                            {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            {showNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                         </button>
                                     </div>
                                     {errorsReset.newPassword && (
@@ -288,7 +288,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                             className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                                             tabIndex={-1}
                                         >
-                                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                            {showConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                                         </button>
                                     </div>
                                     {errorsReset.confirmNewPassword && (

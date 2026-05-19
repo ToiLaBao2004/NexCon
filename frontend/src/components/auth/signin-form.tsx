@@ -15,10 +15,14 @@ import { useState } from "react"
 import { authService } from "@/services/authService"
 import { Textarea } from "@/components/ui/textarea"
 
+const emailSchema = z.string().trim().email("Địa chỉ email không hợp lệ")
+
 const signInSchema = z.object({
-  email: z.string().trim().email("Địa chỉ email không hợp lệ"),
+  email: emailSchema,
   password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
 })
+
+const APPEAL_REASON_MIN_LENGTH = 20
 
 type SignInFormValues = z.infer<typeof signInSchema>
 
@@ -34,6 +38,8 @@ export function SigninForm({
   const [appealReason, setAppealReason] = useState("");
   const [appealSubmitting, setAppealSubmitting] = useState(false);
   const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
+  const appealReasonLength = appealReason.trim().length;
+  const isAppealReasonTooShort = appealReasonLength < APPEAL_REASON_MIN_LENGTH;
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError, clearErrors, watch } = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
@@ -66,8 +72,9 @@ export function SigninForm({
   }
 
   const handleForgotPassword = async () => {
-    const emailValue = watch("email");
-    console.log("Forgot Password clicked, email:", emailValue);
+    const emailValue = watch("email")?.trim();
+    const emailResult = emailSchema.safeParse(emailValue);
+
     if (!emailValue) {
       setError("email", {
         type: "manual",
@@ -75,11 +82,20 @@ export function SigninForm({
       });
       return;
     }
+
+    if (!emailResult.success) {
+      setError("email", {
+        type: "manual",
+        message: emailResult.error.issues[0]?.message || "Địa chỉ email không hợp lệ",
+      });
+      return;
+    }
+
     try {
-      await sendOtpResetPassword(emailValue);
+      await sendOtpResetPassword(emailResult.data);
       navigate("/otp-resetpass", {
         state: {
-          emailOTPResetPassData: { email: emailValue }
+          emailOTPResetPassData: { email: emailResult.data }
         }
       });
     } catch (error: any) {
@@ -178,7 +194,7 @@ export function SigninForm({
                   tabIndex={-1}
                   aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                 </button>
               </div>
               {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
@@ -200,11 +216,21 @@ export function SigninForm({
                     className="min-h-24 resize-none bg-background"
                     maxLength={2000}
                   />
+                  <div className="flex justify-end">
+                    <span
+                      className={cn(
+                        "text-xs",
+                        isAppealReasonTooShort ? "text-destructive" : "text-muted-foreground"
+                      )}
+                    >
+                      {Math.min(appealReasonLength, APPEAL_REASON_MIN_LENGTH)}/{APPEAL_REASON_MIN_LENGTH}
+                    </span>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     className="w-full"
-                    disabled={hasPendingAppeal || appealSubmitting || appealReason.trim().length < 20}
+                    disabled={hasPendingAppeal || appealSubmitting || isAppealReasonTooShort}
                     onClick={handleSubmitAppeal}
                   >
                     {hasPendingAppeal ? "Đang chờ xem xét" : "Gửi kháng cáo"}

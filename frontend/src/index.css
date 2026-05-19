@@ -252,6 +252,7 @@
 
   .beautiful-scrollbar::-webkit-scrollbar {
     width: 4px;
+    height: 4px;
 }
 
 .beautiful-scrollbar::-webkit-scrollbar-track {
