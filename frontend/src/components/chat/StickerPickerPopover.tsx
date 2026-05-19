@@ -71,7 +71,7 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
           </div>
 
           <div className="p-2 bg-muted/30 border-t border-border/40">
-            <div className="flex gap-2 overflow-x-auto no-scrollbar py-1 px-1">
+            <div className="flex gap-2 overflow-x-auto beautiful-scrollbar py-1 px-1">
               {STICKER_SETS.map((set) => (
                 <button
                   key={set.id}
