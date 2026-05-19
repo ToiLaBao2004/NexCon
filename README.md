@@ -38,15 +38,15 @@ Dự án được thiết kế theo hướng production-ready với:
 
 NexCon hướng tới việc xây dựng một nền tảng giao tiếp hiện đại, nơi người dùng có thể:
 
-| Mục tiêu | Mô tả |
-| --- | --- |
-| Kết nối người dùng | Tìm kiếm, kết bạn, chặn người dùng và quản lý mối quan hệ |
+| Mục tiêu            | Mô tả                                                           |
+| ------------------- | --------------------------------------------------------------- |
+| Kết nối người dùng  | Tìm kiếm, kết bạn, chặn người dùng và quản lý mối quan hệ       |
 | Trò chuyện realtime | Nhắn tin cá nhân, nhóm, sticker, media, reaction, ghim tin nhắn |
-| Gọi trực tuyến | Audio/video call cá nhân và nhóm thông qua LiveKit |
-| Quản lý lịch nhắc | Tạo reminder cá nhân/nhóm, lịch họp, thông báo nhắc hẹn |
-| Bảo mật tài khoản | JWT, refresh token, Google OAuth, OTP, quản lý phiên đăng nhập |
-| Quản trị hệ thống | Admin dashboard, report, lock appeal, moderation, audit log |
-| Kiểm duyệt nội dung | AI moderation cho text/link/image và lưu ngữ cảnh training |
+| Gọi trực tuyến      | Audio/video call cá nhân và nhóm thông qua LiveKit              |
+| Quản lý lịch nhắc   | Tạo reminder cá nhân/nhóm, lịch họp, thông báo nhắc hẹn         |
+| Bảo mật tài khoản   | JWT, refresh token, Google OAuth, OTP, quản lý phiên đăng nhập  |
+| Quản trị hệ thống   | Admin dashboard, report, lock appeal, moderation, audit log     |
+| Kiểm duyệt nội dung | AI moderation cho text/link/image và lưu ngữ cảnh training      |
 
 ---
 
@@ -149,20 +149,20 @@ Vai trò chính:
 
 ## 🧰 Công nghệ sử dụng
 
-| Layer | Công nghệ |
-| --- | --- |
-| Frontend | React 19, Vite 7, TypeScript, Tailwind CSS, Radix UI, Zustand |
-| Realtime | Socket.IO, LiveKit |
-| Mobile bridge | Capacitor |
-| Backend | Node.js, Express 5, Mongoose, JWT, Passport Google OAuth |
-| Database | MongoDB Atlas |
-| Queue/Cache | Redis, BullMQ |
-| Media Storage | Cloudinary |
-| Notification | Firebase Admin, Web Push |
-| AI/Moderation | Google Gemini, AssemblyAI |
-| Testing | Node Test Runner, Vitest |
-| CI/CD | GitHub Actions, Vercel, Railway |
-| Container | Docker, Docker Compose, Nginx |
+| Layer         | Công nghệ                                                     |
+| ------------- | ------------------------------------------------------------- |
+| Frontend      | React 19, Vite 7, TypeScript, Tailwind CSS, Radix UI, Zustand |
+| Realtime      | Socket.IO, LiveKit                                            |
+| Mobile bridge | Capacitor                                                     |
+| Backend       | Node.js, Express 5, Mongoose, JWT, Passport Google OAuth      |
+| Database      | MongoDB Atlas                                                 |
+| Queue/Cache   | Redis, BullMQ                                                 |
+| Media Storage | Cloudinary                                                    |
+| Notification  | Firebase Admin, Web Push                                      |
+| AI/Moderation | Google Gemini, AssemblyAI                                     |
+| Testing       | Node Test Runner, Vitest                                      |
+| CI/CD         | GitHub Actions, Vercel, Railway                               |
+| Container     | Docker, Docker Compose, Nginx                                 |
 
 ---
 
@@ -218,13 +218,13 @@ NexCon/
 
 ### Yêu cầu môi trường
 
-| Công cụ | Phiên bản khuyến nghị |
-| --- | --- |
-| Node.js | 22.x |
-| npm | 10.x hoặc mới hơn |
-| Docker | Tuỳ chọn |
+| Công cụ | Phiên bản khuyến nghị            |
+| ------- | -------------------------------- |
+| Node.js | 22.x                             |
+| npm     | 10.x hoặc mới hơn                |
+| Docker  | Tuỳ chọn                         |
 | MongoDB | MongoDB Atlas hoặc local MongoDB |
-| Redis | Local Redis hoặc Docker Redis |
+| Redis   | Local Redis hoặc Docker Redis    |
 
 ### 1. Clone repository
 
@@ -406,11 +406,11 @@ Workflow chạy khi:
 
 ### Các job CI
 
-| Job | Lệnh chính | Mục đích |
-| --- | --- | --- |
-| Backend | `npm ci`, `npm test` | Cài backend dependencies và chạy test |
-| Frontend | `npm ci --legacy-peer-deps`, `npm test`, `npm run build` | Test và build frontend |
-| Frontend lint | `npm run lint` | Báo cáo lint, chưa chặn merge |
+| Job           | Lệnh chính                                               | Mục đích                              |
+| ------------- | -------------------------------------------------------- | ------------------------------------- |
+| Backend       | `npm ci`, `npm test`                                     | Cài backend dependencies và chạy test |
+| Frontend      | `npm ci --legacy-peer-deps`, `npm test`, `npm run build` | Test và build frontend                |
+| Frontend lint | `npm run lint`                                           | Báo cáo lint, chưa chặn merge         |
 
 ### Quy trình chuẩn
 
@@ -438,12 +438,12 @@ docs/ci-cd-quy-trinh.md
 
 Thiết lập Vercel:
 
-| Cấu hình | Giá trị |
-| --- | --- |
-| Root Directory | `frontend` |
-| Build Command | `npm run build` |
-| Output Directory | `dist` |
-| Install Command | `npm ci --legacy-peer-deps` |
+| Cấu hình         | Giá trị                     |
+| ---------------- | --------------------------- |
+| Root Directory   | `frontend`                  |
+| Build Command    | `npm run build`             |
+| Output Directory | `dist`                      |
+| Install Command  | `npm ci --legacy-peer-deps` |
 
 Environment variables cần cấu hình trên Vercel:
 
@@ -458,11 +458,11 @@ VITE_VAPID_PUBLIC_KEY=
 
 Thiết lập Railway:
 
-| Cấu hình | Giá trị |
-| --- | --- |
-| Root Directory | `backend` |
-| Start Command | `npm start` |
-| Runtime | Node.js |
+| Cấu hình       | Giá trị     |
+| -------------- | ----------- |
+| Root Directory | `backend`   |
+| Start Command  | `npm start` |
+| Runtime        | Node.js     |
 
 Environment variables cần cấu hình trên Railway:
 
@@ -485,17 +485,17 @@ LIVEKIT_API_SECRET=
 
 ## 🗄️ Database và service liên quan
 
-| Service | Vai trò |
-| --- | --- |
-| MongoDB Atlas | Lưu user, session, conversation, message, notification, reminder, report |
-| Redis | Cache/queue cho worker, reminder, cleanup và realtime-related background job |
-| Cloudinary | Lưu media, ảnh, file upload |
-| LiveKit | Audio/video room và meeting realtime |
-| Firebase Admin | Push notification / FCM |
-| Web Push | Push notification trên web |
-| Gemini AI | Kiểm duyệt text/link/image |
-| AssemblyAI | Transcribe audio |
-| Brevo/Email Provider | Gửi email OTP, thông báo và appeal |
+| Service              | Vai trò                                                                      |
+| -------------------- | ---------------------------------------------------------------------------- |
+| MongoDB Atlas        | Lưu user, session, conversation, message, notification, reminder, report     |
+| Redis                | Cache/queue cho worker, reminder, cleanup và realtime-related background job |
+| Cloudinary           | Lưu media, ảnh, file upload                                                  |
+| LiveKit              | Audio/video room và meeting realtime                                         |
+| Firebase Admin       | Push notification / FCM                                                      |
+| Web Push             | Push notification trên web                                                   |
+| Gemini AI            | Kiểm duyệt text/link/image                                                   |
+| AssemblyAI           | Transcribe audio                                                             |
+| Brevo/Email Provider | Gửi email OTP, thông báo và appeal                                           |
 
 ---
 
@@ -503,37 +503,37 @@ LIVEKIT_API_SECRET=
 
 Backend expose API với prefix `/api`.
 
-| Module | Prefix | Mô tả |
-| --- | --- | --- |
-| Auth | `/api/auth` | Đăng ký, đăng nhập, Google OAuth, refresh token, session |
-| OTP | `/api/otp` | OTP tạo tài khoản và đặt lại mật khẩu |
-| Push | `/api/push` | Đăng ký push subscription |
-| Admin | `/api/admin` | Dashboard admin, report review, user management |
-| Users | `/api/users` | Hồ sơ người dùng, cập nhật thông tin |
-| Friends | `/api/friends` | Kết bạn, lời mời, danh sách bạn bè, block |
-| Messages | `/api/messages` | Gửi, đọc, tìm kiếm, reaction, media message |
-| Conversations | `/api/conversations` | Quản lý hội thoại cá nhân và nhóm |
-| Notifications | `/api/notifications` | Thông báo trong ứng dụng |
-| LiveKit | `/api/livekit` | Token và cấu hình LiveKit |
-| Meetings | `/api/meetings` | Tạo, join, kết thúc meeting |
-| Reminders | `/api/reminders` | Reminder cá nhân/nhóm |
-| Reports | `/api/reports` | Report nội dung/người dùng và lịch sử report |
+| Module        | Prefix               | Mô tả                                                    |
+| ------------- | -------------------- | -------------------------------------------------------- |
+| Auth          | `/api/auth`          | Đăng ký, đăng nhập, Google OAuth, refresh token, session |
+| OTP           | `/api/otp`           | OTP tạo tài khoản và đặt lại mật khẩu                    |
+| Push          | `/api/push`          | Đăng ký push subscription                                |
+| Admin         | `/api/admin`         | Dashboard admin, report review, user management          |
+| Users         | `/api/users`         | Hồ sơ người dùng, cập nhật thông tin                     |
+| Friends       | `/api/friends`       | Kết bạn, lời mời, danh sách bạn bè, block                |
+| Messages      | `/api/messages`      | Gửi, đọc, tìm kiếm, reaction, media message              |
+| Conversations | `/api/conversations` | Quản lý hội thoại cá nhân và nhóm                        |
+| Notifications | `/api/notifications` | Thông báo trong ứng dụng                                 |
+| LiveKit       | `/api/livekit`       | Token và cấu hình LiveKit                                |
+| Meetings      | `/api/meetings`      | Tạo, join, kết thúc meeting                              |
+| Reminders     | `/api/reminders`     | Reminder cá nhân/nhóm                                    |
+| Reports       | `/api/reports`       | Report nội dung/người dùng và lịch sử report             |
 
 ### Socket modules
 
-| Module | Vai trò |
-| --- | --- |
-| `socket/index.js` | Khởi tạo Socket.IO server |
-| `socket/socketGateway.js` | Điều phối realtime events |
-| `socket/callHandler.js` | Call cá nhân |
-| `socket/groupCallHandler.js` | Group call |
+| Module                       | Vai trò                   |
+| ---------------------------- | ------------------------- |
+| `socket/index.js`            | Khởi tạo Socket.IO server |
+| `socket/socketGateway.js`    | Điều phối realtime events |
+| `socket/callHandler.js`      | Call cá nhân              |
+| `socket/groupCallHandler.js` | Group call                |
 
 ### Background workers
 
-| Worker | Script |
-| --- | --- |
-| Reminder worker | `backend/src/workers/reminderWorker.js` |
-| Group cleanup worker | `npm run worker:group-cleanup` |
+| Worker                            | Script                                      |
+| --------------------------------- | ------------------------------------------- |
+| Reminder worker                   | `backend/src/workers/reminderWorker.js`     |
+| Group cleanup worker              | `npm run worker:group-cleanup`              |
 | Conversation clear cleanup worker | `npm run worker:conversation-clear-cleanup` |
 
 ---
@@ -542,12 +542,12 @@ Backend expose API với prefix `/api`.
 
 > Thêm screenshot thật vào thư mục `docs/assets/` khi có bản demo ổn định.
 
-| Màn hình | Preview |
-| --- | --- |
-| Sign in / Sign up | `docs/assets/demo-auth.png` |
-| Chat realtime | `docs/assets/demo-chat.png` |
-| Group call | `docs/assets/demo-call.png` |
-| Admin dashboard | `docs/assets/demo-admin.png` |
+| Màn hình          | Preview                      |
+| ----------------- | ---------------------------- |
+| Sign in / Sign up | `docs/assets/demo-auth.png`  |
+| Chat realtime     | `docs/assets/demo-chat.png`  |
+| Group call        | `docs/assets/demo-call.png`  |
+| Admin dashboard   | `docs/assets/demo-admin.png` |
 
 ```md
 ![NexCon Chat Demo](./docs/assets/demo-chat.png)
@@ -581,13 +581,13 @@ Backend expose API với prefix `/api`.
 
 ## 👥 Nhóm phát triển
 
-| Vai trò | Thành viên | Ghi chú |
-| --- | --- | --- |
-| Project Owner | ToiLaBao2004 | GitHub maintainer |
-| Frontend Developer | Cập nhật sau | React/Vite UI |
-| Backend Developer | Cập nhật sau | Express/Socket.IO/API |
-| DevOps/CI-CD | Cập nhật sau | Railway, Vercel, GitHub Actions |
-| QA/Tester | Cập nhật sau | Test plan, regression test |
+| Vai trò            | Thành viên               | Ghi chú                         |
+| ------------------ | ------------------------ | ------------------------------- |
+| Project Owner      | ToiLaBao2004             | GitHub maintainer               |
+| Frontend Developer | ToiLaBao2004, Tnthien204 | React/Vite UI                   |
+| Backend Developer  | ToiLaBao2004, Tnthien204 | Express/Socket.IO/API           |
+| DevOps/CI-CD       | ToiLaBao2004             | Railway, Vercel, GitHub Actions |
+| QA/Tester          | Tnthien204               | Test plan, regression test      |
 
 ---
 
@@ -597,12 +597,6 @@ Backend expose API với prefix `/api`.
 - [Frontend README](./frontend/README.md)
 - [GitHub Actions workflow](./.github/workflows/ci.yml)
 - [Docker Compose](./docker-compose.yml)
-
----
-
-## 📄 License
-
-Dự án hiện đang dùng license khai báo trong backend package là `ISC`. Nếu repository cần license chính thức ở cấp root, hãy bổ sung file `LICENSE`.
 
 ---
 
