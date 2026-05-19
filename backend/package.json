@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
+    "test": "node --test",
     "start": "node src/server.js",
     "worker:group-cleanup": "node src/workers/groupCleanupWorkerRunner.js",
     "worker:conversation-clear-cleanup": "node src/workers/conversationClearCleanupWorkerRunner.js"
