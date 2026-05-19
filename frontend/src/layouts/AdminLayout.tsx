@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router";
 import {
+  Activity,
   FileWarning,
   LayoutDashboard,
   LogOut,
@@ -13,6 +14,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 
 const navItems = [
   { to: "/admin/overview", label: "Tổng quan", icon: LayoutDashboard },
+  { to: "/admin/observability", label: "Giám sát", icon: Activity },
   { to: "/admin/reports/messages", label: "Báo cáo tin nhắn", icon: FileWarning },
   { to: "/admin/reports/users", label: "Báo cáo người dùng", icon: UserRoundX },
   { to: "/admin/appeals", label: "Kháng cáo khóa", icon: UnlockKeyhole },

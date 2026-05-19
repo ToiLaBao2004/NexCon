@@ -25,6 +25,7 @@ import { reloadPendingConversationClearCleanups, startConversationClearCleanupWo
 import { apiLimiter } from './middlewares/rateLimiters.js';
 import { auditLogMiddleware } from './middlewares/auditLogMiddleware.js';
 import { requireUser } from './middlewares/roleMiddleware.js';
+import { startSystemMetricsSampler } from './services/systemMetricsService.js';
 
 const PORT = process.env.PORT;
 
@@ -72,6 +73,7 @@ app.use('/api/reports', requireUser, reportRouter);
 
 connectDB().then(() => {
     try {
+        startSystemMetricsSampler();
         startReminderWorker();
         if (process.env.ENABLE_INLINE_GROUP_CLEANUP_WORKER !== 'false') {
             startGroupCleanupWorker();
@@ -89,5 +91,4 @@ connectDB().then(() => {
         console.log(`Server is running on port ${PORT}`);
     });
 });
-
 

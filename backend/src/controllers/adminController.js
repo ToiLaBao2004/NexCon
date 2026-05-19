@@ -18,11 +18,22 @@ import {
     shouldAutoConfirmModeration,
 } from '../services/moderation/messageModerationReviewService.js';
 import { recordConfirmedViolationContext } from '../services/moderation/violationTrainingService.js';
+import {
+    getRequestTrafficBuckets,
+    getSystemMetricsSnapshot,
+} from '../services/systemMetricsService.js';
 import { io, isUserOnline } from '../socket/index.js';
 import { decryptMessagePayload } from '../utils/messageCrypto.js';
 
 const COMPLETED_REPORT_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const COMPLETED_APPEAL_TTL_MS = 180 * 24 * 60 * 60 * 1000;
+const OBSERVABILITY_RANGES = {
+    '15m': { minutes: 15, bucketMs: 60 * 1000 },
+    '1h': { minutes: 60, bucketMs: 5 * 60 * 1000 },
+    '6h': { minutes: 6 * 60, bucketMs: 15 * 60 * 1000 },
+    '24h': { minutes: 24 * 60, bucketMs: 60 * 60 * 1000 },
+    '7d': { minutes: 7 * 24 * 60, bucketMs: 6 * 60 * 60 * 1000 },
+};
 
 function requireObjectId(value, name) {
     if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -36,6 +47,64 @@ function parsePagination(query, defaultLimit = 20, maxLimit = 100) {
     const page = Math.max(1, Number.parseInt(query.page || '1', 10) || 1);
     const limit = Math.min(maxLimit, Math.max(1, Number.parseInt(query.limit || `${defaultLimit}`, 10) || defaultLimit));
     return { page, limit, skip: (page - 1) * limit };
+}
+
+function parseObservabilityRange(value) {
+    const key = Object.keys(OBSERVABILITY_RANGES).includes(value) ? value : '24h';
+    return { key, ...OBSERVABILITY_RANGES[key] };
+}
+
+function makeTimeBuckets(startMs, endMs, bucketMs) {
+    const bucketCount = Math.floor((endMs - startMs) / bucketMs) + 1;
+
+    return Array.from({ length: bucketCount }, (_, index) => ({
+        timestamp: new Date(startMs + index * bucketMs).toISOString(),
+        requests: 0,
+        errors: 0,
+        clientErrors: 0,
+        avgDurationMs: 0,
+        maxDurationMs: 0,
+        messages: 0,
+        newUsers: 0,
+        reports: 0,
+        egressBytes: 0,
+    }));
+}
+
+function bucketExpression(startMs, bucketMs) {
+    return {
+        $subtract: [
+            { $toLong: '$createdAt' },
+            {
+                $mod: [
+                    { $subtract: [{ $toLong: '$createdAt' }, startMs] },
+                    bucketMs,
+                ],
+            },
+        ],
+    };
+}
+
+function applyCountRows(series, rows, fieldName, startMs, bucketMs) {
+    rows.forEach((row) => {
+        const index = Math.floor((Number(row._id) - startMs) / bucketMs);
+        if (index < 0 || index >= series.length) return;
+        series[index][fieldName] = row.count || 0;
+    });
+}
+
+function formatRuntimeSample(sample) {
+    if (!sample) return null;
+
+    return {
+        ...sample,
+        cpuVCpu: Number(sample.cpuVCpu || 0),
+        memoryRssMb: Number(sample.memoryRssMb || 0),
+        heapUsedMb: Number(sample.heapUsedMb || 0),
+        heapTotalMb: Number(sample.heapTotalMb || 0),
+        externalMb: Number(sample.externalMb || 0),
+        uptimeSeconds: Number(sample.uptimeSeconds || 0),
+    };
 }
 
 function escapeRegex(value) {
@@ -356,6 +425,171 @@ export async function getAdminStats(req, res) {
         });
     } catch (error) {
         return handleAdminError(res, error, 'Error fetching admin stats:');
+    }
+}
+
+export async function getAdminObservability(req, res) {
+    try {
+        const range = parseObservabilityRange(String(req.query.range || '24h'));
+        const now = new Date();
+        const endMs = now.getTime();
+        const startMs = endMs - range.minutes * 60 * 1000;
+        const start = new Date(startMs);
+        const bucket = bucketExpression(startMs, range.bucketMs);
+        const series = makeTimeBuckets(startMs, endMs, range.bucketMs);
+
+        const [
+            auditRows,
+            messageRows,
+            userRows,
+            reportRows,
+            activeUsers,
+            totalUsers,
+            totalConversations,
+            totalMessages,
+            openReports,
+            pendingAppeals,
+            recentErrors,
+        ] = await Promise.all([
+            AuditLog.aggregate([
+                { $match: { createdAt: { $gte: start, $lte: now } } },
+                {
+                    $project: {
+                        bucket,
+                        statusCode: 1,
+                        durationMs: { $ifNull: ['$durationMs', 0] },
+                    },
+                },
+                {
+                    $group: {
+                        _id: '$bucket',
+                        requests: { $sum: 1 },
+                        errors: {
+                            $sum: { $cond: [{ $gte: ['$statusCode', 500] }, 1, 0] },
+                        },
+                        clientErrors: {
+                            $sum: {
+                                $cond: [
+                                    {
+                                        $and: [
+                                            { $gte: ['$statusCode', 400] },
+                                            { $lt: ['$statusCode', 500] },
+                                        ],
+                                    },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+                        durationTotalMs: { $sum: '$durationMs' },
+                        maxDurationMs: { $max: '$durationMs' },
+                    },
+                },
+            ]),
+            Message.aggregate([
+                { $match: { createdAt: { $gte: start, $lte: now } } },
+                { $project: { bucket } },
+                { $group: { _id: '$bucket', count: { $sum: 1 } } },
+            ]),
+            User.aggregate([
+                { $match: { ...userRoleFilter(), createdAt: { $gte: start, $lte: now } } },
+                { $project: { bucket } },
+                { $group: { _id: '$bucket', count: { $sum: 1 } } },
+            ]),
+            Report.aggregate([
+                { $match: { createdAt: { $gte: start, $lte: now } } },
+                { $project: { bucket } },
+                { $group: { _id: '$bucket', count: { $sum: 1 } } },
+            ]),
+            AuditLog.distinct('userId', { createdAt: { $gte: start, $lte: now } }),
+            User.countDocuments(userRoleFilter()),
+            Conversation.countDocuments(),
+            Message.countDocuments(),
+            Report.countDocuments({ status: { $in: ['pending', 'reviewing'] } }),
+            LockAppeal.countDocuments({ status: 'pending' }),
+            AuditLog.find({
+                createdAt: { $gte: start, $lte: now },
+                statusCode: { $gte: 400 },
+            })
+                .select('method path statusCode durationMs createdAt')
+                .sort({ createdAt: -1 })
+                .limit(12)
+                .lean(),
+        ]);
+
+        auditRows.forEach((row) => {
+            const index = Math.floor((Number(row._id) - startMs) / range.bucketMs);
+            if (index < 0 || index >= series.length) return;
+
+            const requests = row.requests || 0;
+            series[index].requests = requests;
+            series[index].errors = row.errors || 0;
+            series[index].clientErrors = row.clientErrors || 0;
+            series[index].avgDurationMs = requests > 0
+                ? Math.round((row.durationTotalMs || 0) / requests)
+                : 0;
+            series[index].maxDurationMs = Math.round(row.maxDurationMs || 0);
+        });
+
+        applyCountRows(series, messageRows, 'messages', startMs, range.bucketMs);
+        applyCountRows(series, userRows, 'newUsers', startMs, range.bucketMs);
+        applyCountRows(series, reportRows, 'reports', startMs, range.bucketMs);
+
+        const trafficRows = getRequestTrafficBuckets({
+            since: start,
+            bucketMs: range.bucketMs,
+            bucketCount: series.length,
+        });
+
+        trafficRows.forEach((row, index) => {
+            if (!series[index]) return;
+            series[index].egressBytes = row.egressBytes || 0;
+        });
+
+        const runtime = getSystemMetricsSnapshot({ since: start });
+        const requestTotal = series.reduce((sum, item) => sum + item.requests, 0);
+        const errorTotal = series.reduce((sum, item) => sum + item.errors, 0);
+        const clientErrorTotal = series.reduce((sum, item) => sum + item.clientErrors, 0);
+        const durationTotal = auditRows.reduce((sum, row) => sum + (row.durationTotalMs || 0), 0);
+        const messageTotal = series.reduce((sum, item) => sum + item.messages, 0);
+        const newUserTotal = series.reduce((sum, item) => sum + item.newUsers, 0);
+        const reportTotal = series.reduce((sum, item) => sum + item.reports, 0);
+        const egressTotal = series.reduce((sum, item) => sum + item.egressBytes, 0);
+
+        return res.status(200).json({
+            range: {
+                key: range.key,
+                minutes: range.minutes,
+                bucketMs: range.bucketMs,
+                start: start.toISOString(),
+                end: now.toISOString(),
+            },
+            summary: {
+                requests: requestTotal,
+                errors: errorTotal,
+                clientErrors: clientErrorTotal,
+                errorRate: requestTotal > 0 ? Math.round((errorTotal / requestTotal) * 10000) / 100 : 0,
+                avgLatencyMs: requestTotal > 0 ? Math.round(durationTotal / requestTotal) : 0,
+                messages: messageTotal,
+                newUsers: newUserTotal,
+                reports: reportTotal,
+                activeUsers: activeUsers.length,
+                egressBytes: egressTotal,
+                totals: {
+                    users: totalUsers,
+                    conversations: totalConversations,
+                    messages: totalMessages,
+                    openReports,
+                    pendingAppeals,
+                },
+                runtime: formatRuntimeSample(runtime.current),
+            },
+            series,
+            runtimeSamples: runtime.samples.map(formatRuntimeSample),
+            recentErrors,
+        });
+    } catch (error) {
+        return handleAdminError(res, error, 'Error fetching admin observability:');
     }
 }
 

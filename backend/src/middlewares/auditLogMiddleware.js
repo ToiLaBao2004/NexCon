@@ -1,4 +1,5 @@
 import AuditLog from '../models/auditLogModel.js';
+import { recordApiRequest } from '../services/systemMetricsService.js';
 
 function getClientIp(req) {
     const raw = req.headers['x-forwarded-for'] || req.ip || req.socket?.remoteAddress || '';
@@ -29,13 +30,22 @@ export function auditLogMiddleware(req, res, next) {
     const startedAt = Date.now();
 
     res.on('finish', () => {
+        const durationMs = Date.now() - startedAt;
+        const contentLength = Number(res.getHeader('content-length')) || 0;
+
+        recordApiRequest({
+            statusCode: res.statusCode,
+            durationMs,
+            bytes: contentLength,
+        });
+
         AuditLog.create({
             userId: req.user._id,
             role: req.user.role || 'user',
             method: req.method,
             path: req.originalUrl || req.url,
             statusCode: res.statusCode,
-            durationMs: Date.now() - startedAt,
+            durationMs,
             ip: getClientIp(req),
             userAgent: req.headers['user-agent'] || '',
             query: sanitizeQuery(req.query),
