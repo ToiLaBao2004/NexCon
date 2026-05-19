@@ -2,6 +2,7 @@ import express from 'express';
 import {
     addAdminUserViolation,
     aiReviewMessageReports,
+    getAdminObservability,
     getAdminStats,
     getAdminUserAssets,
     getAdminUserAuditLogs,
@@ -25,6 +26,7 @@ const adminRouter = express.Router();
 adminRouter.use(requireAdmin);
 
 adminRouter.get('/stats', getAdminStats);
+adminRouter.get('/observability', getAdminObservability);
 adminRouter.get('/users', listAdminUsers);
 adminRouter.get('/users/:userId/profile', getAdminUserProfile);
 adminRouter.get('/users/:userId/audit-logs', getAdminUserAuditLogs);

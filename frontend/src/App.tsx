@@ -8,6 +8,7 @@ import NotificationPage from "./pages/NotificationPage";
 import ReportHistoryPage from "./pages/ReportHistoryPage";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminOverviewPage from "./pages/AdminOverviewPage";
+import AdminObservabilityPage from "./pages/AdminObservabilityPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminAppealsPage from "./pages/AdminAppealsPage";
 import SignInPage from "./pages/SignInPage";
@@ -250,6 +251,7 @@ function App() {
               <Route element={<AdminLayout />}>
                 <Route path="/admin" element={<Navigate to="/admin/overview" replace />} />
                 <Route path="/admin/overview" element={<AdminOverviewPage />} />
+                <Route path="/admin/observability" element={<AdminObservabilityPage />} />
                 <Route path="/admin/reports/messages" element={<AdminReportsPage targetType="message" />} />
                 <Route path="/admin/reports/users" element={<AdminReportsPage targetType="user" />} />
                 <Route path="/admin/appeals" element={<AdminAppealsPage />} />

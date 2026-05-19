@@ -46,6 +46,64 @@ export interface AdminStats {
   pendingAppeals: number;
 }
 
+export type AdminObservabilityRangeKey = "15m" | "1h" | "6h" | "24h" | "7d";
+
+export interface AdminObservabilityPoint {
+  timestamp: string;
+  requests: number;
+  errors: number;
+  clientErrors: number;
+  avgDurationMs: number;
+  maxDurationMs: number;
+  messages: number;
+  newUsers: number;
+  reports: number;
+  egressBytes: number;
+}
+
+export interface AdminRuntimeSample {
+  timestamp: string;
+  cpuVCpu: number;
+  memoryRssMb: number;
+  heapUsedMb: number;
+  heapTotalMb: number;
+  externalMb: number;
+  uptimeSeconds: number;
+}
+
+export interface AdminObservabilityData {
+  range: {
+    key: AdminObservabilityRangeKey;
+    minutes: number;
+    bucketMs: number;
+    start: string;
+    end: string;
+  };
+  summary: {
+    requests: number;
+    errors: number;
+    clientErrors: number;
+    errorRate: number;
+    avgLatencyMs: number;
+    messages: number;
+    newUsers: number;
+    reports: number;
+    activeUsers: number;
+    egressBytes: number;
+    totals: {
+      users: number;
+      conversations: number;
+      messages: number;
+      openReports: number;
+      pendingAppeals: number;
+    };
+    runtime: AdminRuntimeSample | null;
+  };
+  series: AdminObservabilityPoint[];
+  runtimeSamples: AdminRuntimeSample[];
+  recentErrors: AdminAuditLog[];
+}
+
 export interface AdminAuditLog {
   _id: string;
   method: string;
@@ -167,6 +225,12 @@ export const adminService = {
   async getStats() {
     const res = await api.get("/admin/stats");
     return res.data as { stats: AdminStats };
+  },
+
+  async getObservability(range: AdminObservabilityRangeKey = "24h") {
+    const query = new URLSearchParams({ range });
+    const res = await api.get(`/admin/observability?${query.toString()}`);
+    return res.data as AdminObservabilityData;
   },
 
   async listUsers(params: { search?: string; page?: number; limit?: number } = {}) {
