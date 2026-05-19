@@ -22,6 +22,8 @@ const signInSchema = z.object({
   password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
 })
 
+const APPEAL_REASON_MIN_LENGTH = 20
+
 type SignInFormValues = z.infer<typeof signInSchema>
 
 export function SigninForm({
@@ -36,6 +38,8 @@ export function SigninForm({
   const [appealReason, setAppealReason] = useState("");
   const [appealSubmitting, setAppealSubmitting] = useState(false);
   const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
+  const appealReasonLength = appealReason.trim().length;
+  const isAppealReasonTooShort = appealReasonLength < APPEAL_REASON_MIN_LENGTH;
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, setError, clearErrors, watch } = useForm<SignInFormValues>({
     resolver: zodResolver(signInSchema),
@@ -212,11 +216,21 @@ export function SigninForm({
                     className="min-h-24 resize-none bg-background"
                     maxLength={2000}
                   />
+                  <div className="flex justify-end">
+                    <span
+                      className={cn(
+                        "text-xs",
+                        isAppealReasonTooShort ? "text-destructive" : "text-muted-foreground"
+                      )}
+                    >
+                      {Math.min(appealReasonLength, APPEAL_REASON_MIN_LENGTH)}/{APPEAL_REASON_MIN_LENGTH}
+                    </span>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
                     className="w-full"
-                    disabled={hasPendingAppeal || appealSubmitting || appealReason.trim().length < 20}
+                    disabled={hasPendingAppeal || appealSubmitting || isAppealReasonTooShort}
                     onClick={handleSubmitAppeal}
                   >
                     {hasPendingAppeal ? "Đang chờ xem xét" : "Gửi kháng cáo"}
