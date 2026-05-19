@@ -98,7 +98,7 @@ export function ResetPassForm({
                   onClick={() => setShowNew(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showNew ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
               </div>
               {errors.newPassword && (
@@ -124,7 +124,7 @@ export function ResetPassForm({
                   onClick={() => setShowConfirm(v => !v)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
-                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showConfirm ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
               </div>
               {errors.confirmNewPassword && (

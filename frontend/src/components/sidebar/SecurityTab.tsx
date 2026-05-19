@@ -189,7 +189,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                                 onClick={() => setShowCurrentPassword(prev => !prev)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                             >
-                                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                {showCurrentPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                             </button>
                         </div>
                         {errors.currentPassword && (
@@ -213,7 +213,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                                 onClick={() => setShowNewPassword(prev => !prev)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                             >
-                                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                {showNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                             </button>
                         </div>
                         {errors.newPassword && (
@@ -237,7 +237,7 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
                                 onClick={() => setShowConfirmPassword(prev => !prev)}
                                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                             >
-                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                {showConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                             </button>
                         </div>
                         {errors.confirmNewPassword && (
