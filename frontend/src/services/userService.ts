@@ -22,21 +22,6 @@ export const userService = {
         return response.data;
     },
 
-    updateCover: async (file: File, onProgress?: (percent: number) => void) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        const response = await api.post('/users/update-cover', formData, {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-            onUploadProgress: (event) => {
-                if (!onProgress || !event.total) return;
-                onProgress(Math.round((event.loaded * 100) / event.total));
-            },
-        });
-        return response.data;
-    },
-
     fetchMe: async () => {
         const response = await api.get('/users/me');
         return response.data.user;

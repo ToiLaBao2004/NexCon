@@ -23,12 +23,6 @@ const userSchema = new mongoose.Schema({
     avatarId: {
         type: String // cloudinary public id
     },
-    coverUrl: {
-        type: String
-    },
-    coverId: {
-        type: String
-    },
     bio: {
         type: String,
         maxlength: 500

@@ -65,8 +65,6 @@ export default interface AuthState {
 
   updateAvatar: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
 
-  updateCover: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
-
   getSessions: () => Promise<void>;
 
   signOutBySession: (sessionId: string) => Promise<void>;
