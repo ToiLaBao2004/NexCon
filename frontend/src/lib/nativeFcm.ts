@@ -1,16 +1,28 @@
 import type { Notification } from '@capacitor-firebase/messaging';
+import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import type { PluginListenerHandle } from '@capacitor/core';
 import api from '@/lib/axios';
+import { rememberNativeCallAction, type NativeCallAction } from '@/lib/nativeCallAction';
 
-type NativeFcmOpenHandler = (path: string) => void;
+type NativeOpenSource = 'notification' | 'url';
+
+export type NativeFcmOpenPayload = Omit<NativeCallAction, 'action'> & {
+  path: string;
+  source: NativeOpenSource;
+  action: NativeCallAction['action'] | '';
+};
+
+type NativeFcmOpenHandler = (payload: NativeFcmOpenPayload) => void;
 type FirebaseMessagingModule = typeof import('@capacitor-firebase/messaging');
 
 let tokenRefreshListener: PluginListenerHandle | null = null;
 let notificationActionListener: PluginListenerHandle | null = null;
+let appUrlOpenListener: PluginListenerHandle | null = null;
 let notificationOpenHandler: NativeFcmOpenHandler | null = null;
 let lastSavedToken: string | null = null;
 let firebaseMessagingModulePromise: Promise<FirebaseMessagingModule> | null = null;
+let lastHandledOpenUrl: string | null = null;
 
 function isNativeFcmAvailable() {
   return Capacitor.isNativePlatform();
@@ -58,6 +70,69 @@ function resolveNotificationPath(notification: Notification) {
     || readDataString(notification.data, 'linkUrl')
     || notification.link
   );
+}
+
+function resolveUrlOpenPayload(rawUrl: string): NativeFcmOpenPayload {
+  try {
+    const parsed = new URL(rawUrl);
+    const path = normalizePath(parsed.searchParams.get('url') || parsed.searchParams.get('path') || rawUrl);
+    const action = normalizeCallAction(parsed.searchParams.get('call_action'));
+
+    return {
+      path,
+      source: 'url',
+      action,
+      type: parsed.searchParams.get('type'),
+      callType: parsed.searchParams.get('callType'),
+      conversationId: parsed.searchParams.get('conversationId'),
+      roomName: parsed.searchParams.get('roomName'),
+      callId: parsed.searchParams.get('callId'),
+    };
+  } catch {
+    return {
+      path: normalizePath(rawUrl),
+      source: 'url',
+      action: '',
+    };
+  }
+}
+
+function resolveNotificationOpenPayload(notification: Notification): NativeFcmOpenPayload {
+  const data = notification.data;
+  return {
+    path: resolveNotificationPath(notification),
+    source: 'notification',
+    action: normalizeCallAction(readDataString(data, 'call_action')),
+    type: readDataString(data, 'type'),
+    callType: readDataString(data, 'callType'),
+    conversationId: readDataString(data, 'conversationId'),
+    roomName: readDataString(data, 'roomName'),
+    callId: readDataString(data, 'callId'),
+  };
+}
+
+function normalizeCallAction(action?: string | null): NativeFcmOpenPayload['action'] {
+  return action === 'answer' || action === 'decline' ? action : '';
+}
+
+function rememberNativeOpenCallAction(payload: NativeFcmOpenPayload) {
+  if (!payload.action || (payload.type !== 'direct-call' && payload.type !== 'group-call')) {
+    return;
+  }
+
+  rememberNativeCallAction({
+    action: payload.action,
+    type: payload.type,
+    callType: payload.callType,
+    conversationId: payload.conversationId,
+    roomName: payload.roomName,
+    callId: payload.callId,
+  });
+}
+
+function dispatchNativeOpen(payload: NativeFcmOpenPayload) {
+  rememberNativeOpenCallAction(payload);
+  notificationOpenHandler?.(payload);
 }
 
 async function saveTokenToBackend(token: string) {
@@ -122,6 +197,22 @@ export async function registerNativeFcm() {
 export async function listenForNativeFcmOpen(onOpen: NativeFcmOpenHandler) {
   notificationOpenHandler = onOpen;
 
+  if (!appUrlOpenListener) {
+    appUrlOpenListener = await App.addListener('appUrlOpen', (event) => {
+      if (!event.url || event.url === lastHandledOpenUrl) {
+        return;
+      }
+      lastHandledOpenUrl = event.url;
+      dispatchNativeOpen(resolveUrlOpenPayload(event.url));
+    });
+
+    const launchUrl = await App.getLaunchUrl();
+    if (launchUrl?.url && launchUrl.url !== lastHandledOpenUrl) {
+      lastHandledOpenUrl = launchUrl.url;
+      dispatchNativeOpen(resolveUrlOpenPayload(launchUrl.url));
+    }
+  }
+
   if (notificationActionListener) {
     return;
   }
@@ -133,7 +224,7 @@ export async function listenForNativeFcmOpen(onOpen: NativeFcmOpenHandler) {
 
   const { FirebaseMessaging } = messagingModule;
   notificationActionListener = await FirebaseMessaging.addListener('notificationActionPerformed', (event) => {
-    notificationOpenHandler?.(resolveNotificationPath(event.notification));
+    dispatchNativeOpen(resolveNotificationOpenPayload(event.notification));
   });
 }
 

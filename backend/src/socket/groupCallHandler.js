@@ -6,6 +6,7 @@ import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
 import { LOCKED_USER_DISPLAY_NAME } from '../utils/lockedUser.js';
 import { sendFCMToUser } from '../services/fcmService.js';
 import { isMuted } from '../utils/isMuted.js';
+import { createCallActionToken, getCallActionUrl } from '../utils/callActionToken.js';
 import {
     clearWaitingTimeout,
     emitWaitingRoomUpdate,
@@ -72,7 +73,7 @@ function emitToOtherUserDevices(socket, userId, event, payload) {
     socket.to(`user:${userId.toString()}`).emit(event, payload);
 }
 
-async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupName, getReceiverSocketId }) {
+async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupName }) {
     const callLabel = groupCallInfo.callType === 'video' ? 'Cuoc goi video nhom' : 'Cuoc goi thoai nhom';
 
     await Promise.all((conversation.participants || []).map(async (participant) => {
@@ -84,7 +85,6 @@ async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupNa
         const callParticipant = groupCallInfo.participants.get(participantId);
         if (!callParticipant || callParticipant.isLocked || callParticipant.status !== 'ringing') return;
         if (isMuted(participant.mute, 'meetings')) return;
-        if (getReceiverSocketId(participantId)) return;
 
         await sendFCMToUser(participantId, {
             title: groupName || 'Cuoc goi nhom',
@@ -98,6 +98,13 @@ async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupNa
                 initiatorId: groupCallInfo.initiatorId,
                 initiatorName: groupCallInfo.initiator.displayName || 'Thanh vien',
                 groupName: groupName || 'Nhom',
+                callActionToken: createCallActionToken({
+                    type: 'group-call',
+                    userId: participantId,
+                    conversationId: groupCallInfo.conversationId,
+                    callId: groupCallInfo.callId,
+                }),
+                callActionUrl: getCallActionUrl(),
                 url: `/chat?conversationId=${groupCallInfo.conversationId}`,
             },
         });
@@ -373,7 +380,6 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 conversation,
                 groupCallInfo,
                 groupName,
-                getReceiverSocketId,
             });
 
             console.log(`[GroupCall] ${user.displayName} started group call in ${conversationId}`);
@@ -836,9 +842,39 @@ function emitPendingGroupCallsForUser(socket, userId) {
     }
 }
 
+async function declineGroupCallFromPush(io, payload = {}) {
+    const userId = normalizeUserId(payload.userId || '');
+    const conversationId = payload.conversationId?.toString();
+    if (!userId || !conversationId) return false;
+
+    const groupCall = activeGroupCalls.get(conversationId);
+    if (!groupCall || (payload.callId && groupCall.callId !== payload.callId)) {
+        return false;
+    }
+
+    const participant = groupCall.participants.get(userId);
+    if (!participant || participant.status !== 'ringing') {
+        return false;
+    }
+
+    participant.status = 'declined';
+    groupCall.participantSockets?.delete(userId);
+
+    io.to(`user:${userId}`).emit('group-call:declined-on-other-device', groupCallDevicePayload(groupCall));
+    io.to(conversationId).emit('group-call:user-declined', {
+        conversationId,
+        userId,
+        participants: participantsArray(groupCall),
+    });
+
+    await checkAutoEnd(conversationId, io);
+    return true;
+}
+
 export {
     registerGroupCallHandlers,
     handleGroupCallDisconnect,
     hasUserActiveGroupCall,
     emitPendingGroupCallsForUser,
+    declineGroupCallFromPush,
 };

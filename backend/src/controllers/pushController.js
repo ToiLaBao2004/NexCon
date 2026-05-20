@@ -1,5 +1,7 @@
 import { removeSubscription, saveSubscription } from '../services/pushNotificationService.js';
 import User from '../models/userModel.js';
+import { verifyCallActionToken } from '../utils/callActionToken.js';
+import { handlePushCallAction } from '../socket/index.js';
 
 export async function saveFcmToken(req, res) {
     try {
@@ -78,4 +80,25 @@ export function getVapidPublicKey(req, res) {
     }
 
     return res.status(200).json({ publicKey });
+}
+
+export async function handleCallAction(req, res) {
+    try {
+        const token = String(req.body?.token || '').trim();
+        const action = String(req.body?.action || '').trim();
+        if (!token || action !== 'decline') {
+            return res.status(400).json({ message: 'Invalid call action payload.' });
+        }
+
+        const payload = verifyCallActionToken(token);
+        if (!payload) {
+            return res.status(401).json({ message: 'Invalid or expired call action token.' });
+        }
+
+        const handled = await handlePushCallAction(payload, action);
+        return res.status(200).json({ handled });
+    } catch (error) {
+        console.error('Call action error:', error);
+        return res.status(500).json({ message: 'Internal server error.' });
+    }
 }
