@@ -29,26 +29,19 @@ const avatarCropPresets: CropPreset[] = [
     { id: "square", label: "1:1", aspect: 1, outputWidth: 512, outputHeight: 512 },
 ];
 
-const coverCropPresets: CropPreset[] = [
-    { id: "wide", label: "16:9", aspect: 16 / 9, outputWidth: 1280, outputHeight: 720 },
-    { id: "source", label: "Gốc", aspect: "source", maxDimension: 1600 },
-];
-
 const getUploadErrorMessage = (error: unknown, fallback: string) => {
     const maybeError = error as { response?: { data?: { message?: string } } };
     return maybeError.response?.data?.message || fallback;
 };
 
 export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps) {
-    const { user, updateProfile, updateAvatar, updateCover } = useAuthStore();
+    const { user, updateProfile, updateAvatar } = useAuthStore();
 
     const [loading, setLoading] = useState(false);
-    const [uploadingTarget, setUploadingTarget] = useState<"avatar" | "cover" | null>(null);
+    const [uploadingTarget, setUploadingTarget] = useState<"avatar" | null>(null);
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
-    const [coverCropFile, setCoverCropFile] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const coverInputRef = useRef<HTMLInputElement>(null);
     const uploading = uploadingTarget !== null;
 
     const [formData, setFormData] = useState({
@@ -120,20 +113,6 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
         setAvatarCropFile(file);
     };
 
-    const handleCoverFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        e.target.value = "";
-        if (!file) return;
-
-        const error = validateImageFile(file);
-        if (error) {
-            toast.error(error);
-            return;
-        }
-
-        setCoverCropFile(file);
-    };
-
     const handleAvatarCropConfirm = async (file: File) => {
         try {
             setUploadingTarget("avatar");
@@ -143,21 +122,6 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             toast.success("Cập nhật ảnh đại diện thành công!");
         } catch (error: unknown) {
             toast.error(getUploadErrorMessage(error, "Upload ảnh thất bại"));
-        } finally {
-            setUploadingTarget(null);
-            setUploadProgress(null);
-        }
-    };
-
-    const handleCoverCropConfirm = async (file: File) => {
-        try {
-            setUploadingTarget("cover");
-            setUploadProgress(0);
-            await updateCover(file, setUploadProgress);
-            setCoverCropFile(null);
-            toast.success("Cập nhật ảnh bìa thành công!");
-        } catch (error: unknown) {
-            toast.error(getUploadErrorMessage(error, "Upload ảnh bìa thất bại"));
         } finally {
             setUploadingTarget(null);
             setUploadProgress(null);
@@ -179,37 +143,6 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-12 gap-y-6">
                     {/* ==================== CỘT TRÁI ==================== */}
                     <div className="space-y-4">
-                        <div className="space-y-2">
-                            <div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl border border-border/70 bg-muted shadow-sm">
-                                {user?.coverUrl ? (
-                                    <img
-                                        src={user.coverUrl}
-                                        alt="Ảnh bìa"
-                                        className="h-full w-full object-cover"
-                                    />
-                                ) : (
-                                    <div className="h-full w-full bg-gradient-to-br from-primary/25 via-sky-500/15 to-emerald-400/20" />
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => coverInputRef.current?.click()}
-                                    disabled={uploading}
-                                    className="absolute bottom-3 right-3 flex h-9 w-9 items-center justify-center rounded-full border border-white/40 bg-black/55 text-white shadow-lg backdrop-blur transition-colors hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-70"
-                                    title="Đổi ảnh bìa"
-                                >
-                                    {uploadingTarget === "cover" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                                </button>
-                                <input
-                                    type="file"
-                                    ref={coverInputRef}
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={handleCoverFileChange}
-                                />
-                            </div>
-                            <p className="text-xs text-muted-foreground">Ảnh bìa hiển thị trên profile của bạn</p>
-                        </div>
-
                         {/* Avatar */}
                         <div className="flex flex-col items-center gap-2">
                             <div className="relative group">
@@ -337,19 +270,6 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                 onConfirm={handleAvatarCropConfirm}
             />
 
-            <ImageCropDialog
-                file={coverCropFile}
-                open={Boolean(coverCropFile)}
-                title="Chỉnh ảnh bìa"
-                cropShape="rect"
-                presets={coverCropPresets}
-                defaultPresetId="wide"
-                confirmLabel="Lưu ảnh bìa"
-                maxOutputBytes={2 * 1024 * 1024}
-                uploadProgress={uploadingTarget === "cover" ? uploadProgress : null}
-                onCancel={() => setCoverCropFile(null)}
-                onConfirm={handleCoverCropConfirm}
-            />
         </Dialog>
     );
 }

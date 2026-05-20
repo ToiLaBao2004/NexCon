@@ -13,24 +13,13 @@ import StickerPickerPopover from "./StickerPickerPopover";
 import CachedStickerImage from "./CachedStickerImage";
 import { isUrl, formatBytes } from "@/lib/utils";
 import { draftStorage } from "@/lib/draftStorage";
-import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropDialog";
-import {
-	DEFAULT_MAX_OUTPUT_IMAGE_BYTES,
-	validateImageFile,
-} from "@/lib/imageCrop";
+import { validateImageFile } from "@/lib/imageCrop";
 
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const MAX_IMAGE_ATTACHMENTS = 10;
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
-
-const chatImageCropPresets: CropPreset[] = [
-	{ id: "source", label: "Gốc", aspect: "source", maxDimension: 1920 },
-	{ id: "square", label: "1:1", aspect: 1, maxDimension: 1600 },
-	{ id: "portrait", label: "4:5", aspect: 4 / 5, maxDimension: 1600 },
-	{ id: "wide", label: "16:9", aspect: 16 / 9, maxDimension: 1920 },
-];
 
 interface Attachment {
 	type: "image" | "file" | "audio";
@@ -177,7 +166,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const [value, setValue] = useState("");
 	const [attachments, setAttachments] = useState<Attachment[]>([]);
-	const [imageCropQueue, setImageCropQueue] = useState<File[]>([]);
 	const [sending, setSending] = useState(false);
 	const [loadingLocal, setLoadingLocal] = useState(false);
 	const [isRecording, setIsRecording] = useState(false);
@@ -644,7 +632,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const attachImages = (files: File[]) => {
 		const validFiles: File[] = [];
 		for (const file of files) {
-			const error = validateImageFile(file);
+			const error = validateImageFile(file, { maxBytes: MAX_IMAGE_SIZE });
 			if (error) {
 				toast.error(error);
 				continue;
@@ -656,7 +644,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		const startsNewImageBatch = attachments.some((item) => item.type !== "image");
 		const currentImageCount = startsNewImageBatch ? 0 : attachments.length;
-		const availableSlots = MAX_IMAGE_ATTACHMENTS - currentImageCount - imageCropQueue.length;
+		const availableSlots = MAX_IMAGE_ATTACHMENTS - currentImageCount;
 
 		if (availableSlots <= 0) {
 			toast.error(`Chỉ có thể gửi tối đa ${MAX_IMAGE_ATTACHMENTS} ảnh một lần.`);
@@ -668,36 +656,22 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			toast.warning(`Chỉ thêm ${availableSlots} ảnh đầu tiên.`);
 		}
 
-		setImageCropQueue((current) => [...current, ...nextFiles]);
+		setLoadingLocal(true);
+		setTimeout(() => {
+			setAttachments((current) => {
+				const shouldReplace = current.some((item) => item.type !== "image");
+				if (shouldReplace) {
+					revokeAttachmentPreviews(current);
+				}
+				const base = shouldReplace ? [] : current;
+				return [...base, ...nextFiles.map(buildImageAttachment)];
+			});
+			setLoadingLocal(false);
+		}, 200);
 	};
 
 	const attachImage = (file: File) => {
 		attachImages([file]);
-	};
-
-	const appendCroppedImage = (file: File) => {
-		setAttachments((current) => {
-			const shouldReplace = current.some((item) => item.type !== "image");
-			if (shouldReplace) {
-				revokeAttachmentPreviews(current);
-			}
-			const base = shouldReplace ? [] : current;
-			return [...base, buildImageAttachment(file)];
-		});
-	};
-
-	const handleImageCropConfirm = async (file: File) => {
-		if (file.size > MAX_IMAGE_SIZE) {
-			toast.error(`Ảnh sau khi xử lý vẫn quá lớn - tối đa ${formatBytes(MAX_IMAGE_SIZE)}`);
-			return;
-		}
-
-		appendCroppedImage(file);
-		setImageCropQueue((current) => current.slice(1));
-	};
-
-	const handleImageCropCancel = () => {
-		setImageCropQueue((current) => current.slice(1));
 	};
 
 	const attachFile = (file: File) => {
@@ -1068,18 +1042,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					{value.length}/{MAX_TEXT_MESSAGE_LENGTH}
 				</div>
 			)}
-			<ImageCropDialog
-				file={imageCropQueue[0] ?? null}
-				open={imageCropQueue.length > 0}
-				title="Chỉnh ảnh"
-				cropShape="rect"
-				presets={chatImageCropPresets}
-				defaultPresetId="source"
-				confirmLabel="Thêm ảnh"
-				maxOutputBytes={DEFAULT_MAX_OUTPUT_IMAGE_BYTES}
-				onCancel={handleImageCropCancel}
-				onConfirm={handleImageCropConfirm}
-			/>
 		</div>
 	);
 };

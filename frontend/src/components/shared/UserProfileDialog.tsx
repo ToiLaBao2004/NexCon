@@ -25,7 +25,6 @@ interface UserProfile {
     displayName: string;
     email: string;
     avatarUrl?: string;
-    coverUrl?: string;
     bio?: string;
     phone?: string;
 }
@@ -94,9 +93,6 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     const isBlockedByOther = blockedBy.includes(user._id);
     const isBlockedRelation = !isSelf && (profileAccessBlocked || isBlockedByMe || isBlockedByOther);
     const shouldHideProfileDetails = profileLoading || isBlockedRelation;
-    const profileCoverUrl = fullUser?.coverUrl || user.coverUrl || null;
-    const bannerImageUrl = profileCoverUrl || albumArt;
-
     const handleAction = async (action: () => Promise<void>) => {
         try {
             setActionLoading(true);
@@ -269,14 +265,14 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                 {/* Banner */}
                 <div className="relative overflow-hidden" style={{ height: !isBlockedRelation && fullUser?.music?.trackId ? "152px" : "128px" }}>
                     {/* Background: album art blur hoặc gradient */}
-                    {bannerImageUrl ? (
+                    {albumArt ? (
                         <>
                             <img
-                                src={bannerImageUrl}
+                                src={albumArt}
                                 alt=""
-                                className={cn("absolute inset-0 w-full h-full object-cover", !profileCoverUrl && "scale-110")}
+                                className="absolute inset-0 w-full h-full object-cover scale-110"
                             />
-                            <div className={cn("absolute inset-0 bg-black/40", !profileCoverUrl && "backdrop-blur-sm")} />
+                            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
                         </>
                     ) : (
                         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent" />
