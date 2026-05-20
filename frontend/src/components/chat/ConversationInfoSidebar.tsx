@@ -57,10 +57,21 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
+import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropDialog";
+import { validateImageFile } from "@/lib/imageCrop";
 
 interface ConversationInfoSidebarProps {
   conversation: Conversation;
 }
+
+const groupAvatarCropPresets: CropPreset[] = [
+  { id: "square", label: "1:1", aspect: 1, outputWidth: 512, outputHeight: 512 },
+];
+
+const getUploadErrorMessage = (error: unknown, fallback: string) => {
+  const maybeError = error as { response?: { data?: { message?: string } } };
+  return maybeError.response?.data?.message || fallback;
+};
 
 // Main component
 export default function ConversationInfoSidebar({ conversation, }: ConversationInfoSidebarProps) {
@@ -79,6 +90,8 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
   const [groupNameDraft, setGroupNameDraft] = useState("");
   const [groupRenameLoading, setGroupRenameLoading] = useState(false);
   const [groupAvatarLoading, setGroupAvatarLoading] = useState(false);
+  const [groupAvatarProgress, setGroupAvatarProgress] = useState<number | null>(null);
+  const [groupAvatarCropFile, setGroupAvatarCropFile] = useState<File | null>(null);
   const [isNewGroupModalOpen, setIsNewGroupModalOpen] = useState(false);
   const [manageGroupOpen, setManageGroupOpen] = useState(false);
 
@@ -197,19 +210,27 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Vui lòng chọn tệp ảnh hợp lệ");
+    const error = validateImageFile(file);
+    if (error) {
+      toast.error(error);
       return;
     }
 
+    setGroupAvatarCropFile(file);
+  };
+
+  const handleGroupAvatarCropConfirm = async (file: File) => {
     try {
       setGroupAvatarLoading(true);
-      await updateGroupAvatar(conversation._id, file);
+      setGroupAvatarProgress(0);
+      await updateGroupAvatar(conversation._id, file, setGroupAvatarProgress);
+      setGroupAvatarCropFile(null);
       toast.success("Đã cập nhật ảnh đại diện nhóm");
-    } catch {
-      toast.error("Không thể cập nhật ảnh nhóm");
+    } catch (error: unknown) {
+      toast.error(getUploadErrorMessage(error, "Không thể cập nhật ảnh nhóm"));
     } finally {
       setGroupAvatarLoading(false);
+      setGroupAvatarProgress(null);
     }
   };
 
@@ -521,6 +542,19 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
         conversationId={conversation._id}
         isGroupAdmin={isGroupAdmin}
         participants={conversation.participants}
+      />
+      <ImageCropDialog
+        file={groupAvatarCropFile}
+        open={Boolean(groupAvatarCropFile)}
+        title="Chỉnh ảnh nhóm"
+        cropShape="round"
+        presets={groupAvatarCropPresets}
+        defaultPresetId="square"
+        confirmLabel="Lưu ảnh"
+        maxOutputBytes={1024 * 1024}
+        uploadProgress={groupAvatarLoading ? groupAvatarProgress : null}
+        onCancel={() => setGroupAvatarCropFile(null)}
+        onConfirm={handleGroupAvatarCropConfirm}
       />
     </aside>
   );

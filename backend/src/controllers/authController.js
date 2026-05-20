@@ -102,6 +102,7 @@ function buildSafeUser(user) {
         email: user.email,
         displayName: user.displayName,
         avatarUrl: user.avatarUrl,
+        coverUrl: user.coverUrl,
         bio: user.bio,
         phone: user.phone,
         googleId: user.googleId,

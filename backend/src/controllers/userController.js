@@ -1,6 +1,6 @@
 import User from '../models/userModel.js';
 import BlockUser from '../models/blockUserModel.js';
-import { upLoadImageFromBuffer, deleteImage } from '../middlewares/uploadMiddleware.js';
+import { MAX_IMAGE_SIZE, upLoadImageFromBuffer, uploadCoverImageFromBuffer, deleteImage } from '../middlewares/uploadMiddleware.js';
 import bcrypt from 'bcrypt';
 import { searchSpotifyTracks } from '../services/spotifyService.js';
 import { checkFieldFormat } from '../utils/fieldFormat.js';
@@ -110,6 +110,16 @@ export async function updateAvatar(req, res) {
             return res.status(400).json({ message: 'No file uploaded' });
         }
 
+        if (!req.file.mimetype?.startsWith('image/')) {
+            return res.status(400).json({ message: 'Uploaded file is not an image.' });
+        }
+
+        if (req.file.size > MAX_IMAGE_SIZE) {
+            return res.status(413).json({
+                message: `Ảnh quá lớn. Kích thước tối đa là ${MAX_IMAGE_SIZE / 1024 / 1024}MB.`,
+            });
+        }
+
         // Get old avatar info
         const user = await User.findById(userId);
         if (user && user.avatarId) {
@@ -149,6 +159,60 @@ export async function updateAvatar(req, res) {
         });
     } catch (error) {
         console.error('Update avatar error:', error);
+        return res.status(500).json({ message: 'Server error' });
+    }
+}
+
+export async function updateCover(req, res) {
+    try {
+        const userId = req.user._id;
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        if (!req.file.mimetype?.startsWith('image/')) {
+            return res.status(400).json({ message: 'Uploaded file is not an image.' });
+        }
+
+        if (req.file.size > MAX_IMAGE_SIZE) {
+            return res.status(413).json({
+                message: `Ảnh quá lớn. Kích thước tối đa là ${MAX_IMAGE_SIZE / 1024 / 1024}MB.`,
+            });
+        }
+
+        const user = await User.findById(userId);
+        if (user?.coverId) {
+            try {
+                await deleteImage(user.coverId);
+            } catch (deleteError) {
+                console.error("Lỗi khi xóa ảnh bìa cũ trên Cloudinary:", deleteError);
+            }
+        }
+
+        const result = await uploadCoverImageFromBuffer(req.file.buffer, "NexCon/covers");
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            {
+                $set: {
+                    coverUrl: result.secure_url,
+                    coverId: result.public_id
+                }
+            },
+            { new: true }
+        ).select('-password');
+
+        if (!updatedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        return res.status(200).json({
+            message: 'Cover updated successfully',
+            user: updatedUser
+        });
+    } catch (error) {
+        console.error('Update cover error:', error);
         return res.status(500).json({ message: 'Server error' });
     }
 }

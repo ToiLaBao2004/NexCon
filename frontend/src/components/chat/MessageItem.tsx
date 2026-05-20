@@ -532,9 +532,21 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 	}
 
 	if (type === "image" && (message.filePublicId || message.fileUrl)) {
+		const uploadProgress = typeof message.progress === "number" ? Math.min(100, Math.max(0, Math.round(message.progress))) : null;
 		const errorBadge = isOwn && message.status === "error" ? (
 			<span className="absolute bottom-1.5 right-1.5 flex size-5 items-center justify-center rounded-full bg-black/55 text-white shadow-sm">
 				<AlertCircle className="size-3 text-red-200" />
+			</span>
+		) : null;
+		const uploadOverlay = isOwn && message.status === "sending" ? (
+			<span className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-xl bg-black/45 px-4 text-white backdrop-blur-[1px]">
+				<span className="h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+					<span
+						className="block h-full rounded-full bg-white transition-all"
+						style={{ width: `${uploadProgress ?? 15}%` }}
+					/>
+				</span>
+				<span className="text-xs font-semibold">{uploadProgress ?? 0}%</span>
 			</span>
 		) : null;
 
@@ -558,6 +570,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							alt={message.fileName ?? "image"}
 							className="max-w-[280px] max-h-[340px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
 						/>
+						{uploadOverlay}
 						{errorBadge}
 					</button>
 				) : (
@@ -579,6 +592,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							alt={message.fileName ?? "image"}
 							className="max-w-[280px] max-h-[340px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
 						/>
+						{uploadOverlay}
 						{errorBadge}
 					</button>
 				)}

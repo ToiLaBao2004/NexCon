@@ -1192,9 +1192,9 @@ export const useChatStore = create<ChatState>()(
                     console.error("Lỗi khi cập nhật tên nhóm:", error);
                 }
             },
-            updateGroupAvatar: async (conversationId: string, file: File) => {
+            updateGroupAvatar: async (conversationId: string, file: File, onProgress?: (percent: number) => void) => {
                 try {
-                    const response = await chatService.updateGroupAvatar(conversationId, file);
+                    const response = await chatService.updateGroupAvatar(conversationId, file, onProgress);
                     if (response?.conversation) {
                         get().updateConversation(response.conversation);
                         return;

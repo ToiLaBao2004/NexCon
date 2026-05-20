@@ -159,12 +159,16 @@ export const chatService = {
 		return res.data;
 	},
 
-	async updateGroupAvatar(conversationId: string, file: File) {
+	async updateGroupAvatar(conversationId: string, file: File, onProgress?: (percent: number) => void) {
 		const formData = new FormData();
 		formData.append('file', file);
 
 		const res = await api.post(`/conversations/${conversationId}/update-group-avatar`, formData, {
 			headers: { 'Content-Type': 'multipart/form-data' },
+			onUploadProgress: (event) => {
+				if (!onProgress || !event.total) return;
+				onProgress(Math.round((event.loaded * 100) / event.total));
+			},
 		});
 
 		return res.data;

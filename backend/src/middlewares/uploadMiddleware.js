@@ -35,6 +35,20 @@ export const uploadImageFromBuffer = (buffer, folder = 'NexCon/avatars') => {
     });
 };
 
+export const uploadCoverImageFromBuffer = (buffer, folder = 'NexCon/covers') => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder,
+                resource_type: 'image',
+                transformation: [{ width: 1280, height: 720, crop: 'fill', quality: 'auto:good' }],
+            },
+            (error, result) => (error ? reject(error) : resolve(result))
+        );
+        stream.end(buffer);
+    });
+};
+
 export const uploadChatImageFromBuffer = (buffer, folder = 'NexCon/messages/images') => {
     return new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
