@@ -40,6 +40,9 @@ import { useBackButton } from "./hooks/useBackButton";
 import { listenForNativeFcmOpen, registerNativeFcm } from "@/lib/nativeFcm";
 import AppStatusLayer from "@/components/system/AppStatusLayer";
 import { useAppStatusStore } from "./stores/useAppStatusStore";
+import { useCallStore } from "./stores/useCallStore";
+import { useGroupCallStore } from "./stores/useGroupCallStore";
+import { consumePendingNativeCallAction } from "@/lib/nativeCallAction";
 
 function BackButtonHandler() {
   useBackButton();
@@ -54,7 +57,46 @@ function NativeFcmHandler({ enabled }: { enabled: boolean }) {
       return;
     }
 
-    void listenForNativeFcmOpen((path) => navigate(path));
+    void listenForNativeFcmOpen((payload) => {
+      navigate(payload.path);
+
+      if (payload.action !== "answer") {
+        return;
+      }
+
+      window.setTimeout(() => {
+        if (payload.type === "direct-call") {
+          const callState = useCallStore.getState();
+          if (
+            callState.status === "incoming" &&
+            (!payload.roomName || callState._roomName === payload.roomName)
+          ) {
+            consumePendingNativeCallAction({
+              type: "direct-call",
+              conversationId: payload.conversationId,
+              roomName: payload.roomName,
+            });
+            void callState.acceptCall();
+          }
+          return;
+        }
+
+        if (payload.type === "group-call" && payload.conversationId) {
+          const groupCallState = useGroupCallStore.getState();
+          if (
+            groupCallState.status === "incoming" &&
+            groupCallState.conversationId === payload.conversationId
+          ) {
+            consumePendingNativeCallAction({
+              type: "group-call",
+              conversationId: payload.conversationId,
+              callId: payload.callId,
+            });
+            void groupCallState.joinGroupCall(payload.conversationId);
+          }
+        }
+      }, 250);
+    });
   }, [navigate]);
 
   useEffect(() => {

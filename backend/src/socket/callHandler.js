@@ -7,6 +7,7 @@ import { persistCallSystemMessage } from '../utils/callSystemMessageHelper.js';
 import { hasUserActiveGroupCall } from './groupCallHandler.js';
 import { sendFCMToUser } from '../services/fcmService.js';
 import { isMuted } from '../utils/isMuted.js';
+import { createCallActionToken, getCallActionUrl } from '../utils/callActionToken.js';
 
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
@@ -328,6 +329,15 @@ async function sendOfflineDirectCallPush({ session, conversation, receiverId }) 
             callerId: session.callerId,
             receiverId: session.receiverId,
             callerName: session.initiator.displayName || 'Nguoi dung',
+            callerAvatarUrl: session.initiator.avatarUrl || '',
+            callActionToken: createCallActionToken({
+                type: 'direct-call',
+                callerId: session.callerId,
+                receiverId: session.receiverId,
+                roomName: session.roomName,
+                conversationId: session.conversationId,
+            }),
+            callActionUrl: getCallActionUrl(),
             url: `/chat?conversationId=${session.conversationId}`,
         },
     });
@@ -562,9 +572,8 @@ export function registerCallHandlers(socket, user, activeCalls, io, getReceiverS
             const callerTarget = getParticipantSocketTarget(session, callerId);
             if (receiverTarget) {
                 io.to(receiverTarget).emit('incoming-call', buildDirectIncomingPayload(session));
-            } else {
-                await sendOfflineDirectCallPush({ session, conversation, receiverId });
             }
+            await sendOfflineDirectCallPush({ session, conversation, receiverId });
             if (callerTarget) {
                 io.to(callerTarget).emit('call-ringing', buildDirectRingingPayload(session));
             }
@@ -837,6 +846,39 @@ export function emitPendingDirectCallsForUser(socket, userId, activeCalls, io, g
             io.to(callerTarget).emit('call-ringing', buildDirectRingingPayload(session));
         }
     }
+}
+
+export async function declineDirectCallFromPush(activeCalls, io, getReceiverSocketId, payload = {}) {
+    const receiverId = payload.receiverId?.toString();
+    const callerId = payload.callerId?.toString();
+    if (!receiverId || !callerId) return false;
+
+    const activeCall = findDirectCallForParticipants(activeCalls, {
+        userId: receiverId,
+        otherUserId: callerId,
+        roomName: payload.roomName,
+    });
+    if (!activeCall || activeCall.receiverId !== receiverId || activeCall.status !== 'calling') {
+        return false;
+    }
+
+    clearDirectCallRingTimeout(activeCall);
+    markParticipant(activeCall, receiverId, { status: 'declined' });
+    await persistFinalizedDirectSession(io, activeCall, 'canceled');
+    deleteDirectCall(activeCalls, activeCall);
+
+    const eventPayload = {
+        by: { _id: receiverId },
+        roomName: activeCall.roomName,
+        conversationId: activeCall.conversationId,
+        callerId,
+        receiverId,
+    };
+
+    io.to(`user:${callerId}`).emit('call-rejected', eventPayload);
+    io.to(`user:${receiverId}`).emit('call-rejected', eventPayload);
+
+    return true;
 }
 
 function clearDirectCallRingTimeout(session) {

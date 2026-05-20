@@ -6,6 +6,7 @@ import {
     unsubscribePush,
     saveFcmToken,
     removeFcmToken,
+    handleCallAction,
 } from '../controllers/pushController.js';
 
 const pushRouter = express.Router();
@@ -15,5 +16,6 @@ pushRouter.post('/subscribe', authMiddleware, subscribePush);
 pushRouter.delete('/unsubscribe', authMiddleware, unsubscribePush);
 pushRouter.post('/fcm-token', authMiddleware, saveFcmToken);
 pushRouter.delete('/fcm-token', authMiddleware, removeFcmToken);
+pushRouter.post('/call-action', handleCallAction);
 
 export default pushRouter;
