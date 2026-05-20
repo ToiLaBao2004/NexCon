@@ -48,6 +48,32 @@ function escapeRegex(value) {
 	return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function getConversationActivityTime(conversation) {
+	return new Date(
+		conversation?.lastMessage?.createdAt
+		|| conversation?.updatedAt
+		|| conversation?.createdAt
+		|| 0
+	).getTime();
+}
+
+function sortConversationsForClient(conversations = []) {
+	return [...conversations].sort((a, b) => {
+		const aPinned = a.isPinned === true;
+		const bPinned = b.isPinned === true;
+
+		if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+		if (aPinned && bPinned) {
+			const aPinnedAt = new Date(a.pinnedAt || 0).getTime();
+			const bPinnedAt = new Date(b.pinnedAt || 0).getTime();
+			if (aPinnedAt !== bPinnedAt) return bPinnedAt - aPinnedAt;
+		}
+
+		return getConversationActivityTime(b) - getConversationActivityTime(a);
+	});
+}
+
 function sanitizeParticipantUser(userObj) {
 	if (!userObj) return userObj;
 	return maskLockedUserDoc(userObj);
@@ -209,10 +235,11 @@ export async function getConversations(req, res) {
 		const limit = clampPageLimit(req.query.limit, 50, 100);
 		const cursor = req.query.cursor;
 
-		const matchQuery = { "participants.userId": myId };
+		const unpinnedQuery = { participants: { $elemMatch: { userId: myId, pinnedAt: null } } };
+		let cursorDate = null;
 		if (cursor) {
 			const d = new Date(cursor);
-			if (!isNaN(d.getTime())) matchQuery.updatedAt = { $lt: d };
+			if (!isNaN(d.getTime())) cursorDate = d;
 		}
 
 		const visibleMessageFilter = {
@@ -223,18 +250,52 @@ export async function getConversations(req, res) {
 			],
 		};
 
-		let rawConversations = await Conversation.find(matchQuery)
-			.sort({ updatedAt: -1 })
-			.limit(limit + 1)
-			.populate("participants.userId", PARTICIPANT_SELECT)
-			.populate("lastMessage.senderId", MESSAGE_SENDER_SELECT)
-			.lean();
+		let rawConversations = [];
+		let hasMore = false;
+		let nextCursor = null;
 
-		const hasMore = rawConversations.length > limit;
-		if (hasMore) rawConversations.pop();
-		const nextCursor = hasMore && rawConversations.length > 0
-			? rawConversations[rawConversations.length - 1].updatedAt
-			: null;
+		if (cursorDate) {
+			const pageQuery = { ...unpinnedQuery, updatedAt: { $lt: cursorDate } };
+			rawConversations = await Conversation.find(pageQuery)
+				.sort({ updatedAt: -1 })
+				.limit(limit + 1)
+				.populate("participants.userId", PARTICIPANT_SELECT)
+				.populate("lastMessage.senderId", MESSAGE_SENDER_SELECT)
+				.lean();
+
+			hasMore = rawConversations.length > limit;
+			if (hasMore) rawConversations.pop();
+			nextCursor = hasMore && rawConversations.length > 0
+				? rawConversations[rawConversations.length - 1].updatedAt
+				: null;
+		} else {
+			const rawPinnedConversations = await Conversation.find({
+				participants: {
+					$elemMatch: {
+						userId: myId,
+						pinnedAt: { $exists: true, $ne: null },
+					},
+				},
+			})
+				.populate("participants.userId", PARTICIPANT_SELECT)
+				.populate("lastMessage.senderId", MESSAGE_SENDER_SELECT)
+				.lean();
+
+			const unpinnedLimit = Math.max(limit - rawPinnedConversations.length, 1);
+			const rawUnpinnedConversations = await Conversation.find(unpinnedQuery)
+				.sort({ updatedAt: -1 })
+				.limit(unpinnedLimit + 1)
+				.populate("participants.userId", PARTICIPANT_SELECT)
+				.populate("lastMessage.senderId", MESSAGE_SENDER_SELECT)
+				.lean();
+
+			hasMore = rawUnpinnedConversations.length > unpinnedLimit;
+			if (hasMore) rawUnpinnedConversations.pop();
+			nextCursor = hasMore && rawUnpinnedConversations.length > 0
+				? rawUnpinnedConversations[rawUnpinnedConversations.length - 1].updatedAt
+				: null;
+			rawConversations = [...rawPinnedConversations, ...rawUnpinnedConversations];
+		}
 
 		let conversations = decryptConversationsPayload(rawConversations);
 
@@ -379,7 +440,7 @@ export async function getConversations(req, res) {
 			};
 		});
 
-		return res.status(200).json({ conversations: formatted, hasMore, nextCursor });
+		return res.status(200).json({ conversations: sortConversationsForClient(formatted), hasMore, nextCursor });
 	} catch (error) {
 		console.error("Error occurred while fetching conversations", error);
 		return res.status(500).json({ message: "Internal server error" });

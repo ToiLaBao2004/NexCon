@@ -182,6 +182,14 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const textInputRef = useRef<HTMLTextAreaElement>(null);
 
+	useEffect(() => {
+		const focusTimer = window.setTimeout(() => {
+			textInputRef.current?.focus({ preventScroll: true });
+		}, 0);
+
+		return () => window.clearTimeout(focusTimer);
+	}, [selectedConvo._id]);
+
 	const participants = selectedConvo.participants;
 	const attachment = attachments[0] ?? null;
 	const mentionCandidates = useMemo(() => {
