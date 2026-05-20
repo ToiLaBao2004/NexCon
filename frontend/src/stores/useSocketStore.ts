@@ -17,6 +17,7 @@ import { showReminderToast } from "@/components/reminder/showReminderToast";
 import { useMeetStore } from "./useMeetStore";
 import { flashTabTitle } from "@/utils/tabTitle";
 import { useAppStatusStore } from "./useAppStatusStore";
+import { consumePendingNativeCallAction } from "@/lib/nativeCallAction";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 
@@ -984,6 +985,20 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const isMutedCall = isMuted(myParticipant?.mute, "meetings");
 
       useCallStore.getState().handleIncomingCall(from, callType, roomName, isMutedCall);
+      const nativeAction = consumePendingNativeCallAction({
+        type: "direct-call",
+        conversationId,
+        roomName,
+      });
+      if (nativeAction?.action === "answer") {
+        window.setTimeout(() => {
+          void useCallStore.getState().acceptCall();
+        }, 0);
+      } else if (nativeAction?.action === "decline") {
+        window.setTimeout(() => {
+          useCallStore.getState().rejectCall();
+        }, 0);
+      }
       useChatStore.getState().fetchConversations(true);
     });
 
@@ -1079,6 +1094,20 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const isMutedCall = isMuted(myParticipant?.mute, "meetings");
 
       useGroupCallStore.getState().handleGroupCallIncoming(payload, isMutedCall);
+      const nativeAction = consumePendingNativeCallAction({
+        type: "group-call",
+        conversationId: payload.conversationId,
+        callId: payload.callId,
+      });
+      if (nativeAction?.action === "answer") {
+        window.setTimeout(() => {
+          void useGroupCallStore.getState().joinGroupCall(payload.conversationId);
+        }, 0);
+      } else if (nativeAction?.action === "decline") {
+        window.setTimeout(() => {
+          useGroupCallStore.getState().declineGroupCall(payload.conversationId);
+        }, 0);
+      }
     });
 
     socket.on("group-call:token", (payload) => {
