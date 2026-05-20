@@ -7,6 +7,8 @@ export interface User {
   email: string;
   displayName: string;
   avatarUrl?: string;
+  coverUrl?: string;
+  coverId?: string;
   bio?: string;
   phone?: string;
   googleId?: string;

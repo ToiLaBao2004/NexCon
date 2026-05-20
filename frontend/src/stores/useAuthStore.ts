@@ -333,12 +333,21 @@ export const useAuthStore = create<AuthState>()(
       }
     },
 
-    updateAvatar: async (file) => {
+    updateAvatar: async (file, onProgress) => {
       try {
-        await userService.updateAvatar(file);
+        await userService.updateAvatar(file, onProgress);
         await get().fetchMe(true);
       } catch (error: any) {
         console.error('Lỗi khi tải lên ảnh đại diện:', error);
+        throw error;
+      }
+    },
+    updateCover: async (file, onProgress) => {
+      try {
+        await userService.updateCover(file, onProgress);
+        await get().fetchMe(true);
+      } catch (error: unknown) {
+        console.error('Lỗi khi tải lên ảnh bìa:', error);
         throw error;
       }
     },

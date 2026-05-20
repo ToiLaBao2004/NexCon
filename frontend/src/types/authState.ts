@@ -63,7 +63,9 @@ export default interface AuthState {
 
   updateProfile: (data: { displayName?: string; bio?: string; phone?: string }) => Promise<void>;
 
-  updateAvatar: (file: File) => Promise<void>;
+  updateAvatar: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
+
+  updateCover: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
 
   getSessions: () => Promise<void>;
 

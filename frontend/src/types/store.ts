@@ -130,7 +130,7 @@ export interface ChatState {
   markAsSeen: (conversationId?: string) => Promise<void>;
   markAsUnread: (conversationId: string) => Promise<void>;
   updateGroupName: (conversationId: string, name: string) => Promise<void>;
-  updateGroupAvatar: (conversationId: string, file: File) => Promise<void>;
+  updateGroupAvatar: (conversationId: string, file: File, onProgress?: (percent: number) => void) => Promise<void>;
   openChat: (params: { userId?: string; conversationId?: string }) => Promise<void>;
   createGroup: (name: string, members: string[]) => Promise<void>;
   recallMessage: (messageId: string) => Promise<void>;
