@@ -34,6 +34,12 @@ steps.txt
 .env.development
 .env.production
 
-android
+frontend/android/app/build/
+frontend/android/build/
+frontend/android/.gradle/
+frontend/android/.idea/
+frontend/android/local.properties
 
 firebase-service-account.json
+*.jks
+*.keystore

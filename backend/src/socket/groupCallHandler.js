@@ -89,12 +89,15 @@ async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupNa
         await sendFCMToUser(participantId, {
             title: groupName || 'Cuoc goi nhom',
             body: `${groupCallInfo.initiator.displayName || 'Thanh vien'} dang bat dau ${callLabel}`,
+            dataOnly: true,
             data: {
                 type: 'group-call',
                 callType: groupCallInfo.callType,
                 callId: groupCallInfo.callId,
                 conversationId: groupCallInfo.conversationId,
                 initiatorId: groupCallInfo.initiatorId,
+                initiatorName: groupCallInfo.initiator.displayName || 'Thanh vien',
+                groupName: groupName || 'Nhom',
                 url: `/chat?conversationId=${groupCallInfo.conversationId}`,
             },
         });

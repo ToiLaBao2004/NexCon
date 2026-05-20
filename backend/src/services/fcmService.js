@@ -9,7 +9,7 @@ function normalizeData(data = {}) {
     );
 }
 
-export async function sendFCMToUser(userId, { title, body, data = {} }) {
+export async function sendFCMToUser(userId, { title, body, data = {}, dataOnly = false }) {
     try {
         const user = await User.findById(userId).select('fcmTokens');
         if (!user?.fcmTokens?.length) return;
@@ -18,8 +18,10 @@ export async function sendFCMToUser(userId, { title, body, data = {} }) {
         if (!validTokens.length) return;
 
         const message = {
-            notification: { title, body },
-            data: normalizeData(data),
+            data: normalizeData({
+                ...data,
+                ...(dataOnly ? { title, body } : {}),
+            }),
             android: {
                 priority: 'high',
                 notification: {
@@ -29,6 +31,10 @@ export async function sendFCMToUser(userId, { title, body, data = {} }) {
             },
             tokens: validTokens,
         };
+
+        if (!dataOnly) {
+            message.notification = { title, body };
+        }
 
         const response = await fcm.sendEachForMulticast(message);
 

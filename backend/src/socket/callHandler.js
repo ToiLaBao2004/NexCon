@@ -319,6 +319,7 @@ async function sendOfflineDirectCallPush({ session, conversation, receiverId }) 
     await sendFCMToUser(receiverId, {
         title: session.initiator.displayName || 'Cuoc goi den',
         body: `${callLabel} den`,
+        dataOnly: true,
         data: {
             type: 'direct-call',
             callType: session.callType,
@@ -326,6 +327,7 @@ async function sendOfflineDirectCallPush({ session, conversation, receiverId }) 
             conversationId: session.conversationId,
             callerId: session.callerId,
             receiverId: session.receiverId,
+            callerName: session.initiator.displayName || 'Nguoi dung',
             url: `/chat?conversationId=${session.conversationId}`,
         },
     });
