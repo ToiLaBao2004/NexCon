@@ -16,13 +16,27 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        NexConAppState.setForeground(true);
+    }
+
+    @Override
+    public void onPause() {
+        NexConAppState.setForeground(false);
+        super.onPause();
+    }
+
+    @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        setIntent(intent);
         configureLockScreenLaunch(intent);
     }
 
     private void configureLockScreenLaunch(Intent intent) {
         if (!isCallIntent(intent)) {
+            clearLockScreenLaunch();
             return;
         }
 
@@ -39,11 +53,22 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    private void clearLockScreenLaunch() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(false);
+            setTurnScreenOn(false);
+        }
+        getWindow().clearFlags(
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                | WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        );
+    }
+
     private boolean isCallIntent(Intent intent) {
         if (intent == null) {
             return false;
         }
-        String type = intent.getStringExtra("fcm_type");
-        return "direct-call".equals(type) || "group-call".equals(type);
+        return CallNotificationHelper.isCallIntent(intent);
     }
 }

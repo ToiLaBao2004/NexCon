@@ -9,6 +9,7 @@ import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.PowerManager;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -20,8 +21,8 @@ import java.util.Map;
 import io.capawesome.capacitorjs.plugins.firebase.messaging.MessagingService;
 
 public class NexConFirebaseMessagingService extends MessagingService {
-    private static final String CALLS_CHANNEL_ID = "calls";
     private static final int CALL_NOTIFICATION_TIMEOUT_MS = 30_000;
+    private static final long WAKE_LOCK_TIMEOUT_MS = 8_000L;
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
@@ -29,7 +30,10 @@ public class NexConFirebaseMessagingService extends MessagingService {
 
         Map<String, String> data = remoteMessage.getData();
         String type = data.get("type");
-        if ("direct-call".equals(type) || "group-call".equals(type)) {
+        if (CallNotificationHelper.isCallType(type)) {
+            if (NexConAppState.isForeground()) {
+                return;
+            }
             showIncomingCallNotification(data);
         }
     }
@@ -40,51 +44,75 @@ public class NexConFirebaseMessagingService extends MessagingService {
         if (notificationManager == null) return;
 
         ensureCallsChannel(notificationManager);
+        wakeScreenForIncomingCall();
 
         String type = safe(data.get("type"), "direct-call");
         String callType = safe(data.get("callType"), "voice");
         String title = safe(data.get("title"), resolveTitle(data, type));
         String body = safe(data.get("body"), "video".equals(callType) ? "Cuoc goi video den" : "Cuoc goi thoai den");
+        int notificationId = CallNotificationHelper.notificationId(data);
 
-        Intent openIntent = new Intent(this, MainActivity.class);
-        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        openIntent.putExtra("fcm_type", type);
-        openIntent.putExtra("conversationId", data.get("conversationId"));
-        openIntent.putExtra("roomName", data.get("roomName"));
-        openIntent.putExtra("callId", data.get("callId"));
+        Intent incomingCallIntent = new Intent(this, IncomingCallActivity.class);
+        incomingCallIntent.setAction(CallNotificationHelper.ACTION_SHOW_CALL);
+        incomingCallIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        CallNotificationHelper.putCallExtras(incomingCallIntent, data);
+        incomingCallIntent.putExtra(CallNotificationHelper.EXTRA_NOTIFICATION_ID, notificationId);
 
-        PendingIntent openPendingIntent = PendingIntent.getActivity(
+        PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
             this,
-            notificationId(data),
-            openIntent,
+            notificationId,
+            incomingCallIntent,
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CALLS_CHANNEL_ID)
+        Intent answerIntent = new Intent(this, IncomingCallActivity.class);
+        answerIntent.setAction(CallNotificationHelper.ACTION_ANSWER_CALL);
+        answerIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        CallNotificationHelper.putCallExtras(answerIntent, data);
+        answerIntent.putExtra(CallNotificationHelper.EXTRA_NOTIFICATION_ID, notificationId);
+        PendingIntent answerPendingIntent = PendingIntent.getActivity(
+            this,
+            notificationId + 1,
+            answerIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        Intent declineIntent = new Intent(this, CallActionReceiver.class);
+        declineIntent.setAction(CallNotificationHelper.ACTION_DECLINE_CALL);
+        CallNotificationHelper.putCallExtras(declineIntent, data);
+        declineIntent.putExtra(CallNotificationHelper.EXTRA_NOTIFICATION_ID, notificationId);
+        PendingIntent declinePendingIntent = PendingIntent.getBroadcast(
+            this,
+            notificationId + 2,
+            declineIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CallNotificationHelper.CALLS_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_nexcon_call)
             .setContentTitle(title)
             .setContentText(body)
-            .setContentIntent(openPendingIntent)
+            .setContentIntent(fullScreenPendingIntent)
             .setCategory(NotificationCompat.CATEGORY_CALL)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
-            .setOngoing(false)
+            .setAutoCancel(false)
+            .setOngoing(true)
             .setTimeoutAfter(CALL_NOTIFICATION_TIMEOUT_MS)
-            .setDefaults(NotificationCompat.DEFAULT_ALL);
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setTicker(title)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .addAction(R.drawable.ic_stat_nexcon_call, "Tu choi", declinePendingIntent)
+            .addAction(R.drawable.ic_stat_nexcon_call, "Tra loi", answerPendingIntent);
 
-        if (canUseFullScreenIntent(notificationManager)) {
-            builder.setFullScreenIntent(openPendingIntent, true);
-        }
-
-        notificationManager.notify(notificationId(data), builder.build());
+        notificationManager.notify(notificationId, builder.build());
     }
 
     private void ensureCallsChannel(NotificationManager notificationManager) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
 
         NotificationChannel channel = new NotificationChannel(
-            CALLS_CHANNEL_ID,
+            CallNotificationHelper.CALLS_CHANNEL_ID,
             "Cuoc goi",
             NotificationManager.IMPORTANCE_HIGH
         );
@@ -102,13 +130,6 @@ public class NexConFirebaseMessagingService extends MessagingService {
         notificationManager.createNotificationChannel(channel);
     }
 
-    private boolean canUseFullScreenIntent(NotificationManager notificationManager) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            return true;
-        }
-        return notificationManager.canUseFullScreenIntent();
-    }
-
     private String resolveTitle(Map<String, String> data, String type) {
         if ("group-call".equals(type)) {
             return safe(data.get("groupName"), "Cuoc goi nhom");
@@ -116,9 +137,21 @@ public class NexConFirebaseMessagingService extends MessagingService {
         return safe(data.get("callerName"), "Cuoc goi den");
     }
 
-    private int notificationId(Map<String, String> data) {
-        String stableId = safe(data.get("roomName"), safe(data.get("callId"), safe(data.get("conversationId"), "nexcon-call")));
-        return 10_000 + Math.abs(stableId.hashCode() % 80_000);
+    private void wakeScreenForIncomingCall() {
+        try {
+            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (powerManager == null) return;
+
+            PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                    | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                    | PowerManager.ON_AFTER_RELEASE,
+                "NexCon:IncomingCall"
+            );
+            wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS);
+        } catch (RuntimeException ignored) {
+            // Full-screen intent still handles the normal wake path.
+        }
     }
 
     private String safe(String value, String fallback) {

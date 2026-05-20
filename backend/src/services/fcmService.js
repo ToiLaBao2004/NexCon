@@ -16,6 +16,7 @@ export async function sendFCMToUser(userId, { title, body, data = {}, dataOnly =
 
         const validTokens = user.fcmTokens.filter(Boolean);
         if (!validTokens.length) return;
+        const isCallPush = data?.type === 'direct-call' || data?.type === 'group-call';
 
         const message = {
             data: normalizeData({
@@ -24,9 +25,10 @@ export async function sendFCMToUser(userId, { title, body, data = {}, dataOnly =
             }),
             android: {
                 priority: 'high',
+                ...(isCallPush ? { ttl: 30_000, collapseKey: data.roomName || data.callId || data.conversationId } : {}),
                 notification: {
                     sound: 'default',
-                    channelId: 'messages',
+                    channelId: isCallPush ? 'calls' : 'messages',
                 },
             },
             tokens: validTokens,

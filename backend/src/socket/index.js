@@ -6,8 +6,8 @@ import { getUserConversationsForSocketIO } from "../controllers/conversationCont
 import Conversation from "../models/conversationModel.js";
 import BlockUser from "../models/blockUserModel.js";
 import Friend from "../models/friendModel.js";
-import { registerCallHandlers, handleCallDisconnect, emitPendingDirectCallsForUser } from "./callHandler.js";
-import { registerGroupCallHandlers, handleGroupCallDisconnect, emitPendingGroupCallsForUser } from "./groupCallHandler.js";
+import { registerCallHandlers, handleCallDisconnect, emitPendingDirectCallsForUser, declineDirectCallFromPush } from "./callHandler.js";
+import { registerGroupCallHandlers, handleGroupCallDisconnect, emitPendingGroupCallsForUser, declineGroupCallFromPush } from "./groupCallHandler.js";
 import { configureSocketGateway } from "./socketGateway.js";
 import Message from "../models/messageModel.js";
 
@@ -94,6 +94,20 @@ async function emitOnlineUsers() {
 
 function getReceiverSocketId(userId) {
     return isUserOnline(userId) ? getUserRoom(userId) : null;
+}
+
+async function handlePushCallAction(payload, action) {
+    if (action !== 'decline') return false;
+
+    if (payload?.type === 'direct-call') {
+        return declineDirectCallFromPush(activeCalls, io, getReceiverSocketId, payload);
+    }
+
+    if (payload?.type === 'group-call') {
+        return declineGroupCallFromPush(io, payload);
+    }
+
+    return false;
 }
 
 function emitToUser(userId, event, data) {
@@ -322,4 +336,5 @@ export {
     disconnectSessionSockets,
     disconnectUserSockets,
     emitOnlineUsers,
+    handlePushCallAction,
 };
