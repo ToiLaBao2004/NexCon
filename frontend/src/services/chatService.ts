@@ -23,8 +23,21 @@ const pageLimit = 20;
 function resolveErrorMessage(error: any): string {
 	const status = error?.response?.status;
 	const serverMsg = error?.response?.data?.message ?? '';
+	const normalizedServerMsg = String(serverMsg).trim().toLowerCase();
 
 	if (!navigator.onLine) return 'Không có kết nối mạng.';
+	if (normalizedServerMsg.includes('not friends')) {
+		return 'Bạn chỉ có thể nhắn tin cho bạn bè. Hãy kết bạn trước khi gửi tin nhắn.';
+	}
+	if (normalizedServerMsg.includes('not in this group') || normalizedServerMsg.includes('not a member')) {
+		return 'Bạn không còn là thành viên của cuộc trò chuyện này.';
+	}
+	if (normalizedServerMsg.includes('conversation not found')) {
+		return 'Không tìm thấy cuộc trò chuyện này.';
+	}
+	if (normalizedServerMsg.includes('recipientid') || normalizedServerMsg.includes('conversationid')) {
+		return 'Thiếu thông tin người nhận. Vui lòng thử lại.';
+	}
 	if (serverMsg) return serverMsg;
 	if (status === 403) return 'Bạn không có quyền gửi tin nhắn tới người này.';
 	if (status === 413) return 'File quá lớn — vui lòng chọn file nhỏ hơn 10MB.';
