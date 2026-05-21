@@ -509,16 +509,14 @@ export async function sendMessage(req, res) {
 
                 const cleanTranscript = transcript;
 
-                if (!cleanTranscript) {
-                    return res.status(400).json({
-                        message: 'Không thể chuyển audio thành văn bản để kiểm duyệt.',
-                    });
-                }
+                if (cleanTranscript) {
+                    const moderationResult = await moderateTextMessage(cleanTranscript, { modality: 'voice_transcript' });
 
-                const moderationResult = await moderateTextMessage(cleanTranscript, { modality: 'voice_transcript' });
-
-                if (moderationResult.blocked) {
-                    return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn thoại vi phạm tiêu chuẩn cộng đồng.', 'audio');
+                    if (moderationResult.blocked) {
+                        return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn thoại vi phạm tiêu chuẩn cộng đồng.', 'audio');
+                    }
+                } else {
+                    console.warn('[Moderation] Audio transcription unavailable, allowing voice message.');
                 }
 
                 const result = await safeUpload(
@@ -531,7 +529,7 @@ export async function sendMessage(req, res) {
                 messageData.fileName = uploadedFile.originalname || 'voice_message.webm';
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
-                messageData.content = cleanTranscript;
+                messageData.content = cleanTranscript || '';
 
                 break;
             }
