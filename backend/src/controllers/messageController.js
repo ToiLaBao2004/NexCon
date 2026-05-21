@@ -34,6 +34,20 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
 const SEARCH_MAX_SCANNED_MESSAGES = 500;
+const moderationCategoryLabels = {
+    abusive: 'Ngôn từ xúc phạm',
+    harassment: 'Quấy rối hoặc công kích cá nhân',
+    hate: 'Ngôn từ thù ghét',
+    sexual: 'Nội dung tình dục hoặc nhạy cảm',
+    dangerous: 'Nội dung nguy hiểm',
+    scam: 'Lừa đảo hoặc giả mạo',
+    self_harm: 'Tự gây hại',
+    spam: 'Spam gây hại',
+    unsafe_link: 'Liên kết không an toàn',
+    illegal: 'Nội dung bất hợp pháp',
+    violence: 'Bạo lực hoặc đe dọa',
+    unknown: 'Vi phạm tiêu chuẩn cộng đồng',
+};
 
 function clampSearchLimit(value) {
     const parsed = Number(value);
@@ -59,10 +73,11 @@ function getMessageVisibleToUserIds(message) {
 }
 
 async function respondWithModerationBlock(req, res, moderationResult, message, messageType) {
+    const reason = moderationResult.reason || message;
     const violation = await registerViolation({
         userId: req.user._id,
         source: `ai_${messageType}`,
-        reason: moderationResult.reason || message,
+        reason,
         metadata: {
             category: moderationResult.category,
             confidence: moderationResult.confidence ?? null,
@@ -71,11 +86,40 @@ async function respondWithModerationBlock(req, res, moderationResult, message, m
         },
     });
 
+    const categoryLabel = moderationCategoryLabels[moderationResult.category] || moderationCategoryLabels.unknown;
+    const isLocked = Boolean(violation.locked);
+    const blockedUntil = violation.blockedUntil || null;
+    const restrictionMessage = isLocked
+        ? blockedUntil
+            ? `Tài khoản của bạn bị khóa tạm thời đến ${new Date(blockedUntil).toLocaleString('vi-VN')}.`
+            : 'Tài khoản của bạn đã bị khóa do vi phạm lặp lại. Bạn có thể gửi khiếu nại ở màn hình đăng nhập.'
+        : `Tin nhắn chưa được gửi. Đây là lần vi phạm ${violation.count}/${violation.threshold}; vi phạm sẽ giảm sau ${violation.decayDays} ngày nếu không tái phạm.`;
+
     return res.status(violation.locked ? 423 : 400).json({
-        message: `${message} Hệ thống đã ghi nhận một lần vi phạm.`,
+        code: 'COMMUNITY_STANDARD_VIOLATION',
+        title: isLocked ? 'Tài khoản đã bị hạn chế' : 'Tin nhắn chưa được gửi',
+        message: `${message} Lý do: ${categoryLabel}. ${reason}`,
+        detail: restrictionMessage,
+        whatViolated: {
+            category: moderationResult.category || 'unknown',
+            label: categoryLabel,
+            reason,
+            confidence: moderationResult.confidence ?? null,
+            messageType,
+        },
+        restriction: {
+            type: isLocked ? 'account_lock' : 'message_block',
+            locked: isLocked,
+            blockedUntil,
+            isTemporary: Boolean(blockedUntil),
+            canAppeal: isLocked,
+            detailsUrl: '/moderation',
+            appealUrl: '/signin',
+            message: restrictionMessage,
+        },
         moderation: {
             category: moderationResult.category,
-            reason: moderationResult.reason,
+            reason,
             source: moderationResult.source,
             confidence: moderationResult.confidence ?? null,
         },

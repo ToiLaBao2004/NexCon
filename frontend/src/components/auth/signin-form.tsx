@@ -9,11 +9,14 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { FcGoogle } from "react-icons/fc"
 import { useOTPStore } from "@/stores/useOtpStore"
 import { useAuthStore } from "@/stores/useAuthStore"
-import { useNavigate } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
 import { authService } from "@/services/authService"
 import { Textarea } from "@/components/ui/textarea"
+import { ViolationHistoryList } from "@/components/moderation/ViolationHistoryList"
+import type { ModerationStatusResponse } from "@/types/moderation"
+import { formatModerationDate } from "@/lib/moderationNotice"
 
 const emailSchema = z.string().trim().email("Địa chỉ email không hợp lệ")
 
@@ -35,6 +38,7 @@ export function SigninForm({
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [lockedMessage, setLockedMessage] = useState<string | null>(null);
+  const [lockedDetails, setLockedDetails] = useState<Partial<ModerationStatusResponse> | null>(null);
   const [appealReason, setAppealReason] = useState("");
   const [appealSubmitting, setAppealSubmitting] = useState(false);
   const [hasPendingAppeal, setHasPendingAppeal] = useState(false);
@@ -49,6 +53,7 @@ export function SigninForm({
     const { email, password } = data;
     try {
       setLockedMessage(null);
+      setLockedDetails(null);
       setHasPendingAppeal(false);
       await signIn(email, password);
       const role = useAuthStore.getState().user?.role;
@@ -58,6 +63,13 @@ export function SigninForm({
       const backendMsg = error.response?.data?.message || "Đăng nhập thất bại.";
       if (error.response?.status === 423 || error.response?.data?.locked) {
         setLockedMessage(backendMsg);
+        setLockedDetails({
+          summary: error.response?.data?.violationSummary,
+          restriction: error.response?.data?.restriction,
+          history: error.response?.data?.violationHistory || [],
+          appeal: error.response?.data?.appeal,
+        });
+        setHasPendingAppeal(!error.response?.data?.appeal?.canSubmit && error.response?.data?.appeal?.status === "pending");
         clearErrors("root");
         return;
       }
@@ -207,7 +219,41 @@ export function SigninForm({
             {errors.root && <p className="text-sm text-destructive mt-2">{errors.root.message}</p>}
             {lockedMessage && (
               <div className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                <p className="text-sm font-medium text-destructive">{lockedMessage}</p>
+                <p className="text-sm font-semibold text-destructive">
+                  {lockedDetails?.restriction?.locked ? "Tài khoản đang bị hạn chế" : "Không thể đăng nhập"}
+                </p>
+                <p className="mt-1 text-sm text-destructive/90">{lockedMessage}</p>
+                {lockedDetails?.summary && (
+                  <div className="mt-3 grid gap-2 rounded-md border border-destructive/20 bg-background/70 p-3 text-xs text-muted-foreground">
+                    <span>
+                      Số lần vi phạm còn hiệu lực: {lockedDetails.summary.count ?? 0}/{lockedDetails.summary.threshold ?? 0}
+                    </span>
+                    <span>
+                      Lần gần nhất: {formatModerationDate(lockedDetails.summary.lastViolationAt)}
+                    </span>
+                    <span>
+                      Thời gian block: {lockedDetails.restriction?.blockedUntil
+                        ? `đến ${formatModerationDate(lockedDetails.restriction.blockedUntil)}`
+                        : "không thời hạn, đến khi admin mở khóa hoặc chấp nhận khiếu nại"}
+                    </span>
+                  </div>
+                )}
+                {lockedDetails?.history && lockedDetails.history.length > 0 && (
+                  <div className="mt-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Lịch sử vi phạm gần đây
+                    </p>
+                    <ViolationHistoryList items={lockedDetails.history.slice(0, 3)} compact />
+                  </div>
+                )}
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <Link className="font-medium text-primary hover:underline" to="/community-standards">
+                    Xem tiêu chuẩn cộng đồng
+                  </Link>
+                  <Link className="font-medium text-primary hover:underline" to="/privacy">
+                    Chính sách quyền riêng tư
+                  </Link>
+                </div>
                 <div className="mt-3 space-y-2">
                   <Textarea
                     value={appealReason}
@@ -229,7 +275,7 @@ export function SigninForm({
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full"
+                    className="w-full cursor-pointer"
                     disabled={hasPendingAppeal || appealSubmitting || isAppealReasonTooShort}
                     onClick={handleSubmitAppeal}
                   >
@@ -259,9 +305,9 @@ export function SigninForm({
           </div>
         </CardContent>
       </Card>
-      <div className="text-xs text-center px-6 text-muted-foreground [a]:underline [a]:underline-offset-4 [a]:hover:text-primary text-balance">
-        Bằng cách nhấp vào tiếp tục, bạn đồng ý với của chúng tôi <a href="#" className="underline underline-offset-4">Điều khoản dịch vụ</a>{" "}
-        và <a href="#" className="underline underline-offset-4">Chính sách bảo mật</a>.
+      <div className="text-xs text-center px-6 text-slate-600 dark:text-white/85 [a]:font-semibold [a]:text-primary dark:[a]:text-cyan-200 [a]:underline [a]:underline-offset-4 [a]:hover:text-primary/80 dark:[a]:hover:text-white text-balance">
+        Bằng cách nhấp vào tiếp tục, bạn đồng ý với <Link to="/terms">Điều khoản sử dụng</Link>,{" "}
+        <Link to="/community-standards">Tiêu chuẩn cộng đồng</Link> và <Link to="/privacy">Chính sách quyền riêng tư</Link>.
       </div>
     </div>
   )

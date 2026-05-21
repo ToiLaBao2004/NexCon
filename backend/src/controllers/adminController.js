@@ -1098,6 +1098,7 @@ export async function lockAdminUser(req, res) {
             userId,
             adminId: req.user._id,
             reason: req.body?.reason || 'Tài khoản đã bị khóa.',
+            expiresAt: req.body?.expiresAt || null,
         });
 
         return res.status(200).json({ user: toUserSummary(user.toObject ? user.toObject() : user) });

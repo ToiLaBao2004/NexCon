@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useAuthStore } from "@/stores/useAuthStore"
 import { useOTPStore } from "@/stores/useOtpStore"
-import { useNavigate } from "react-router"
+import { Link, useNavigate } from "react-router"
 import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { checkFieldFormat } from "@/lib/fieldFormat"
@@ -179,9 +179,9 @@ export function SignupForm({
           </div>
         </CardContent>
       </Card>
-      <div className="text-xs text-center px-6 text-muted-foreground [a]:underline [a]:underline-offset-4 [a]:hover:text-primary text-balance">
-        Bằng cách nhấp vào tiếp tục, bạn đồng ý với của chúng tôi <a href="#" className="underline underline-offset-4">Điều khoản dịch vụ</a>{" "}
-        và <a href="#" className="underline underline-offset-4">Chính sách bảo mật</a>.
+      <div className="text-xs text-center px-6 text-slate-600 dark:text-white/85 [a]:font-semibold [a]:text-primary dark:[a]:text-cyan-200 [a]:underline [a]:underline-offset-4 [a]:hover:text-primary/80 dark:[a]:hover:text-white text-balance">
+        Bằng cách nhấp vào tiếp tục, bạn đồng ý với <Link to="/terms">Điều khoản sử dụng</Link>,{" "}
+        <Link to="/community-standards">Tiêu chuẩn cộng đồng</Link> và <Link to="/privacy">Chính sách quyền riêng tư</Link>.
       </div>
     </div>
   )

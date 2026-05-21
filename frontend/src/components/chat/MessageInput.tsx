@@ -2,6 +2,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import type { Conversation, Mention, MessageType } from "@/types/chat";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Button } from "../ui/button";
+import { useNavigate } from "react-router";
 import EmojiPicker from "./EmojiPicker";
 import VoiceRecorder from "./VoiceRecorder";
 import { useChatStore } from "@/stores/useChatStore";
@@ -14,6 +15,7 @@ import CachedStickerImage from "./CachedStickerImage";
 import { isUrl, formatBytes } from "@/lib/utils";
 import { draftStorage } from "@/lib/draftStorage";
 import { validateImageFile } from "@/lib/imageCrop";
+import { buildModerationNotice, getModerationPayload, isModerationBlockError } from "@/lib/moderationNotice";
 
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -159,6 +161,7 @@ function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: numb
 
 const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const { user } = useAuthStore();
+	const navigate = useNavigate();
 	const { emitTyping, emitStopTyping } = useSocketStore();
 	const { sendMessage, markAsSeen, replyingTo, setReplyingTo, setDraft, clearDraft } = useChatStore();
 	const { blockedUsers, blockedBy, fetchBlockedList } = useFriendStore();
@@ -181,6 +184,21 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const imageInputRef = useRef<HTMLInputElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const textInputRef = useRef<HTMLTextAreaElement>(null);
+
+	const showModerationBlockToast = useCallback((error: any) => {
+		const payload = getModerationPayload(error);
+		const notice = buildModerationNotice(payload);
+		const targetPath = payload?.restriction?.type === "account_lock" ? "/signin" : "/moderation";
+
+		toast.error(notice.title, {
+			description: notice.description,
+			duration: 12000,
+			action: {
+				label: "Xem chi tiết",
+				onClick: () => navigate(targetPath),
+			},
+		});
+	}, [navigate]);
 
 	useEffect(() => {
 		const focusTimer = window.setTimeout(() => {
@@ -302,10 +320,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				});
 
 				const results = await Promise.allSettled(sendTasks);
-				const isFilteredError = (reason: any) => {
-					const message = String(reason?.message || "").toLowerCase();
-					return message.includes("tiêu chuẩn cộng đồng") || message.includes("vi phạm");
-				};
+				const isFilteredError = (reason: any) => isModerationBlockError(reason);
 				const filteredCount = results.filter((result) =>
 					result.status === "rejected" && isFilteredError(result.reason)
 				).length;
@@ -341,9 +356,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				return;
 			}
 
-			const isModerationError =
-				error?.response?.data?.moderation ||
-				error?.message?.toLowerCase().includes("tiêu chuẩn cộng đồng");
+			const isModerationError = isModerationBlockError(error);
 
 			const failedAttachmentIndex = prevAttachments.length > 0 ? sentCount : -1;
 			const restoreStart = isModerationError && failedAttachmentIndex >= 0
@@ -360,10 +373,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				setValue("");
 				setAttachments(restoredAttachments);
 
-				toast.error(
-					error?.response?.data?.message ||
-					"Tin nhắn vi phạm tiêu chuẩn cộng đồng."
-				);
+				showModerationBlockToast(error);
 			} else {
 				setValue(sentCount === 0 ? currValue : "");
 				setAttachments(restoredAttachments);
@@ -722,18 +732,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		try {
 			await sendMessage(payload);
 		} catch (error: any) {
-			const isModerationError =
-				error?.response?.data?.moderation ||
-				error?.message?.toLowerCase().includes("tiêu chuẩn cộng đồng");
+			const isModerationError = isModerationBlockError(error);
 
 			if (isModerationError) {
 				setValue("");
 				setAttachments([]);
 
-				toast.error(
-					error?.response?.data?.message ||
-					"Tin nhắn vi phạm tiêu chuẩn cộng đồng."
-				);
+				showModerationBlockToast(error);
 			} else {
 				setValue(currValue);
 				setAttachments(prevAttachments);
@@ -747,7 +752,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			setSending(false);
 			setTimeout(() => textInputRef.current?.focus(), 0);
 		}
-	}, [selectedConvo, otherUserId, sendMessage, value, attachments, selectedMentions]);
+	}, [selectedConvo, otherUserId, sendMessage, value, attachments, selectedMentions, showModerationBlockToast]);
 
 	const handleStickerSelect = async (url: string) => {
 		const payload: Parameters<typeof sendMessage>[0] = {

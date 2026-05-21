@@ -1,4 +1,4 @@
-import { MessageSquare, Video, Users, Calendar, Bell, Moon, Sun, LogOut, Settings, User } from "lucide-react";
+import { MessageSquare, Video, Users, Calendar, Bell, Moon, Sun, LogOut, Settings, User, ShieldAlert } from "lucide-react";
 import { useNavigate, useLocation } from "react-router";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useNotificationStore } from "@/stores/useNotificationStore";
@@ -117,6 +117,10 @@ const MobileBottomNav = () => {
                             <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => setIsSettingsOpen(true)}>
                                 <Settings className="mr-2 h-4 w-4" />
                                 <span>Cài đặt</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => navigate("/moderation")}>
+                                <ShieldAlert className="mr-2 h-4 w-4" />
+                                <span>Vi phạm & khiếu nại</span>
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />

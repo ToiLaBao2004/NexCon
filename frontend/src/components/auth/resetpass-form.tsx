@@ -166,7 +166,7 @@ export function ResetPassForm({
         </CardContent>
       </Card>
 
-      <div className="text-xs text-center px-6 text-muted-foreground [a]:underline [a]:underline-offset-4 [a]:hover:text-primary text-balance">
+      <div className="text-xs text-center px-6 text-slate-600 dark:text-white/85 [a]:font-semibold [a]:text-primary dark:[a]:text-cyan-200 [a]:underline [a]:underline-offset-4 [a]:hover:text-primary/80 dark:[a]:hover:text-white text-balance">
         Bằng cách nhấp vào tiếp tục, bạn đồng ý với của chúng tôi{" "}
         <a href="#" className="underline underline-offset-4">
           Điều khoản dịch vụ

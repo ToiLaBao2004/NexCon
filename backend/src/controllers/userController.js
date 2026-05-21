@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import { searchSpotifyTracks } from '../services/spotifyService.js';
 import { checkFieldFormat } from '../utils/fieldFormat.js';
 import { maskLockedUser } from '../utils/lockedUser.js';
+import { getUserModerationDetails } from '../services/moderation/violationService.js';
 
 export async function getCurrentUser(req, res) {
     try {
@@ -19,6 +20,20 @@ export async function getCurrentUser(req, res) {
     } catch (error) {
         console.error("Get current user error:", error);
         return res.status(500).json({ message: "Server error" });
+    }
+}
+
+export async function getMyModerationStatus(req, res) {
+    try {
+        const limit = Math.max(1, Math.min(100, Number.parseInt(req.query?.limit || '30', 10) || 30));
+        const moderation = await getUserModerationDetails(req.user._id, { limit });
+
+        return res.status(200).json(moderation);
+    } catch (error) {
+        console.error("Get moderation status error:", error);
+        return res.status(error.statusCode || 500).json({
+            message: error.statusCode === 404 ? "User not found" : "Server error",
+        });
     }
 }
 

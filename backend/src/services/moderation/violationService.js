@@ -1,12 +1,15 @@
+import mongoose from 'mongoose';
 import redis, { isRedisReady } from '../../config/redis.js';
 import User from '../../models/userModel.js';
 import Session from '../../models/sessionModel.js';
+import LockAppeal from '../../models/lockAppealModel.js';
 import { createNotification } from '../notificationServices.js';
 import { disconnectUserSockets } from '../../socket/index.js';
 
 const VIOLATION_DECAY_MS = 7 * 24 * 60 * 60 * 1000;
 const VIOLATION_DECAY_SECONDS = Math.floor(VIOLATION_DECAY_MS / 1000);
 const LOCK_THRESHOLD = Number.parseInt(process.env.VIOLATION_LOCK_THRESHOLD || '5', 10);
+const MAX_VIOLATION_HISTORY = Number.parseInt(process.env.VIOLATION_HISTORY_LIMIT || '50', 10) || 50;
 
 const READ_REDIS_VIOLATION_STATE_SCRIPT = `
 local key = KEYS[1]
@@ -124,6 +127,120 @@ function normalizeReason(reason) {
     return String(reason || 'Vi phạm tiêu chuẩn cộng đồng.').trim().slice(0, 1000);
 }
 
+function normalizeOptionalDate(value) {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function objectIdOrNull(value) {
+    const raw = value?._id || value;
+    if (!raw) return null;
+    const text = raw.toString?.() || String(raw);
+    return mongoose.Types.ObjectId.isValid(text) ? new mongoose.Types.ObjectId(text) : null;
+}
+
+function numberOrNull(value) {
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+}
+
+function sanitizeMetadata(value, depth = 0) {
+    if (value == null) return value;
+    if (depth > 4) return '[Max depth]';
+    if (typeof value === 'string') return value.slice(0, 1000);
+    if (typeof value === 'number' || typeof value === 'boolean') return value;
+    if (value instanceof Date) return value.toISOString();
+    if (Array.isArray(value)) return value.slice(0, 20).map((item) => sanitizeMetadata(item, depth + 1));
+    if (typeof value === 'object') {
+        return Object.entries(value).reduce((acc, [key, item]) => {
+            acc[String(key).slice(0, 80)] = sanitizeMetadata(item, depth + 1);
+            return acc;
+        }, {});
+    }
+    return String(value).slice(0, 1000);
+}
+
+function buildViolationHistoryEntry({
+    actorId = null,
+    source = 'manual',
+    reason = '',
+    metadata = {},
+    count = 0,
+    willLock = false,
+}) {
+    const aiModeration = metadata?.aiModeration || {};
+    const category = metadata?.category || aiModeration?.category || '';
+    const confidence = metadata?.confidence ?? aiModeration?.confidence ?? null;
+    const messageId = metadata?.messageId || metadata?.targetMessageId || null;
+
+    return {
+        _id: new mongoose.Types.ObjectId(),
+        recordedAt: new Date(),
+        source: String(source || 'manual').slice(0, 120),
+        reason: normalizeReason(reason),
+        category: String(category || '').slice(0, 80),
+        confidence: numberOrNull(confidence),
+        status: willLock ? 'account_locked' : 'warning_sent',
+        action: willLock ? 'account_locked' : 'message_blocked',
+        countAfter: count,
+        threshold: LOCK_THRESHOLD,
+        messageType: String(metadata?.messageType || '').slice(0, 40),
+        conversationId: objectIdOrNull(metadata?.conversationId),
+        messageId: objectIdOrNull(messageId),
+        reportId: objectIdOrNull(metadata?.reportId),
+        actorId: objectIdOrNull(actorId),
+        metadata: sanitizeMetadata(metadata),
+    };
+}
+
+function serializeViolationHistoryItem(item = {}) {
+    return {
+        _id: item._id?.toString?.() || item._id || null,
+        recordedAt: item.recordedAt || null,
+        source: item.source || 'unknown',
+        reason: item.reason || '',
+        category: item.category || '',
+        confidence: item.confidence ?? null,
+        status: item.status || 'recorded',
+        action: item.action || '',
+        countAfter: item.countAfter || 0,
+        threshold: item.threshold || LOCK_THRESHOLD,
+        messageType: item.messageType || '',
+        conversationId: item.conversationId?.toString?.() || item.conversationId || null,
+        messageId: item.messageId?.toString?.() || item.messageId || null,
+        reportId: item.reportId?.toString?.() || item.reportId || null,
+        actorId: item.actorId?.toString?.() || item.actorId || null,
+        metadata: item.metadata || null,
+    };
+}
+
+export function buildRestrictionDetails(user) {
+    const lock = user?.lock || {};
+    const locked = Boolean(lock.isLocked);
+    const blockedUntil = lock.expiresAt || null;
+    const reason = locked
+        ? normalizeReason(lock.reason || 'Tài khoản của bạn đang bị khóa do vi phạm tiêu chuẩn cộng đồng.')
+        : '';
+
+    return {
+        locked,
+        type: locked ? 'account_lock' : 'none',
+        reason,
+        lockedAt: lock.lockedAt || null,
+        blockedUntil,
+        isTemporary: Boolean(blockedUntil),
+        canAppeal: locked,
+        detailsUrl: '/moderation',
+        appealUrl: '/signin',
+        message: locked
+            ? blockedUntil
+                ? `Tài khoản bị khóa tạm thời đến ${new Date(blockedUntil).toLocaleString('vi-VN')}.`
+                : 'Tài khoản bị khóa cho đến khi admin mở khóa hoặc chấp nhận khiếu nại.'
+            : '',
+    };
+}
+
 function buildLockNotice() {
     return 'Tài khoản của bạn đã bị khóa sau khi chúng tôi xem xét vi phạm. Nếu cho rằng quyết định này nhầm lẫn, bạn có thể gửi kháng cáo từ màn hình đăng nhập.';
 }
@@ -230,6 +347,7 @@ export async function getViolationSummary(userId) {
             count: state.count,
             threshold: LOCK_THRESHOLD,
             decayDays: 7,
+            lastViolationAt: state.lastViolationAt,
             nextDecayAt: state.nextDecayAt,
             source: 'redis',
         };
@@ -240,13 +358,60 @@ export async function getViolationSummary(userId) {
         count: state.count,
         threshold: LOCK_THRESHOLD,
         decayDays: 7,
+        lastViolationAt: state.lastViolationAt,
         nextDecayAt: state.nextDecayAt,
         source: 'mongo-cache',
     };
 }
 
-export async function lockAccount({ userId, adminId = null, reason = '' }) {
+export async function getUserModerationDetails(userId, { limit = 20 } = {}) {
+    const user = await User.findById(userId).select('lock moderation').lean();
+    if (!user) {
+        const error = new Error('User not found.');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    const [summary, pendingAppeal] = await Promise.all([
+        getViolationSummary(userId),
+        LockAppeal.findOne({ userId, status: 'pending' })
+            .select('_id status reason createdAt updatedAt')
+            .sort({ createdAt: -1 })
+            .lean(),
+    ]);
+
+    const historyLimit = Math.max(1, Math.min(100, Number.parseInt(limit, 10) || 20));
+    const history = [...(user.moderation?.violationHistory || [])]
+        .slice(-historyLimit)
+        .reverse()
+        .map(serializeViolationHistoryItem);
+
+    return {
+        summary: {
+            ...summary,
+            lastViolationAt: user.moderation?.lastViolationAt || summary.lastViolationAt || null,
+        },
+        restriction: buildRestrictionDetails(user),
+        history,
+        appeal: pendingAppeal
+            ? {
+                _id: pendingAppeal._id,
+                status: pendingAppeal.status,
+                reason: pendingAppeal.reason,
+                submittedAt: pendingAppeal.createdAt,
+                updatedAt: pendingAppeal.updatedAt,
+                canSubmit: false,
+            }
+            : {
+                status: null,
+                canSubmit: Boolean(user.lock?.isLocked),
+            },
+    };
+}
+
+export async function lockAccount({ userId, adminId = null, reason = '', expiresAt = null }) {
     const lockReason = normalizeReason(reason || 'Tài khoản bị khóa do vượt ngưỡng vi phạm.');
+    const lockExpiresAt = normalizeOptionalDate(expiresAt);
     const current = await User.findById(userId).select('lock').lean();
     const wasLocked = Boolean(current?.lock?.isLocked);
     const user = await User.findByIdAndUpdate(
@@ -255,6 +420,7 @@ export async function lockAccount({ userId, adminId = null, reason = '' }) {
             $set: {
                 'lock.isLocked': true,
                 'lock.lockedAt': new Date(),
+                'lock.expiresAt': lockExpiresAt,
                 'lock.lockedBy': adminId,
                 'lock.reason': lockReason,
                 'lock.unlockedAt': null,
@@ -302,6 +468,7 @@ export async function unlockAccount({ userId, adminId = null, reason = '', reset
             'lock.unlockedAt': new Date(),
             'lock.unlockedBy': adminId,
             'lock.reason': null,
+            'lock.expiresAt': null,
             'moderation.violationCountCache': resetViolations ? 0 : undefined,
         },
     };
@@ -349,6 +516,7 @@ export async function registerViolation({
     const normalizedReason = normalizeReason(reason);
     let count;
     let violationState;
+    let latestViolation = null;
 
     if (isRedisReady) {
         violationState = await registerRedisViolation(userId);
@@ -382,6 +550,28 @@ export async function registerViolation({
         throw error;
     }
 
+    const willLock = count >= LOCK_THRESHOLD && !user.lock?.isLocked;
+    latestViolation = buildViolationHistoryEntry({
+        actorId,
+        source,
+        reason: normalizedReason,
+        metadata,
+        count,
+        willLock,
+    });
+
+    await User.updateOne(
+        { _id: user._id },
+        {
+            $push: {
+                'moderation.violationHistory': {
+                    $each: [latestViolation],
+                    $slice: -Math.max(10, MAX_VIOLATION_HISTORY),
+                },
+            },
+        }
+    );
+
     if (notify) {
         await createNotification(
             user._id,
@@ -403,7 +593,7 @@ export async function registerViolation({
     }
 
     let locked = false;
-    if (count >= LOCK_THRESHOLD && !user.lock?.isLocked) {
+    if (willLock) {
         await lockAccount({
             userId,
             adminId: actorId,
@@ -416,8 +606,10 @@ export async function registerViolation({
         count,
         threshold: LOCK_THRESHOLD,
         locked,
+        blockedUntil: null,
         decayDays: 7,
         nextDecayAt: violationState.nextDecayAt,
+        latestViolation: serializeViolationHistoryItem(latestViolation),
     };
 }
 

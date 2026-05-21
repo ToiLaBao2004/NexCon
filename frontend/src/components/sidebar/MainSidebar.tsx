@@ -7,7 +7,8 @@ import {
     Sun,
     LogOut,
     MessageSquare,
-    Settings
+    Settings,
+    ShieldAlert
 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useThemeStore } from "@/stores/useThemeStore";
@@ -137,6 +138,10 @@ const MainSidebar = () => {
                                     <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => setIsSettingsOpen(true)}>
                                         <Settings className="mr-2 h-4 w-4" />
                                         <span>Cài đặt</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => navigate("/moderation")}>
+                                        <ShieldAlert className="mr-2 h-4 w-4" />
+                                        <span>Vi phạm & khiếu nại</span>
                                     </DropdownMenuItem>
                                 </DropdownMenuGroup>
                                 <DropdownMenuSeparator />

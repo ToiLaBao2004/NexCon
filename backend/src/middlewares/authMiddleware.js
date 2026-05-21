@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/userModel.js';
 import Session from '../models/sessionModel.js';
+import { getUserModerationDetails } from '../services/moderation/violationService.js';
 
 export async function authMiddleware(req, res, next) {
     try {
@@ -15,10 +16,16 @@ export async function authMiddleware(req, res, next) {
             return res.status(401).json({ message: 'User not found.' });
         }
         if (user.lock?.isLocked) {
+            const moderation = await getUserModerationDetails(user._id, { limit: 10 });
             return res.status(423).json({
                 success: false,
                 locked: true,
-                message: user.lock.reason || 'Tài khoản của bạn đang bị khóa.',
+                title: 'Tài khoản đang bị hạn chế',
+                message: moderation.restriction.reason || user.lock.reason || 'Tài khoản của bạn đang bị khóa.',
+                restriction: moderation.restriction,
+                violationSummary: moderation.summary,
+                violationHistory: moderation.history,
+                appeal: moderation.appeal,
             });
         }
         const session = await Session.findById(payload.sessionId);
