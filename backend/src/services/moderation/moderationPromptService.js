@@ -129,13 +129,19 @@ export async function appendViolationExample(example) {
 
 export async function buildTextModerationPrompt({ text, modality = 'text' }) {
     const doc = await readModerationPromptDoc();
+    const safeModality = safePromptText(modality, 80);
+
     return `${doc}
+
+## Current Moderation Task
+
+Modality: ${safeModality}
 
 ## Tác vụ kiểm duyệt hiện tại
 
-Loại nội dung: ${safePromptText(modality, 80)}
+Loại nội dung: ${safeModality}
 
-Phân tích nội dung ${safePromptText(modality, 80)} sau và quyết định có vi phạm tiêu chuẩn cộng đồng NexCon hay không.
+Phân tích nội dung ${safeModality} sau và quyết định có vi phạm tiêu chuẩn cộng đồng NexCon hay không.
 
 Chỉ trả JSON:
 {
@@ -153,7 +159,12 @@ Nội dung:
 
 export async function buildLinkModerationPrompt(url) {
     const doc = await readModerationPromptDoc();
+
     return `${doc}
+
+## Current Moderation Task
+
+Modality: link
 
 ## Tác vụ kiểm duyệt hiện tại
 
@@ -177,7 +188,12 @@ URL:
 
 export async function buildImageModerationPrompt({ mimeType = 'image/jpeg' } = {}) {
     const doc = await readModerationPromptDoc();
+
     return `${doc}
+
+## Current Moderation Task
+
+Modality: image
 
 ## Tác vụ kiểm duyệt hiện tại
 
