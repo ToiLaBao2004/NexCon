@@ -64,7 +64,7 @@ function buildGroupIncomingPayload(groupCall) {
         callId: groupCall.callId,
         callType: groupCall.callType,
         initiator: groupCall.initiator,
-        groupName: groupCall.groupName || 'Nhom',
+        groupName: groupCall.groupName || 'Nhóm',
         participants: participantsArray(groupCall),
     };
 }
@@ -74,7 +74,7 @@ function emitToOtherUserDevices(socket, userId, event, payload) {
 }
 
 async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupName }) {
-    const callLabel = groupCallInfo.callType === 'video' ? 'Cuoc goi video nhom' : 'Cuoc goi thoai nhom';
+    const callLabel = groupCallInfo.callType === 'video' ? 'cuộc gọi video nhóm' : 'cuộc gọi thoại nhóm';
 
     await Promise.all((conversation.participants || []).map(async (participant) => {
         const participantUser = participant.userId;
@@ -87,8 +87,8 @@ async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupNa
         if (isMuted(participant.mute, 'meetings')) return;
 
         await sendFCMToUser(participantId, {
-            title: groupName || 'Cuoc goi nhom',
-            body: `${groupCallInfo.initiator.displayName || 'Thanh vien'} dang bat dau ${callLabel}`,
+            title: groupName || 'Cuộc gọi nhóm',
+            body: `${groupCallInfo.initiator.displayName || 'Thành viên'} đang bắt đầu ${callLabel}`,
             dataOnly: true,
             data: {
                 type: 'group-call',
@@ -96,8 +96,8 @@ async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupNa
                 callId: groupCallInfo.callId,
                 conversationId: groupCallInfo.conversationId,
                 initiatorId: groupCallInfo.initiatorId,
-                initiatorName: groupCallInfo.initiator.displayName || 'Thanh vien',
-                groupName: groupName || 'Nhom',
+                initiatorName: groupCallInfo.initiator.displayName || 'Thành viên',
+                groupName: groupName || 'Nhóm',
                 callActionToken: createCallActionToken({
                     type: 'group-call',
                     userId: participantId,

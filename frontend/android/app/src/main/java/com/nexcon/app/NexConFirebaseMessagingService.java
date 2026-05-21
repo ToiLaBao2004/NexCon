@@ -16,6 +16,7 @@ import android.os.PowerManager;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.Person;
 
 import com.google.firebase.messaging.RemoteMessage;
 
@@ -53,7 +54,7 @@ public class NexConFirebaseMessagingService extends MessagingService {
         String type = safe(data.get("type"), "direct-call");
         String callType = safe(data.get("callType"), "voice");
         String title = safe(data.get("title"), resolveTitle(data, type));
-        String body = safe(data.get("body"), "video".equals(callType) ? "Cuoc goi video den" : "Cuoc goi thoai den");
+        String body = safe(data.get("body"), "video".equals(callType) ? "Cuộc gọi video đến" : "Cuộc gọi thoại đến");
         int notificationId = CallNotificationHelper.notificationId(data);
 
         Intent incomingCallIntent = new Intent(this, IncomingCallActivity.class);
@@ -92,6 +93,11 @@ public class NexConFirebaseMessagingService extends MessagingService {
             PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
+        Person caller = new Person.Builder()
+            .setName(title)
+            .setImportant(true)
+            .build();
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CallNotificationHelper.CALLS_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_nexcon_call)
             .setContentTitle(title)
@@ -105,12 +111,14 @@ public class NexConFirebaseMessagingService extends MessagingService {
             .setTimeoutAfter(CALL_NOTIFICATION_TIMEOUT_MS)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setTicker(title)
+            .setColorized(true)
             .setFullScreenIntent(fullScreenPendingIntent, true)
-            .addAction(R.drawable.ic_stat_nexcon_call, "Tu choi", declinePendingIntent)
-            .addAction(R.drawable.ic_stat_nexcon_call, "Tra loi", answerPendingIntent);
+            .setStyle(NotificationCompat.CallStyle.forIncomingCall(caller, declinePendingIntent, answerPendingIntent))
+            .addAction(R.drawable.ic_stat_nexcon_call, "Từ chối", declinePendingIntent)
+            .addAction(R.drawable.ic_stat_nexcon_call, "Trả lời", answerPendingIntent);
 
         notificationManager.notify(notificationId, builder.build());
-        openIncomingCallScreenIfDeviceIsLocked(incomingCallIntent);
+        openIncomingCallScreen(incomingCallIntent);
     }
 
     private void ensureCallsChannel(NotificationManager notificationManager) {
@@ -118,10 +126,10 @@ public class NexConFirebaseMessagingService extends MessagingService {
 
         NotificationChannel channel = new NotificationChannel(
             CallNotificationHelper.CALLS_CHANNEL_ID,
-            "Cuoc goi",
+            "Cuộc gọi",
             NotificationManager.IMPORTANCE_HIGH
         );
-        channel.setDescription("Thong bao cuoc goi den");
+        channel.setDescription("Thông báo cuộc gọi đến");
         channel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
         channel.enableVibration(true);
 
@@ -135,21 +143,13 @@ public class NexConFirebaseMessagingService extends MessagingService {
         notificationManager.createNotificationChannel(channel);
     }
 
-    private void openIncomingCallScreenIfDeviceIsLocked(Intent incomingCallIntent) {
+    private void openIncomingCallScreen(Intent incomingCallIntent) {
         try {
-            boolean shouldOpen = false;
-
             PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            if (powerManager != null && !powerManager.isInteractive()) {
-                shouldOpen = true;
-            }
-
             KeyguardManager keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-            if (keyguardManager != null && keyguardManager.isKeyguardLocked()) {
-                shouldOpen = true;
-            }
-
-            if (!shouldOpen) return;
+            boolean isScreenOff = powerManager != null && !powerManager.isInteractive();
+            boolean isLocked = keyguardManager != null && keyguardManager.isKeyguardLocked();
+            long delayMs = (isScreenOff || isLocked) ? 150L : 0L;
 
             Intent intent = new Intent(incomingCallIntent);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -159,7 +159,7 @@ public class NexConFirebaseMessagingService extends MessagingService {
                 } catch (RuntimeException ignored) {
                     // Full-screen notification remains the supported path if direct launch is blocked.
                 }
-            }, 250L);
+            }, delayMs);
         } catch (RuntimeException ignored) {
             // Keep notification delivery intact.
         }
@@ -167,9 +167,9 @@ public class NexConFirebaseMessagingService extends MessagingService {
 
     private String resolveTitle(Map<String, String> data, String type) {
         if ("group-call".equals(type)) {
-            return safe(data.get("groupName"), "Cuoc goi nhom");
+            return safe(data.get("groupName"), "Cuộc gọi nhóm");
         }
-        return safe(data.get("callerName"), "Cuoc goi den");
+        return safe(data.get("callerName"), "Cuộc gọi đến");
     }
 
     private void wakeScreenForIncomingCall() {

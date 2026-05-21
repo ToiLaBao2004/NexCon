@@ -74,7 +74,7 @@ public class IncomingCallActivity extends Activity {
         callTypeText.setText(callTypeLabel);
         callerNameText.setText(callerName);
         callerInitialText.setText(resolveInitial(callerName));
-        callHintText.setText("Dang do chuong tren NexCon");
+        callHintText.setText("Đang đổ chuông trên NexCon");
 
         answerButton.setOnClickListener((View view) -> launchMainApp("answer"));
         declineButton.setOnClickListener((View view) -> declineCall());
@@ -134,17 +134,17 @@ public class IncomingCallActivity extends Activity {
 
     private String resolveCallerName(Intent intent, String type) {
         if ("group-call".equals(type)) {
-            return CallNotificationHelper.getStringExtra(intent, "groupName", "Cuoc goi nhom");
+            return CallNotificationHelper.getStringExtra(intent, "groupName", "Cuộc gọi nhóm");
         }
-        return CallNotificationHelper.getStringExtra(intent, "callerName", "Cuoc goi den");
+        return CallNotificationHelper.getStringExtra(intent, "callerName", "Cuộc gọi đến");
     }
 
     private String resolveCallTypeLabel(String type, String callType) {
         boolean isVideo = "video".equals(callType);
         if ("group-call".equals(type)) {
-            return isVideo ? "Cuoc goi video nhom" : "Cuoc goi thoai nhom";
+            return isVideo ? "Cuộc gọi video nhóm" : "Cuộc gọi thoại nhóm";
         }
-        return isVideo ? "Cuoc goi video den" : "Cuoc goi thoai den";
+        return isVideo ? "Cuộc gọi video đến" : "Cuộc gọi thoại đến";
     }
 
     private String resolveInitial(String callerName) {
