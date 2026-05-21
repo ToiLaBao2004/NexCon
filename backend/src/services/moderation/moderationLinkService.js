@@ -225,18 +225,22 @@ export async function moderateLinkMessage(url, options = {}) {
     const localResult = containsBlockedLink(url);
 
     if (localResult.matched) {
-        console.log(`[Moderation] Blocked LINK by LOCAL: ${localResult.reason}`);
-        return {
-            allowed: false,
-            blocked: true,
-            category: localResult.category,
-            reason: localResult.reason,
-            userMessage: localResult.userMessage,
-            source: localResult.source
-        };
+        const isFormatError = localResult.category === 'invalid' || localResult.reason?.startsWith('Unsupported protocol');
+        if (isFormatError) {
+            return {
+                allowed: false,
+                blocked: true,
+                category: localResult.category,
+                reason: localResult.reason,
+                userMessage: localResult.userMessage,
+                source: localResult.source
+            };
+        }
+
+        console.log(`[Moderation] LOCAL link signal, verifying with AI: ${localResult.reason}`);
     }
 
-    if (forceAI || shouldUseAIForLink(url)) {
+    if (forceAI || localResult.matched || shouldUseAIForLink(url)) {
         console.log(`[Moderation] Calling Gemini for LINK: ${String(url).slice(0, 120)}`);
 
         const aiResult = await checkLinkWithGemini(url);

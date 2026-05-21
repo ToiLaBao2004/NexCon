@@ -168,19 +168,10 @@ export async function moderateTextMessage(text, options = {}) {
 
     const localResult = containsBlockedKeyword(cleaned);
     if (localResult.matched) {
-        console.log(`[Moderation] Blocked by LOCAL: ${localResult.reason}`);
-
-        return {
-            allowed: false,
-            blocked: true,
-            category: localResult.category,
-            reason: localResult.reason,
-            userMessage: localResult.userMessage || "Tin nhắn chứa từ ngữ vi phạm tiêu chuẩn cộng đồng.",
-            source: 'local'
-        };
+        console.log(`[Moderation] LOCAL signal, verifying with AI: ${localResult.reason}`);
     }
 
-    if (forceAI || shouldUseAI(cleaned)) {
+    if (forceAI || localResult.matched || shouldUseAI(cleaned)) {
         const aiResult = await checkWithGemini(cleaned, { modality });
 
         if (aiResult.blocked && aiResult.confidence >= 0.8) {

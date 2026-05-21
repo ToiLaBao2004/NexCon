@@ -1,7 +1,6 @@
 import { getGeminiModelForImage } from '../getGeminiModelService.js';
 import { buildImageModerationPrompt } from './moderationPromptService.js';
 
-const IMAGE_MODERATION_FAIL_CLOSED = process.env.IMAGE_MODERATION_FAIL_CLOSED !== 'false';
 const BLOCK_THRESHOLD = 0.8;
 
 const parseGeminiJson = (text) => {
@@ -18,16 +17,28 @@ const parseGeminiJson = (text) => {
     }
 };
 
+function allowOnModerationFailure({ category, reason, raw = null }) {
+    return {
+        blocked: false,
+        safe: true,
+        category,
+        confidence: 0,
+        reason,
+        userMessage: null,
+        source: 'gemini',
+        moderationSkipped: true,
+        raw,
+    };
+}
+
 const normalizeModerationResult = (data) => {
     const category = String(data?.category || 'unknown');
     const confidence = Number(data?.confidence ?? 0);
     const safe = data?.safe === true;
     const action = String(data?.action || '').toLowerCase();
 
-    const mustBlock =
-        safe === false ||
-        action === 'block' ||
-        (category !== 'safe' && confidence >= BLOCK_THRESHOLD);
+    const looksUnsafe = safe === false || action === 'block' || category !== 'safe';
+    const mustBlock = looksUnsafe && confidence >= BLOCK_THRESHOLD;
 
     return {
         blocked: mustBlock,
@@ -46,19 +57,10 @@ export const moderateImageMessage = async (imageBuffer, mimeType = 'image/jpeg')
         const geminiModel = getGeminiModelForImage();
 
         if (!geminiModel) {
-            return {
-                blocked: IMAGE_MODERATION_FAIL_CLOSED,
-                safe: !IMAGE_MODERATION_FAIL_CLOSED,
-                category: IMAGE_MODERATION_FAIL_CLOSED ? 'moderation_unavailable' : 'safe',
-                confidence: IMAGE_MODERATION_FAIL_CLOSED ? 1 : 0,
-                reason: IMAGE_MODERATION_FAIL_CLOSED
-                    ? 'Không thể kiểm duyệt ảnh vì Gemini chưa được cấu hình.'
-                    : 'Gemini disabled',
-                userMessage: IMAGE_MODERATION_FAIL_CLOSED
-                    ? 'Không thể gửi ảnh lúc này. Vui lòng thử lại sau.'
-                    : null,
-                source: 'gemini',
-            };
+            return allowOnModerationFailure({
+                category: 'moderation_unavailable',
+                reason: 'Không thể kiểm duyệt ảnh vì Gemini chưa được cấu hình.',
+            });
         }
 
         const prompt = await buildImageModerationPrompt({ mimeType });
@@ -76,29 +78,20 @@ export const moderateImageMessage = async (imageBuffer, mimeType = 'image/jpeg')
         const parsed = parseGeminiJson(text);
 
         if (!parsed) {
-            return {
-                blocked: true,
-                safe: false,
+            return allowOnModerationFailure({
                 category: 'parse_error',
-                confidence: 1,
                 reason: 'Không phân tích được kết quả kiểm duyệt ảnh.',
-                userMessage: 'Ảnh chưa được xác minh an toàn.',
-                source: 'gemini',
-            };
+                raw: text,
+            });
         }
 
         return normalizeModerationResult(parsed);
     } catch (error) {
         console.error('Image moderation error:', error);
 
-        return {
-            blocked: true,
-            safe: false,
+        return allowOnModerationFailure({
             category: 'moderation_error',
-            confidence: 1,
             reason: 'Lỗi kiểm duyệt ảnh.',
-            userMessage: 'Không thể kiểm duyệt ảnh. Vui lòng thử lại sau.',
-            source: 'gemini',
-        };
+        });
     }
 };
