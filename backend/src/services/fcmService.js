@@ -18,19 +18,24 @@ export async function sendFCMToUser(userId, { title, body, data = {}, dataOnly =
         if (!validTokens.length) return;
         const isCallPush = data?.type === 'direct-call' || data?.type === 'group-call';
 
+        const androidConfig = {
+            priority: 'high',
+            ...(isCallPush ? { ttl: 30_000, collapseKey: data.roomName || data.callId || data.conversationId } : {}),
+        };
+
+        if (!isCallPush) {
+            androidConfig.notification = {
+                sound: 'default',
+                channelId: 'messages',
+            };
+        }
+
         const message = {
             data: normalizeData({
                 ...data,
                 ...(dataOnly ? { title, body } : {}),
             }),
-            android: {
-                priority: 'high',
-                ...(isCallPush ? { ttl: 30_000, collapseKey: data.roomName || data.callId || data.conversationId } : {}),
-                notification: {
-                    sound: 'default',
-                    channelId: isCallPush ? 'calls' : 'messages',
-                },
-            },
+            android: androidConfig,
             tokens: validTokens,
         };
 
