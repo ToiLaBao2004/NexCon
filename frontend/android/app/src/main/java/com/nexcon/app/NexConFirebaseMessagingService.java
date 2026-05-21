@@ -25,8 +25,10 @@ import java.util.Map;
 import io.capawesome.capacitorjs.plugins.firebase.messaging.MessagingService;
 
 public class NexConFirebaseMessagingService extends MessagingService {
+    private static final String MESSAGES_CHANNEL_ID = "messages_wakeup_v1";
     private static final int CALL_NOTIFICATION_TIMEOUT_MS = 30_000;
     private static final long WAKE_LOCK_TIMEOUT_MS = 8_000L;
+    private static final long MESSAGE_WAKE_LOCK_TIMEOUT_MS = 3_000L;
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
@@ -40,7 +42,58 @@ public class NexConFirebaseMessagingService extends MessagingService {
             return;
         }
 
+        if ("message".equals(type)) {
+            if (NexConAppState.isForeground()) {
+                return;
+            }
+            showMessageNotification(data);
+            return;
+        }
+
         super.onMessageReceived(remoteMessage);
+    }
+
+    private void showMessageNotification(Map<String, String> data) {
+        NotificationManager notificationManager =
+            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager == null) return;
+
+        ensureMessagesChannel(notificationManager);
+        wakeScreenForMessage();
+
+        String title = safe(data.get("title"), "Tin nhắn mới");
+        String body = safe(data.get("body"), "Bạn có tin nhắn mới");
+        String url = safe(data.get("url"), "/chat");
+        int notificationId = messageNotificationId(data);
+
+        Intent openIntent = new Intent(this, MainActivity.class);
+        openIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        openIntent.putExtra("url", url);
+        openIntent.putExtra("fcm_type", "message");
+        openIntent.putExtra("conversationId", data.get("conversationId"));
+        openIntent.putExtra("messageId", data.get("messageId"));
+        openIntent.setData(Uri.parse("com.nexcon.app://notification?url=" + Uri.encode(url)));
+
+        PendingIntent openPendingIntent = PendingIntent.getActivity(
+            this,
+            notificationId,
+            openIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, MESSAGES_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_nexcon_call)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setContentIntent(openPendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setAutoCancel(true)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setTicker(title);
+
+        notificationManager.notify(notificationId, builder.build());
     }
 
     private void showIncomingCallNotification(Map<String, String> data) {
@@ -143,6 +196,28 @@ public class NexConFirebaseMessagingService extends MessagingService {
         notificationManager.createNotificationChannel(channel);
     }
 
+    private void ensureMessagesChannel(NotificationManager notificationManager) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+
+        NotificationChannel channel = new NotificationChannel(
+            MESSAGES_CHANNEL_ID,
+            "Tin nhắn",
+            NotificationManager.IMPORTANCE_HIGH
+        );
+        channel.setDescription("Thông báo tin nhắn mới");
+        channel.setLockscreenVisibility(android.app.Notification.VISIBILITY_PUBLIC);
+        channel.enableVibration(true);
+
+        Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build();
+        channel.setSound(soundUri, audioAttributes);
+
+        notificationManager.createNotificationChannel(channel);
+    }
+
     private void openIncomingCallScreen(Intent incomingCallIntent) {
         try {
             PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -187,6 +262,28 @@ public class NexConFirebaseMessagingService extends MessagingService {
         } catch (RuntimeException ignored) {
             // Full-screen intent still handles the normal wake path.
         }
+    }
+
+    private void wakeScreenForMessage() {
+        try {
+            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (powerManager == null || powerManager.isInteractive()) return;
+
+            PowerManager.WakeLock wakeLock = powerManager.newWakeLock(
+                PowerManager.SCREEN_BRIGHT_WAKE_LOCK
+                    | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                    | PowerManager.ON_AFTER_RELEASE,
+                "NexCon:Message"
+            );
+            wakeLock.acquire(MESSAGE_WAKE_LOCK_TIMEOUT_MS);
+        } catch (RuntimeException ignored) {
+            // The notification is still delivered if the device blocks wake-up.
+        }
+    }
+
+    private int messageNotificationId(Map<String, String> data) {
+        String stableId = safe(data.get("messageId"), safe(data.get("conversationId"), "nexcon-message"));
+        return 100_000 + Math.abs(stableId.hashCode() % 800_000);
     }
 
     private String safe(String value, String fallback) {

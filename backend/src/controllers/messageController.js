@@ -312,8 +312,6 @@ async function sendOfflineMessagePushes({ conversation, message, senderId, sende
         if (skipUserIds.has(recipientId)) return;
         if (!isMessageVisibleToUser(message, recipientId)) return;
         if (isMuted(participant.mute, 'messages')) return;
-        if (getReceiverSocketId(recipientId)) return;
-
         await sendFCMToUser(recipientId, {
             title,
             body,

@@ -17,13 +17,15 @@ export async function sendFCMToUser(userId, { title, body, data = {}, dataOnly =
         const validTokens = user.fcmTokens.filter(Boolean);
         if (!validTokens.length) return;
         const isCallPush = data?.type === 'direct-call' || data?.type === 'group-call';
+        const isMessagePush = data?.type === 'message';
+        const isNativeHandledPush = isCallPush || isMessagePush;
 
         const androidConfig = {
             priority: 'high',
             ...(isCallPush ? { ttl: 30_000, collapseKey: data.roomName || data.callId || data.conversationId } : {}),
         };
 
-        if (!isCallPush) {
+        if (!isNativeHandledPush) {
             androidConfig.notification = {
                 sound: 'default',
                 channelId: 'messages',
@@ -33,13 +35,13 @@ export async function sendFCMToUser(userId, { title, body, data = {}, dataOnly =
         const message = {
             data: normalizeData({
                 ...data,
-                ...(dataOnly ? { title, body } : {}),
+                ...((dataOnly || isNativeHandledPush) ? { title, body } : {}),
             }),
             android: androidConfig,
             tokens: validTokens,
         };
 
-        if (!dataOnly) {
+        if (!dataOnly && !isNativeHandledPush) {
             message.notification = { title, body };
         }
 
