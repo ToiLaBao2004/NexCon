@@ -44,7 +44,7 @@ export default function ModerationStatusPage() {
           <header className="rounded-md border border-border/70 bg-card px-4 py-4 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-start gap-3">
-                <Button variant="ghost" size="icon" className="size-9 rounded-md" onClick={() => navigate(-1)}>
+                <Button variant="ghost" size="icon" className="size-9 rounded-md" onClick={() => navigate("/chat")}>
                   <ArrowLeft className="size-4" />
                 </Button>
                 <div className="min-w-0">
