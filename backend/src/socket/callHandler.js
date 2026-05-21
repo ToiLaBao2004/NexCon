@@ -316,10 +316,10 @@ async function sendOfflineDirectCallPush({ session, conversation, receiverId }) 
         return;
     }
 
-    const callLabel = session.callType === 'video' ? 'Cuoc goi video' : 'Cuoc goi thoai';
+    const callLabel = session.callType === 'video' ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
     await sendFCMToUser(receiverId, {
-        title: session.initiator.displayName || 'Cuoc goi den',
-        body: `${callLabel} den`,
+        title: session.initiator.displayName || 'Cuộc gọi đến',
+        body: `${callLabel} đến`,
         dataOnly: true,
         data: {
             type: 'direct-call',
@@ -328,7 +328,7 @@ async function sendOfflineDirectCallPush({ session, conversation, receiverId }) 
             conversationId: session.conversationId,
             callerId: session.callerId,
             receiverId: session.receiverId,
-            callerName: session.initiator.displayName || 'Nguoi dung',
+            callerName: session.initiator.displayName || 'Người dùng',
             callerAvatarUrl: session.initiator.avatarUrl || '',
             callActionToken: createCallActionToken({
                 type: 'direct-call',
