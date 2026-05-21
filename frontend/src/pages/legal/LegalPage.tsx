@@ -1,6 +1,7 @@
-import { Link } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 type LegalPageType = "terms" | "community" | "privacy";
 
@@ -103,18 +104,37 @@ const legalContent: Record<LegalPageType, {
 
 export default function LegalPage({ type }: LegalPageProps) {
   const content = legalContent[type];
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { accessToken, user } = useAuthStore();
+  const fromPath = typeof (location.state as { from?: unknown } | null)?.from === "string"
+    ? (location.state as { from: string }).from
+    : null;
+  const isSignedIn = Boolean(accessToken);
+  const fallbackPath = isSignedIn ? (user?.role === "admin" ? "/admin" : "/chat") : "/signin";
+  const returnPath = fromPath || fallbackPath;
+  const linkState = fromPath ? { from: fromPath } : undefined;
 
   return (
     <main className="min-h-svh bg-background px-4 py-6 text-foreground md:px-8">
       <div className="mx-auto max-w-4xl">
         <header className="mb-5 flex items-center justify-between gap-3">
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/signin">
-              <ArrowLeft className="size-4" />
-              Quay lại
-            </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (fromPath) {
+                navigate(fromPath);
+                return;
+              }
+              navigate(returnPath);
+            }}
+          >
+            <ArrowLeft className="size-4" />
+            Quay lại
           </Button>
-          <Link to="/signin" className="text-sm font-semibold text-primary">
+          <Link to={fallbackPath} className="text-sm font-semibold text-primary">
             NexCon
           </Link>
         </header>
@@ -148,9 +168,9 @@ export default function LegalPage({ type }: LegalPageProps) {
           </div>
 
           <footer className="mt-6 flex flex-wrap gap-3 border-t border-border/70 pt-4 text-sm">
-            <Link className="text-primary hover:underline" to="/terms">Điều khoản sử dụng</Link>
-            <Link className="text-primary hover:underline" to="/community-standards">Tiêu chuẩn cộng đồng</Link>
-            <Link className="text-primary hover:underline" to="/privacy">Chính sách quyền riêng tư</Link>
+            <Link className="text-primary hover:underline" to="/terms" state={linkState}>Điều khoản sử dụng</Link>
+            <Link className="text-primary hover:underline" to="/community-standards" state={linkState}>Tiêu chuẩn cộng đồng</Link>
+            <Link className="text-primary hover:underline" to="/privacy" state={linkState}>Chính sách quyền riêng tư</Link>
           </footer>
         </section>
       </div>
