@@ -15,6 +15,7 @@ export interface User {
   lock?: {
     isLocked?: boolean;
     lockedAt?: string | null;
+    expiresAt?: string | null;
     lockedBy?: string | null;
     reason?: string;
     unlockedAt?: string | null;
@@ -24,6 +25,7 @@ export interface User {
     violationCountCache?: number;
     lastViolationAt?: string | null;
     nextViolationDecayAt?: string | null;
+    violationHistory?: import("./moderation").ViolationHistoryItem[];
   };
   createdAt?: string;
   updatedAt?: string;

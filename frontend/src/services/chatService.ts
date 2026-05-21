@@ -1,6 +1,7 @@
 import api from '@/lib/axios';
 import type { ConversationResponse, Message } from '@/types/chat';
 import type { SendMessagePayload } from '@/types/store';
+import type { ModerationApiErrorPayload } from '@/types/moderation';
 
 interface FetchMessagesParams {
 	conversationId: string;
@@ -23,9 +24,15 @@ const pageLimit = 20;
 function resolveErrorMessage(error: any): string {
 	const status = error?.response?.status;
 	const serverMsg = error?.response?.data?.message ?? '';
+	const payload = error?.response?.data as ModerationApiErrorPayload | undefined;
 	const normalizedServerMsg = String(serverMsg).trim().toLowerCase();
 
 	if (!navigator.onLine) return 'Không có kết nối mạng.';
+	if (payload?.code === 'COMMUNITY_STANDARD_VIOLATION') {
+		const label = payload.whatViolated?.label || payload.moderation?.category || 'Vi phạm tiêu chuẩn cộng đồng';
+		const reason = payload.whatViolated?.reason || payload.moderation?.reason || serverMsg;
+		return `${payload.title || 'Nội dung chưa được gửi'}: ${label}. ${reason}`;
+	}
 	if (normalizedServerMsg.includes('not friends')) {
 		return 'Bạn chỉ có thể nhắn tin cho bạn bè. Hãy kết bạn trước khi gửi tin nhắn.';
 	}
@@ -43,6 +50,27 @@ function resolveErrorMessage(error: any): string {
 	if (status === 413) return 'File quá lớn — vui lòng chọn file nhỏ hơn 10MB.';
 	if (status === 400) return 'Dữ liệu gửi lên không hợp lệ.';
 	return 'Đã xảy ra lỗi. Vui lòng thử lại.';
+}
+
+function createChatError(error: any) {
+	const chatError = new Error(resolveErrorMessage(error)) as Error & {
+		response?: any;
+		details?: any;
+		moderation?: any;
+		violation?: any;
+		restriction?: any;
+		code?: string;
+	};
+	const payload = error?.response?.data;
+
+	chatError.response = error?.response;
+	chatError.details = payload;
+	chatError.moderation = payload?.moderation;
+	chatError.violation = payload?.violation;
+	chatError.restriction = payload?.restriction;
+	chatError.code = payload?.code;
+
+	return chatError;
 }
 
 export const chatService = {
@@ -116,7 +144,7 @@ export const chatService = {
 			});
 			return { message: res.data.message, signedUrl: res.data.signedUrl };
 		} catch (error: any) {
-			throw new Error(resolveErrorMessage(error));
+			throw createChatError(error);
 		}
 	},
 

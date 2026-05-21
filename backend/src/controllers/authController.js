@@ -12,6 +12,7 @@ import { checkFieldFormat } from '../utils/fieldFormat.js';
 import { OAuth2Client } from 'google-auth-library';
 import { saveGoogleAvatarToCloudinary } from '../config/passport.js';
 import LockAppeal from '../models/lockAppealModel.js';
+import { getUserModerationDetails } from '../services/moderation/violationService.js';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -133,6 +134,19 @@ function handleAuthError(res, error, fallbackMessage = 'Internal server error.')
     return res.status(500).json({ message: fallbackMessage });
 }
 
+async function sendLockedAccountResponse(res, user) {
+    const moderation = await getUserModerationDetails(user._id, { limit: 10 });
+    return res.status(423).json({
+        locked: true,
+        title: 'Tài khoản đang bị hạn chế',
+        message: moderation.restriction.reason || user.lock?.reason || 'Tài khoản của bạn đang bị khóa.',
+        restriction: moderation.restriction,
+        violationSummary: moderation.summary,
+        violationHistory: moderation.history,
+        appeal: moderation.appeal,
+    });
+}
+
 export async function verifyValidFieldsSignUp(req, res) {
     try {
         let { email, password, confirmNewPassword } = req.body;
@@ -204,6 +218,9 @@ export async function signIn(req, res) {
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
             return res.status(401).json({ message: 'Invalid email or password.' });
+        }
+        if (user.lock?.isLocked) {
+            return sendLockedAccountResponse(res, user);
         }
         ensureAccountUnlocked(user);
 
@@ -498,6 +515,9 @@ export async function googleSuccess(req, res) {
             return res.status(401).json({ message: 'Session expired' });
         }
         const user = await User.findById(session.userId).select('lock');
+        if (user?.lock?.isLocked) {
+            return sendLockedAccountResponse(res, user);
+        }
         ensureAccountUnlocked(user);
 
         const accessToken = jwt.sign(
@@ -528,6 +548,9 @@ export async function refreshToken(req, res) {
             return res.status(401).json({ message: 'Invalid or expired refresh token.' });
         }
         const user = await User.findById(session.userId).select('lock');
+        if (user?.lock?.isLocked) {
+            return sendLockedAccountResponse(res, user);
+        }
         ensureAccountUnlocked(user);
         const accessToken = jwt.sign(
             { userId: session.userId, sessionId: session._id },
@@ -555,6 +578,9 @@ export async function googleMobileAuth(req, res) {
 
         let user = await User.findOne({ $or: [{ googleId }, { email }] });
         if (user) {
+            if (user.lock?.isLocked) {
+                return sendLockedAccountResponse(res, user);
+            }
             ensureAccountUnlocked(user);
             user.googleId = googleId;
             if (!user.avatarUrl && picture) {

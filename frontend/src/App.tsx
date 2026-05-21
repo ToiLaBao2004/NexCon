@@ -6,6 +6,8 @@ import PeoplePage from "./pages/PeoplePage";
 import ReminderPage from "./pages/ReminderPage";
 import NotificationPage from "./pages/NotificationPage";
 import ReportHistoryPage from "./pages/ReportHistoryPage";
+import ModerationStatusPage from "./pages/ModerationStatusPage";
+import LegalPage from "./pages/legal/LegalPage";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminOverviewPage from "./pages/AdminOverviewPage";
 import AdminObservabilityPage from "./pages/AdminObservabilityPage";
@@ -285,6 +287,9 @@ function App() {
           <Routes>
             <Route path="/signin" element={<SignInPage />} />
             <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/terms" element={<LegalPage type="terms" />} />
+            <Route path="/community-standards" element={<LegalPage type="community" />} />
+            <Route path="/privacy" element={<LegalPage type="privacy" />} />
             <Route path="/otp" element={<OtpPage />} />
             <Route path="/otp-resetpass" element={<OtpResetPassPage />} />
             <Route path="/reset-password" element={<ResetPassPage />} />
@@ -308,6 +313,7 @@ function App() {
                 <Route path="/reminders" element={<ReminderPage />} />
                 <Route path="/notification" element={<NotificationPage />} />
                 <Route path="/reports/my" element={<ReportHistoryPage />} />
+                <Route path="/moderation" element={<ModerationStatusPage />} />
                 <Route path="/settings/sessions" element={<SessionsPage />} />
                 <Route path="/" element={<Navigate to="/chat" replace />} />
               </Route>

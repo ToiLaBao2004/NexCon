@@ -358,6 +358,15 @@
   * {
     @apply border-border outline-ring/50;
   }
+  button:not(:disabled),
+  a[href],
+  summary,
+  [role="button"],
+  [role="menuitem"],
+  [role="tab"],
+  [data-clickable="true"] {
+    cursor: pointer;
+  }
   body {
     @apply bg-background text-foreground;
   }
