@@ -9,7 +9,7 @@ import android.os.Bundle;
 import java.util.Map;
 
 final class CallNotificationHelper {
-    static final String CALLS_CHANNEL_ID = "calls";
+    static final String CALLS_CHANNEL_ID = "incoming_calls_v2";
     static final String ACTION_SHOW_CALL = "com.nexcon.app.action.SHOW_CALL";
     static final String ACTION_ANSWER_CALL = "com.nexcon.app.action.ANSWER_CALL";
     static final String ACTION_DECLINE_CALL = "com.nexcon.app.action.DECLINE_CALL";

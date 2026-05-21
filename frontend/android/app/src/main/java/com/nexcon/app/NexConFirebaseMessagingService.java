@@ -1,6 +1,7 @@
 package com.nexcon.app;
 
 import android.app.NotificationChannel;
+import android.app.KeyguardManager;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -9,6 +10,8 @@ import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 
 import androidx.annotation.NonNull;
@@ -26,8 +29,6 @@ public class NexConFirebaseMessagingService extends MessagingService {
 
     @Override
     public void onMessageReceived(@NonNull RemoteMessage remoteMessage) {
-        super.onMessageReceived(remoteMessage);
-
         Map<String, String> data = remoteMessage.getData();
         String type = data.get("type");
         if (CallNotificationHelper.isCallType(type)) {
@@ -35,7 +36,10 @@ public class NexConFirebaseMessagingService extends MessagingService {
                 return;
             }
             showIncomingCallNotification(data);
+            return;
         }
+
+        super.onMessageReceived(remoteMessage);
     }
 
     private void showIncomingCallNotification(Map<String, String> data) {
@@ -106,6 +110,7 @@ public class NexConFirebaseMessagingService extends MessagingService {
             .addAction(R.drawable.ic_stat_nexcon_call, "Tra loi", answerPendingIntent);
 
         notificationManager.notify(notificationId, builder.build());
+        openIncomingCallScreenIfDeviceIsLocked(incomingCallIntent);
     }
 
     private void ensureCallsChannel(NotificationManager notificationManager) {
@@ -128,6 +133,36 @@ public class NexConFirebaseMessagingService extends MessagingService {
         channel.setSound(ringtoneUri, audioAttributes);
 
         notificationManager.createNotificationChannel(channel);
+    }
+
+    private void openIncomingCallScreenIfDeviceIsLocked(Intent incomingCallIntent) {
+        try {
+            boolean shouldOpen = false;
+
+            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (powerManager != null && !powerManager.isInteractive()) {
+                shouldOpen = true;
+            }
+
+            KeyguardManager keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+            if (keyguardManager != null && keyguardManager.isKeyguardLocked()) {
+                shouldOpen = true;
+            }
+
+            if (!shouldOpen) return;
+
+            Intent intent = new Intent(incomingCallIntent);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    startActivity(intent);
+                } catch (RuntimeException ignored) {
+                    // Full-screen notification remains the supported path if direct launch is blocked.
+                }
+            }, 250L);
+        } catch (RuntimeException ignored) {
+            // Keep notification delivery intact.
+        }
     }
 
     private String resolveTitle(Map<String, String> data, String type) {
