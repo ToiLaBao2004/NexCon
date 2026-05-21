@@ -121,7 +121,7 @@ export default function ModerationStatusPage() {
                   )}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button asChild variant="outline" size="sm">
-                      <Link to="/community-standards">Xem tiêu chuẩn</Link>
+                      <Link to="/community-standards" state={{ from: "/moderation" }}>Xem tiêu chuẩn</Link>
                     </Button>
                     <Button asChild variant="outline" size="sm">
                       <Link to="/reports/my">Lịch sử báo cáo</Link>
