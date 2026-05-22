@@ -266,7 +266,7 @@ export default function ReminderFormModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 min-h-0 space-y-4 overflow-y-auto bg-muted/20 px-4 py-4">
+          <div className="beautiful-scrollbar flex-1 min-h-0 space-y-4 overflow-y-auto bg-muted/20 px-4 py-4">
             {!isNotifyOnlyEdit && (
               <>
                 <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4 shadow-sm">

@@ -89,7 +89,7 @@ const ConversationMixedList = () => {
 
       {/* Conversation list */}
       <div
-        className="flex-1 min-h-0 overflow-y-auto beautiful-scrollbar pb-5 pt-2 space-y-2.5"
+        className="flex-1 min-h-0 overflow-y-auto beautiful-scrollbar pb-4 pt-1.5 space-y-1.5"
         onScroll={handleScroll}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) {

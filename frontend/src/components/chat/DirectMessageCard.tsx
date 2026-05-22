@@ -382,7 +382,7 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
             type="sidebar"
             name={displayName}
             avatarUrl={otherUser.userId?.avatarUrl ?? undefined}
-            className={density === "people" ? "!h-14 !w-14 !text-lg" : undefined}
+            className={density === "people" ? "!h-12 !w-12 !text-base" : undefined}
           />
           {onlineUsers.includes(otherUser?.userId?._id ?? "") && <StatusBadge status="online" />}
           {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
