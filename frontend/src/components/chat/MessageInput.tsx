@@ -16,6 +16,7 @@ import { isUrl, formatBytes } from "@/lib/utils";
 import { draftStorage } from "@/lib/draftStorage";
 import { validateImageFile } from "@/lib/imageCrop";
 import { buildModerationNotice, getModerationPayload, isModerationBlockError } from "@/lib/moderationNotice";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -162,6 +163,7 @@ function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: numb
 const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const { user } = useAuthStore();
 	const navigate = useNavigate();
+	const isMobile = useIsMobile();
 	const { emitTyping, emitStopTyping } = useSocketStore();
 	const { sendMessage, markAsSeen, replyingTo, setReplyingTo, setDraft, clearDraft } = useChatStore();
 	const { blockedUsers, blockedBy, fetchBlockedList } = useFriendStore();
@@ -184,6 +186,19 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const imageInputRef = useRef<HTMLInputElement>(null);
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const textInputRef = useRef<HTMLTextAreaElement>(null);
+	const restoreInputFocusAfterSendRef = useRef(false);
+	const handledPointerSendRef = useRef(false);
+
+	const focusTextInput = useCallback(() => {
+		textInputRef.current?.focus({ preventScroll: true });
+	}, []);
+
+	const shouldRestoreTextInputAfterSend = useCallback(() => {
+		const inputFocused = typeof document !== "undefined" && document.activeElement === textInputRef.current;
+		const shouldRestore = !isMobile || inputFocused || restoreInputFocusAfterSendRef.current;
+		restoreInputFocusAfterSendRef.current = false;
+		return shouldRestore;
+	}, [isMobile]);
 
 	const showModerationBlockToast = useCallback((error: any) => {
 		const payload = getModerationPayload(error);
@@ -201,12 +216,14 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}, [navigate]);
 
 	useEffect(() => {
+		if (isMobile) return;
+
 		const focusTimer = window.setTimeout(() => {
-			textInputRef.current?.focus({ preventScroll: true });
+			focusTextInput();
 		}, 0);
 
 		return () => window.clearTimeout(focusTimer);
-	}, [selectedConvo._id]);
+	}, [focusTextInput, isMobile, selectedConvo._id]);
 
 	const participants = selectedConvo.participants;
 	const attachment = attachments[0] ?? null;
@@ -248,16 +265,28 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	const handleSend = async () => {
+		if (sending) {
+			restoreInputFocusAfterSendRef.current = false;
+			return;
+		}
+
 		const trimmed = value.trim();
 		const type = resolveType(trimmed);
 		const currentAttachments = attachments;
 
-		if (type === "text" && !trimmed && currentAttachments.length === 0) return;
-		if ((type === "image" || type === "file" || type === "audio") && currentAttachments.length === 0) return;
+		if (type === "text" && !trimmed && currentAttachments.length === 0) {
+			restoreInputFocusAfterSendRef.current = false;
+			return;
+		}
+		if ((type === "image" || type === "file" || type === "audio") && currentAttachments.length === 0) {
+			restoreInputFocusAfterSendRef.current = false;
+			return;
+		}
 
 		const currValue = trimmed;
 		const prevAttachments = currentAttachments;
 		const prevMentions = selectedMentions;
+		const shouldRestoreFocus = shouldRestoreTextInputAfterSend();
 		const tokenized = buildMentionsFromText(currValue, prevMentions);
 		if (type === "text" && tokenized.content.length > MAX_TEXT_MESSAGE_LENGTH) {
 			toast.error(`Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
@@ -385,7 +414,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			}
 		} finally {
 			setSending(false);
-			setTimeout(() => textInputRef.current?.focus(), 0);
+			if (shouldRestoreFocus) {
+				setTimeout(focusTextInput, 0);
+			}
 		}
 	};
 
@@ -572,21 +603,23 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				if (textInputRef.current) {
 					textInputRef.current.style.height = "auto";
 					textInputRef.current.style.height = `${textInputRef.current.scrollHeight}px`;
-					textInputRef.current.focus();
+					if (!isMobile) {
+						focusTextInput();
+					}
 				}
 			}, 0);
 		}
-	}, [selectedConvo._id, user]);
+	}, [focusTextInput, isMobile, selectedConvo._id, user]);
 
 	useEffect(() => {
 		if (!user) return;
 		if (replyingTo && textInputRef.current) {
 			const timer = setTimeout(() => {
-				textInputRef.current?.focus();
+				focusTextInput();
 			}, 100);
 			return () => clearTimeout(timer);
 		}
-	}, [replyingTo, user]);
+	}, [focusTextInput, replyingTo, user]);
 
 	const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
 		const items = Array.from(e.clipboardData?.items || []);
@@ -719,6 +752,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const currValue = value;
 		const prevAttachments = attachments;
 		const prevMentions = selectedMentions;
+		const shouldRestoreFocus = shouldRestoreTextInputAfterSend();
 
 		const payload: Parameters<typeof sendMessage>[0] = { type: "audio", file };
 
@@ -750,11 +784,14 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			}
 		} finally {
 			setSending(false);
-			setTimeout(() => textInputRef.current?.focus(), 0);
+			if (shouldRestoreFocus) {
+				setTimeout(focusTextInput, 0);
+			}
 		}
-	}, [selectedConvo, otherUserId, sendMessage, value, attachments, selectedMentions, showModerationBlockToast]);
+	}, [selectedConvo, otherUserId, sendMessage, value, attachments, selectedMentions, shouldRestoreTextInputAfterSend, focusTextInput, showModerationBlockToast]);
 
 	const handleStickerSelect = async (url: string) => {
+		const shouldRestoreFocus = shouldRestoreTextInputAfterSend();
 		const payload: Parameters<typeof sendMessage>[0] = {
 			type: "sticker",
 			content: url
@@ -773,7 +810,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			toast.error("Gửi sticker thất bại. Vui lòng thử lại!");
 		} finally {
 			setSending(false);
-			setTimeout(() => textInputRef.current?.focus(), 0);
+			if (shouldRestoreFocus) {
+				setTimeout(focusTextInput, 0);
+			}
 		}
 	};
 
@@ -821,6 +860,25 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const canSend = !sending && (attachments.length > 0 || value.trim().length > 0);
 	const showTextLimit = value.length >= MAX_TEXT_MESSAGE_LENGTH - 100;
+	const handleSendButtonPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+		if (!isMobile || event.pointerType === "mouse" || !canSend) return;
+		if (typeof document !== "undefined" && document.activeElement === textInputRef.current) {
+			event.preventDefault();
+			restoreInputFocusAfterSendRef.current = true;
+			handledPointerSendRef.current = true;
+			window.setTimeout(() => {
+				handledPointerSendRef.current = false;
+			}, 500);
+			void handleSend();
+		}
+	};
+	const handleSendButtonClick = () => {
+		if (handledPointerSendRef.current) {
+			handledPointerSendRef.current = false;
+			return;
+		}
+		void handleSend();
+	};
 
 	return (
 		<div className="flex min-w-0 flex-col bg-background border-t border-border/80">
@@ -982,8 +1040,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							value={value}
 							onChange={handleInputChange}
 							onPaste={handlePaste}
-							onFocus={() => markAsSeen()}
+							onFocus={() => {
+								markAsSeen();
+							}}
 							maxLength={MAX_TEXT_MESSAGE_LENGTH}
+							enterKeyHint="send"
 							rows={1}
 							placeholder={
 								attachment
@@ -991,7 +1052,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									: ""
 							}
 							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
-							disabled={sending}
+							disabled={!isMobile && sending}
 						/>
 						{mentionOpen && (
 							<div className="absolute left-0 bottom-full mb-2 z-40 w-60 max-w-full border border-border/60 bg-popover shadow-lg overflow-hidden rounded-sm">
@@ -1040,7 +1101,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 				{!isRecording && (
 					<Button
-						onClick={handleSend}
+						onPointerDown={handleSendButtonPointerDown}
+						onClick={handleSendButtonClick}
 						className="bg-gradient-chat hover:shadow-glow transition-all hover:scale-105 shrink-0"
 						disabled={!canSend}
 						size="icon"
