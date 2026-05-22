@@ -14,11 +14,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Loader2 } from "lucide-react";
+import { Camera, Eye, Loader2 } from "lucide-react";
 import EditMusicProfile from "@/components/ui/editmusicprofile";
 import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropDialog";
 import { validateImageFile } from "@/lib/imageCrop";
+import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 
 interface ProfileEditDialogProps {
     open: boolean;
@@ -41,6 +42,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     const [uploadingTarget, setUploadingTarget] = useState<"avatar" | null>(null);
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
+    const [previewOpen, setPreviewOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploading = uploadingTarget !== null;
 
@@ -59,6 +61,19 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             });
         }
     }, [open, user]);
+
+    useEffect(() => {
+        if (!open) setPreviewOpen(false);
+    }, [open]);
+
+    const previewUser = user ? {
+        _id: user._id,
+        displayName: formData.displayName.trim() || user.displayName || "User",
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        bio: formData.bio,
+        phone: formData.phone,
+    } : null;
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -234,7 +249,17 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                 </div>
 
                 {/* Footer */}
-                <DialogFooter className="mt-6 flex flex-col-reverse sm:flex-row gap-3">
+                <DialogFooter className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setPreviewOpen(true)}
+                        disabled={!user || loading || uploading}
+                        className="sm:flex-1"
+                    >
+                        <Eye className="h-4 w-4" />
+                        Xem trước
+                    </Button>
                     <Button
                         type="button"
                         variant="outline"
@@ -268,6 +293,13 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                 uploadProgress={uploadingTarget === "avatar" ? uploadProgress : null}
                 onCancel={() => setAvatarCropFile(null)}
                 onConfirm={handleAvatarCropConfirm}
+            />
+
+            <UserProfileDialog
+                user={previewUser}
+                open={previewOpen}
+                onOpenChange={setPreviewOpen}
+                previewAsOther
             />
 
         </Dialog>
