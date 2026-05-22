@@ -336,6 +336,32 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       set({ connectionStatus: 'connected' });
       useAppStatusStore.getState().setSocketStatus('connected');
       useAppStatusStore.getState().clearMaintenance();
+
+      const chatStore = useChatStore.getState();
+      void chatStore.fetchConversations(true);
+
+      const activeConversationId = chatStore.activeConversationId;
+      if (activeConversationId) {
+        useChatStore.setState((state) => {
+          const previous = state.messages[activeConversationId] ?? {
+            items: [],
+            hasMore: false,
+            nextCursor: "",
+            pinnedMessages: [],
+          };
+
+          return {
+            messages: {
+              ...state.messages,
+              [activeConversationId]: {
+                ...previous,
+                nextCursor: "",
+              },
+            },
+          };
+        });
+        void useChatStore.getState().fetchMessages(activeConversationId);
+      }
     });
 
     socket.io.on("reconnect_error", () => {
