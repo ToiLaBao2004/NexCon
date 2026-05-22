@@ -59,7 +59,7 @@ interface PanelProps {
 
 export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: PanelProps) {
   const mutualGroups = useComputedMutualGroups(otherParticipantId);
-  const { setActiveConversation, fetchMessages } = useChatStore();
+  const { messages, setActiveConversation, fetchMessages } = useChatStore();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,7 +90,9 @@ export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: Pa
                     onClick={async () => {
                       onOpenChange(false);
                       setActiveConversation(g._id);
-                      try { await fetchMessages(g._id); } catch { }
+                      if (!messages[g._id]) {
+                        try { await fetchMessages(g._id); } catch { }
+                      }
                     }}
                   />
                 ))}
