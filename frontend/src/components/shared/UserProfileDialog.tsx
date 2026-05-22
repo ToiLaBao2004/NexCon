@@ -35,9 +35,10 @@ interface UserProfileDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onOpenChat?: (user: any) => void;
+    previewAsOther?: boolean;
 }
 
-export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: UserProfileDialogProps) {
+export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previewAsOther = false }: UserProfileDialogProps) {
     const { user: currentUser } = useAuthStore();
     const { getUserById } = useUserStore();
     const {
@@ -86,7 +87,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
 
     if (!user) return null;
 
-    const isSelf = currentUser?._id === user._id;
+    const isSelf = !previewAsOther && currentUser?._id === user._id;
     const isFriend = !!friends.find(f => f.friendId === user._id);
     const pendingRequest = sentRequests.find((r) => r.to._id === user._id);
     const receivedRequest = incomingRequests.find((r) => r.from._id === user._id);
@@ -148,7 +149,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     };
 
     const renderActions = () => {
-        if (isSelf) return null;
+        if (previewAsOther || isSelf) return null;
 
         if (isBlockedRelation) {
             if (!isBlockedByMe) {
@@ -363,7 +364,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
 
                     {renderActions()}
 
-                    {!isSelf && !isBlockedRelation && (
+                    {!previewAsOther && !isSelf && !isBlockedRelation && (
                         <Button
                             type="button"
                             variant="ghost"
@@ -391,7 +392,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                 isLoading={actionLoading}
             />
 
-            {!isSelf && (
+            {!previewAsOther && !isSelf && (
                 <ReportDialog
                     open={reportOpen}
                     onOpenChange={setReportOpen}
