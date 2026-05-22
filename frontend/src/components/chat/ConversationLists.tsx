@@ -33,7 +33,7 @@ interface Props {
 
 export default function ConversationLists({ conversation, mutualGroupCount, memberCount }: Props) {
   const isGroup = conversation.type === "group";
-  const { conversations, setActiveConversation, fetchMessages } = useChatStore();
+  const { conversations, messages, setActiveConversation, fetchMessages } = useChatStore();
   const { user } = useAuthStore();
   const [remindersOpen, setRemindersOpen] = useState(false);
 
@@ -78,9 +78,11 @@ export default function ConversationLists({ conversation, mutualGroupCount, memb
           mutualGroupCount={mutualGroupCount}
           onSelectConversation={async (id: string) => {
             setActiveConversation(id);
-            try {
-              await fetchMessages(id);
-            } catch { }
+            if (!messages[id]) {
+              try {
+                await fetchMessages(id);
+              } catch { }
+            }
           }}
         />
       )}

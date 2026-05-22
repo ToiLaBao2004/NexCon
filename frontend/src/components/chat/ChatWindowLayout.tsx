@@ -19,6 +19,10 @@ import { useSearchParams } from "react-router";
 
 const MAX_CACHED_CONVERSATIONS = 10;
 
+// ChatWindowLayout is unmounted on mobile when the user goes back to the
+// conversation list, so this cache list must live outside the component.
+let recentConversationIds: string[] = [];
+
 const ChatWindowLayout = () => {
   const isOffline = useAppStatusStore((state) => state.isOffline);
   const {
@@ -41,7 +45,6 @@ const ChatWindowLayout = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
 
-  const recentConversationIdsRef = useRef<string[]>([]);
   const deepLinkMessageIdRef = useRef<string | null>(null);
 
   const selectedConvo = conversations.find((c) => c._id === activeConversationId && c.disbanded !== true) ?? null;
@@ -55,19 +58,15 @@ const ChatWindowLayout = () => {
     // Nếu đang offline thì không xóa cache để người dùng vẫn xem được tin nhắn cũ
     if (isOffline) return;
 
-    if (!activeConversationId) {
-      recentConversationIdsRef.current = [];
-      clearConversationCache([]);
-      return;
-    }
+    if (!activeConversationId) return;
 
     const deduped = [
       activeConversationId,
-      ...recentConversationIdsRef.current.filter((id) => id !== activeConversationId),
+      ...recentConversationIds.filter((id) => id !== activeConversationId),
     ];
 
     const keepIds = deduped.slice(0, MAX_CACHED_CONVERSATIONS);
-    recentConversationIdsRef.current = keepIds;
+    recentConversationIds = keepIds;
 
     clearConversationCache(keepIds);
   }, [activeConversationId, clearConversationCache, isOffline]);
