@@ -11,6 +11,7 @@ import { FriendActionButtons } from "@/components/people/FriendActionButtons";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useUserStore } from "@/stores/useUserStore";
+import { useImageViewerStore } from "@/stores/useImageViewerStore";
 import { useState, useEffect } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -93,6 +94,18 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
     const isBlockedByOther = blockedBy.includes(user._id);
     const isBlockedRelation = !isSelf && (profileAccessBlocked || isBlockedByMe || isBlockedByOther);
     const shouldHideProfileDetails = profileLoading || isBlockedRelation;
+    const profileAvatarUrl = fullUser?.avatarUrl || user.avatarUrl || "";
+    const canOpenAvatar = Boolean(profileAvatarUrl && !shouldHideProfileDetails);
+
+    const handleOpenAvatar = () => {
+        if (!canOpenAvatar) return;
+
+        useImageViewerStore.getState().openViewer({
+            src: profileAvatarUrl,
+            alt: `${user.displayName} avatar`,
+        });
+    };
+
     const handleAction = async (action: () => Promise<void>) => {
         try {
             setActionLoading(true);
@@ -298,12 +311,23 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat }: User
                 </div>
 
                 <div className="px-8 pb-8 -mt-16 flex flex-col items-center">
-                    <Avatar className="h-32 w-32 ring-4 ring-background border-4 border-background shadow-xl mb-4 bg-muted">
-                        <AvatarImage src={user.avatarUrl} className="object-cover" />
-                        <AvatarFallback className="text-4xl font-bold bg-primary/10 text-primary">
-                            {user.displayName.charAt(0)}
-                        </AvatarFallback>
-                    </Avatar>
+                    <button
+                        type="button"
+                        onClick={handleOpenAvatar}
+                        disabled={!canOpenAvatar}
+                        title={canOpenAvatar ? "Xem ảnh đại diện" : undefined}
+                        className={cn(
+                            "mb-4 rounded-full outline-none transition-transform focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                            canOpenAvatar ? "cursor-zoom-in hover:scale-[1.03] active:scale-[0.99]" : "cursor-default",
+                        )}
+                    >
+                        <Avatar className="h-32 w-32 ring-4 ring-background border-4 border-background shadow-xl bg-muted">
+                            <AvatarImage src={profileAvatarUrl || undefined} className="object-cover" />
+                            <AvatarFallback className="text-4xl font-bold bg-primary/10 text-primary">
+                                {user.displayName.charAt(0)}
+                            </AvatarFallback>
+                        </Avatar>
+                    </button>
 
                     <div className="text-center w-full">
                         <h3 className="text-2xl font-bold text-foreground">
