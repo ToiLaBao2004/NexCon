@@ -65,7 +65,7 @@ interface ConversationInfoSidebarProps {
 }
 
 const groupAvatarCropPresets: CropPreset[] = [
-  { id: "square", label: "1:1", aspect: 1, outputWidth: 512, outputHeight: 512 },
+  { id: "square", label: "1:1", aspect: 1, outputWidth: 1024, outputHeight: 1024 },
 ];
 
 const getUploadErrorMessage = (error: unknown, fallback: string) => {

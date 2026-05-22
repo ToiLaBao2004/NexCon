@@ -4,10 +4,38 @@ import User from "../models/userModel.js";
 import crypto from "crypto";
 import { upLoadImageFromBuffer } from "../middlewares/uploadMiddleware.js";
 
+const GOOGLE_AVATAR_SIZE = 1024;
+
+function getHighQualityGoogleAvatarUrl(url) {
+    if (!url) return url;
+
+    try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.searchParams.has("sz")) {
+            parsedUrl.searchParams.set("sz", String(GOOGLE_AVATAR_SIZE));
+        }
+
+        return parsedUrl
+            .toString()
+            .replace(/=s\d+(?:-c)?(?=$|[?#])/, `=s${GOOGLE_AVATAR_SIZE}-c`)
+            .replace(/\/s\d+(?:-c)?\//, `/s${GOOGLE_AVATAR_SIZE}-c/`);
+    } catch {
+        return url.replace(/=s\d+(?:-c)?$/, `=s${GOOGLE_AVATAR_SIZE}-c`);
+    }
+}
+
 export async function saveGoogleAvatarToCloudinary(url) {
     if (!url) return { avatarUrl: "", avatarId: "" };
 
-    const res = await fetch(url);
+    const preferredUrl = getHighQualityGoogleAvatarUrl(url);
+    let res = await fetch(preferredUrl);
+    if (!res.ok && preferredUrl !== url) {
+        res = await fetch(url);
+    }
+    if (!res.ok) {
+        throw new Error(`Failed to fetch Google avatar: ${res.status}`);
+    }
+
     const arrayBuffer = await res.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
