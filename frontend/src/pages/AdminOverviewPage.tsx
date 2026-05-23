@@ -134,7 +134,7 @@ export default function AdminOverviewPage() {
                 className="h-10 pl-9"
               />
             </div>
-            <Button variant="outline" className="rounded-md" onClick={() => void refresh()}>
+            <Button className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void refresh()}>
               <RefreshCw className="size-4" />
               Làm mới
             </Button>

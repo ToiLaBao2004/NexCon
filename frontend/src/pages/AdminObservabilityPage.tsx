@@ -159,8 +159,7 @@ export default function AdminObservabilityPage() {
               ))}
             </div>
             <Button
-              variant="outline"
-              className="rounded-md"
+              className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={refreshing}
               onClick={() => void loadObservability(true)}
             >

@@ -183,7 +183,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                 AI lọc hàng loạt
               </Button>
             )}
-            <Button variant="outline" className="rounded-md" onClick={() => void loadReports()} disabled={aiReviewing}>
+            <Button className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void loadReports()} disabled={aiReviewing}>
               <RefreshCw className="size-4" />
               Làm mới
             </Button>

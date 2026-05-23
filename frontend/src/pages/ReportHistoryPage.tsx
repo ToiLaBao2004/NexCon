@@ -1,16 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 import {
   ArrowLeft,
-  CheckCircle2,
-  Clock3,
-  Flag,
   Inbox,
   Loader2,
-  MessageSquare,
   RefreshCw,
-  UserRound,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -137,7 +131,7 @@ function ReportCard({ report, index = 0, embedded = false }: { report: MyReport;
           <div className="flex min-w-0 items-start gap-3">
             <Avatar className="size-10 shrink-0 border border-border/60">
               <AvatarImage src={avatarUrl} alt={targetName} />
-              <AvatarFallback className="bg-muted text-sm font-semibold text-muted-foreground">
+              <AvatarFallback className="bg-muted text-sm font-semibold text-foreground">
                 {avatarFallback}
               </AvatarFallback>
             </Avatar>
@@ -150,7 +144,7 @@ function ReportCard({ report, index = 0, embedded = false }: { report: MyReport;
                   {reasonLabels[report.reasonCategory] || "Khác"}
                 </span>
                 {report.resolution?.decision && (
-                  <span className="rounded-md border border-border/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                <span className="rounded-md border border-border/70 px-2.5 py-1 text-[11px] font-medium text-foreground">
                     {report.resolution.decision === "violation" ? "Có vi phạm" : "Không đủ cơ sở"}
                   </span>
                 )}
@@ -174,7 +168,7 @@ function ReportCard({ report, index = 0, embedded = false }: { report: MyReport;
 
         {detailText && (
           <div className="rounded-lg border border-border/60 bg-muted/20 px-5 py-4 dark:bg-transparent">
-            <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{detailLabel}</p>
+            <p className="text-[12px] font-semibold uppercase tracking-wide text-foreground">{detailLabel}</p>
             <p className="mt-2 text-base leading-6 text-foreground">{detailText}</p>
           </div>
         )}
@@ -205,15 +199,15 @@ function ReportSkeleton() {
 function EmptyState({ embedded = false, onRefresh }: { embedded?: boolean; onRefresh: () => void }) {
   return (
     <div className="flex min-h-72 flex-col items-center justify-center rounded-md border border-border/70 bg-card px-6 py-12 text-center shadow-sm">
-      <div className="mb-3 flex size-11 items-center justify-center rounded-md bg-muted text-muted-foreground">
+      <div className="mb-3 flex size-11 items-center justify-center rounded-md bg-muted text-foreground">
         <Inbox className="size-5" />
       </div>
       <h3 className="text-sm font-semibold text-foreground">Chưa có báo cáo nào</h3>
-      <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+      <p className="mt-1 max-w-sm text-sm text-foreground">
         Các báo cáo bạn đã gửi sẽ xuất hiện tại đây cùng trạng thái xử lý.
       </p>
       {!embedded && (
-        <Button variant="outline" size="sm" className="mt-4" onClick={onRefresh}>
+        <Button size="sm" className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90" onClick={onRefresh}>
           <RefreshCw className="size-4" />
           Làm mới
         </Button>
@@ -222,64 +216,34 @@ function EmptyState({ embedded = false, onRefresh }: { embedded?: boolean; onRef
   );
 }
 
-function ReportSummaryPanel({ reports, refreshing, onRefresh }: { reports: MyReport[]; refreshing: boolean; onRefresh: () => void }) {
+function ReportSummaryPanel({ reports }: { reports: MyReport[] }) {
   const stats = useMemo(() => getReportStats(reports), [reports]);
-  const latestReport = reports[0];
 
   return (
     <aside className="grid gap-3 xl:sticky xl:top-6 xl:self-start">
       <section className="rounded-md border border-border/70 bg-card p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tổng quan</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Tổng quan</p>
             <h2 className="mt-1 text-2xl font-semibold text-foreground">{stats.total}</h2>
-          </div>
-          <div className="flex size-10 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <Flag className="size-5" />
           </div>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <StatTile label="Đang chờ" value={stats.pending + stats.reviewing} icon={<Clock3 className="size-4" />} />
-          <StatTile label="Đã xử lý" value={stats.resolved} icon={<CheckCircle2 className="size-4" />} />
-          <StatTile label="Tin nhắn" value={stats.message} icon={<MessageSquare className="size-4" />} />
-          <StatTile label="Người dùng" value={stats.user} icon={<UserRound className="size-4" />} />
+          <StatTile label="Đang chờ" value={stats.pending + stats.reviewing} />
+          <StatTile label="Đã xử lý" value={stats.resolved} />
+          <StatTile label="Tin nhắn" value={stats.message} />
+          <StatTile label="Người dùng" value={stats.user} />
         </div>
       </section>
-
-      <section className="rounded-md border border-border/70 bg-card p-4 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gần nhất</p>
-        {latestReport ? (
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className={cn("rounded-md", statusClassNames[latestReport.status])}>
-                {statusLabels[latestReport.status]}
-              </Badge>
-              <span className="text-xs text-foreground">{formatReportTime(latestReport.createdAt)}</span>
-            </div>
-            <p className="text-sm font-medium text-foreground">
-              {latestReport.targetType === "message" ? "Báo cáo tin nhắn" : "Báo cáo người dùng"}
-            </p>
-            <p className="line-clamp-2 text-sm text-muted-foreground">{getTargetName(latestReport)}</p>
-          </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted-foreground">Chưa có dữ liệu.</p>
-        )}
-      </section>
-
-      <Button variant="outline" className="w-full justify-center" disabled={refreshing} onClick={onRefresh}>
-        {refreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-        Làm mới danh sách
-      </Button>
     </aside>
   );
 }
 
-function StatTile({ label, value, icon }: { label: string; value: number; icon: ReactNode }) {
+function StatTile({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-md border border-border/60 bg-muted/25 p-3">
-      <div className="flex items-center justify-between gap-2 text-muted-foreground">
+      <div className="flex items-center justify-between gap-2 text-foreground">
         <span className="text-xs">{label}</span>
-        {icon}
       </div>
       <p className="mt-2 text-lg font-semibold text-foreground">{value}</p>
     </div>
@@ -297,7 +261,6 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const stats = useMemo(() => getReportStats(reports), [reports]);
   const visibleReports = useMemo(
     () => filterTab === "all"
       ? reports
@@ -341,23 +304,19 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
                   <ArrowLeft className="size-4" />
                 </Button>
               )}
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <Flag className="size-5" />
-              </div>
               <div className="min-w-0">
                 <h1 className="truncate text-xl font-semibold text-foreground md:text-2xl">
                   Lịch sử báo cáo
                 </h1>
-                <p className="mt-1 truncate text-sm text-muted-foreground">
+                <p className="mt-1 truncate text-sm text-foreground">
                   Theo dõi các báo cáo bạn đã gửi và trạng thái xử lý.
                 </p>
               </div>
             </div>
 
             <Button
-              variant="outline"
               size="sm"
-              className="h-9 shrink-0"
+              className="h-9 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
               disabled={loading || refreshing}
               onClick={() => void loadReports("refresh")}
             >
@@ -370,18 +329,7 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
 
       <main className={cn("beautiful-scrollbar min-h-0 flex-1 overflow-y-auto", embedded ? "pt-0" : "p-4 md:p-6")}>
         <div className={cn("mx-auto w-full min-w-0", embedded ? "max-w-none" : "max-w-7xl")}>
-          {!embedded && (
-            <div className="mb-4 grid gap-3 md:grid-cols-3">
-              <QuickMetric label="Báo cáo gần nhất" value={stats.total} />
-              <QuickMetric label="Đang chờ xử lý" value={stats.pending + stats.reviewing} />
-              <QuickMetric label="Đã có kết quả" value={stats.resolved + stats.dismissed} />
-            </div>
-          )}
-
-          <div className={cn("grid gap-4", embedded ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1fr)_320px]")}>
-            <section className="min-w-0">
-              <div className="mb-3 flex items-center justify-between gap-3 py-1.5">
-                <div className="flex items-center gap-4">
+          <div className="mb-3 flex h-8 items-center gap-4">
                   <button
                     type="button"
                     className={`relative h-8 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${
@@ -404,16 +352,18 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
                   >
                     Đã xử lý
                   </button>
-                </div>
-              </div>
+          </div>
+
+          <div className={cn("grid gap-4", embedded ? "grid-cols-1" : "xl:grid-cols-[minmax(0,1fr)_320px]")}>
+            <section className="min-w-0">
 
               {loading ? (
                 <ReportSkeleton />
               ) : error ? (
                 <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-md border border-border/70 bg-card px-6 py-12 text-center shadow-sm">
                   <XCircle className="size-8 text-destructive" />
-                  <p className="text-sm text-muted-foreground">{error}</p>
-                  <Button variant="outline" onClick={() => void loadReports("refresh")}>
+                  <p className="text-sm text-foreground">{error}</p>
+                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void loadReports("refresh")}>
                     Thử lại
                   </Button>
                 </div>
@@ -431,22 +381,11 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
             {!embedded && (
               <ReportSummaryPanel
                 reports={reports}
-                refreshing={refreshing}
-                onRefresh={() => void loadReports("refresh")}
               />
             )}
           </div>
         </div>
       </main>
-    </div>
-  );
-}
-
-function QuickMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md border border-border/70 bg-card px-4 py-3 shadow-sm">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-foreground">{value}</p>
     </div>
   );
 }

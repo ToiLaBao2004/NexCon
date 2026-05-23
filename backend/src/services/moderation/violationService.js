@@ -3,6 +3,7 @@ import redis, { isRedisReady } from '../../config/redis.js';
 import User from '../../models/userModel.js';
 import Session from '../../models/sessionModel.js';
 import LockAppeal from '../../models/lockAppealModel.js';
+import Report from '../../models/reportModel.js';
 import { createNotification } from '../notificationServices.js';
 import { disconnectUserSockets } from '../../socket/index.js';
 
@@ -215,6 +216,39 @@ function serializeViolationHistoryItem(item = {}) {
     };
 }
 
+async function hydrateViolationHistoryEvidence(history = []) {
+    const missingReportIds = history
+        .filter((item) => item.reportId && !item.metadata?.messageSnapshot && !item.metadata?.evidencePreview)
+        .map((item) => item.reportId);
+
+    if (missingReportIds.length === 0) return history;
+
+    const reports = await Report.find({ _id: { $in: missingReportIds } })
+        .select('_id messageSnapshot')
+        .lean();
+    const reportMap = new Map(reports.map((report) => [report._id.toString(), report]));
+
+    return history.map((item) => {
+        if (!item.reportId || item.metadata?.messageSnapshot || item.metadata?.evidencePreview) return item;
+        const report = reportMap.get(item.reportId.toString());
+        if (!report?.messageSnapshot) return item;
+
+        const snapshot = report.messageSnapshot;
+        return {
+            ...item,
+            metadata: {
+                ...(item.metadata || {}),
+                messageSnapshot: {
+                    type: snapshot.type || '',
+                    content: snapshot.content || '',
+                    fileName: snapshot.fileName || '',
+                    mimeType: snapshot.mimeType || '',
+                },
+            },
+        };
+    });
+}
+
 export function buildRestrictionDetails(user) {
     const lock = user?.lock || {};
     const locked = Boolean(lock.isLocked);
@@ -385,6 +419,7 @@ export async function getUserModerationDetails(userId, { limit = 20 } = {}) {
         .slice(-historyLimit)
         .reverse()
         .map(serializeViolationHistoryItem);
+    const hydratedHistory = await hydrateViolationHistoryEvidence(history);
 
     return {
         summary: {
@@ -392,7 +427,7 @@ export async function getUserModerationDetails(userId, { limit = 20 } = {}) {
             lastViolationAt: user.moderation?.lastViolationAt || summary.lastViolationAt || null,
         },
         restriction: buildRestrictionDetails(user),
-        history,
+        history: hydratedHistory,
         appeal: pendingAppeal
             ? {
                 _id: pendingAppeal._id,
