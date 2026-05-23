@@ -188,10 +188,50 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const textInputRef = useRef<HTMLTextAreaElement>(null);
 	const restoreInputFocusAfterSendRef = useRef(false);
 	const handledPointerSendRef = useRef(false);
+	const messageScrollSnapshotRef = useRef<{ element: HTMLElement; scrollTop: number } | null>(null);
 
 	const focusTextInput = useCallback(() => {
 		textInputRef.current?.focus({ preventScroll: true });
 	}, []);
+
+	const getMessageScrollContainer = useCallback(() => {
+		if (typeof document === "undefined") return null;
+		const containers = Array.from(document.querySelectorAll<HTMLElement>("[data-chat-scroll-container]"));
+		return containers.find((element) => element.dataset.chatScrollContainer === selectedConvo._id) ?? null;
+	}, [selectedConvo._id]);
+
+	const captureMessageScrollPosition = useCallback(() => {
+		const element = getMessageScrollContainer();
+		if (!element) return;
+		messageScrollSnapshotRef.current = {
+			element,
+			scrollTop: element.scrollTop,
+		};
+	}, [getMessageScrollContainer]);
+
+	const restoreMessageScrollPosition = useCallback(() => {
+		const snapshot = messageScrollSnapshotRef.current;
+		if (!snapshot) return;
+
+		window.dispatchEvent(new CustomEvent("nexcon:message-input-focus", {
+			detail: { conversationId: selectedConvo._id },
+		}));
+
+		const restore = () => {
+			if (!snapshot.element.isConnected) return;
+			snapshot.element.scrollTop = snapshot.scrollTop;
+		};
+
+		restore();
+		requestAnimationFrame(restore);
+		window.setTimeout(restore, 80);
+		window.setTimeout(() => {
+			restore();
+			if (messageScrollSnapshotRef.current?.element === snapshot.element) {
+				messageScrollSnapshotRef.current = null;
+			}
+		}, 180);
+	}, [selectedConvo._id]);
 
 	const shouldRestoreTextInputAfterSend = useCallback(() => {
 		const inputFocused = typeof document !== "undefined" && document.activeElement === textInputRef.current;
@@ -484,6 +524,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+		captureMessageScrollPosition();
 		const nextValue = e.target.value;
 		setValue(nextValue);
 		e.target.style.height = "auto";
@@ -511,6 +552,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			emitStopTyping(selectedConvo._id);
 			if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 		}
+
+		restoreMessageScrollPosition();
 	};
 
 	useEffect(() => {
@@ -1036,11 +1079,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					<div className="relative flex min-w-0 flex-1 items-center">
 						<textarea
 							ref={textInputRef}
+							onPointerDown={captureMessageScrollPosition}
 							onKeyDown={handleKeyDown}
 							value={value}
 							onChange={handleInputChange}
 							onPaste={handlePaste}
 							onFocus={() => {
+								restoreMessageScrollPosition();
 								markAsSeen();
 							}}
 							maxLength={MAX_TEXT_MESSAGE_LENGTH}
