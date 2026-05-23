@@ -258,7 +258,7 @@ export default function AdminUserDrawer({
         </SheetHeader>
 
         <div className="border-b border-border/70 px-4 py-3">
-          <div className="flex gap-2 overflow-x-auto">
+          <div className="flex gap-2 overflow-x-auto beautiful-scrollbar">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (

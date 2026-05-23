@@ -2857,7 +2857,7 @@ const MessageItem = ({
 										</TooltipTrigger>
 										<TooltipContent side="top" sideOffset={6} className="max-w-56 text-left">
 											<div className="mb-1 text-[12px] sm:text-[13px] font-semibold text-background/80">Đã xem bởi</div>
-											<div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto pr-1">
+											<div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto beautiful-scrollbar pr-1">
 												{seenUsersForThisMessage.map((seenUser) => (
 													<span key={seenUser._id}>{seenUser.displayName}</span>
 												))}
@@ -2899,7 +2899,7 @@ const MessageItem = ({
 							{seenUsersForThisMessage.length} người đã xem tin nhắn này
 						</p>
 					</DialogHeader>
-					<div className="max-h-[60vh] overflow-y-auto px-5 pb-5">
+					<div className="max-h-[60vh] overflow-y-auto beautiful-scrollbar px-5 pb-5">
 						<div className="flex flex-col gap-2">
 							{seenUsersForThisMessage.map((seenUser) => (
 								<div key={seenUser._id} className="flex items-center gap-3 rounded-xl px-1 py-1.5">

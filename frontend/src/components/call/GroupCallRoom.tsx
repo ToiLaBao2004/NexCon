@@ -250,7 +250,7 @@ const Stage = () => {
 
         {otherTracks.length > 0 && (
           <div className={cn(
-            "flex gap-3 overflow-auto sm:h-full sm:w-72 landscape:h-full landscape:w-72 scrollbar-hide",
+            "flex gap-3 overflow-auto sm:h-full sm:w-72 landscape:h-full landscape:w-72 beautiful-scrollbar",
             "flex-row sm:flex-col landscape:flex-col shrink-0"
           )}>
             {otherTracks.map((trackRef) => {

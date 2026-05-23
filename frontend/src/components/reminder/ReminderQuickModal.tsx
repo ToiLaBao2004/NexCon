@@ -141,7 +141,7 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
     ];
 
   const quickBody = (
-    <div className="flex-1 flex flex-col justify-between px-6 pb-6 pt-4 bg-card overflow-y-auto min-h-0">
+    <div className="flex-1 flex flex-col justify-between px-6 pb-6 pt-4 bg-card overflow-y-auto beautiful-scrollbar min-h-0">
       <div className="space-y-4">
         {/* Create Mode Toggle */}
         <div className="flex items-center gap-1 rounded-xl border border-border/60 bg-muted/40 p-1">

@@ -161,7 +161,7 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
               />
             </div>
 
-            <div className="max-h-[200px] overflow-y-auto pr-1 space-y-1 mt-2 scrollbar-thin scrollbar-thumb-gray-200">
+            <div className="max-h-[200px] overflow-y-auto beautiful-scrollbar pr-1 space-y-1 mt-2">
               {filteredFriends.length > 0 ? (
                 filteredFriends.map((friend: any) => (
                   <div

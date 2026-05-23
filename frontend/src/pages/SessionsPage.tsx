@@ -52,7 +52,7 @@ export default function SessionsPage() {
     return (
         // Outer: full height, scroll toàn trang trên mobile
         <div className="
-            overflow-y-auto
+            overflow-y-auto beautiful-scrollbar
             relative flex-1 h-full overflow-hidden rounded-none border-0 bg-background md:rounded-3xl md:border md:border-border/60 md:shadow-soft
         ">
             <div className="max-w-5xl mx-auto px-4 md:px-6 py-8 pb-24 md:pb-8">

@@ -99,7 +99,7 @@ export function LeaveGroupModal({
                 className="h-9 pl-9 bg-background"
               />
             </div>
-            <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+            <div className="max-h-44 overflow-y-auto beautiful-scrollbar space-y-1 pr-1">
               {filteredNewAdmins.map((member) => {
                 const isOnline = onlineUsers.includes(member._id?.toString?.() || "");
                 return (

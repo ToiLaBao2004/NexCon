@@ -120,7 +120,7 @@ const PreviewScreen = ({
   };
 
   return (
-    <div className="flex h-full flex-1 items-center justify-center overflow-auto bg-background px-3 py-4 md:px-6 md:py-6">
+    <div className="flex h-full flex-1 items-center justify-center overflow-auto beautiful-scrollbar bg-background px-3 py-4 md:px-6 md:py-6">
       <div className="w-full max-w-[1120px] rounded-2xl border border-border/60 bg-card/80 p-3 shadow-xl backdrop-blur-sm md:p-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1.55fr)_minmax(300px,370px)] md:items-stretch">
           <div className="rounded-2xl border border-border/50 bg-muted/30 p-2.5">

@@ -208,7 +208,7 @@ export function PinnedMessagesBanner({
 							</button>
 						</div>
 
-						<div className="max-h-[220px] overflow-y-auto">
+						<div className="max-h-[220px] overflow-y-auto beautiful-scrollbar">
 							{pinned.map((msg) => (
 								<div
 									key={msg._id}

@@ -330,7 +330,7 @@ export default function AdminObservabilityPage() {
                   Chưa có lỗi HTTP trong khoảng thời gian này.
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto beautiful-scrollbar">
                   <div className="min-w-[720px]">
                     <div className="grid grid-cols-[130px_90px_minmax(260px,1fr)_100px_110px] gap-3 border-b border-border/70 bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground">
                       <span>Thời gian</span>

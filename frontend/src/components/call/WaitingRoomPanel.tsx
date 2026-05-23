@@ -38,7 +38,7 @@ const WaitingRoomPanel = ({ roomName, isHost, participants, onClose }: WaitingRo
         </button>
       </div>
 
-      <div className="max-h-[42%] space-y-2 overflow-auto px-3 py-3">
+      <div className="max-h-[42%] space-y-2 overflow-auto beautiful-scrollbar px-3 py-3">
         {participants.map((participant) => (
           <div
             key={participant.userId}
@@ -94,7 +94,7 @@ const WaitingRoomPanel = ({ roomName, isHost, participants, onClose }: WaitingRo
             </div>
           )}
 
-          <div className="max-h-[45%] space-y-2 overflow-auto px-3 pb-3">
+          <div className="max-h-[45%] space-y-2 overflow-auto beautiful-scrollbar px-3 pb-3">
             {waitingRoom.length === 0 && (
               <div className="rounded-xl border border-border/70 bg-muted/40 p-3 text-center text-xs text-muted-foreground dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
                 Chưa có ai đang chờ duyệt.

@@ -991,7 +991,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			{attachments.length > 0 && (
 				<div className="flex items-center gap-2 px-3 pt-2.5">
 					{attachments.every((item) => item.type === "image") ? (
-						<div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
+						<div className="flex max-w-full items-center gap-2 overflow-x-auto beautiful-scrollbar pb-1">
 							{attachments.map((item, index) => (
 								<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/80 shrink-0">
 									{item.preview && <img src={item.preview} alt="preview" className="w-full h-full object-cover" />}
@@ -1112,13 +1112,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									? ""
 									: ""
 							}
-							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
+							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto beautiful-scrollbar bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none"
 							disabled={!isMobile && sending}
 						/>
 						{mentionOpen && (
 							<div className="absolute left-0 bottom-full mb-2 z-40 w-60 max-w-full border border-border/60 bg-popover shadow-lg overflow-hidden rounded-sm">
 								{mentionCandidates.length > 0 ? (
-									<ul className="max-h-56 overflow-y-auto py-1">
+									<ul className="max-h-56 overflow-y-auto beautiful-scrollbar py-1">
 										{mentionCandidates.map((candidate, index) => {
 											const isActive = index === activeMentionIndex;
 											return (

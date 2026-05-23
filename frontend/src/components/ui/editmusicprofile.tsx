@@ -94,7 +94,7 @@ export default function EditMusicProfile() {
 
             {/* Search Results */}
             {musicResults.length > 0 && query.trim().length >= 2 && (
-                <div className="max-h-50 overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm divide-y divide-gray-200 dark:divide-gray-700">
+                <div className="max-h-50 overflow-y-auto beautiful-scrollbar rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm divide-y divide-gray-200 dark:divide-gray-700">
                     {musicResults.map((track: any) => (
                         <button
                             key={track.trackId}
