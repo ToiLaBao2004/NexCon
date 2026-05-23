@@ -217,6 +217,21 @@ const ChatWindowBody: React.FC = () => {
     return () => window.removeEventListener("nexcon:message-input-focus", handleInputFocus as EventListener);
   }, [convoId]);
 
+  useEffect(() => {
+    const handleMessageSend = (event: Event) => {
+      const detail = (event as CustomEvent<{ conversationId?: string }>).detail;
+      if (detail?.conversationId && detail.conversationId !== convoId) return;
+
+      suppressAutoScrollUntilRef.current = 0;
+      requestAnimationFrame(() => scrollToBottom(true, true));
+      setTimeout(() => scrollToBottom(true, true), 80);
+      setTimeout(() => scrollToBottom(true, true), 180);
+    };
+
+    window.addEventListener("nexcon:message-send", handleMessageSend as EventListener);
+    return () => window.removeEventListener("nexcon:message-send", handleMessageSend as EventListener);
+  }, [convoId, scrollToBottom]);
+
 
   // IntersectionObserver for top sentinel (load older)
   useEffect(() => {

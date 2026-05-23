@@ -189,6 +189,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const restoreInputFocusAfterSendRef = useRef(false);
 	const handledPointerSendRef = useRef(false);
 	const messageScrollSnapshotRef = useRef<{ element: HTMLElement; scrollTop: number } | null>(null);
+	const messageScrollRestoreTimersRef = useRef<ReturnType<typeof window.setTimeout>[]>([]);
 
 	const focusTextInput = useCallback(() => {
 		textInputRef.current?.focus({ preventScroll: true });
@@ -209,9 +210,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		};
 	}, [getMessageScrollContainer]);
 
+	const clearPendingMessageScrollRestore = useCallback(() => {
+		messageScrollRestoreTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+		messageScrollRestoreTimersRef.current = [];
+		messageScrollSnapshotRef.current = null;
+	}, []);
+
 	const restoreMessageScrollPosition = useCallback(() => {
 		const snapshot = messageScrollSnapshotRef.current;
 		if (!snapshot) return;
+		messageScrollRestoreTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+		messageScrollRestoreTimersRef.current = [];
 
 		window.dispatchEvent(new CustomEvent("nexcon:message-input-focus", {
 			detail: { conversationId: selectedConvo._id },
@@ -224,13 +233,15 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		restore();
 		requestAnimationFrame(restore);
-		window.setTimeout(restore, 80);
-		window.setTimeout(() => {
+		messageScrollRestoreTimersRef.current.push(window.setTimeout(restore, 80));
+		const finalTimer = window.setTimeout(() => {
 			restore();
 			if (messageScrollSnapshotRef.current?.element === snapshot.element) {
 				messageScrollSnapshotRef.current = null;
 			}
+			messageScrollRestoreTimersRef.current = messageScrollRestoreTimersRef.current.filter((timer) => timer !== finalTimer);
 		}, 180);
+		messageScrollRestoreTimersRef.current.push(finalTimer);
 	}, [selectedConvo._id]);
 
 	const shouldRestoreTextInputAfterSend = useCallback(() => {
@@ -322,6 +333,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			restoreInputFocusAfterSendRef.current = false;
 			return;
 		}
+		clearPendingMessageScrollRestore();
+		window.dispatchEvent(new CustomEvent("nexcon:message-send", {
+			detail: { conversationId: selectedConvo._id },
+		}));
 
 		const currValue = trimmed;
 		const prevAttachments = currentAttachments;
@@ -594,8 +609,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}, [attachments]);
 
 	useEffect(() => () => {
+		clearPendingMessageScrollRestore();
 		revokeAttachmentPreviews(attachmentsRef.current);
-	}, []);
+	}, [clearPendingMessageScrollRestore]);
 
 	useEffect(() => {
 		if (!user) return;
