@@ -6,7 +6,13 @@ import GroupChatCard from "./GroupChatCard";
 import { Input } from "@/components/ui/input";
 import { Search, X, Loader2 } from "lucide-react";
 
-const ConversationMixedList = () => {
+export type ConversationFilter = "all" | "unread";
+
+interface ConversationMixedListProps {
+  conversationFilter: ConversationFilter;
+}
+
+const ConversationMixedList = ({ conversationFilter }: ConversationMixedListProps) => {
   const {
     conversations,
     fetchConversations,
@@ -19,6 +25,7 @@ const ConversationMixedList = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const conversationItems = useMemo(() => conversations ?? [], [conversations]);
+  const currentUserId = user?._id?.toString();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -47,9 +54,14 @@ const ConversationMixedList = () => {
 
   const filtered = useMemo(() => {
     const keyword = searchQuery.trim().toLowerCase();
-    if (!keyword) return conversationItems;
-
     return conversationItems.filter((c) => {
+      if (conversationFilter === "unread") {
+        const unreadCount = currentUserId ? Number(c.unreadCounts?.[currentUserId] || 0) : 0;
+        if (unreadCount <= 0) return false;
+      }
+
+      if (!keyword) return true;
+
       if (c.type === "group") {
         return (c.group?.name ?? "").toLowerCase().includes(keyword);
       }
@@ -60,7 +72,7 @@ const ConversationMixedList = () => {
       const name = other?.userId?.nickname?.trim() || other?.userId?.displayName || "";
       return name.toLowerCase().includes(keyword);
     });
-  }, [conversationItems, searchQuery, user?._id]);
+  }, [conversationFilter, conversationItems, currentUserId, searchQuery, user?._id]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -105,7 +117,7 @@ const ConversationMixedList = () => {
                 <p>Không tìm thấy kết quả cho <span className="font-medium">"{searchQuery}"</span></p>
               </>
             ) : (
-              "Chưa có cuộc trò chuyện nào"
+              conversationFilter === "unread" ? "Không có cuộc trò chuyện chưa đọc" : "Chưa có cuộc trò chuyện nào"
             )}
           </div>
         ) : (

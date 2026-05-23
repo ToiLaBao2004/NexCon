@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/sidebar"
 import NewGroupChatModal from "../chat/NewGroupModal"
 import AddFriendModal from "../chat/AddFriendModal"
-import ConversationMixedList from "../chat/ConversationMixedList"
+import ConversationMixedList, { type ConversationFilter } from "../chat/ConversationMixedList"
 
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/useChatStore"
@@ -20,6 +20,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const setFocusedConversation = useChatStore((s) => s.setFocusedConversation);
   const [isGroupModalOpen, setIsGroupModalOpen] = React.useState(false);
+  const [conversationFilter, setConversationFilter] = React.useState<ConversationFilter>("all");
   const isMobile = useIsMobile();
 
   return (
@@ -45,8 +46,28 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
           <SidebarGroup className="flex min-h-0 flex-1 flex-col px-5">
             <SidebarGroupLabel asChild>
-              <div className="flex items-center justify-between px-0 py-3">
-                <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">cuộc trò chuyện</span>
+              <div className="flex items-center justify-between gap-3 px-0 py-3">
+                <div className="flex items-center gap-4">
+                  {([
+                    { value: "all", label: "Tất cả" },
+                    { value: "unread", label: "Chưa đọc" },
+                  ] as const).map((item) => {
+                    const active = conversationFilter === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setConversationFilter(item.value)}
+                        className={`relative h-8 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${active
+                          ? "font-semibold after:opacity-100"
+                          : "font-normal after:opacity-0 hover:text-foreground/80"
+                          }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <button
                   type="button"
                   onClick={() => setIsGroupModalOpen(true)}
@@ -57,7 +78,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </div>
             </SidebarGroupLabel>
             <SidebarGroupContent className="min-h-0 flex-1">
-              <ConversationMixedList />
+              <ConversationMixedList conversationFilter={conversationFilter} />
             </SidebarGroupContent>
           </SidebarGroup>
         </div>

@@ -86,9 +86,9 @@ export function LeaveGroupModal({
         </DialogHeader>
 
         {mustSelectNewAdmin && (
-          <div className="rounded-lg border border-amber-300/70 bg-amber-50 px-4 py-3 space-y-2">
-            <p className="text-sm font-semibold text-amber-900">Chọn trưởng nhóm mới trước khi rời nhóm</p>
-            <p className="text-xs text-amber-800/90">
+          <div className="rounded-lg border border-blue-300/70 bg-blue-50/60 px-4 py-3 space-y-2">
+            <p className="text-sm font-semibold text-blue-900">Chọn trưởng nhóm mới trước khi rời nhóm</p>
+            <p className="text-xs text-blue-800/90">
               Bạn đang là trưởng nhóm. Vui lòng chọn người kế nhiệm để tiếp tục.
             </p>
             <div className="relative">
