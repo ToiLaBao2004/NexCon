@@ -247,9 +247,9 @@ export default function LegalPage({ type }: LegalPageProps) {
   };
 
   return (
-    <main className="min-h-svh bg-background px-4 py-6 text-foreground md:px-8">
-      <div className="mx-auto w-full max-w-6xl">
-        <header className="mb-5 flex items-center justify-between gap-3">
+    <main className="flex h-svh min-h-0 bg-background px-4 py-6 text-foreground md:px-8">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col">
+        <header className="mb-5 flex shrink-0 items-center justify-between gap-3">
           <Button
             type="button"
             size="sm"
@@ -264,8 +264,8 @@ export default function LegalPage({ type }: LegalPageProps) {
           </Link>
         </header>
 
-        <section className="rounded-md border border-border/70 bg-card shadow-sm">
-          <div className="border-b border-border/70 px-5 py-6 md:px-8 md:py-7">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/70 bg-card shadow-sm">
+          <div className="shrink-0 border-b border-border/70 px-5 py-6 md:px-8 md:py-7">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 {content.label}
@@ -280,7 +280,7 @@ export default function LegalPage({ type }: LegalPageProps) {
             </h1>
           </div>
 
-          <nav className="flex flex-wrap gap-4 border-b border-border/70 px-5 md:px-8">
+          <nav className="flex shrink-0 flex-wrap gap-4 border-b border-border/70 px-5 md:px-8">
             {legalNav.map((item) => (
               <Link
                 key={item.type}
@@ -298,8 +298,8 @@ export default function LegalPage({ type }: LegalPageProps) {
             ))}
           </nav>
 
-          <div className="grid gap-6 px-5 py-6 md:px-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="lg:sticky lg:top-6 lg:self-start">
+          <div className="grid min-h-0 flex-1 gap-6 px-5 py-6 md:px-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <aside className="min-h-0 self-start">
               <div className="rounded-md border border-border/70 bg-background p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Tóm tắt chính</p>
                 <div className="mt-4 grid gap-3">
@@ -315,7 +315,8 @@ export default function LegalPage({ type }: LegalPageProps) {
               </div>
             </aside>
 
-            <div className="grid gap-4">
+            <div className="beautiful-scrollbar min-h-0 overflow-y-auto pr-1">
+              <div className="grid gap-4">
               {content.sections.map((section) => (
                 <section key={section.title} className="rounded-md border border-border/70 bg-background p-5">
                   <h2 className="text-lg font-semibold leading-7 text-foreground">{section.title}</h2>
@@ -331,6 +332,7 @@ export default function LegalPage({ type }: LegalPageProps) {
                   </div>
                 </section>
               ))}
+              </div>
             </div>
           </div>
         </section>

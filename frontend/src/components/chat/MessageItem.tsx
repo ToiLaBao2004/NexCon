@@ -2451,8 +2451,8 @@ const MessageItem = ({
 								{!isVisualOnly && showTimestamp && (
 									<div className={cn(
 										"flex w-full items-end gap-2 select-none",
-										showSmartReminderButton ? "justify-between" : "justify-end",
-										(isOwn && !isLink) ? "text-white/45" : "text-muted-foreground/45"
+										showSmartReminderButton ? "justify-between" : "justify-start",
+										(isOwn && !isLink) ? "text-white/65" : "text-foreground/65"
 									)}>
 										{/* ── Smart Reminder Button ─────────────────────────────────────────── */}
 										{showSmartReminderButton && (

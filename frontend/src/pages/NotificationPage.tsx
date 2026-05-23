@@ -63,15 +63,15 @@ const NotificationPage = () => {
                             </Button>
                         </div>
 
-                        <div className="mt-3 flex items-center gap-2">
+                        <div className="mt-3 flex items-center gap-4">
                             <button
                                 type="button"
                                 onClick={() => setFilter("all")}
                                 className={cn(
-                                    "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+                                    "relative h-8 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity",
                                     filter === "all"
-                                        ? "bg-primary/15 text-primary"
-                                        : "text-foreground hover:bg-muted"
+                                        ? "font-semibold after:opacity-100"
+                                        : "font-normal after:opacity-0 hover:text-foreground/80"
                                 )}
                             >
                                 Tất cả
@@ -80,10 +80,10 @@ const NotificationPage = () => {
                                 type="button"
                                 onClick={() => setFilter("unread")}
                                 className={cn(
-                                    "rounded-full px-4 py-2 text-sm font-semibold transition-colors",
+                                    "relative h-8 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity",
                                     filter === "unread"
-                                        ? "bg-primary/15 text-primary"
-                                        : "text-foreground hover:bg-muted"
+                                        ? "font-semibold after:opacity-100"
+                                        : "font-normal after:opacity-0 hover:text-foreground/80"
                                 )}
                             >
                                 Chưa đọc
