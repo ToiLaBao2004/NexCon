@@ -572,6 +572,16 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	useEffect(() => {
+		return () => {
+			if (typingTimeoutRef.current) {
+				clearTimeout(typingTimeoutRef.current);
+				typingTimeoutRef.current = null;
+			}
+			emitStopTyping(selectedConvo._id);
+		};
+	}, [emitStopTyping, selectedConvo._id]);
+
+	useEffect(() => {
 		if (!user) return;
 		if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
 

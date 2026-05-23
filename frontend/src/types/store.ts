@@ -204,6 +204,7 @@ export interface SocketState {
   disconnectSocket: () => void;
   typingUsers: Record<string, string[]>;
   setTypingUser: (conversationId: string, userId: string, isTyping: boolean) => void;
+  clearTypingUsers: (conversationId?: string) => void;
   emitTyping: (conversationId: string) => void;
   emitStopTyping: (conversationId: string) => void;
 }

@@ -29,6 +29,8 @@ const SESSION_ROOM_PREFIX = "session:";
 
 // Track active direct calls by sorted user pair.
 const activeCalls = new Map();
+const activeTyping = new Map();
+const socketTypingKeys = new Map();
 
 function getUserRoom(userId) {
     return `${USER_ROOM_PREFIX}${userId.toString()}`;
@@ -116,6 +118,73 @@ function emitToUser(userId, event, data) {
     if (!roomSockets || roomSockets.size === 0) return false;
     io.to(room).emit(event, data);
     return true;
+}
+
+function getTypingKey(conversationId, userId) {
+    return `${conversationId.toString()}:${userId.toString()}`;
+}
+
+function markSocketTyping(socketId, conversationId, userId) {
+    const key = getTypingKey(conversationId, userId);
+    let entry = activeTyping.get(key);
+    if (!entry) {
+        entry = {
+            conversationId: conversationId.toString(),
+            userId: userId.toString(),
+            socketIds: new Set(),
+        };
+        activeTyping.set(key, entry);
+    }
+    entry.socketIds.add(socketId);
+
+    let keys = socketTypingKeys.get(socketId);
+    if (!keys) {
+        keys = new Set();
+        socketTypingKeys.set(socketId, keys);
+    }
+    keys.add(key);
+}
+
+function clearTypingKeyForSocket(socketId, key) {
+    const entry = activeTyping.get(key);
+    const keys = socketTypingKeys.get(socketId);
+    if (keys) {
+        keys.delete(key);
+        if (keys.size === 0) {
+            socketTypingKeys.delete(socketId);
+        }
+    }
+
+    if (!entry) return "unknown";
+
+    entry.socketIds.delete(socketId);
+    if (entry.socketIds.size > 0) {
+        return "still-typing";
+    }
+
+    activeTyping.delete(key);
+    return {
+        conversationId: entry.conversationId,
+        userId: entry.userId,
+    };
+}
+
+function clearSocketTyping(socketId, conversationId, userId) {
+    return clearTypingKeyForSocket(socketId, getTypingKey(conversationId, userId));
+}
+
+function clearAllSocketTyping(socketId) {
+    const keys = Array.from(socketTypingKeys.get(socketId) ?? []);
+    const stoppedTyping = [];
+
+    keys.forEach((key) => {
+        const result = clearTypingKeyForSocket(socketId, key);
+        if (result && typeof result === "object") {
+            stoppedTyping.push(result);
+        }
+    });
+
+    return stoppedTyping;
 }
 
 function joinUserSocketsToRoom(userId, roomName) {
@@ -216,13 +285,19 @@ io.on("connection", async (socket) => {
     });
 
     // Typing indicators
-    const handleTypingEvent = async (event, { conversationId }) => {
+    const handleTypingEvent = async (event, data = {}) => {
         try {
+            const conversationId = data?.conversationId?.toString?.() || data?.conversationId;
+            if (!conversationId) return;
+
             const conversation = await Conversation.findById(conversationId).select("type participants").lean();
             if (!conversation) return;
 
+            const myId = user._id.toString();
+            const isParticipant = conversation.participants.some(p => p.userId.toString() === myId);
+            if (!isParticipant) return;
+
             if (conversation.type === "direct") {
-                const myId = user._id.toString();
                 const otherParticipant = conversation.participants.find(p => p.userId.toString() !== myId);
                 if (otherParticipant) {
                     const [blockExists, friendExists] = await Promise.all([
@@ -243,7 +318,15 @@ io.on("connection", async (socket) => {
                     if (blockExists || !friendExists) return;
                 }
             }
-            socket.to(conversationId).emit(event, { conversationId, userId: user._id.toString() });
+
+            if (event === "user-typing") {
+                markSocketTyping(socket.id, conversationId, myId);
+            } else {
+                const result = clearSocketTyping(socket.id, conversationId, myId);
+                if (result === "still-typing") return;
+            }
+
+            socket.to(conversationId).emit(event, { conversationId, userId: myId });
         } catch (error) {
             console.error(`Error handling ${event}:`, error);
         }
@@ -312,6 +395,14 @@ io.on("connection", async (socket) => {
     // Disconnect
     socket.on("disconnect", async () => {
         const userId = user._id.toString();
+        const stoppedTyping = clearAllSocketTyping(socket.id);
+        stoppedTyping.forEach(({ conversationId, userId: typingUserId }) => {
+            io.to(conversationId).except(socket.id).emit("user-stopped-typing", {
+                conversationId,
+                userId: typingUserId,
+            });
+        });
+
         await emitOnlineUsers();
 
         // Xử lý cuộc gọi đang active (lưu DB + thông báo đối phương)
