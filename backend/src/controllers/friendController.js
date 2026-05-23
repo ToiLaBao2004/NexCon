@@ -4,10 +4,11 @@ import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
 import Conversation from "../models/conversationModel.js";
-import { io, getReceiverSocketId, emitToUser, emitOnlineUsers } from "../socket/index.js";
+import { io, getReceiverSocketId, emitToUser, emitOnlineUsers, isUserOnline } from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
 import { checkFieldFormat } from "../utils/fieldFormat.js";
 import { maskLockedUserDoc } from "../utils/lockedUser.js";
+import { getVisiblePresencesForUsers } from "../services/userStatusService.js";
 
 const toFriendItem = (friendship, user) => {
     const safeUser = maskLockedUserDoc(user);
@@ -611,7 +612,7 @@ export async function getAllFriends(req, res) {
             { path: 'userA', select: 'displayName avatarUrl email bio phone lock' },
             { path: 'userB', select: 'displayName avatarUrl email bio phone lock' }
         ]).lean();
-        const listedFriends = friends.map(friend => {
+        let listedFriends = friends.map(friend => {
             const isUserA = friend.userA._id.toString() === user._id.toString();
             const friendUser = maskLockedUserDoc(isUserA ? friend.userB : friend.userA);
             return {
@@ -627,6 +628,16 @@ export async function getAllFriends(req, res) {
                 updatedAt: friend.updatedAt
             };
         });
+        const friendIds = listedFriends.map((friend) => friend.friendId?.toString()).filter(Boolean);
+        const presences = await getVisiblePresencesForUsers(friendIds, {
+            socketOnlineUserIds: friendIds.filter((id) => isUserOnline(id)),
+            viewerId: user._id,
+        });
+        const presenceByUserId = new Map(presences.map((presence) => [presence.userId, presence]));
+        listedFriends = listedFriends.map((friend) => ({
+            ...friend,
+            presence: presenceByUserId.get(friend.friendId?.toString()) || null,
+        }));
         return res.status(200).json({ listedFriends });
     } catch (error) {
         console.error('Get all friends error:', error);

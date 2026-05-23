@@ -2,6 +2,30 @@ export interface UserMusic {
   trackId: string;
 }
 
+export type UserPresenceStatus =
+  | "online"
+  | "away"
+  | "busy"
+  | "do_not_disturb"
+  | "invisible"
+  | "offline";
+
+export type UserStatusMode = "auto" | "manual";
+
+export interface UserPresence {
+  userId: string;
+  status: UserPresenceStatus;
+  status_label?: string;
+  status_mode: UserStatusMode;
+  manual_status: Exclude<UserPresenceStatus, "offline">;
+  show_activity: boolean;
+  is_online: boolean;
+  activity_hidden?: boolean;
+  last_seen_at?: string | null;
+  last_seen_relative?: string | null;
+  updatedAt?: string | null;
+}
+
 export interface User {
   _id: string;
   email: string;
@@ -27,6 +51,7 @@ export interface User {
     nextViolationDecayAt?: string | null;
     violationHistory?: import("./moderation").ViolationHistoryItem[];
   };
+  presence?: UserPresence | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -37,6 +62,7 @@ export interface FriendItem {
   displayName: string;
   avatarUrl?: string;
   nickname?: string;
+  presence?: UserPresence | null;
   createdAt?: string;
   updatedAt?: string;
 }

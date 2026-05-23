@@ -4,7 +4,6 @@ import { SidebarTrigger } from "../ui/sidebar";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Separator } from "@radix-ui/react-separator";
 import UserAvatar from "./UserAvatar";
-import StatusBadge from "./StatusBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { Phone, Video, Search, ArrowLeft, CalendarClock } from "lucide-react";
@@ -18,6 +17,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useMaxWidth } from "@/hooks/use-max-width";
 import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
 import ScheduleMeetingModal from "@/components/reminder/ScheduleMeetingModal";
+import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
 
 const PanelRightIcon = ({ className, filled }: { className?: string; filled?: boolean }) => (
   <svg
@@ -47,7 +47,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   const { conversations, activeConversationId, setActiveConversation, activeSidebar, setActiveSidebar } =
     useChatStore();
   const { user } = useAuthStore();
-  const { onlineUsers } = useSocketStore();
+  const { onlineUsers, userPresences } = useSocketStore();
   const { startCall, status: callStatus } = useCallStore();
   const { startGroupCall, status: groupCallStatus } = useGroupCallStore();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -80,6 +80,14 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   }
 
   const isOtherUserLocked = Boolean(otherUser?.userId?.isLocked || otherUser?.userId?.lock?.isLocked);
+  const otherPresence = getPresenceForUser(
+    otherUser?.userId?._id,
+    userPresences,
+    otherUser?.userId?.presence ?? null,
+    onlineUsers,
+  );
+  const otherBadgeStatus = getPresenceBadgeStatus(otherPresence);
+  const otherPresenceText = getPresenceText(otherPresence);
   const displayName =
     chat.type === "direct"
       ? (!isOtherUserLocked && otherUser?.userId?.nickname?.trim()
@@ -169,10 +177,8 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                   name={displayName}
                   avatarUrl={otherUser?.userId?.avatarUrl || undefined}
                   className="!h-[52px] !w-[52px] !text-lg"
+                  status={otherBadgeStatus}
                 />
-                {onlineUsers.includes(otherUser?.userId?._id ?? "") && (
-                  <StatusBadge status="online" />
-                )}
               </>
             ) : (
               <GroupChatAvatar
@@ -183,16 +189,21 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
             )}
           </div>
           {/* name */}
-          <h2
+          <div
             className={cn(
-              "flex-1 truncate text-lg font-semibold leading-tight text-foreground",
+              "flex-1 min-w-0",
               chat.type === "direct" &&
               "cursor-pointer hover:text-primary transition-colors",
             )}
             onClick={() => chat?.type === "direct" && setIsProfileOpen(true)}
           >
-            {displayName}
-          </h2>
+            <h2 className="truncate text-lg font-semibold leading-tight text-foreground">
+              {displayName}
+            </h2>
+            {chat.type === "direct" && !isOtherUserLocked && (
+              <p className="truncate text-xs text-muted-foreground">{otherPresenceText}</p>
+            )}
+          </div>
           <div className="ml-0.5 flex shrink-0 items-center gap-1 md:ml-2 md:gap-1.5">
             {/* call buttons */}
             {chat.type === "direct" && (
