@@ -14,6 +14,7 @@ import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { chatService } from "@/services/chatService";
 import { useChatStore } from "@/stores/useChatStore";
 import { useSocketStore } from "@/stores/useSocketStore";
+import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
 
 interface Props {
   conversationId?: string;
@@ -37,7 +38,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
   const [userToRemove, setUserToRemove] = useState<any>(null);
   const [isConfirmRemoveOpen, setIsConfirmRemoveOpen] = useState(false);
   const [removingUser, setRemovingUser] = useState(false);
-  const { onlineUsers } = useSocketStore();
+  const { onlineUsers, userPresences } = useSocketStore();
 
   useEffect(() => {
     const fetchQueue = () => {
@@ -144,11 +145,12 @@ export default function MembersPanel({ conversationId, participants, memberCount
                           const u = item.userId;
                           if (!u) return null;
                           const name = u.displayName || "Người dùng";
-                          const isOnline = onlineUsers.includes(u._id?.toString?.() || "");
+                          const presence = getPresenceForUser(u._id?.toString?.() || "", userPresences, u.presence ?? null, onlineUsers);
+                          const badgeStatus = getPresenceBadgeStatus(presence);
                           return (
                             <div key={u._id} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg hover:bg-muted/10 text-left transition-colors group">
                               <div className="shrink-0 cursor-pointer" onClick={() => handleShowProfile(u)}>
-                                <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" status={isOnline ? "online" : "offline"} />
+                                <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" status={badgeStatus} />
                               </div>
                               <div className="flex-1 cursor-pointer min-w-0" onClick={() => handleShowProfile(u)}>
                                 <div className="font-medium text-[14px] text-foreground truncate">{name}</div>
@@ -178,7 +180,8 @@ export default function MembersPanel({ conversationId, participants, memberCount
                   const u = p.userId || p;
                   const name = u?.displayName || "Người dùng";
                   const isMe = u?._id?.toString() === currentUserId?.toString();
-                  const isOnline = onlineUsers.includes(u?._id?.toString?.() || "");
+                  const presence = getPresenceForUser(u?._id?.toString?.() || "", userPresences, u?.presence ?? null, onlineUsers);
+                  const badgeStatus = getPresenceBadgeStatus(presence);
                   const isLeader = adminIds.some((id) => id?.toString?.() === u?._id?.toString?.());
 
                   return (
@@ -190,7 +193,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
                         className="shrink-0 cursor-pointer"
                         onClick={() => handleShowProfile(u)}
                       >
-                        <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" status={isOnline ? "online" : "offline"} />
+                        <UserAvatar type="sidebar" name={name} avatarUrl={u?.avatarUrl} className="!h-9 !w-9 !text-sm border border-border/10" status={badgeStatus} />
                       </div>
                       <div
                         className="flex-1 cursor-pointer min-w-0"

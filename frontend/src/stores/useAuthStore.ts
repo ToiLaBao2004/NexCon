@@ -342,6 +342,29 @@ export const useAuthStore = create<AuthState>()(
         throw error;
       }
     },
+
+    updateMyStatus: async (data) => {
+      try {
+        const presence = await userService.updateMyStatus(data);
+        set((state) => ({
+          user: state.user ? { ...state.user, presence } : state.user,
+        }));
+        if (presence?.userId) {
+          useSocketStore.setState((state) => ({
+            userPresences: {
+              ...state.userPresences,
+              [presence.userId]: presence,
+            },
+            onlineUsers: presence.is_online
+              ? Array.from(new Set([...state.onlineUsers, presence.userId]))
+              : state.onlineUsers.filter((id) => id !== presence.userId),
+          }));
+        }
+      } catch (error: any) {
+        console.error('Lá»—i khi cáº­p nháº­t tráº¡ng thÃ¡i:', error);
+        throw error;
+      }
+    },
   }), {
     name: "auth-storage",
     partialize: (state) => ({ user: state.user }), // chỉ persist user 

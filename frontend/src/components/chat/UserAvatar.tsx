@@ -1,13 +1,14 @@
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import StatusBadge from "./StatusBadge";
+import type { UserPresenceStatus } from "@/types/user";
 
 interface IUserAvatarProps {
     type: "sidebar" | "chat" | "profile" | "seen" | "card";
     name: string;
     avatarUrl?: string;
     className?: string;
-    status?: "online" | "offline";
+    status?: UserPresenceStatus;
 }
 
 const UserAvatar = ({ type, name, avatarUrl, className, status }: IUserAvatarProps) => {
@@ -34,7 +35,7 @@ const UserAvatar = ({ type, name, avatarUrl, className, status }: IUserAvatarPro
                 </AvatarFallback>
 
             </Avatar>
-            {status === "online" && type !== "seen" && <StatusBadge status="online" />}
+            {status && type !== "seen" && status !== "offline" && <StatusBadge status={status} />}
         </span>
     );
 };

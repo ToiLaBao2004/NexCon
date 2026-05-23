@@ -5,7 +5,6 @@ import { useChatStore } from '@/stores/useChatStore';
 import { useFriendStore } from '@/stores/useFriendStore';
 import { cn } from '@/lib/utils';
 import UserAvatar from './UserAvatar';
-import StatusBadge from './StatusBadge';
 import UnreadCountBadge from './UnreadCountBadge';
 import MentionCountBadge from './MentionCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
@@ -37,6 +36,7 @@ import { getSystemMessageText } from '@/utils/chatUtils';
 import { FIELD_LIMITS, checkFieldFormat } from '@/lib/fieldFormat';
 import { toast } from "sonner";
 import { ReportDialog } from "../shared/ReportDialog";
+import { getPresenceBadgeStatus, getPresenceForUser } from '@/utils/userPresence';
 
 const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
 
@@ -61,7 +61,7 @@ const decodeMentionTokens = (text: string, convo: Conversation) => {
 const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation; density?: "default" | "people" }) => {
   const { user } = useAuthStore();
   const { focusedConversationId, setActiveConversation, messages, fetchMessages, fetchConversations, clearConversation, toggleConversationPin, markAsUnread, markAsSeen, drafts } = useChatStore();
-  const { onlineUsers } = useSocketStore();
+  const { onlineUsers, userPresences } = useSocketStore();
   const { setNickName, loading } = useFriendStore();
   const active = focusedConversationId === convo._id;
 
@@ -98,6 +98,13 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
   const displayName = !isOtherUserLocked && otherUser?.userId?.nickname?.trim()
     ? otherUser.userId.nickname
     : otherUser?.userId?.displayName ?? "";
+  const otherPresence = getPresenceForUser(
+    otherUser?.userId?._id,
+    userPresences,
+    otherUser?.userId?.presence ?? null,
+    onlineUsers,
+  );
+  const otherBadgeStatus = getPresenceBadgeStatus(otherPresence);
 
   const unreadCount = convo.unreadCounts[user._id];
   const unreadMentionCount = myParticipant?.unreadMentionCount ?? 0;
@@ -383,8 +390,8 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
             name={displayName}
             avatarUrl={otherUser.userId?.avatarUrl ?? undefined}
             className={density === "people" ? "!h-14 !w-14 !text-lg" : undefined}
+            status={otherBadgeStatus}
           />
-          {onlineUsers.includes(otherUser?.userId?._id ?? "") && <StatusBadge status="online" />}
           {unreadCount > 0 && <UnreadCountBadge unreadCount={unreadCount} />}
           {unreadMentionCount > 0 && <MentionCountBadge count={unreadMentionCount} />}
         </>

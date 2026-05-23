@@ -15,6 +15,7 @@ import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
 import UserAvatar from "./UserAvatar";
 import { Search } from "lucide-react";
+import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
 
 interface LeaveGroupModalProps {
   open: boolean;
@@ -32,7 +33,7 @@ export function LeaveGroupModal({
   participants = [],
 }: LeaveGroupModalProps) {
   const { user } = useAuthStore();
-  const { onlineUsers } = useSocketStore();
+  const { onlineUsers, userPresences } = useSocketStore();
   const { leaveGroup } = useChatStore();
   const [silent, setSilent] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -101,7 +102,8 @@ export function LeaveGroupModal({
             </div>
             <div className="max-h-44 overflow-y-auto space-y-1 pr-1">
               {filteredNewAdmins.map((member) => {
-                const isOnline = onlineUsers.includes(member._id?.toString?.() || "");
+                const presence = getPresenceForUser(member._id?.toString?.() || "", userPresences, member.presence ?? null, onlineUsers);
+                const badgeStatus = getPresenceBadgeStatus(presence);
                 return (
                   <label
                     key={member._id}
@@ -119,7 +121,7 @@ export function LeaveGroupModal({
                       name={member.displayName || "Người dùng"}
                       avatarUrl={member.avatarUrl}
                       className="h-8 w-8"
-                      status={isOnline ? "online" : "offline"}
+                      status={badgeStatus}
                     />
                     <div className="min-w-0">
                       <span className="block text-sm text-foreground truncate">

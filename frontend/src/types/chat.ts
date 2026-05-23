@@ -1,3 +1,5 @@
+import type { UserPresence } from "./user";
+
 export interface Participant {
   userId: {
     _id: string;
@@ -11,6 +13,7 @@ export interface Participant {
     lock?: {
       isLocked?: boolean;
     };
+    presence?: UserPresence | null;
   };
   joinedAt: string;
   unreadMentionCount?: number;
@@ -191,4 +194,3 @@ export interface MentionMessage {
   };
   mentions: Mention[];
 }
-

@@ -18,8 +18,47 @@ import { useMeetStore } from "./useMeetStore";
 import { flashTabTitle } from "@/utils/tabTitle";
 import { useAppStatusStore } from "./useAppStatusStore";
 import { consumePendingNativeCallAction } from "@/lib/nativeCallAction";
+import type { UserPresence } from "@/types/user";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
+
+const normalizeOnlineUsersPayload = (payload: any): {
+  onlineUsers: string[];
+  userPresences: Record<string, UserPresence>;
+} => {
+  if (Array.isArray(payload)) {
+    return {
+      onlineUsers: payload.map((id) => String(id)),
+      userPresences: Object.fromEntries(payload.map((id) => {
+        const userId = String(id);
+        return [userId, {
+          userId,
+          status: "online",
+          status_mode: "auto",
+          manual_status: "online",
+          show_activity: true,
+          is_online: true,
+          last_seen_at: null,
+          last_seen_relative: null,
+        } satisfies UserPresence];
+      })),
+    };
+  }
+
+  const presences = Array.isArray(payload?.presences) ? payload.presences : [];
+  const userPresences = Object.fromEntries(
+    presences
+      .filter((presence: any) => presence?.userId)
+      .map((presence: UserPresence) => [String(presence.userId), presence])
+  );
+  const onlineUsers = Array.isArray(payload?.onlineUserIds)
+    ? payload.onlineUserIds.map((id: any) => String(id))
+    : presences
+      .filter((presence: UserPresence) => presence?.is_online)
+      .map((presence: UserPresence) => String(presence.userId));
+
+  return { onlineUsers, userPresences };
+};
 
 const canShowBrowserNotification = () => {
   return typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
@@ -194,6 +233,7 @@ const playWaitingRoomKnock = () => {
 export const useSocketStore = create<SocketState>((set, get) => ({
   socket: null,
   onlineUsers: [],
+  userPresences: {},
   connectionStatus: 'idle',
   typingUsers: {},
   setTypingUser: (conversationId, userId, isTyping) => {
@@ -344,8 +384,15 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useAppStatusStore.getState().setSocketStatus(nextStatus);
     });
 
-    socket.on("online-users", (userIds) => {
-      set({ onlineUsers: userIds });
+    socket.on("online-users", (payload) => {
+      const normalized = normalizeOnlineUsersPayload(payload);
+      set((state) => ({
+        onlineUsers: normalized.onlineUsers,
+        userPresences: {
+          ...state.userPresences,
+          ...normalized.userPresences,
+        },
+      }));
     });
 
     socket.on("new-message", ({ message, conversation, unreadCounts }) => {
@@ -1345,7 +1392,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     const socket = get().socket;
     if (socket) {
       socket.disconnect();
-      set({ socket: null, connectionStatus: 'idle' });
+      set({ socket: null, onlineUsers: [], userPresences: {}, connectionStatus: 'idle' });
       useAppStatusStore.getState().setSocketStatus('idle');
       // Reset call state if any
       useCallStore.getState().handleCallEnded();

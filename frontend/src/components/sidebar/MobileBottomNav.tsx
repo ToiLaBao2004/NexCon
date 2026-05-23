@@ -23,6 +23,10 @@ import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
 import { ProfileEditDialog } from "./ProfileEditDialog";
 import { SettingsDialog } from "./SettingsDialog";
+import { UserStatusMenuItems } from "./UserStatusMenuItems";
+import { useSocketStore } from "@/stores/useSocketStore";
+import StatusBadge from "@/components/chat/StatusBadge";
+import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
 
 const MobileBottomNav = () => {
     const navigate = useNavigate();
@@ -32,8 +36,11 @@ const MobileBottomNav = () => {
     const { incomingRequests } = useFriendStore();
     const { unreadCount } = useNotificationStore();
     const { conversations, setFocusedConversation } = useChatStore();
+    const { onlineUsers, userPresences } = useSocketStore();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const myPresence = getPresenceForUser(user?._id, userPresences, user?.presence ?? null, onlineUsers);
+    const myBadgeStatus = getPresenceBadgeStatus(myPresence);
 
     const unreadMessagesCount = conversations.reduce((acc, convo) => {
         if (!user) return acc;
@@ -99,12 +106,15 @@ const MobileBottomNav = () => {
                             className="relative flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-2xl text-foreground/75 transition-colors hover:bg-muted/50 hover:text-foreground"
                             aria-label="Tài khoản"
                         >
-                            <Avatar className="h-5 w-5 rounded-full border border-border/60">
-                                <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
-                                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
-                                    {user?.displayName?.charAt(0) || "U"}
-                                </AvatarFallback>
-                            </Avatar>
+                            <span className="relative">
+                                <Avatar className="h-5 w-5 rounded-full border border-border/60">
+                                    <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
+                                    <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
+                                        {user?.displayName?.charAt(0) || "U"}
+                                    </AvatarFallback>
+                                </Avatar>
+                                {myBadgeStatus && <StatusBadge status={myBadgeStatus} />}
+                            </span>
                             <span className="text-[10.5px] font-medium leading-none">Tài khoản</span>
                         </button>
                     </DropdownMenuTrigger>
@@ -123,6 +133,7 @@ const MobileBottomNav = () => {
                                 <span>Vi phạm & khiếu nại</span>
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
+                        <UserStatusMenuItems />
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             className="cursor-pointer py-2 text-primary focus:text-primary"

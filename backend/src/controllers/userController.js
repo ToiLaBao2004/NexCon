@@ -6,20 +6,78 @@ import { searchSpotifyTracks } from '../services/spotifyService.js';
 import { checkFieldFormat } from '../utils/fieldFormat.js';
 import { maskLockedUser } from '../utils/lockedUser.js';
 import { getUserModerationDetails } from '../services/moderation/violationService.js';
+import {
+    getSelfPresence,
+    getVisiblePresencesForUsers,
+    updateUserStatus as updateUserStatusPreference,
+} from '../services/userStatusService.js';
+import { emitOnlineUsers, isUserOnline } from '../socket/index.js';
 
 export async function getCurrentUser(req, res) {
     try {
         const userId = req.user._id || req.user.id;
 
-        const user = await User.findById(userId).select("-password");
+        const user = await User.findById(userId).select("-password").lean();
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        return res.status(200).json({ user });
+        const presence = await getSelfPresence(userId, { socketOnline: isUserOnline(userId) });
+
+        return res.status(200).json({ user: { ...user, presence } });
     } catch (error) {
         console.error("Get current user error:", error);
         return res.status(500).json({ message: "Server error" });
+    }
+}
+
+export async function getMyUserStatus(req, res) {
+    try {
+        const userId = req.user._id || req.user.id;
+        const presence = await getSelfPresence(userId, { socketOnline: isUserOnline(userId) });
+
+        return res.status(200).json({ presence });
+    } catch (error) {
+        console.error("Get user status error:", error);
+        return res.status(500).json({ message: "Server error" });
+    }
+}
+
+export async function updateMyUserStatus(req, res) {
+    try {
+        const userId = req.user._id || req.user.id;
+        const requestedStatus = req.body?.status;
+        const requestedMode = req.body?.status_mode ?? req.body?.statusMode;
+        const requestedManualStatus = req.body?.manual_status ?? req.body?.manualStatus;
+        const requestedShowActivity = req.body?.show_activity ?? req.body?.showActivity;
+
+        const updates = {};
+        if (requestedMode !== undefined) {
+            updates.status_mode = requestedMode;
+        }
+        if (requestedManualStatus !== undefined) {
+            updates.manual_status = requestedManualStatus;
+        } else if (requestedStatus !== undefined) {
+            if (String(requestedStatus).trim().toLowerCase() === 'auto') {
+                updates.status_mode = 'auto';
+            } else {
+                updates.manual_status = requestedStatus;
+            }
+        }
+        if (requestedShowActivity !== undefined) {
+            updates.show_activity = requestedShowActivity;
+        }
+
+        await updateUserStatusPreference(userId, updates);
+        const presence = await getSelfPresence(userId, { socketOnline: isUserOnline(userId) });
+        await emitOnlineUsers();
+
+        return res.status(200).json({ presence });
+    } catch (error) {
+        console.error("Update user status error:", error);
+        return res.status(error.statusCode || 500).json({
+            message: error.statusCode ? error.message : "Server error",
+        });
     }
 }
 
@@ -299,8 +357,17 @@ export async function getUserById(req, res) {
             }
         }
 
+        const [presence] = await getVisiblePresencesForUsers([id], {
+            socketOnlineUserIds: isUserOnline(id) ? [id] : [],
+            viewerId: currentUserId,
+        });
+        const visibleUser = currentUserId && id === currentUserId ? user : maskLockedUser(user);
+
         return res.status(200).json({
-            user: currentUserId && id === currentUserId ? user : maskLockedUser(user),
+            user: {
+                ...visibleUser,
+                presence,
+            },
         });
     } catch (error) {
         console.error("Get user by ID error:", error);

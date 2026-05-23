@@ -13,6 +13,7 @@ import {
 	getReceiverSocketId,
 	joinUserSocketsToRoom,
 	leaveUserSocketsFromRoom,
+	isUserOnline,
 } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
 import {
@@ -24,6 +25,7 @@ import {
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
 import { enqueueGroupCleanup } from '../config/groupCleanupQueue.js';
 import { enqueueConversationClearCleanup } from '../config/conversationClearCleanupQueue.js';
+import { getVisiblePresencesForUsers } from '../services/userStatusService.js';
 
 const MUTE_DURATION_MS = {
 	'1h': 60 * 60 * 1000,
@@ -77,6 +79,43 @@ function sortConversationsForClient(conversations = []) {
 function sanitizeParticipantUser(userObj) {
 	if (!userObj) return userObj;
 	return maskLockedUserDoc(userObj);
+}
+
+async function attachPresenceToConversationParticipants(conversations = [], viewerId) {
+	const participantIds = [
+		...new Set(
+			conversations
+				.flatMap((conversation) => conversation.participants || [])
+				.map((participant) => participant?.userId?._id?.toString?.() || participant?.userId?.toString?.())
+				.filter(Boolean)
+		),
+	];
+
+	if (!participantIds.length) return conversations;
+
+	const presences = await getVisiblePresencesForUsers(participantIds, {
+		socketOnlineUserIds: participantIds.filter((id) => isUserOnline(id)),
+		viewerId,
+	});
+	const presenceByUserId = new Map(presences.map((presence) => [presence.userId, presence]));
+
+	return conversations.map((conversation) => ({
+		...conversation,
+		participants: (conversation.participants || []).map((participant) => {
+			const participantId = participant?.userId?._id?.toString?.() || participant?.userId?.toString?.();
+			if (!participantId || !participant.userId || typeof participant.userId !== 'object') {
+				return participant;
+			}
+
+			return {
+				...participant,
+				userId: {
+					...participant.userId,
+					presence: presenceByUserId.get(participantId) || null,
+				},
+			};
+		}),
+	}));
 }
 
 function sanitizePopulatedConversation(conversation) {
@@ -440,7 +479,9 @@ export async function getConversations(req, res) {
 			};
 		});
 
-		return res.status(200).json({ conversations: sortConversationsForClient(formatted), hasMore, nextCursor });
+		const formattedWithPresence = await attachPresenceToConversationParticipants(formatted, myId);
+
+		return res.status(200).json({ conversations: sortConversationsForClient(formattedWithPresence), hasMore, nextCursor });
 	} catch (error) {
 		console.error("Error occurred while fetching conversations", error);
 		return res.status(500).json({ message: "Internal server error" });
@@ -510,7 +551,9 @@ export async function getGroups(req, res) {
 			};
 		});
 
-		return res.status(200).json({ groups: formatted, hasMore, nextCursor });
+		const formattedWithPresence = await attachPresenceToConversationParticipants(formatted, myId);
+
+		return res.status(200).json({ groups: formattedWithPresence, hasMore, nextCursor });
 	} catch (error) {
 		console.error('Error fetching groups:', error);
 		return res.status(500).json({ message: 'Internal server error' });

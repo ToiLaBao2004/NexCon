@@ -1,4 +1,4 @@
-import type { User } from './user';
+import type { User, UserPresenceStatus, UserStatusMode } from './user';
 
 export interface SessionInfo {
   sessionId: string;
@@ -64,6 +64,12 @@ export default interface AuthState {
   updateProfile: (data: { displayName?: string; bio?: string; phone?: string }) => Promise<void>;
 
   updateAvatar: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
+
+  updateMyStatus: (data: {
+    status_mode?: UserStatusMode;
+    manual_status?: Exclude<UserPresenceStatus, "offline">;
+    show_activity?: boolean;
+  }) => Promise<void>;
 
   getSessions: () => Promise<void>;
 

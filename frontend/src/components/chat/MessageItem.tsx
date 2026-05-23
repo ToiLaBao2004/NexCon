@@ -33,6 +33,7 @@ import { useThemeStore } from "@/stores/useThemeStore";
 import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
 import ReminderFormModal from "@/components/reminder/ReminderFormModal";
 import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder";
+import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
 import ForwardMessageModal from "./ForwardMessageModal";
 import { DetailDialog } from "./ConversationRemindersPanel";
 import { ReportDialog } from "@/components/shared/ReportDialog";
@@ -2010,7 +2011,7 @@ const MessageItem = ({
 		return (senderObj ? senderObj._id : msg.senderId)?.toString?.() ?? "";
 	};
 
-	const { onlineUsers } = useSocketStore();
+	const { onlineUsers, userPresences } = useSocketStore();
 	const isImageBatch = (imageBatchItems?.length ?? 0) > 1;
 	const hasUnrecalledBatchMessage = imageBatchItems?.some((item) => item.isRecalled !== true) ?? false;
 	const isRecalled = message.isRecalled === true && (!isImageBatch || !hasUnrecalledBatchMessage);
@@ -2044,7 +2045,13 @@ const MessageItem = ({
 	const downloadableBubbleMessages = bubbleMessages.filter((item) =>
 		item.isRecalled !== true && item.reportStatus !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
 	);
-	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
+	const senderPresence = getPresenceForUser(
+		actualSenderId?.toString?.(),
+		userPresences,
+		participant?.userId?.presence ?? null,
+		onlineUsers,
+	);
+	const senderBadgeStatus = getPresenceBadgeStatus(senderPresence);
 	// Automatically fetch signed URL for files and audio if not cached
 	useEffect(() => {
 		if (
@@ -2359,7 +2366,7 @@ const MessageItem = ({
 								name={participant?.userId.nickname ?? participant?.userId.displayName ?? "User"}
 								avatarUrl={participant?.userId.avatarUrl ?? undefined}
 								className="size-10 text-base"
-								status={selectedConvo.type === "group" && isSenderOnline ? "online" : undefined}
+								status={selectedConvo.type === "group" ? senderBadgeStatus : undefined}
 							/>
 						)}
 					</div>
