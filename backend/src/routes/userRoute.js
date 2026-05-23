@@ -1,7 +1,8 @@
 import express from 'express';
 import {
     getCurrentUser, updateAvatar, updateProfile, updateMusic, searchMusic,
-    removeMusic, changePassword, searchUsers, getUserById, getMyModerationStatus
+    removeMusic, changePassword, searchUsers, getUserById, getMyModerationStatus,
+    getMyUserStatus, updateMyUserStatus
 } from '../controllers/userController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
 import { handleUploadError, upload } from '../middlewares/uploadMiddleware.js';
@@ -11,6 +12,8 @@ const userRouter = express.Router();
 
 userRouter.get('/me', authMiddleware, getCurrentUser);
 userRouter.get('/me/moderation', authMiddleware, getMyModerationStatus);
+userRouter.get('/me/status', authMiddleware, getMyUserStatus);
+userRouter.patch('/me/status', authMiddleware, updateMyUserStatus);
 userRouter.use(requireUser);
 userRouter.get('/search', authMiddleware, searchUsers);
 userRouter.put('/update-profile', authMiddleware, updateProfile);

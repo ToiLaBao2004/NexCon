@@ -20,6 +20,9 @@ import { Flag, Loader2, UserMinus, UserPlus, Mail, Phone, Info, Check, X as Clos
 import { cn } from "@/lib/utils";
 import type { User } from "@/types/user";
 import { ReportDialog } from "./ReportDialog";
+import { useSocketStore } from "@/stores/useSocketStore";
+import StatusBadge from "@/components/chat/StatusBadge";
+import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
 
 interface UserProfile {
     _id: string;
@@ -56,6 +59,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
     const [reportOpen, setReportOpen] = useState(false);
     const [profileAccessBlocked, setProfileAccessBlocked] = useState(false);
     const [profileLoading, setProfileLoading] = useState(false);
+    const { onlineUsers, userPresences } = useSocketStore();
 
     useEffect(() => {
         if (open && user?._id) {
@@ -97,6 +101,9 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
     const shouldHideProfileDetails = profileLoading || isBlockedRelation;
     const profileAvatarUrl = fullUser?.avatarUrl || user.avatarUrl || "";
     const canOpenAvatar = Boolean(profileAvatarUrl && !shouldHideProfileDetails);
+    const profilePresence = getPresenceForUser(user._id, userPresences, fullUser?.presence ?? null, onlineUsers);
+    const profileBadgeStatus = !shouldHideProfileDetails ? getPresenceBadgeStatus(profilePresence) : undefined;
+    const profilePresenceText = !shouldHideProfileDetails ? getPresenceText(profilePresence) : "";
 
     const handleOpenAvatar = () => {
         if (!canOpenAvatar) return;
@@ -322,18 +329,24 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                             canOpenAvatar ? "cursor-zoom-in hover:scale-[1.03] active:scale-[0.99]" : "cursor-default",
                         )}
                     >
-                        <Avatar className="h-32 w-32 ring-4 ring-background border-4 border-background shadow-xl bg-muted">
-                            <AvatarImage src={profileAvatarUrl || undefined} className="object-cover" />
-                            <AvatarFallback className="text-4xl font-bold bg-primary/10 text-primary">
-                                {user.displayName.charAt(0)}
-                            </AvatarFallback>
-                        </Avatar>
+                        <span className="relative inline-flex">
+                            <Avatar className="h-32 w-32 ring-4 ring-background border-4 border-background shadow-xl bg-muted">
+                                <AvatarImage src={profileAvatarUrl || undefined} className="object-cover" />
+                                <AvatarFallback className="text-4xl font-bold bg-primary/10 text-primary">
+                                    {user.displayName.charAt(0)}
+                                </AvatarFallback>
+                            </Avatar>
+                            {profileBadgeStatus && <StatusBadge status={profileBadgeStatus} />}
+                        </span>
                     </button>
 
                     <div className="text-center w-full">
                         <h3 className="text-2xl font-bold text-foreground">
                             {user.displayName} {isSelf && <span className="text-sm font-normal text-muted-foreground ml-1">(Bạn)</span>}
                         </h3>
+                        {profilePresenceText && (
+                            <p className="mt-1 text-sm text-muted-foreground">{profilePresenceText}</p>
+                        )}
 
                         {!shouldHideProfileDetails && (
                             <div className="flex flex-col gap-3 mt-6 w-full text-left bg-muted/20 p-4 rounded-xl border border-border/40">

@@ -1,5 +1,5 @@
 import api from '@/lib/axios';
-import type { UserMusic } from '@/types/user';
+import type { UserMusic, UserPresenceStatus, UserStatusMode } from '@/types/user';
 
 export const userService = {
     updateProfile: async (data: { displayName?: string; bio?: string; phone?: string }) => {
@@ -25,6 +25,20 @@ export const userService = {
     fetchMe: async () => {
         const response = await api.get('/users/me');
         return response.data.user;
+    },
+
+    fetchMyStatus: async () => {
+        const response = await api.get('/users/me/status');
+        return response.data.presence;
+    },
+
+    updateMyStatus: async (data: {
+        status_mode?: UserStatusMode;
+        manual_status?: Exclude<UserPresenceStatus, 'offline'>;
+        show_activity?: boolean;
+    }) => {
+        const response = await api.patch('/users/me/status', data);
+        return response.data.presence;
     },
 
     changePassword: async (data: { currentPassword?: string; newPassword?: string; confirmNewPassword?: string }) => {

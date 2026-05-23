@@ -33,6 +33,7 @@ import { useThemeStore } from "@/stores/useThemeStore";
 import ReminderQuickModal from "@/components/reminder/ReminderQuickModal";
 import ReminderFormModal from "@/components/reminder/ReminderFormModal";
 import type { Reminder, SharedReminderOverviewResponse } from "@/types/reminder";
+import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
 import ForwardMessageModal from "./ForwardMessageModal";
 import { DetailDialog } from "./ConversationRemindersPanel";
 import { ReportDialog } from "@/components/shared/ReportDialog";
@@ -804,13 +805,13 @@ function ReplyQuoteInline({
 						<SecureImage
 							messageId={replyTo._id}
 							alt="reply-thumbnail"
-							className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+							className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
 						/>
 					) : (
 						<img
 							src={replyTo.fileUrl!}
 							alt="reply-thumbnail"
-							className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+							className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
 						/>
 					)
 				) : null}
@@ -826,7 +827,7 @@ function ReplyQuoteInline({
 					<CachedStickerImage
 						src={replyTo.content}
 						alt="reply-sticker-thumbnail"
-						className="w-8 h-8 rounded-md object-contain bg-white/10 border border-blue-200 dark:border-blue-400"
+						className="size-6 rounded-md object-contain bg-white/10 border border-blue-200 dark:border-blue-400"
 					/>
 				)}
 				<span className="flex items-center gap-1">
@@ -860,13 +861,11 @@ function ReplyQuoteInline({
 	return (
 		<div
 			className={cn(
-				"-mb-5 cursor-pointer transition-colors",
-				"border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30",
-				"px-3 py-1.5 rounded-xl shadow-sm",
-				"flex flex-col gap-0",
-				isOwn ? "border-emerald-500/60 bg-emerald-500/20" : "border-blue-500",
+				"mb-1 w-fit max-w-full min-w-0 self-start cursor-pointer rounded-xl border px-2 py-1.5 shadow-sm transition-colors",
+				isOwn
+					? "border-white/25 bg-white/20 text-white/90 hover:bg-white/25 dark:border-white/20 dark:bg-white/15 dark:hover:bg-white/20"
+					: "border-slate-200/80 bg-slate-100/75 text-slate-900 hover:bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900/55 dark:text-slate-50 dark:hover:bg-slate-900/75",
 			)}
-			style={{ boxShadow: "0 2px 8px 0 rgba(0, 120, 255, 0.08)" }}
 			onClick={async (e) => {
 				e.stopPropagation();
 				const el = document.getElementById(`message-${replyTo._id}`);
@@ -880,25 +879,34 @@ function ReplyQuoteInline({
 				}
 			}}
 		>
-			{senderName && (
+			<div className="flex min-w-0 max-w-[240px] gap-1.5">
 				<span
 					className={cn(
-						"block text-[12px] sm:text-[13px] font-semibold truncate leading-snug mb-0.5",
-						isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
+						"mt-0.5 w-[3px] self-stretch rounded-full",
+						isOwn ? "bg-emerald-200/80 dark:bg-emerald-300/75" : "bg-blue-500"
 					)}
-				>
-					{senderName}
-				</span>
-			)}
-			<span
-				className={cn(
-					"block truncate text-[12px] sm:text-[13px] leading-snug",
-					senderName ? "mt-px" : "",
-					isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
-				)}
-			>
-				{preview}
-			</span>
+				/>
+				<div className="min-w-0 flex-1">
+					{senderName && (
+						<span
+							className={cn(
+								"block truncate text-[12px] font-semibold leading-tight",
+								isOwn ? "text-white/90" : "text-slate-900 dark:text-slate-50"
+							)}
+						>
+							{senderName}
+						</span>
+					)}
+					<span
+						className={cn(
+							"mt-0.5 block truncate text-[11.5px] leading-tight sm:text-[12px]",
+							isOwn ? "text-white/65" : "text-slate-600 dark:text-slate-300"
+						)}
+					>
+						{preview}
+					</span>
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -2010,7 +2018,7 @@ const MessageItem = ({
 		return (senderObj ? senderObj._id : msg.senderId)?.toString?.() ?? "";
 	};
 
-	const { onlineUsers } = useSocketStore();
+	const { onlineUsers, userPresences } = useSocketStore();
 	const isImageBatch = (imageBatchItems?.length ?? 0) > 1;
 	const hasUnrecalledBatchMessage = imageBatchItems?.some((item) => item.isRecalled !== true) ?? false;
 	const isRecalled = message.isRecalled === true && (!isImageBatch || !hasUnrecalledBatchMessage);
@@ -2044,7 +2052,13 @@ const MessageItem = ({
 	const downloadableBubbleMessages = bubbleMessages.filter((item) =>
 		item.isRecalled !== true && item.reportStatus !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
 	);
-	const isSenderOnline = actualSenderId ? onlineUsers.includes(actualSenderId.toString()) : false;
+	const senderPresence = getPresenceForUser(
+		actualSenderId?.toString?.(),
+		userPresences,
+		participant?.userId?.presence ?? null,
+		onlineUsers,
+	);
+	const senderBadgeStatus = getPresenceBadgeStatus(senderPresence);
 	// Automatically fetch signed URL for files and audio if not cached
 	useEffect(() => {
 		if (
@@ -2359,7 +2373,7 @@ const MessageItem = ({
 								name={participant?.userId.nickname ?? participant?.userId.displayName ?? "User"}
 								avatarUrl={participant?.userId.avatarUrl ?? undefined}
 								className="size-10 text-base"
-								status={selectedConvo.type === "group" && isSenderOnline ? "online" : undefined}
+								status={selectedConvo.type === "group" ? senderBadgeStatus : undefined}
 							/>
 						)}
 					</div>
@@ -2374,7 +2388,7 @@ const MessageItem = ({
 					<div className={cn("relative", reactionSummary && "mb-3.5")}>
 						<Card
 							className={cn(
-								"shadow-sm overflow-hidden w-fit",
+								"shadow-sm overflow-hidden w-fit gap-0",
 								isOwn && "ms-auto",
 								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[14px] leading-relaxed sm:text-[15px]" : "px-4 py-2.5 text-[14px] leading-relaxed sm:text-[15px]"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
@@ -2404,8 +2418,8 @@ const MessageItem = ({
 									<span>Đã chuyển tiếp tin nhắn</span>
 								</div>
 							)}
-							<div className="flex flex-col gap-0.5 w-fit">
-								<div className="w-fit">
+							<div className="flex w-full min-w-0 flex-col gap-1">
+								<div className="w-fit max-w-full">
 									<MessageContent
 										message={message}
 										isOwn={isOwn}
@@ -2417,9 +2431,9 @@ const MessageItem = ({
 
 								{!isVisualOnly && showTimestamp && (
 									<div className={cn(
-										"flex items-center gap-1 select-none -mt-0.5 pb-1",
-										isOwn ? "self-end" : "self-start",
-										(isOwn && !isLink) ? "text-white/60" : "text-muted-foreground/60"
+										"flex w-full items-end gap-2 select-none",
+										showSmartReminderButton ? "justify-between" : "justify-end",
+										(isOwn && !isLink) ? "text-white/45" : "text-muted-foreground/45"
 									)}>
 										{/* ── Smart Reminder Button ─────────────────────────────────────────── */}
 										{showSmartReminderButton && (
@@ -2430,11 +2444,11 @@ const MessageItem = ({
 												disabled={isBlocked}
 											/>
 										)}
-										<span className="text-[13px] font-medium leading-none whitespace-nowrap sm:text-sm">
+										<span className="shrink-0 whitespace-nowrap text-[10.5px] font-normal leading-none tabular-nums tracking-normal">
 											{formatMessageTime(new Date(message.createdAt))}
 										</span>
 										{isOwn && message.status === "error" && (
-											<AlertCircle className="size-2.5 text-red-300" />
+											<AlertCircle className="size-2.5 shrink-0 text-red-300" />
 										)}
 									</div>
 								)}

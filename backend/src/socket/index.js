@@ -10,6 +10,7 @@ import { registerCallHandlers, handleCallDisconnect, emitPendingDirectCallsForUs
 import { registerGroupCallHandlers, handleGroupCallDisconnect, emitPendingGroupCallsForUser, declineGroupCallFromPush } from "./groupCallHandler.js";
 import { configureSocketGateway } from "./socketGateway.js";
 import Message from "../models/messageModel.js";
+import { buildPresencePayloadForViewer, touchUserActivity } from "../services/userStatusService.js";
 
 const app = express();
 
@@ -59,7 +60,7 @@ async function emitOnlineUsers() {
     try {
         const allOnlineIds = getOnlineUserIds();
         const sockets = Array.from(io.sockets.sockets.values());
-        
+
         const userSocketsMap = new Map();
         sockets.forEach(s => {
             const uid = s.user?._id?.toString();
@@ -71,20 +72,11 @@ async function emitOnlineUsers() {
 
         await Promise.all(Array.from(userSocketsMap.entries()).map(async ([userId, clientSockets]) => {
             try {
-                const blocks = await BlockUser.find({
-                    $or: [
-                        { from: userId },
-                        { to: userId }
-                    ]
-                }).lean();
+                const payload = await buildPresencePayloadForViewer(userId, {
+                    socketOnlineUserIds: allOnlineIds,
+                });
 
-                const blockedIds = new Set(blocks.map(b => 
-                    b.from.toString() === userId ? b.to.toString() : b.from.toString()
-                ));
-
-                const filteredIds = allOnlineIds.filter(id => !blockedIds.has(id));
-                
-                clientSockets.forEach(s => s.emit("online-users", filteredIds));
+                clientSockets.forEach(s => s.emit("online-users", payload));
             } catch (err) {
                 console.error(`Error filtering online users for ${userId}:`, err);
             }
@@ -246,8 +238,10 @@ io.on("connection", async (socket) => {
     if (sessionId) {
         socket.join(getSessionRoom(sessionId));
     }
+    await touchUserActivity(userId);
     await emitOnlineUsers();
 
+    let lastActivityTouchAt = Date.now();
     socket.use(async (_packet, next) => {
         try {
             const isSessionValid = await validateSocketSession(socket);
@@ -255,6 +249,14 @@ io.on("connection", async (socket) => {
                 socket.emit("session-revoked", { reason: "session-expired-or-revoked" });
                 socket.disconnect(true);
                 return next(new Error("Unauthorized - Session expired or revoked"));
+            }
+
+            const now = Date.now();
+            if (now - lastActivityTouchAt > 60_000) {
+                lastActivityTouchAt = now;
+                void touchUserActivity(userId).catch((error) => {
+                    console.error("Error touching user activity:", error);
+                });
             }
 
             return next();
@@ -403,6 +405,7 @@ io.on("connection", async (socket) => {
             });
         });
 
+        await touchUserActivity(userId);
         await emitOnlineUsers();
 
         // Xử lý cuộc gọi đang active (lưu DB + thông báo đối phương)

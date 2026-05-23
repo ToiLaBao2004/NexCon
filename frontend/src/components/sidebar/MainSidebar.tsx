@@ -37,6 +37,10 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { ProfileEditDialog } from "./ProfileEditDialog";
 import { SettingsDialog } from "./SettingsDialog";
+import { UserStatusMenuItems } from "./UserStatusMenuItems";
+import { useSocketStore } from "@/stores/useSocketStore";
+import StatusBadge from "@/components/chat/StatusBadge";
+import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
 
 const MainSidebar = () => {
     const { user, signOut } = useAuthStore();
@@ -44,12 +48,16 @@ const MainSidebar = () => {
     const { incomingRequests } = useFriendStore();
     const { unreadCount } = useNotificationStore();
     const { conversations, setFocusedConversation } = useChatStore();
+    const { onlineUsers, userPresences } = useSocketStore();
     const navigate = useNavigate();
     const location = useLocation();
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
     const friendRequestCount = incomingRequests.length;
+    const myPresence = getPresenceForUser(user?._id, userPresences, user?.presence ?? null, onlineUsers);
+    const myBadgeStatus = getPresenceBadgeStatus(myPresence);
+    const myPresenceText = getPresenceText(myPresence);
 
     const unreadMessagesCount = conversations.reduce((acc, convo) => {
         if (!user) return acc;
@@ -113,7 +121,7 @@ const MainSidebar = () => {
                                             {user?.displayName?.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <div className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 rounded-full bg-green-500 border-2 border-white dark:border-[#081c36]" />
+                                    {myBadgeStatus && <StatusBadge status={myBadgeStatus} />}
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent className="w-80 ml-2" align="start" side="right" sideOffset={15}>
@@ -126,9 +134,11 @@ const MainSidebar = () => {
                                         <div className="flex flex-col space-y-0.5">
                                             <p className="text-sm font-semibold leading-none">{user?.displayName}</p>
                                             <p className="text-xs text-muted-foreground truncate w-60">{user?.email}</p>
+                                            <p className="text-xs text-muted-foreground truncate w-60">{myPresenceText}</p>
                                         </div>
                                     </div>
                                 </DropdownMenuLabel>
+                                <UserStatusMenuItems />
                                 <DropdownMenuSeparator />
                                 <DropdownMenuGroup>
                                     <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => setIsProfileOpen(true)}>

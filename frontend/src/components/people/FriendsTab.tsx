@@ -4,6 +4,9 @@ import { useState } from "react";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { FriendActionButtons } from "@/components/people/FriendActionButtons";
 import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
+import { useSocketStore } from "@/stores/useSocketStore";
+import StatusBadge from "@/components/chat/StatusBadge";
+import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
 
 type Friend = {
     _id: string;
@@ -29,6 +32,7 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
     const [unfriendModalOpen, setUnfriendModalOpen] = useState(false);
     const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
     const [isProfileOpen, setIsProfileOpen] = useState(false);
+    const userPresences = useSocketStore((state) => state.userPresences);
 
     const handleOpenUnfriendModal = (friend: Friend) => {
         setProcessingId(null);
@@ -61,7 +65,9 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
             {friends.length > 0 ? (
                 <div className="flex flex-col gap-2.5">
                     {friends.map((friend) => {
-                        const isOnline = onlineUsers.includes(friend.friendId);
+                        const presence = getPresenceForUser(friend.friendId, userPresences, friend.presence ?? null, onlineUsers);
+                        const badgeStatus = getPresenceBadgeStatus(presence);
+                        const presenceText = getPresenceText(presence);
                         const isProcessing = processingId === friend.friendId;
 
                         return (
@@ -73,15 +79,14 @@ export default function FriendsTab({ friends, onlineUsers, onOpenChat, onUnfrien
                                             {friend.displayName.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    {isOnline && (
-                                        <div className="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full border-2 border-card bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-                                    )}
+                                    {badgeStatus && <StatusBadge status={badgeStatus} />}
                                 </div>
 
                                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleOpenProfile(friend)}>
                                     <p className="truncate text-base font-semibold text-foreground">
                                         {friend.nickname || friend.displayName}
                                     </p>
+                                    <p className="truncate text-xs text-muted-foreground">{presenceText}</p>
                                 </div>
 
                                 <FriendActionButtons

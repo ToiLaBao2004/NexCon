@@ -59,6 +59,7 @@ import { Button } from "@/components/ui/button";
 import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropDialog";
 import { validateImageFile } from "@/lib/imageCrop";
+import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
 
 interface ConversationInfoSidebarProps {
   conversation: Conversation;
@@ -77,7 +78,7 @@ const getUploadErrorMessage = (error: unknown, fallback: string) => {
 export default function ConversationInfoSidebar({ conversation, }: ConversationInfoSidebarProps) {
   const { user } = useAuthStore();
   const { conversations } = useChatStore();
-  const onlineUsers = useSocketStore((s) => s.onlineUsers);
+  const { onlineUsers, userPresences } = useSocketStore();
   const [mutualPopoverOpen, setMutualPopoverOpen] = useState(false);
   const { setNickName, loading: nicknameLoading, friends } = useFriendStore();
   const [newGroupInitialSelected, setNewGroupInitialSelected] = useState<string[] | undefined>(undefined);
@@ -123,9 +124,14 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
     );
   }, [otherParticipant]);
 
-  const isDirectParticipantOnline = Boolean(
-    otherParticipant?.userId?._id && onlineUsers.includes(otherParticipant.userId._id)
+  const directPresence = getPresenceForUser(
+    otherParticipant?.userId?._id,
+    userPresences,
+    otherParticipant?.userId?.presence ?? null,
+    onlineUsers,
   );
+  const directBadgeStatus = getPresenceBadgeStatus(directPresence);
+  const directPresenceText = getPresenceText(directPresence);
 
   const groupDisplayName = conversation.group?.name || "Nhóm";
   const isConversationPinned = conversation.isPinned === true;
@@ -260,7 +266,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 name={directDisplayName}
                 avatarUrl={otherParticipant?.userId?.avatarUrl ?? undefined}
                 className="!h-20 !w-20 !text-2xl"
-                status={isDirectParticipantOnline ? "online" : undefined}
+                status={directBadgeStatus}
               />
             </div>
 
@@ -269,6 +275,9 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 <div className="relative inline-block">
                   <span ref={nameRefDirect} className="block text-center text-xl font-bold leading-tight text-foreground">
                     {directDisplayName}
+                  </span>
+                  <span className="mt-1 block text-center text-xs text-muted-foreground">
+                    {directPresenceText}
                   </span>
                   <button
                     onClick={() => setOpenNickname(true)}

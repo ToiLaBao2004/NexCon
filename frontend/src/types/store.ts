@@ -1,7 +1,7 @@
 import type { Socket } from "socket.io-client";
 import type { Room } from "livekit-client";
 import type { Conversation, Mention, Message, MessageType } from "./chat";
-import type { FriendRequest, FriendItem, FriendSuggestion, SentFriendRequest } from "./user";
+import type { FriendRequest, FriendItem, FriendSuggestion, SentFriendRequest, UserPresence } from "./user";
 import type {
   Reminder,
   GetRemindersParams,
@@ -198,6 +198,7 @@ export interface ChatState {
 export interface SocketState {
   socket: Socket | null;
   onlineUsers: string[];
+  userPresences: Record<string, UserPresence>;
   connectionStatus: 'idle' | 'connected' | 'reconnecting' | 'disconnected';
   connectSocket: () => void;
   joinConversation: (conversationId: string) => void;
