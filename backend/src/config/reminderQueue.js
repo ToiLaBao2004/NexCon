@@ -1,7 +1,30 @@
 import { Queue, QueueEvents } from 'bullmq';
-import redisIOClient from './redisIOClient.js';
+import redisIOClient, { isRedisIOReady } from './redisIOClient.js';
 
 const QUEUE_NAME = 'reminder';
+const QUEUE_OPERATION_TIMEOUT_MS = Number(process.env.REMINDER_QUEUE_OPERATION_TIMEOUT_MS || 1500);
+
+function isReminderQueueReady(action, reminderId = '') {
+    if (isRedisIOReady) return true;
+
+    const suffix = reminderId ? ` (${reminderId})` : '';
+    console.warn(`[ReminderQueue] Redis chưa sẵn sàng, bỏ qua ${action}${suffix}.`);
+    return false;
+}
+
+function withReminderQueueTimeout(promise, action, reminderId = '') {
+    let timeoutId;
+
+    const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+            const suffix = reminderId ? ` (${reminderId})` : '';
+            reject(new Error(`${action}${suffix} timed out after ${QUEUE_OPERATION_TIMEOUT_MS}ms`));
+        }, QUEUE_OPERATION_TIMEOUT_MS);
+    });
+
+    return Promise.race([promise, timeoutPromise])
+        .finally(() => clearTimeout(timeoutId));
+}
 
 // Khởi tạo Queue xử lý nhắc hẹn
 export const reminderQueue = new Queue(QUEUE_NAME, {
@@ -39,6 +62,10 @@ export async function scheduleReminderJob(reminder) {
 
     const reminderId = reminder._id.toString();
 
+    if (!isReminderQueueReady('schedule reminder job', reminderId)) {
+        return null;
+    }
+
     // Bỏ qua nếu nhắc hẹn đã xong hoặc bị hủy
     if (['triggered', 'dismissed'].includes(reminder.status)) {
         return null;
@@ -55,13 +82,17 @@ export async function scheduleReminderJob(reminder) {
     if (delay < 0) return null;
 
     try {
-        const job = await reminderQueue.add(
-            'trigger',
-            { reminderId },
-            {
-                jobId: reminderId, // Dùng ID của reminder làm jobId để tránh trùng job (deduplication)
-                delay,
-            },
+        const job = await withReminderQueueTimeout(
+            reminderQueue.add(
+                'trigger',
+                { reminderId },
+                {
+                    jobId: reminderId, // Dùng ID của reminder làm jobId để tránh trùng job (deduplication)
+                    delay,
+                },
+            ),
+            'schedule reminder job',
+            reminderId,
         );
         return job;
     } catch (error) {
@@ -75,13 +106,29 @@ export async function scheduleReminderJob(reminder) {
  * Hủy Job khỏi hàng chờ
  */
 export async function removeReminderJob(reminderId) {
-    if (!reminderId) return;
+    if (!reminderId) return false;
     const jobId = reminderId.toString();
 
+    if (!isReminderQueueReady('remove reminder job', jobId)) {
+        return false;
+    }
+
     try {
-        const job = await reminderQueue.getJob(jobId);
-        if (job) await job.remove();
+        const job = await withReminderQueueTimeout(
+            reminderQueue.getJob(jobId),
+            'get reminder job',
+            jobId,
+        );
+        if (job) {
+            await withReminderQueueTimeout(
+                job.remove(),
+                'remove reminder job',
+                jobId,
+            );
+        }
+        return true;
     } catch (error) {
         console.warn(`[ReminderQueue] Không thể xóa job ${jobId}:`, error?.message);
+        return false;
     }
 }
