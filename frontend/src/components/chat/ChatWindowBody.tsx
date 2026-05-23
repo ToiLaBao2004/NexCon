@@ -141,10 +141,12 @@ const ChatWindowBody: React.FC = () => {
   }, [messages]);
 
   const loadingMoreRef = useRef(false);
+  const suppressAutoScrollUntilRef = useRef(0);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [pendingNewMessageIds, setPendingNewMessageIds] = useState<string[]>([]);
   const distanceFromBottomRef = useRef(0);
-  const scrollToBottom = useCallback((instant: boolean = false) => {
+  const scrollToBottom = useCallback((instant: boolean = false, force: boolean = false) => {
+    if (!force && Date.now() < suppressAutoScrollUntilRef.current) return;
     if (scrollRef.current) {
       scrollRef.current.scrollTo({
         top: scrollRef.current.scrollHeight,
@@ -193,6 +195,27 @@ const ChatWindowBody: React.FC = () => {
 
     return () => container.removeEventListener('scroll', syncScrollState);
   }, [convoId, syncScrollState]);
+
+  useEffect(() => {
+    const handleInputFocus = (event: Event) => {
+      const detail = (event as CustomEvent<{ conversationId?: string }>).detail;
+      if (detail?.conversationId && detail.conversationId !== convoId) return;
+
+      suppressAutoScrollUntilRef.current = Date.now() + 350;
+      const container = scrollRef.current;
+      if (!container) return;
+
+      const scrollTop = container.scrollTop;
+      requestAnimationFrame(() => {
+        if (Date.now() < suppressAutoScrollUntilRef.current) {
+          container.scrollTop = scrollTop;
+        }
+      });
+    };
+
+    window.addEventListener("nexcon:message-input-focus", handleInputFocus as EventListener);
+    return () => window.removeEventListener("nexcon:message-input-focus", handleInputFocus as EventListener);
+  }, [convoId]);
 
 
   // IntersectionObserver for top sentinel (load older)
@@ -289,8 +312,8 @@ const ChatWindowBody: React.FC = () => {
     if (isJumpMode && convoId && isNewMessageAtBottom && isOwnLastMessage) {
       pendingImageScrollRef.current = shouldFollowImage;
       void exitJumpMode(convoId).then(() => {
-        requestAnimationFrame(() => scrollToBottom(true));
-        setTimeout(() => scrollToBottom(true), 120);
+        requestAnimationFrame(() => scrollToBottom(true, true));
+        setTimeout(() => scrollToBottom(true, true), 120);
       });
       return;
     }
@@ -319,7 +342,7 @@ const ChatWindowBody: React.FC = () => {
 
       if (isOwnLastMessage) {
         pendingImageScrollRef.current = shouldFollowImage;
-        scrollToBottom(true);
+        scrollToBottom(true, true);
         return;
       }
 
@@ -369,8 +392,8 @@ const ChatWindowBody: React.FC = () => {
       hasScrolled = true;
       pendingImageScrollRef.current = false;
       lastImageScrollIdRef.current = lastMessage._id;
-      scrollToBottom(true);
-      setTimeout(() => scrollToBottom(true), 120);
+      scrollToBottom(true, true);
+      setTimeout(() => scrollToBottom(true, true), 120);
     };
 
     const pending: HTMLImageElement[] = [];
@@ -413,6 +436,7 @@ const ChatWindowBody: React.FC = () => {
 
     const handleResize = () => {
       if (loadingMoreRef.current || isJumpMode) return;
+      if (Date.now() < suppressAutoScrollUntilRef.current) return;
 
       const { scrollTop, scrollHeight } = container;
       const clientHeight = container.getBoundingClientRect().height;
@@ -481,6 +505,7 @@ const ChatWindowBody: React.FC = () => {
 
       <div
         ref={scrollRef}
+        data-chat-scroll-container={convoId}
         className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4 pb-8"
       >
         <div ref={topSentinelRef} className="h-1 shrink-0" />
