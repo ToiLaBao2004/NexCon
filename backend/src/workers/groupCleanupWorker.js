@@ -5,7 +5,7 @@ import Message from '../models/messageModel.js';
 import Reminder from '../models/reminderModel.js';
 import { deleteCloudinaryResource } from '../middlewares/uploadMiddleware.js';
 import { removeReminderJob } from '../config/reminderQueue.js';
-import { enqueueGroupCleanup } from '../config/groupCleanupQueue.js';
+import { GROUP_CLEANUP_RETENTION_DAYS, enqueueGroupCleanup, getGroupCleanupDeleteAfter } from '../config/groupCleanupQueue.js';
 
 const MESSAGE_BATCH_SIZE = 50;
 const REMINDER_BATCH_SIZE = 100;
@@ -115,6 +115,30 @@ async function processGroupCleanup(conversationId) {
     if (!conversation) return;
 
     if (conversation.type !== 'group' || !conversation.disbanded) return;
+    const disbandedAt = conversation.disbandedAt || conversation.createdAt || new Date();
+    const deleteAfter = conversation.deleteAfter || getGroupCleanupDeleteAfter(disbandedAt);
+    if (new Date(deleteAfter).getTime() > Date.now()) {
+        const nextJob = await enqueueGroupCleanup(conversationId, deleteAfter);
+        await Conversation.updateOne(
+            { _id: conversationId },
+            {
+                $set: {
+                    deleteAfter,
+                    'cleanup.status': 'queued',
+                    'cleanup.queuedAt': new Date(),
+                    'cleanup.scheduledFor': deleteAfter,
+                    'cleanup.retentionDays': GROUP_CLEANUP_RETENTION_DAYS,
+                    ...(nextJob?.id ? { 'cleanup.jobId': nextJob.id.toString() } : {}),
+                },
+                $unset: {
+                    'cleanup.error': 1,
+                    'cleanup.failedAt': 1,
+                },
+            },
+        );
+        return;
+    }
+
     if (conversation.cleanup?.status === 'completed') {
         await Conversation.deleteOne({ _id: conversationId, disbanded: true });
         return;
@@ -204,31 +228,34 @@ export async function reloadPendingGroupCleanups() {
                 disbanded: true,
                 $or: [
                     { 'cleanup.status': { $exists: false } },
-                    { 'cleanup.status': { $in: ['idle', 'queued', 'processing', 'failed', 'completed'] } },
+                    { 'cleanup.status': { $in: ['idle', 'queued', 'processing', 'failed'] } },
                 ],
-            }).select('_id cleanup.status').lean();
+            }).select('_id disbandedAt deleteAfter cleanup.status').lean();
 
             let count = 0;
             for (const conversation of conversations) {
-                const job = await enqueueGroupCleanup(conversation._id);
+                const deleteAfter = conversation.deleteAfter || getGroupCleanupDeleteAfter(conversation.disbandedAt);
+                const job = await enqueueGroupCleanup(conversation._id, deleteAfter);
                 if (!job) continue;
                 count += 1;
 
-                if (conversation.cleanup?.status !== 'completed') {
-                    await Conversation.updateOne(
-                        { _id: conversation._id },
-                        {
-                            $set: {
-                                'cleanup.status': 'queued',
-                                'cleanup.queuedAt': new Date(),
-                            },
-                            $unset: {
-                                'cleanup.error': 1,
-                                'cleanup.failedAt': 1,
-                            },
+                await Conversation.updateOne(
+                    { _id: conversation._id },
+                    {
+                        $set: {
+                            deleteAfter,
+                            'cleanup.status': 'queued',
+                            'cleanup.queuedAt': new Date(),
+                            'cleanup.scheduledFor': deleteAfter,
+                            'cleanup.retentionDays': GROUP_CLEANUP_RETENTION_DAYS,
+                            ...(job?.id ? { 'cleanup.jobId': job.id.toString() } : {}),
                         },
-                    );
-                }
+                        $unset: {
+                            'cleanup.error': 1,
+                            'cleanup.failedAt': 1,
+                        },
+                    },
+                );
             }
 
             console.log(`[GroupCleanupMigration] Da reload ${count}/${conversations.length} job cleanup nhom vao Queue.`);

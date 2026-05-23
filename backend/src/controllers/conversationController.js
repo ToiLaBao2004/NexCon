@@ -22,7 +22,7 @@ import {
 	decryptMessagesPayload,
 } from '../utils/messageCrypto.js';
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
-import { enqueueGroupCleanup } from '../config/groupCleanupQueue.js';
+import { GROUP_CLEANUP_RETENTION_DAYS, enqueueGroupCleanup, getGroupCleanupDeleteAfter } from '../config/groupCleanupQueue.js';
 import { enqueueConversationClearCleanup } from '../config/conversationClearCleanupQueue.js';
 
 const MUTE_DURATION_MS = {
@@ -1215,8 +1215,10 @@ export async function updateGroupAvatar(req, res) {
 }
 
 async function disbandGroup(conversation, adminUser) {
+	const disbandedAt = new Date();
 	conversation.disbanded = true;
-	conversation.disbandedAt = new Date();
+	conversation.disbandedAt = disbandedAt;
+	conversation.deleteAfter = getGroupCleanupDeleteAfter(disbandedAt);
 
 	const systemMessage = new Message({
 		conversationId: conversation._id,
@@ -1244,16 +1246,22 @@ async function disbandGroup(conversation, adminUser) {
 }
 
 async function queueDisbandCleanup(conversation) {
+	const disbandedAt = conversation.disbandedAt || new Date();
+	const deleteAfter = conversation.deleteAfter || getGroupCleanupDeleteAfter(disbandedAt);
+	conversation.disbandedAt = disbandedAt;
+	conversation.deleteAfter = deleteAfter;
 	conversation.cleanup = {
 		...(conversation.cleanup?.toObject?.() || conversation.cleanup || {}),
 		status: 'queued',
 		queuedAt: new Date(),
+		scheduledFor: deleteAfter,
+		retentionDays: GROUP_CLEANUP_RETENTION_DAYS,
 		error: undefined,
 		failedAt: undefined,
 	};
 
 	try {
-		const cleanupJob = await enqueueGroupCleanup(conversation._id);
+		const cleanupJob = await enqueueGroupCleanup(conversation._id, deleteAfter);
 		if (cleanupJob?.id) {
 			conversation.cleanup.jobId = cleanupJob.id.toString();
 		}
@@ -1291,24 +1299,27 @@ export async function disbandGroupByAdmin(req, res) {
 				const cleanupResult = await queueDisbandCleanup(conversation);
 				return res.status(202).json({
 					message: cleanupResult?.status === 'queued'
-						? 'Group already disbanded. Cleanup job queued.'
+						? 'Group already disbanded. Cleanup job scheduled after retention period.'
 						: 'Group already disbanded. Cleanup job will be retried when Redis is available.',
 					cleanupStatus: cleanupResult?.status || 'failed',
+					deleteAfter: conversation.deleteAfter,
 				});
 			}
 
 			return res.status(200).json({
 				message: 'Group already disbanded.',
 				cleanupStatus,
+				deleteAfter: conversation.deleteAfter,
 			});
 		}
 
 		const cleanupResult = await disbandGroup(conversation, req.user);
 		res.status(202).json({
 			message: cleanupResult?.status === 'queued'
-				? 'Group disbanded. Cleanup job queued.'
+				? 'Group disbanded. Cleanup job scheduled after retention period.'
 				: 'Group disbanded. Cleanup job will be retried when Redis is available.',
 			cleanupStatus: cleanupResult?.status || 'failed',
+			deleteAfter: conversation.deleteAfter,
 		});
 	} catch (error) {
 		console.error('Error disbanding group:', error);

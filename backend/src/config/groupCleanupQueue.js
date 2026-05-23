@@ -2,6 +2,21 @@ import { Queue, QueueEvents } from 'bullmq';
 import redisIOClient from './redisIOClient.js';
 
 const QUEUE_NAME = 'group-cleanup';
+export const GROUP_CLEANUP_RETENTION_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export function getGroupCleanupDeleteAfter(disbandedAt = new Date()) {
+    const start = disbandedAt ? new Date(disbandedAt) : new Date();
+    const startTime = Number.isFinite(start.getTime()) ? start.getTime() : Date.now();
+    return new Date(startTime + GROUP_CLEANUP_RETENTION_DAYS * DAY_MS);
+}
+
+export function getGroupCleanupDelay(deleteAfter) {
+    if (!deleteAfter) return 0;
+    const deleteAfterTime = new Date(deleteAfter).getTime();
+    if (!Number.isFinite(deleteAfterTime)) return 0;
+    return Math.max(deleteAfterTime - Date.now(), 0);
+}
 
 export const groupCleanupQueue = new Queue(QUEUE_NAME, {
     connection: redisIOClient,
@@ -32,15 +47,19 @@ groupCleanupQueueEvents.on('error', (err) => {
     }
 });
 
-export async function enqueueGroupCleanup(conversationId) {
+export async function enqueueGroupCleanup(conversationId, deleteAfter = null) {
     if (!conversationId) return null;
 
     const id = conversationId.toString();
+    const delay = getGroupCleanupDelay(deleteAfter);
+    const scheduledFor = deleteAfter ? new Date(deleteAfter) : new Date();
+
     return groupCleanupQueue.add(
         'cleanup',
         { conversationId: id },
         {
-            jobId: id,
+            jobId: `${id}:${scheduledFor.getTime()}`,
+            delay,
         },
     );
 }
