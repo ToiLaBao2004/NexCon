@@ -126,6 +126,7 @@ function ReportCard({ report, index = 0, embedded = false }: { report: MyReport;
     <article
       className={cn(
         "rounded-2xl border bg-card px-6 py-6 shadow-sm transition-colors hover:border-primary/30",
+        "dark:bg-transparent dark:shadow-none",
         embedded ? "border-border/60" : "border-border/70",
         "animate-in fade-in slide-in-from-bottom-1 duration-300"
       )}
@@ -172,7 +173,7 @@ function ReportCard({ report, index = 0, embedded = false }: { report: MyReport;
         </div>
 
         {detailText && (
-          <div className="rounded-lg border border-border/60 bg-muted/20 px-5 py-4">
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-5 py-4 dark:bg-transparent">
             <p className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{detailLabel}</p>
             <p className="mt-2 text-base leading-6 text-foreground">{detailText}</p>
           </div>
@@ -326,7 +327,8 @@ export function ReportHistoryContent({ embedded = false, onBack }: ReportHistory
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-hidden bg-background",
+        "flex h-full min-h-0 flex-col overflow-hidden",
+        embedded ? "bg-transparent" : "bg-background",
         !embedded && "dark:bg-[#0b1426]"
       )}
     >
