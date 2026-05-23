@@ -3,7 +3,8 @@ import { LoaderCircle, Mic, MicOff, PhoneOff, Video, VideoOff, Minimize2, Maximi
 import { useCallStore } from "@/stores/useCallStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import UserAvatar from "@/components/chat/UserAvatar";
-import { cn, formatCallTimer, nameToColor } from "@/lib/utils";
+import { getAvatarSrc } from "@/lib/avatar";
+import { cn, formatCallTimer } from "@/lib/utils";
 import { useDraggable, type DragHandlers } from "@/hooks/useDraggable";
 
 interface CallModalProps {
@@ -181,20 +182,11 @@ const VideoCallLayout = ({
         {/* Remote avatar (connecting / cam off) */}
         {showRemoteAvatar && (
           <div className="w-full h-full flex flex-col items-center justify-center gap-3">
-            {remoteUser.avatarUrl ? (
-              <img
-                src={remoteUser.avatarUrl}
-                alt={remoteUser.displayName}
-                className="w-16 h-16 rounded-full object-cover shadow-md select-none"
-              />
-            ) : (
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-md select-none"
-                style={{ background: nameToColor(remoteUser.displayName) }}
-              >
-                {remoteUser.displayName.charAt(0).toUpperCase()}
-              </div>
-            )}
+            <img
+              src={getAvatarSrc(remoteUser.avatarUrl)}
+              alt={remoteUser.displayName}
+              className="w-16 h-16 rounded-full object-cover shadow-md select-none"
+            />
             <p className="text-sm font-medium text-foreground dark:text-zinc-300">{remoteUser.displayName}</p>
             {!remoteStream && (
               <div className="flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs text-muted-foreground shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-zinc-400">
@@ -227,20 +219,11 @@ const VideoCallLayout = ({
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-muted/60 dark:bg-zinc-800">
-              {localUser?.avatarUrl ? (
-                <img
-                  src={localUser.avatarUrl}
-                  alt={localUser.displayName}
-                  className="w-10 h-10 rounded-full object-cover shadow-md select-none"
-                />
-              ) : (
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-md select-none"
-                  style={{ background: nameToColor(localUser?.displayName ?? '') }}
-                >
-                  {localUser?.displayName?.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <img
+                src={getAvatarSrc(localUser?.avatarUrl)}
+                alt={localUser?.displayName || "Avatar"}
+                className="w-10 h-10 rounded-full object-cover shadow-md select-none"
+              />
             </div>
           )}
         </div>

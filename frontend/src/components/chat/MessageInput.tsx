@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
 import CachedStickerImage from "./CachedStickerImage";
+import { getAvatarSrc } from "@/lib/avatar";
 import { isUrl, formatBytes } from "@/lib/utils";
 import { draftStorage } from "@/lib/draftStorage";
 import { validateImageFile } from "@/lib/imageCrop";
@@ -1140,11 +1141,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 														className={`w-full px-3 py-2 text-left flex items-center gap-2.5 transition-colors rounded-sm ${isActive ? "bg-primary/10" : "hover:bg-muted/70"}`}
 													>
 														<span className="size-6 rounded-sm overflow-hidden shrink-0 bg-muted flex items-center justify-center text-[11px] font-semibold text-muted-foreground">
-															{candidate.avatarUrl ? (
-																<img src={candidate.avatarUrl} alt={candidate.displayName} className="w-full h-full object-cover" />
-															) : (
-																candidate.displayName.charAt(0).toUpperCase()
-															)}
+															<img src={getAvatarSrc(candidate.avatarUrl)} alt={candidate.displayName} className="w-full h-full object-cover" />
 														</span>
 														<div className="min-w-0">
 															<span className="text-sm font-medium text-foreground truncate">{candidate.displayName}</span>

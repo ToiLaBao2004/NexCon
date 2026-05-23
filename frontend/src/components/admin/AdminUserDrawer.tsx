@@ -28,6 +28,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { getAvatarSrc } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import {
   adminService,
@@ -351,13 +352,7 @@ function ProfileTab({
             <div className="rounded-md border border-border/70 bg-muted/20 p-3">
               <div className="text-xs text-muted-foreground">Ảnh đại diện</div>
               <div className="mt-3 aspect-square overflow-hidden rounded-md bg-muted">
-                {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.displayName || user.email} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-muted-foreground">
-                    {(user.displayName || user.email || "?").slice(0, 1).toUpperCase()}
-                  </div>
-                )}
+                <img src={getAvatarSrc(user.avatarUrl)} alt={user.displayName || user.email} className="h-full w-full object-cover" />
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
