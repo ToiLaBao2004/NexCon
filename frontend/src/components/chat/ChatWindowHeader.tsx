@@ -44,7 +44,7 @@ interface ChatWindowHeaderProps {
 }
 
 const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProps) => {
-  const { conversations, activeConversationId, setActiveConversation, activeSidebar, setActiveSidebar } =
+  const { conversations, activeConversationId, setActiveConversation, activeSidebar, infoSidebarOpen, setActiveSidebar } =
     useChatStore();
   const { user } = useAuthStore();
   const { onlineUsers, userPresences } = useSocketStore();
@@ -138,7 +138,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
       // Toggle off search mode. 
       // On desktop, we might want to default back to info. 
       // On mobile/tablet, we want to close it (null).
-      setActiveSidebar(useOverlayInfoSidebar ? null : 'info');
+      setActiveSidebar(!useOverlayInfoSidebar && infoSidebarOpen ? 'info' : null);
     }
   };
 

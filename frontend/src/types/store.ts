@@ -169,6 +169,7 @@ export interface ChatState {
 
   // Sidebar
   activeSidebar: 'search' | 'info' | null;
+  infoSidebarOpen: boolean;
   setActiveSidebar: (sidebar: 'search' | 'info' | null) => void;
   searchResults: {
     items: Message[];

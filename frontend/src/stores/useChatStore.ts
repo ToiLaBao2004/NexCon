@@ -85,6 +85,7 @@ export const useChatStore = create<ChatState>()(
             groupsNextCursor: null,
 
             activeSidebar: null,
+            infoSidebarOpen: true,
             searchResults: {
                 items: [] as import('@/types/chat').Message[],
                 isSearching: false,
@@ -157,7 +158,14 @@ export const useChatStore = create<ChatState>()(
                     };
                 });
             },
-            setActiveSidebar: (sidebar) => set({ activeSidebar: sidebar }),
+            setActiveSidebar: (sidebar) => set((state) => ({
+                activeSidebar: sidebar,
+                infoSidebarOpen: sidebar === 'info'
+                    ? true
+                    : sidebar === null
+                        ? false
+                        : state.infoSidebarOpen,
+            })),
             clearSearch: () => set({
                 searchResults: { items: [], isSearching: false, isLoadingMore: false, hasMore: false, nextCursor: null, query: '' },
             }),
@@ -225,6 +233,7 @@ export const useChatStore = create<ChatState>()(
                     convoLoading: false,
                     replyingTo: null,
                     activeSidebar: null,
+                    infoSidebarOpen: true,
                     searchResults: { items: [], isSearching: false, isLoadingMore: false, hasMore: false, nextCursor: null, query: '' },
                     drafts: {},
                 });
