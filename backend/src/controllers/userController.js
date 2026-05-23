@@ -120,7 +120,7 @@ export async function searchUsers(req, res) {
         const users = await User.find({
             email: searchEmail,
             $or: [{ role: 'user' }, { role: { $exists: false } }, { role: null }],
-            _id: { $nin: blockedIds, $ne: currentUserId }
+            _id: { $nin: blockedIds }
         })
             .select('_id displayName avatarUrl email lock')
             .limit(20)
@@ -241,7 +241,7 @@ export async function searchMusic(req, res) {
         const { q } = req.query;
 
         if (!q || !q.trim()) {
-            return res.status(400).json({ message: "Missing search query" });
+            return res.status(200).json({ tracks: [] });
         }
 
         const tracks = await searchSpotifyTracks(q.trim());
@@ -319,6 +319,11 @@ export async function changePassword(req, res) {
         const isMatch = await bcrypt.compare(currentPassword, user.password);
         if (!isMatch) {
             return res.status(400).json({ message: 'Mật khẩu hiện tại không chính xác' });
+        }
+
+        const isSameAsCurrent = await bcrypt.compare(newPassword, user.password);
+        if (isSameAsCurrent) {
+            return res.status(400).json({ message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại' });
         }
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);

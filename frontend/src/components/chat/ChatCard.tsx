@@ -27,13 +27,13 @@ const ChatCard = (
 			key={convoId}
 			className={cn(
 				"border border-transparent cursor-pointer transition-colors bg-transparent shadow-none hover:bg-muted/60 group",
-				isPeopleDensity ? "min-h-[84px] rounded-xl px-4 py-3.5" : "p-3",
+				isPeopleDensity ? "min-h-[68px] rounded-xl px-4 py-2" : "p-3",
 				isActive &&
 				"bg-primary/15 border-primary/25 shadow-[inset_3px_0_0_hsl(var(--primary))]"
 			)}
 			onClick={() => onSelect(convoId)}
 		>
-			<div className={cn("flex items-center", isPeopleDensity ? "gap-4" : "gap-3")}>
+			<div className={cn("flex items-center", isPeopleDensity ? "gap-3.5" : "gap-3")}>
 				<div className="relative">{leftSection}</div>
 
 				<div className="flex-1 min-w-0">

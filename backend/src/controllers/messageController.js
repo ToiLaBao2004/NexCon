@@ -571,7 +571,14 @@ export async function sendMessage(req, res) {
                 messageData.fileName = uploadedFile.originalname || 'voice_message.webm';
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
-                messageData.content = cleanTranscript || '';
+                if (cleanTranscript) {
+                    messageData.content = cleanTranscript;
+                }
+                messageData.metadata = {
+                    ...(messageData.metadata || {}),
+                    transcript: cleanTranscript || null,
+                    transcriptStatus: cleanTranscript ? 'completed' : 'unavailable',
+                };
 
                 break;
             }

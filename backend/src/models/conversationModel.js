@@ -138,6 +138,10 @@ const conversationSchema = new mongoose.Schema({
     disbandedAt: {
         type: Date,
     },
+    deleteAfter: {
+        type: Date,
+        index: true,
+    },
     cleanup: {
         status: {
             type: String,
@@ -150,6 +154,12 @@ const conversationSchema = new mongoose.Schema({
         },
         queuedAt: {
             type: Date,
+        },
+        scheduledFor: {
+            type: Date,
+        },
+        retentionDays: {
+            type: Number,
         },
         startedAt: {
             type: Date,
