@@ -2095,6 +2095,17 @@ const MessageItem = ({
 			return (senderObj ? senderObj._id : msg.senderId)?.toString?.() ?? "";
 		};
 
+		const latestSentIndexBySender = new Map<string, number>();
+		messages.forEach((msg, idx) => {
+			if (msg.type === "system" && msg.systemType !== "call") return;
+			if (msg.status && msg.status !== "sent") return;
+
+			const senderId = resolveSenderId(msg);
+			if (senderId) {
+				latestSentIndexBySender.set(senderId, idx);
+			}
+		});
+
 		for (const p of selectedConvo.participants) {
 			const pid = p.userId?._id?.toString();
 			if (!pid || pid === currentUserIdStr) continue;
@@ -2104,15 +2115,23 @@ const MessageItem = ({
 			if (lastReadIndex === undefined) continue;
 
 			let targetMessageId: string | null = null;
+			let targetMessageIndex = -1;
 			for (let i = lastReadIndex; i >= 0; i -= 1) {
 				const msg = messages[i];
-				if (!(msg.type === "system" && msg.systemType !== "call") && resolveSenderId(msg) === currentUserIdStr) {
+				if (msg.type === "system" && msg.systemType !== "call") continue;
+				if (resolveSenderId(msg) === pid) continue;
+
+				if (!msg.status || msg.status === "sent") {
 					targetMessageId = msg._id;
+					targetMessageIndex = i;
 					break;
 				}
 			}
 
 			if (!targetMessageId) continue;
+			const latestSentIndex = latestSentIndexBySender.get(pid);
+			if (latestSentIndex !== undefined && latestSentIndex > targetMessageIndex) continue;
+
 			if (!map[targetMessageId]) map[targetMessageId] = [];
 			map[targetMessageId].push({
 				_id: pid,
@@ -2817,13 +2836,19 @@ const MessageItem = ({
 				</div>
 			</div>
 
-			{isOwn && (!message.status || message.status === "sent") && (
+			{(!message.status || message.status === "sent") && (
 				seenUsersForThisMessage.length > 0 ? (
 					isCoarsePointer ? (
-						<div className="mt-0.5 mx-3 flex justify-end">
+						<div className={cn(
+							"mt-0.5 flex",
+							isOwn ? "mx-3 justify-end" : "ml-[60px] mr-3 justify-start"
+						)}>
 							<button
 								type="button"
-								className="flex min-h-7 items-center justify-end -space-x-1 rounded-full px-1.5 py-1 active:bg-muted/70"
+								className={cn(
+									"flex min-h-7 items-center -space-x-1 rounded-full py-1 active:bg-muted/70",
+									isOwn ? "justify-end px-1.5" : "justify-start pl-0 pr-1.5"
+								)}
 								aria-label={`Xem ${seenUsersForThisMessage.length} người đã xem tin nhắn`}
 								onClick={() => setShowSeenUsersDialog(true)}
 							>
@@ -2845,7 +2870,10 @@ const MessageItem = ({
 						</div>
 					) : (
 						<TooltipProvider delayDuration={120}>
-							<div className="flex items-center justify-end -space-x-1 mt-0.5 mx-3">
+							<div className={cn(
+								"flex items-center -space-x-1 mt-0.5",
+								isOwn ? "mx-3 justify-end" : "ml-[60px] mr-3 justify-start"
+							)}>
 								{visibleSeenUsers.map((seenUser) => (
 									<Tooltip key={seenUser._id}>
 										<TooltipTrigger asChild>
