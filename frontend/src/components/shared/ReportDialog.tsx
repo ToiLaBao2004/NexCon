@@ -98,8 +98,8 @@ export function ReportDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => !submitting && onOpenChange(nextOpen)}>
-      <DialogContent className="z-[300] w-[92vw] max-w-md rounded-2xl p-0 overflow-hidden">
-        <DialogHeader className="px-5 pt-5 pb-3 text-left">
+      <DialogContent className="z-[300] !flex max-h-[calc(100dvh-2rem)] w-[92vw] max-w-md flex-col !gap-0 overflow-hidden rounded-2xl p-0 sm:!max-w-md">
+        <DialogHeader className="shrink-0 px-5 pt-5 pb-3 text-left">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
               <AlertTriangle className="size-5" strokeWidth={1.8} />
@@ -113,10 +113,10 @@ export function ReportDialog({
           </div>
         </DialogHeader>
 
-        <div className="space-y-4 px-5 pb-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 pb-4 beautiful-scrollbar">
           {previewText && (
             <div className="rounded-md border bg-muted/35 px-3 py-2 text-sm text-muted-foreground">
-              <p className="line-clamp-3 break-words">{previewText}</p>
+              <p className="line-clamp-3 break-all">{previewText}</p>
             </div>
           )}
 
@@ -161,12 +161,12 @@ export function ReportDialog({
               maxLength={1000}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Thêm chi tiết để quản trị viên hiểu ngữ cảnh..."
-              className="min-h-24 resize-none"
+              className="min-h-20 resize-none"
             />
           </div>
         </div>
 
-        <DialogFooter className="border-t bg-muted/20 px-5 py-4 sm:justify-end">
+        <DialogFooter className="shrink-0 border-t bg-muted/20 px-5 py-4 sm:justify-end">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
             Hủy
           </Button>

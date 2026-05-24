@@ -37,6 +37,11 @@ const getMessageSenderId = (message?: Message | null) => {
   return String(senderObj?._id || message.senderId || "");
 };
 
+const getMessageStableKey = (message?: Message | null) => {
+  if (!message) return "";
+  return String(message.clientTempId || message._id || "");
+};
+
 function TypingIndicatorPill({ name }: { name: string }) {
   return (
     <div className="flex min-w-0 max-w-[80%] items-center gap-2.5 rounded-full border border-border/40 bg-white/80 px-3.5 py-1.5 shadow-lg shadow-black/5 backdrop-blur-md dark:bg-slate-900/80 sm:max-w-[360px]">
@@ -94,6 +99,7 @@ const ChatWindowBody: React.FC = () => {
   const prevMessageCount = useRef(0);
   const isFirstLoad = useRef(true);
   const lastItemId = messages[messages.length - 1]?._id;
+  const lastItemKey = getMessageStableKey(messages[messages.length - 1]);
 
   const activeTypingUserIds = convoId
     ? (typingUsers[convoId]?.filter(id => id !== user?._id) || [])
@@ -149,6 +155,7 @@ const ChatWindowBody: React.FC = () => {
         const batchId = getImageBatchId(message);
         return {
           message,
+          renderKey: getMessageStableKey(message),
           originalIndex,
           imageBatchItems: batchId ? (groups.get(batchId) ?? [message]) : undefined,
           isHiddenBatchChild: batchId ? firstByBatchId.get(batchId) !== message._id : false,
@@ -314,14 +321,14 @@ const ChatWindowBody: React.FC = () => {
   }, [messages.length, messageLoading, convoId]);
 
 
-  const prevLastItemIdRef = useRef<string | undefined>(undefined);
+  const prevLastItemKeyRef = useRef<string | undefined>(undefined);
   const lastImageScrollIdRef = useRef<string | undefined>(undefined);
   const pendingImageScrollRef = useRef(false);
 
   // Handle auto-scroll to bottom on first load or new messages
   useEffect(() => {
-    const isNewMessageAtBottom = lastItemId !== prevLastItemIdRef.current;
-    prevLastItemIdRef.current = lastItemId;
+    const isNewMessageAtBottom = lastItemKey !== prevLastItemKeyRef.current;
+    prevLastItemKeyRef.current = lastItemKey;
 
     const lastMessage = messages[messages.length - 1];
     const lastSenderId = getMessageSenderId(lastMessage);
@@ -385,11 +392,11 @@ const ChatWindowBody: React.FC = () => {
         scrollToBottom();
       }
     }
-  }, [lastItemId, messages.length, convoId, isJumpMode, user?._id, exitJumpMode, scrollToBottom, messages]);
+  }, [lastItemKey, messages.length, convoId, isJumpMode, user?._id, exitJumpMode, scrollToBottom, messages]);
 
   useEffect(() => {
     requestAnimationFrame(syncScrollState);
-  }, [lastItemId, syncScrollState]);
+  }, [lastItemKey, syncScrollState]);
 
   useEffect(() => {
     if (!convoId || messages.length === 0) return;
@@ -443,7 +450,7 @@ const ChatWindowBody: React.FC = () => {
     return () => {
       pending.forEach((img) => img.removeEventListener("load", handleLoad));
     };
-  }, [convoId, lastItemId, messages, scrollToBottom, user?._id]);
+  }, [convoId, lastItemKey, messages, scrollToBottom, user?._id]);
 
 
   // Handle jump scroll to anchor
@@ -548,7 +555,7 @@ const ChatWindowBody: React.FC = () => {
 
   useEffect(() => {
     isFirstLoad.current = true;
-    prevLastItemIdRef.current = undefined;
+    prevLastItemKeyRef.current = undefined;
     prevMessageCount.current = 0;
     loadingMoreRef.current = false;
     prevScrollHeightRef.current = 0;
@@ -598,7 +605,7 @@ const ChatWindowBody: React.FC = () => {
           </div>
         )}
 
-        {renderedMessages.map(({ message, originalIndex, imageBatchItems }) => {
+        {renderedMessages.map(({ message, renderKey, originalIndex, imageBatchItems }) => {
           const isCallMessage = message.type === "system" && message.systemType === "call";
           const isLastMyMsg = message._id === lastMyMessageId || !!imageBatchItems?.some((item) => item._id === lastMyMessageId);
 
@@ -617,7 +624,7 @@ const ChatWindowBody: React.FC = () => {
 
           return (
             <div
-              key={`msg-${message._id ?? originalIndex}`}
+              key={`msg-${renderKey || originalIndex}`}
               id={`message-${message._id}`}
               data-message-ids={(imageBatchItems ?? [message]).map((item) => item._id).filter(Boolean).join(" ")}
             >

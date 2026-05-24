@@ -70,6 +70,28 @@ export const buildConversationPatchFromMessage = (message: any) => {
     };
 };
 
+const getMessageSenderId = (message: any) => {
+    const sender = message?.senderId;
+    return String(sender?._id || sender || "");
+};
+
+const canUseOptimisticSlot = (optimistic: any, incoming: any) => {
+    if (optimistic?.status !== 'sending') return false;
+    if (!incoming?._id) return false;
+    if (optimistic.type !== incoming.type) return false;
+    if (getMessageSenderId(optimistic) !== getMessageSenderId(incoming)) return false;
+    if ((optimistic.content ?? null) !== (incoming.content ?? null)) return false;
+
+    if (optimistic.fileName && incoming.fileName && optimistic.fileName !== incoming.fileName) return false;
+    if (optimistic.fileSize && incoming.fileSize && optimistic.fileSize !== incoming.fileSize) return false;
+
+    const optimisticTime = new Date(optimistic.createdAt || 0).getTime();
+    const incomingTime = new Date(incoming.createdAt || 0).getTime();
+    if (optimisticTime && incomingTime && Math.abs(incomingTime - optimisticTime) > 120000) return false;
+
+    return true;
+};
+
 const isVisibleConversation = (conversation: any) => {
     return !(conversation?.type === 'group' && conversation?.disbanded === true);
 };
@@ -751,6 +773,7 @@ export const useChatStore = create<ChatState>()(
                         isPinned: false,
                         createdAt: new Date().toISOString(),
                         isOwn: true,
+                        clientTempId: tempId,
                         status: 'sending' as const,
                         replyTo: replyToSnapshot,
                     };
@@ -808,14 +831,22 @@ export const useChatStore = create<ChatState>()(
                             const prev = state.messages[convoId];
                             if (!prev) return state;
 
-                            const sentMessage = { ...realMsg, isOwn: true, status: 'sent' as const };
-                            const withoutTemp = prev.items.filter((m) => m._id !== tempId);
-                            const alreadyExists = withoutTemp.some((m) => m._id === realMsg._id);
-                            const items = alreadyExists
-                                ? withoutTemp.map((m) =>
-                                    m._id === realMsg._id ? { ...m, ...sentMessage } : m
-                                )
-                                : [...withoutTemp, sentMessage];
+                            const sentMessage = { ...realMsg, isOwn: true, clientTempId: tempId, status: 'sent' as const };
+                            const tempIndex = prev.items.findIndex((m) => m._id === tempId);
+                            const existingIndex = prev.items.findIndex((m) => m._id === realMsg._id);
+                            const items = (() => {
+                                if (existingIndex !== -1) {
+                                    return prev.items
+                                        .filter((_, index) => index !== tempIndex)
+                                        .map((m) => m._id === realMsg._id ? { ...m, ...sentMessage } : m);
+                                }
+
+                                if (tempIndex !== -1) {
+                                    return prev.items.map((m, index) => index === tempIndex ? { ...m, ...sentMessage } : m);
+                                }
+
+                                return [...prev.items, sentMessage];
+                            })();
                             const prevMedia = state.media[convoId];
                             let nextMedia = prevMedia;
                             if (prevMedia) {
@@ -925,6 +956,19 @@ export const useChatStore = create<ChatState>()(
                             return state;
                         }
 
+                        const optimisticIndex = prevState.items.findIndex((item) =>
+                            canUseOptimisticSlot(item, message)
+                        );
+                        const optimisticMessage = optimisticIndex >= 0 ? prevState.items[optimisticIndex] : null;
+                        const messageForList = optimisticMessage
+                            ? {
+                                ...optimisticMessage,
+                                ...message,
+                                clientTempId: optimisticMessage.clientTempId || optimisticMessage._id,
+                                status: 'sent' as const,
+                            }
+                            : message;
+
                         const prevMedia = state.media[convoId];
                         const prevMediaPagination = state.mediaPagination[convoId];
                         let nextMedia = prevMedia;
@@ -934,17 +978,17 @@ export const useChatStore = create<ChatState>()(
                             if (mediaType === 'image' && (message.fileUrl || message.filePublicId)) {
                                 const alreadyExists = prevMedia.images.some((m) => m._id === message._id);
                                 if (!alreadyExists) {
-                                    nextMedia = { ...prevMedia, images: [message, ...prevMedia.images].slice(0, 8) };
+                                    nextMedia = { ...prevMedia, images: [messageForList, ...prevMedia.images].slice(0, 8) };
                                 }
                             } else if (mediaType === 'file' && (message.fileUrl || message.filePublicId)) {
                                 const alreadyExists = prevMedia.files.some((m) => m._id === message._id);
                                 if (!alreadyExists) {
-                                    nextMedia = { ...prevMedia, files: [message, ...prevMedia.files].slice(0, 3) };
+                                    nextMedia = { ...prevMedia, files: [messageForList, ...prevMedia.files].slice(0, 3) };
                                 }
                             } else if (mediaType === 'link' && message.content) {
                                 const alreadyExists = prevMedia.links.some((m) => m._id === message._id);
                                 if (!alreadyExists) {
-                                    nextMedia = { ...prevMedia, links: [message, ...prevMedia.links].slice(0, 3) };
+                                    nextMedia = { ...prevMedia, links: [messageForList, ...prevMedia.links].slice(0, 3) };
                                 }
                             }
                         }
@@ -957,7 +1001,7 @@ export const useChatStore = create<ChatState>()(
                                         ...prevMediaPagination,
                                         image: {
                                             ...prevMediaPagination.image,
-                                            items: [message, ...prevMediaPagination.image.items],
+                                            items: [messageForList, ...prevMediaPagination.image.items],
                                         },
                                     };
                                 }
@@ -968,7 +1012,7 @@ export const useChatStore = create<ChatState>()(
                                         ...prevMediaPagination,
                                         file: {
                                             ...prevMediaPagination.file,
-                                            items: [message, ...prevMediaPagination.file.items],
+                                            items: [messageForList, ...prevMediaPagination.file.items],
                                         },
                                     };
                                 }
@@ -979,7 +1023,7 @@ export const useChatStore = create<ChatState>()(
                                         ...prevMediaPagination,
                                         link: {
                                             ...prevMediaPagination.link,
-                                            items: [message, ...prevMediaPagination.link.items],
+                                            items: [messageForList, ...prevMediaPagination.link.items],
                                         },
                                     };
                                 }
@@ -991,7 +1035,9 @@ export const useChatStore = create<ChatState>()(
                                 ...state.messages,
                                 [convoId]: {
                                     ...prevState,
-                                    items: [...prevState.items, message],
+                                    items: optimisticIndex >= 0
+                                        ? prevState.items.map((item, index) => index === optimisticIndex ? messageForList : item)
+                                        : [...prevState.items, messageForList],
                                     pinnedMessages: prevState.pinnedMessages ?? [],
                                 },
                             },
