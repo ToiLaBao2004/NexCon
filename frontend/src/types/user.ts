@@ -18,9 +18,7 @@ export interface UserPresence {
   status_label?: string;
   status_mode: UserStatusMode;
   manual_status: Exclude<UserPresenceStatus, "offline">;
-  show_activity: boolean;
   is_online: boolean;
-  activity_hidden?: boolean;
   last_seen_at?: string | null;
   last_seen_relative?: string | null;
   updatedAt?: string | null;

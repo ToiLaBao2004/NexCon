@@ -28,7 +28,6 @@ const DEFAULT_STATUS = {
     manual_status: 'online',
     status_mode: 'auto',
     last_seen_at: null,
-    show_activity: true,
 };
 
 const STATUS_ALIASES = {
@@ -113,13 +112,12 @@ function serializePresence(doc, {
     const userId = normalizeId(raw.userId);
     const statusMode = raw.status_mode || DEFAULT_STATUS.status_mode;
     const manualStatus = raw.manual_status || DEFAULT_STATUS.manual_status;
-    const showActivity = raw.show_activity !== false;
 
     let status = statusMode === 'manual'
         ? manualStatus
         : (socketOnline ? 'online' : 'offline');
 
-    const hiddenFromViewer = !viewerIsSelf && (!showActivity || status === 'invisible');
+    const hiddenFromViewer = !viewerIsSelf && status === 'invisible';
     if (hiddenFromViewer) {
         status = 'offline';
     }
@@ -133,9 +131,7 @@ function serializePresence(doc, {
         status_label: STATUS_LABELS[status] || STATUS_LABELS.offline,
         status_mode: statusMode,
         manual_status: manualStatus,
-        show_activity: showActivity,
         is_online: isOnline,
-        activity_hidden: hiddenFromViewer,
         last_seen_at: lastSeenAt ? new Date(lastSeenAt).toISOString() : null,
         last_seen_relative: lastSeenAt ? formatRelativeTimeVi(lastSeenAt, now) : null,
         updatedAt: raw.updatedAt ? new Date(raw.updatedAt).toISOString() : null,
@@ -150,7 +146,6 @@ export async function ensureUserStatus(userId) {
                 userId,
                 manual_status: DEFAULT_STATUS.manual_status,
                 status_mode: DEFAULT_STATUS.status_mode,
-                show_activity: DEFAULT_STATUS.show_activity,
                 last_seen_at: new Date(),
             },
         },
@@ -167,7 +162,6 @@ export async function touchUserActivity(userId, at = new Date()) {
             $setOnInsert: {
                 manual_status: DEFAULT_STATUS.manual_status,
                 status_mode: DEFAULT_STATUS.status_mode,
-                show_activity: DEFAULT_STATUS.show_activity,
             },
         },
         { new: true, upsert: true, setDefaultsOnInsert: true }
@@ -200,16 +194,11 @@ export async function updateUserStatus(userId, updates = {}) {
         }
     }
 
-    if (Object.prototype.hasOwnProperty.call(updates, 'show_activity')) {
-        $set.show_activity = updates.show_activity !== false;
-    }
-
     $set.last_seen_at = new Date();
     const $setOnInsert = {
         userId,
         manual_status: DEFAULT_STATUS.manual_status,
         status_mode: DEFAULT_STATUS.status_mode,
-        show_activity: DEFAULT_STATUS.show_activity,
     };
     for (const field of Object.keys($set)) {
         delete $setOnInsert[field];
