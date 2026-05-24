@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { adminService, type AdminAppeal, type AdminUser } from "@/services/adminService";
 import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 const statusLabels: Record<AdminAppeal["status"] | "all", string> = {
   pending: "Đang chờ",
@@ -53,7 +54,7 @@ export default function AdminAppealsPage() {
         ? current
         : result.appeals[0]?._id || null);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải kháng cáo");
+      toast.error(getApiErrorMessage(error, "Không thể tải kháng cáo"));
     } finally {
       setLoading(false);
     }
@@ -75,7 +76,7 @@ export default function AdminAppealsPage() {
       toast.success(action === "approve" ? "Đã chấp nhận kháng cáo và mở khóa" : "Đã từ chối kháng cáo");
       await loadAppeals();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể xử lý kháng cáo");
+      toast.error(getApiErrorMessage(error, "Không thể xử lý kháng cáo"));
     } finally {
       setSubmitting(false);
     }

@@ -60,6 +60,7 @@ import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropDialog";
 import { validateImageFile } from "@/lib/imageCrop";
 import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 interface ConversationInfoSidebarProps {
   conversation: Conversation;
@@ -70,8 +71,7 @@ const groupAvatarCropPresets: CropPreset[] = [
 ];
 
 const getUploadErrorMessage = (error: unknown, fallback: string) => {
-  const maybeError = error as { response?: { data?: { message?: string } } };
-  return maybeError.response?.data?.message || fallback;
+  return getApiErrorMessage(error, fallback);
 };
 
 // Main component

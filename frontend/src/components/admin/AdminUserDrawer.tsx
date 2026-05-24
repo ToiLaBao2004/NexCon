@@ -30,6 +30,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { getAvatarSrc } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 import {
   adminService,
   type AdminAuditLog,
@@ -128,7 +129,7 @@ export default function AdminUserDrawer({
       setUser(result.user);
       setLoadedTabs((current) => ({ ...current, profile: true }));
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải hồ sơ người dùng");
+      toast.error(getApiErrorMessage(error, "Không thể tải hồ sơ người dùng"));
     } finally {
       setLoadingProfile(false);
     }
@@ -166,7 +167,7 @@ export default function AdminUserDrawer({
       if (tab === "audit") await loadAudit(userId);
       setLoadedTabs((current) => ({ ...current, [tab]: true }));
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải dữ liệu");
+      toast.error(getApiErrorMessage(error, "Không thể tải dữ liệu"));
     } finally {
       setLoadingTab(null);
     }
@@ -230,7 +231,7 @@ export default function AdminUserDrawer({
       setAssets(result.assets);
       setLoadedTabs((current) => ({ ...current, assets: true }));
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải tài nguyên");
+      toast.error(getApiErrorMessage(error, "Không thể tải tài nguyên"));
     } finally {
       setLoadingTab(null);
     }

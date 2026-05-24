@@ -1,4 +1,5 @@
 import type { ModerationApiErrorPayload, ViolationHistoryItem } from "@/types/moderation";
+import { translateApiMessage } from "@/lib/apiMessage";
 
 export const moderationCategoryLabels: Record<string, string> = {
   abusive: "Ngôn từ xúc phạm",
@@ -54,13 +55,17 @@ export function isModerationBlockError(error: any) {
 
 export function buildModerationNotice(payload?: ModerationApiErrorPayload | null) {
   const category = payload?.whatViolated?.category || payload?.moderation?.category || "unknown";
-  const label = payload?.whatViolated?.label || moderationCategoryLabels[category] || moderationCategoryLabels.unknown;
-  const reason = payload?.whatViolated?.reason || payload?.moderation?.reason || payload?.message || "Nội dung vi phạm tiêu chuẩn cộng đồng.";
+  const label = moderationCategoryLabels[category]
+    || translateApiMessage(payload?.whatViolated?.label, moderationCategoryLabels.unknown);
+  const reason = translateApiMessage(
+    payload?.whatViolated?.reason || payload?.moderation?.reason || payload?.message,
+    "Nội dung không phù hợp với tiêu chuẩn cộng đồng."
+  );
   const count = payload?.violation?.count;
   const threshold = payload?.violation?.threshold;
   const blockedUntil = payload?.restriction?.blockedUntil;
   const countLine = count && threshold ? `Lần vi phạm: ${count}/${threshold}.` : "";
-  const restrictionLine = payload?.restriction?.message || payload?.detail || "";
+  const restrictionLine = translateApiMessage(payload?.restriction?.message || payload?.detail, "");
   const untilLine = blockedUntil ? `Thời gian hạn chế đến: ${formatModerationDate(blockedUntil)}.` : "";
   const isMessageBlock = payload?.restriction?.type === "message_block";
   const description = isMessageBlock
@@ -68,7 +73,7 @@ export function buildModerationNotice(payload?: ModerationApiErrorPayload | null
     : [label, reason, countLine, restrictionLine, untilLine].filter(Boolean).join("\n");
 
   return {
-    title: payload?.title || "Nội dung chưa được gửi",
+    title: translateApiMessage(payload?.title, "Nội dung chưa được gửi"),
     description,
     category,
     label,

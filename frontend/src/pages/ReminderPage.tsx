@@ -22,6 +22,7 @@ import { useSearchParams } from 'react-router';
 import { useReminderStore } from '@/stores/useReminderStore';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { reminderService } from '@/services/reminderService';
+import { getApiSuccessMessage } from '@/lib/apiMessage';
 
 import type {
     CreateReminderPayload,
@@ -539,7 +540,7 @@ const ReminderPage = () => {
             setReminderToConfirmDelete(null);
 
             void fetchUpcomingCount();
-            toast.success(result.message || 'Đã xóa nhắc nhở');
+            toast.success(getApiSuccessMessage(result, 'Đã xóa nhắc nhở'));
         } catch (error) {
             console.error('Delete reminder failed:', error);
             toast.error('Không thể xóa nhắc nhở');

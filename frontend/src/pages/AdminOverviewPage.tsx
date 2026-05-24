@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { getAvatarSrc } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { adminService, type AdminStats, type AdminUser, type Pagination } from "@/services/adminService";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 function formatDate(value?: string | null) {
   if (!value) return "Chưa có";
@@ -61,7 +62,7 @@ export default function AdminOverviewPage() {
       setUsers((current) => (append ? [...current, ...result.users] : result.users));
       setPagination(result.pagination);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải danh sách người dùng");
+      toast.error(getApiErrorMessage(error, "Không thể tải danh sách người dùng"));
     } finally {
       setLoadingUsers(false);
       setLoadingMore(false);

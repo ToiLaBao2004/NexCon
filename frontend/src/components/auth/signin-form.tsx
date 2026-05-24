@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { ViolationHistoryList } from "@/components/moderation/ViolationHistoryList"
 import type { ModerationStatusResponse } from "@/types/moderation"
 import { formatModerationDate } from "@/lib/moderationNotice"
+import { getApiErrorField, getApiErrorMessage } from "@/lib/apiMessage"
 
 const emailSchema = z.string().trim().email("Địa chỉ email không hợp lệ")
 
@@ -63,9 +64,9 @@ export function SigninForm({
       navigate(role === "admin" ? "/admin" : "/");
     } catch (error: any) {
       console.error("Sign in failed:", error);
-      const backendMsg = error.response?.data?.message || "Đăng nhập thất bại.";
+      const message = getApiErrorMessage(error, "Đăng nhập thất bại.");
       if (error.response?.status === 423 || error.response?.data?.locked) {
-        setLockedMessage(backendMsg);
+        setLockedMessage(message);
         setLockedDetails({
           summary: error.response?.data?.violationSummary,
           restriction: error.response?.data?.restriction,
@@ -76,12 +77,13 @@ export function SigninForm({
         clearErrors("root");
         return;
       }
-      if (backendMsg.toLowerCase().includes("email")) {
-        setError("email", { type: "server", message: backendMsg });
-      } else if (backendMsg.toLowerCase().includes("password")) {
-        setError("password", { type: "server", message: backendMsg });
+      const field = getApiErrorField(error);
+      if (field === "email") {
+        setError("email", { type: "server", message });
+      } else if (field === "password") {
+        setError("password", { type: "server", message });
       } else {
-        setError("root", { type: "server", message: backendMsg });
+        setError("root", { type: "server", message });
       }
     }
   }
@@ -115,13 +117,14 @@ export function SigninForm({
       });
     } catch (error: any) {
       console.error("Send OTP failed:", error);
-      const backendMsg = error.response?.data?.message || "Gửi mã OTP thất bại.";
-      if (backendMsg.toLowerCase().includes("email")) {
-        setError("email", { type: "server", message: backendMsg });
-      } else if (backendMsg.toLowerCase().includes("password")) {
-        setError("password", { type: "server", message: backendMsg });
+      const message = getApiErrorMessage(error, "Gửi mã OTP thất bại.");
+      const field = getApiErrorField(error);
+      if (field === "email") {
+        setError("email", { type: "server", message });
+      } else if (field === "password") {
+        setError("password", { type: "server", message });
       } else {
-        setError("root", { type: "server", message: backendMsg });
+        setError("root", { type: "server", message });
       }
     }
   }
@@ -151,7 +154,7 @@ export function SigninForm({
       setAppealReason("");
       setHasPendingAppeal(true);
     } catch (error: any) {
-      setLockedMessage(error.response?.data?.message || "Không thể gửi kháng cáo.");
+      setLockedMessage(getApiErrorMessage(error, "Không thể gửi kháng cáo."));
       if (error.response?.data?.code === "PENDING_APPEAL_EXISTS" || error.response?.status === 409) {
         setHasPendingAppeal(true);
       }

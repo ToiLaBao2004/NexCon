@@ -14,6 +14,7 @@ import api, { saveRefreshToken } from '@/lib/axios';
 import { clearRefreshToken } from '@/lib/axios';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { unregisterNativeFcmOnLogout } from '@/lib/nativeFcm';
+import { getApiErrorMessage } from '@/lib/apiMessage';
 
 const clearAuthStorage = () => {
   localStorage.removeItem('auth-storage');
@@ -52,11 +53,7 @@ export const useAuthStore = create<AuthState>()(
         await authService.verifyValidFieldsSignUp(email, password, confirmPassword);
       } catch (error: any) {
         console.error('Lỗi khi xác định tính hợp lệ:', error);
-        if (error.response?.data?.message) {
-          toast.error(error.response.data.message);
-        } else {
-          toast.error('Đăng ký thất bại. Vui lòng thử lại.');
-        }
+        toast.error(getApiErrorMessage(error, 'Đăng ký thất bại. Vui lòng thử lại.'));
         throw error;
       } finally {
         set({ loading: false });
@@ -71,11 +68,7 @@ export const useAuthStore = create<AuthState>()(
         toast.success('Đăng ký thành công! Bây giờ bạn có thể đăng nhập.');
       } catch (error: any) {
         console.error('Lỗi khi đăng ký:', error);
-        if (error.response?.data?.message) {
-          toast.error(error.response.data.message);
-        } else {
-          toast.error('Đăng ký thất bại. Vui lòng thử lại.');
-        }
+        toast.error(getApiErrorMessage(error, 'Đăng ký thất bại. Vui lòng thử lại.'));
         throw error;
       } finally {
         set({ loading: false });
@@ -109,11 +102,7 @@ export const useAuthStore = create<AuthState>()(
           throw error;
         }
         console.error('Lỗi khi đăng nhập:', error);
-        if (error.response?.data?.message) {
-          toast.error(error.response.data.message);
-        } else {
-          toast.error('Đăng nhập thất bại. Vui lòng thử lại.');
-        }
+        toast.error(getApiErrorMessage(error, 'Đăng nhập thất bại. Vui lòng thử lại.'));
         throw error;
       } finally {
         set({ loading: false });
@@ -127,11 +116,7 @@ export const useAuthStore = create<AuthState>()(
         toast.success('Cập nhật mật khẩu thành công!');
       } catch (error: any) {
         console.error('Lỗi khi cập nhật mật khẩu:', error);
-        if (error.response?.data?.message) {
-          toast.error(error.response.data.message);
-        } else {
-          toast.error('Cập nhật mật khẩu thất bại. Vui lòng thử lại.');
-        }
+        toast.error(getApiErrorMessage(error, 'Cập nhật mật khẩu thất bại. Vui lòng thử lại.'));
         throw error;
       } finally {
         set({ loading: false });
@@ -144,11 +129,7 @@ export const useAuthStore = create<AuthState>()(
         toast.success('Đổi mật khẩu thành công!');
       } catch (error: any) {
         console.error('Lỗi khi đổi mật khẩu:', error);
-        if (error.response?.data?.message) {
-          toast.error(error.response.data.message);
-        } else {
-          toast.error('Đổi mật khẩu thất bại. Vui lòng thử lại.');
-        }
+        toast.error(getApiErrorMessage(error, 'Đổi mật khẩu thất bại. Vui lòng thử lại.'));
         throw error;
       }
     },
@@ -165,11 +146,7 @@ export const useAuthStore = create<AuthState>()(
         toast.success('Đăng xuất thành công!');
       } catch (error: any) {
         console.error('Lỗi khi đăng xuất:', error);
-        if (error.response?.data?.message) {
-          toast.error(error.response.data.message);
-        } else {
-          toast.error('Đăng xuất thất bại. Vui lòng thử lại.');
-        }
+        toast.error(getApiErrorMessage(error, 'Đăng xuất thất bại. Vui lòng thử lại.'));
         throw error;
       } finally {
         set({ loading: false });
@@ -271,11 +248,7 @@ export const useAuthStore = create<AuthState>()(
       } catch (error: any) {
         console.error('Lỗi khi lấy thông tin người dùng hiện tại:', error);
         set({ user: null, accessToken: null });
-        if (error.response?.data?.message) {
-          toast.error(error.response.data.message);
-        } else {
-          toast.error('Không thể lấy thông tin người dùng. Vui lòng đăng nhập lại.');
-        }
+        toast.error(getApiErrorMessage(error, 'Không thể lấy thông tin người dùng. Vui lòng đăng nhập lại.'));
         throw error;
       } finally {
         if (!silent) set({ loading: false });

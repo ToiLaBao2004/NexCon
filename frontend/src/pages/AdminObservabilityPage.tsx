@@ -24,6 +24,7 @@ import {
   type AdminObservabilityData,
   type AdminObservabilityRangeKey,
 } from "@/services/adminService";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 const rangeOptions: Array<{ key: AdminObservabilityRangeKey; label: string }> = [
   { key: "15m", label: "15 phút" },
@@ -80,15 +81,6 @@ function formatDateTime(value?: string | null) {
     day: "2-digit",
     month: "2-digit",
   });
-}
-
-function getApiErrorMessage(error: unknown, fallback: string) {
-  if (typeof error !== "object" || error === null || !("response" in error)) {
-    return fallback;
-  }
-
-  const response = (error as { response?: { data?: { message?: unknown } } }).response;
-  return typeof response?.data?.message === "string" ? response.data.message : fallback;
 }
 
 export default function AdminObservabilityPage() {
