@@ -131,6 +131,136 @@ function metadataObject(value) {
     return value || {};
 }
 
+function getSystemMessageSearchText(message, currentUserId) {
+    if (message.type !== 'system') return message.content || message.fileName || '';
+
+    const metadata = metadataObject(message.metadata);
+    const systemType = message.systemType;
+    const myId = currentUserId.toString();
+    const isMe = (value) => value?.toString?.() === myId || String(value || '') === myId;
+    const nameOrFallback = (value, fallback) => String(value || fallback || '').trim();
+
+    switch (systemType) {
+        case 'member_added': {
+            const addedBy = metadata.addedBy;
+            const addedUserIds = Array.isArray(metadata.addedUserIds) ? metadata.addedUserIds : [];
+            const names = nameOrFallback(metadata.addedUserNames, 'thanh vien moi');
+            const adderName = nameOrFallback(metadata.addedByName, 'Mot nguoi dung');
+
+            if (isMe(addedBy)) return `Ban da them ${names} vao nhom`;
+            if (addedUserIds.some((id) => isMe(id))) return `Ban da duoc ${adderName} them vao nhom`;
+            return `${names} duoc ${adderName} them vao nhom`;
+        }
+
+        case 'member_kicked': {
+            const kickedUserId = metadata.kickedUserId || metadata.removedUserId;
+            const adminId = metadata.adminId || metadata.removedBy;
+            const kickedName = nameOrFallback(metadata.kickedUserName || metadata.removedUserName, 'mot thanh vien');
+            const adminName = nameOrFallback(metadata.adminName || metadata.removedByName, 'Quan tri vien');
+
+            if (isMe(adminId)) return `Ban da xoa ${kickedName} khoi nhom`;
+            if (isMe(kickedUserId)) return `Ban da bi xoa khoi nhom boi ${adminName}`;
+            return `${adminName} da dua ${kickedName} ra khoi nhom`;
+        }
+
+        case 'member_left': {
+            const leftUserId = metadata.leftUserId ?? metadata.userId;
+            const userName = nameOrFallback(metadata.leftUserName ?? metadata.userName, 'Mot thanh vien');
+            return isMe(leftUserId) ? 'Ban da roi khoi nhom' : `${userName} da roi khoi nhom`;
+        }
+
+        case 'group_avatar_updated': {
+            const updatedBy = metadata.updatedBy;
+            const updatedByName = nameOrFallback(metadata.updatedByName, 'Mot thanh vien');
+            return isMe(updatedBy) ? 'Ban da doi anh dai dien nhom' : `${updatedByName} da doi anh dai dien nhom`;
+        }
+
+        case 'group_name_updated': {
+            const updatedBy = metadata.updatedBy;
+            const updatedByName = nameOrFallback(metadata.updatedByName, 'Mot thanh vien');
+            const targetName = String(metadata.newName || '').trim();
+            const actorName = isMe(updatedBy) ? 'Ban' : updatedByName;
+            return targetName
+                ? `${actorName} da doi ten nhom thanh ${targetName}`
+                : `${actorName} da doi ten nhom`;
+        }
+
+        case 'group_disbanded':
+            return isMe(metadata.disbandedBy) ? 'Ban da giai tan nhom' : 'Nhom da bi giai tan';
+
+        case 'admin_transferred': {
+            const appointedBy = metadata.appointedBy;
+            const appointedUserId = metadata.appointedUserId;
+            const appointedUserName = nameOrFallback(metadata.appointedUserInfo?.displayName, 'mot thanh vien');
+
+            if (isMe(appointedBy)) return `Ban da chuyen quyen truong nhom cho ${appointedUserName}`;
+            if (isMe(appointedUserId)) return 'Ban da tro thanh truong nhom moi';
+            return `${appointedUserName} da tro thanh truong nhom moi`;
+        }
+
+        case 'message_pinned': {
+            const actor = isMe(metadata.actionBy) ? 'Ban' : nameOrFallback(metadata.actionByName, 'Mot thanh vien');
+            return `${actor} da ghim mot tin nhan`;
+        }
+
+        case 'message_unpinned': {
+            const actor = isMe(metadata.actionBy) ? 'Ban' : nameOrFallback(metadata.actionByName, 'Mot thanh vien');
+            return `${actor} da bo ghim mot tin nhan`;
+        }
+
+        case 'approval_mode_changed': {
+            const actor = isMe(metadata.changedBy) ? 'Ban' : nameOrFallback(metadata.changedByName, 'Mot quan tri vien');
+            return `${actor} da ${metadata.isApprovalRequired ? 'bat' : 'tat'} che do phe duyet thanh vien moi`;
+        }
+
+        case 'group_avatar_permission_changed': {
+            const actor = isMe(metadata.changedBy) ? 'Ban' : nameOrFallback(metadata.changedByName, 'Mot quan tri vien');
+            return `${actor} da ${metadata.allowMembersChangeAvatar ? 'bat' : 'tat'} quyen cho thanh vien doi ten va anh nhom`;
+        }
+
+        case 'reminder_created_local': {
+            const reminderContent = String(metadata.reminderContent || '').trim();
+            return reminderContent ? `Ban da tao nhac hen moi: ${reminderContent}` : 'Ban da tao nhac hen moi';
+        }
+
+        case 'shared_reminder_created': {
+            const actor = isMe(metadata.creatorId) ? 'Ban' : nameOrFallback(metadata.creatorName, 'Mot thanh vien');
+            const reminderContent = String(metadata.reminderContent || '').trim();
+            return reminderContent ? `${actor} da tao nhac hen chung: ${reminderContent}` : `${actor} da tao nhac hen chung`;
+        }
+
+        case 'shared_reminder_participation_changed': {
+            const actor = isMe(metadata.actorId) ? 'Ban' : nameOrFallback(metadata.actorName, 'Mot thanh vien');
+            const action = String(metadata.action || '').trim().toLowerCase();
+            const reminderContent = String(metadata.reminderContent || '').trim();
+            const actionText = action === 'joined' ? 'tham gia' : action === 'declined' ? 'roi' : 'cap nhat';
+            return reminderContent ? `${actor} da ${actionText} nhac hen: ${reminderContent}` : `${actor} da ${actionText} nhac hen`;
+        }
+
+        case 'shared_reminder_cancelled': {
+            const actor = isMe(metadata.actorId) ? 'Ban' : nameOrFallback(metadata.actorName, 'Mot thanh vien');
+            const reminderContent = String(metadata.reminderContent || '').trim();
+            return reminderContent ? `${actor} da huy nhac hen chung: ${reminderContent}` : `${actor} da huy nhac hen chung`;
+        }
+
+        case 'shared_reminder_updated': {
+            const actor = isMe(metadata.actorId) ? 'Ban' : nameOrFallback(metadata.actorName, 'Mot thanh vien');
+            const reminderContent = String(metadata.reminderContent || '').trim();
+            return reminderContent ? `${actor} da chinh sua nhac hen chung: ${reminderContent}` : `${actor} da chinh sua nhac hen chung`;
+        }
+
+        case 'call_started':
+            return 'Cuoc goi da bat dau';
+        case 'call_ended':
+            return 'Cuoc goi da ket thuc';
+        case 'call':
+            return `${metadata.callType === 'video' ? 'Cuoc goi video' : 'Cuoc goi thoai'}${metadata.mode === 'group' ? ' nhom' : ''}`;
+
+        default:
+            return message.content || 'Thong bao he thong';
+    }
+}
+
 function isVisibleByMetadata(messageLike, userId) {
     const metadata = metadataObject(messageLike?.metadata);
     const visibleToUserIds = Array.isArray(metadata.visibleToUserIds)
@@ -560,7 +690,9 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
                 continue;
             }
 
-            const searchableText = message.searchContent || normalizeVietnamese(message.content || '');
+            const searchableText = message.type === 'system'
+                ? normalizeVietnamese(getSystemMessageSearchText(message, currentUserId))
+                : (message.searchContent || normalizeVietnamese(message.content || ''));
 
             if (!searchableText.includes(normalizedKeyword)) {
                 continue;
