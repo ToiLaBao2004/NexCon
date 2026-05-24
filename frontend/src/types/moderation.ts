@@ -81,6 +81,7 @@ export interface ModerationApiErrorPayload {
     reason?: string;
     source?: string;
     confidence?: number | null;
+    countedAsViolation?: boolean;
   };
   violation?: ViolationSummary & {
     locked?: boolean;

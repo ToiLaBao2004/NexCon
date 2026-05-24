@@ -255,7 +255,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const showModerationBlockToast = useCallback((error: any) => {
 		const payload = getModerationPayload(error);
 		const notice = buildModerationNotice(payload);
-		const targetPath = payload?.restriction?.type === "account_lock" ? "/signin" : "/moderation";
+		const targetPath = payload?.restriction?.type === "account_lock"
+			? payload?.restriction?.appealUrl || "/signin"
+			: payload?.restriction?.detailsUrl || "/moderation";
 
 		toast.error(notice.title, {
 			description: notice.description,
@@ -263,6 +265,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			action: {
 				label: "Xem chi tiết",
 				onClick: () => navigate(targetPath),
+			},
+			actionButtonStyle: {
+				backgroundColor: "hsl(var(--primary))",
+				color: "hsl(var(--primary-foreground))",
 			},
 		});
 	}, [navigate]);

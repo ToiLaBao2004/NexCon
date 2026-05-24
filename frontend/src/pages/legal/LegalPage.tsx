@@ -267,9 +267,6 @@ export default function LegalPage({ type }: LegalPageProps) {
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/70 bg-card shadow-sm">
           <div className="shrink-0 border-b border-border/70 px-5 py-6 md:px-8 md:py-7">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {content.label}
-              </span>
               <span className="rounded-full border border-border/70 px-3 py-1 text-xs font-semibold text-foreground">
                 Cập nhật {content.updatedAt}
               </span>

@@ -24,7 +24,6 @@ import { sendPushToUser } from '../services/pushNotificationService.js';
 import { sendFCMToUser } from '../services/fcmService.js';
 import { transcribeAudioFromBuffer } from '../services/audio/transcribeAudio.js';
 import { moderateImageMessage } from '../services/moderation/imageModerationService.js';
-import { registerViolation } from '../services/moderation/violationService.js';
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
 import { isMuted } from '../utils/isMuted.js';
 import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
@@ -72,32 +71,14 @@ function getMessageVisibleToUserIds(message) {
         : [];
 }
 
-async function respondWithModerationBlock(req, res, moderationResult, message, messageType) {
+function respondWithModerationBlock(req, res, moderationResult, message, messageType) {
     const reason = moderationResult.reason || message;
-    const violation = await registerViolation({
-        userId: req.user._id,
-        source: `ai_${messageType}`,
-        reason,
-        metadata: {
-            category: moderationResult.category,
-            confidence: moderationResult.confidence ?? null,
-            conversationId: req.conversation?._id?.toString?.() || null,
-            messageType,
-        },
-    });
-
     const categoryLabel = moderationCategoryLabels[moderationResult.category] || moderationCategoryLabels.unknown;
-    const isLocked = Boolean(violation.locked);
-    const blockedUntil = violation.blockedUntil || null;
-    const restrictionMessage = isLocked
-        ? blockedUntil
-            ? `Tài khoản của bạn bị khóa tạm thời đến ${new Date(blockedUntil).toLocaleString('vi-VN')}.`
-            : 'Tài khoản của bạn đã bị khóa do vi phạm lặp lại. Bạn có thể gửi khiếu nại ở màn hình đăng nhập.'
-        : `Tin nhắn chưa được gửi. Đây là lần vi phạm ${violation.count}/${violation.threshold}; vi phạm sẽ giảm sau ${violation.decayDays} ngày nếu không tái phạm.`;
+    const restrictionMessage = 'Tin nhắn chưa được gửi và chưa được tính vào số lần vi phạm. Nếu bạn cho rằng AI nhầm lẫn, hãy chỉnh sửa nội dung rồi gửi lại.';
 
-    return res.status(violation.locked ? 423 : 400).json({
+    return res.status(400).json({
         code: 'COMMUNITY_STANDARD_VIOLATION',
-        title: isLocked ? 'Tài khoản đã bị hạn chế' : 'Tin nhắn chưa được gửi',
+        title: 'Tin nhắn chưa được gửi',
         message: `${message} Lý do: ${categoryLabel}. ${reason}`,
         detail: restrictionMessage,
         whatViolated: {
@@ -108,12 +89,12 @@ async function respondWithModerationBlock(req, res, moderationResult, message, m
             messageType,
         },
         restriction: {
-            type: isLocked ? 'account_lock' : 'message_block',
-            locked: isLocked,
-            blockedUntil,
-            isTemporary: Boolean(blockedUntil),
-            canAppeal: isLocked,
-            detailsUrl: '/moderation',
+            type: 'message_block',
+            locked: false,
+            blockedUntil: null,
+            isTemporary: false,
+            canAppeal: false,
+            detailsUrl: '/community-standards',
             appealUrl: '/signin',
             message: restrictionMessage,
         },
@@ -122,8 +103,8 @@ async function respondWithModerationBlock(req, res, moderationResult, message, m
             reason,
             source: moderationResult.source,
             confidence: moderationResult.confidence ?? null,
+            countedAsViolation: false,
         },
-        violation,
     });
 }
 
