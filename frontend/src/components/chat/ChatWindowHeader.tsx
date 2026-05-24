@@ -106,6 +106,11 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   const canScheduleSharedMeeting = chat.type !== "group"
     || chat.group?.allowMembersCreateSharedReminder !== false
     || isGroupAdmin;
+  const canStartGroupCall =
+    chat.type === "group" &&
+    groupCallStatus === "idle" &&
+    callStatus === "idle" &&
+    chat.disbanded !== true;
 
   const handleVoiceCall = () => {
     if (!canCall || !otherUser) return;
@@ -257,7 +262,17 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                   variant="ghost"
                   size="icon"
                   className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
-                  disabled={groupCallStatus !== "idle" || callStatus !== "idle" || chat.disbanded === true}
+                  disabled={!canStartGroupCall}
+                  title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi thoại nhóm"}
+                  onClick={() => startGroupCall(chat._id, "voice")}
+                >
+                  <Phone className="h-5 w-5" strokeWidth={1.65} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
+                  disabled={!canStartGroupCall}
                   title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi nhóm"}
                   onClick={() => startGroupCall(chat._id, "video")}
                 >

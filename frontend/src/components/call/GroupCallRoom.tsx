@@ -22,6 +22,8 @@ import { getAvatarSrc } from '@/lib/avatar';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+type GroupRoomCallType = 'video' | 'voice' | 'audio';
+
 interface GroupCallRoomProps {
   roomName: string;
   roomLabel?: string;
@@ -36,7 +38,7 @@ interface GroupCallRoomProps {
   onParticipantsChange?: (participants: RoomParticipantSummary[]) => void;
   onLeaveIntercept?: (disconnect: () => void) => void;
   roomType?: 'call' | 'meet';
-  callType?: 'video' | 'audio';
+  callType?: GroupRoomCallType;
 }
 
 export interface RoomParticipantSummary {
@@ -307,7 +309,7 @@ const RoomHeader = ({
   roomName: string;
   roomLabel?: string;
   roomType?: 'call' | 'meet';
-  callType?: 'video' | 'audio';
+  callType?: GroupRoomCallType;
 }) => {
   const defaultLabel = roomType === 'meet'
     ? 'Cuộc họp video'
@@ -449,7 +451,7 @@ const MiniControls = ({
   onLeaveIntercept?: (disconnect: () => void) => void;
   roomLabel?: string;
   roomType?: 'call' | 'meet';
-  callType?: 'video' | 'audio';
+  callType?: GroupRoomCallType;
 }) => {
   const { toggle: toggleMic, enabled: micOn } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn } = useTrackToggle({ source: Track.Source.Camera });
@@ -732,9 +734,11 @@ const GroupCallRoom = ({
   roomType = 'meet',
   callType = 'video',
 }: GroupCallRoomProps) => {
+  const shouldStartVideo = roomType === 'call' ? callType === 'video' : initialVideoEnabled;
+
   return (
     <LiveKitRoom
-      video={initialVideoEnabled}
+      video={shouldStartVideo}
       audio={initialAudioEnabled}
       token={token}
       serverUrl={LIVEKIT_URL}
