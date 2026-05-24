@@ -39,6 +39,37 @@ const sortConversations = (conversations: any[]) => {
     });
 };
 
+const buildLastMessageFromMessage = (message: any) => {
+    if (!message?._id) return null;
+
+    return {
+        _id: message._id,
+        content: message.content ?? '',
+        type: message.type,
+        systemType: message.systemType ?? null,
+        metadata: message.metadata,
+        createdAt: message.createdAt ?? new Date().toISOString(),
+        senderId: message.senderId,
+        deliveredTo: message.deliveredTo ?? [],
+        fileName: message.fileName,
+        fileSize: message.fileSize,
+        mimeType: message.mimeType,
+    };
+};
+
+export const buildConversationPatchFromMessage = (message: any) => {
+    const conversationId = message?.conversationId?.toString?.() || message?.conversationId;
+    const lastMessage = buildLastMessageFromMessage(message);
+    if (!conversationId || !lastMessage) return null;
+
+    return {
+        _id: conversationId,
+        lastMessage,
+        lastMessageAt: lastMessage.createdAt,
+        updatedAt: lastMessage.createdAt,
+    };
+};
+
 const isVisibleConversation = (conversation: any) => {
     return !(conversation?.type === 'group' && conversation?.disbanded === true);
 };
@@ -767,6 +798,11 @@ export const useChatStore = create<ChatState>()(
                         useMediaCacheStore.getState().setUrl(realMsg._id, response.signedUrl);
                     }
 
+                    const conversationPatch = buildConversationPatchFromMessage(realMsg);
+                    if (conversationPatch) {
+                        get().updateConversation(conversationPatch as any);
+                    }
+
                     if (tempId && convoId) {
                         set((state) => {
                             const prev = state.messages[convoId];
@@ -1010,10 +1046,16 @@ export const useChatStore = create<ChatState>()(
                         // (i.e., userId is an object with displayName, not a raw ObjectId string)
                         const newParticipants = conversation.participants;
                         const isPopulated = newParticipants?.[0]?.userId?.displayName !== undefined;
+                        const nextActivityAt =
+                            conversation.lastMessage?.createdAt
+                            ?? conversation.lastMessageAt
+                            ?? conversation.updatedAt
+                            ?? existingConv.updatedAt;
 
                         const updatedConv = {
                             ...existingConv,
                             ...conversation,
+                            ...(nextActivityAt ? { updatedAt: nextActivityAt, lastMessageAt: nextActivityAt } : {}),
                             participants: (isPopulated ? newParticipants : null) || existingConv.participants
                         };
 
@@ -1022,12 +1064,28 @@ export const useChatStore = create<ChatState>()(
                         );
 
                         const sortedConversations = sortConversations(updatedConversations as any);
+                        const groupConversationExists = state.groupConversations.some((c) => c._id === conversation._id);
+                        const sortedGroupConversations = groupConversationExists
+                            ? sortConversations(
+                                state.groupConversations.map((c) =>
+                                    c._id === conversation._id
+                                        ? {
+                                            ...c,
+                                            ...conversation,
+                                            ...(nextActivityAt ? { updatedAt: nextActivityAt, lastMessageAt: nextActivityAt } : {}),
+                                            participants: (isPopulated ? newParticipants : null) || c.participants,
+                                        }
+                                        : c
+                                ) as any
+                            )
+                            : state.groupConversations;
 
                         // Also update selectedConvo if it's the active one
                         const isActive = state.activeConversationId === conversation._id;
 
                         return {
                             conversations: sortedConversations,
+                            groupConversations: sortedGroupConversations,
                             ...(isActive ? { selectedConvo: updatedConv } : {})
                         };
                     });
