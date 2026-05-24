@@ -168,6 +168,7 @@ export interface Message {
   updatedAt?: string | null;
   createdAt: string;
   isOwn?: boolean;
+  clientTempId?: string;
   status?: 'sending' | 'sent' | 'error';
   progress?: number;
   replyTo?: ReplyToMessage | null;

@@ -473,7 +473,7 @@ function ImageBatchGrid({
 			>
 				{visibleItems.map((item, index) => (
 					<button
-						key={item._id}
+						key={item.clientTempId || item._id}
 						type="button"
 						className={tileClassName(index)}
 						disabled={item.isRecalled === true || item.reportStatus === true}
@@ -618,6 +618,11 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						className="w-32 h-32 sm:w-40 sm:h-40 object-contain animate-in zoom-in-50 duration-300"
 						loading="lazy"
 					/>
+					{isOwn && message.status === "sending" && (
+						<span className="absolute bottom-2 right-2 flex size-6 items-center justify-center rounded-full bg-black/55 text-white shadow-sm">
+							<Clock className="size-3.5 animate-spin" />
+						</span>
+					)}
 				</div>
 			</div>
 		);
@@ -2046,6 +2051,7 @@ const MessageItem = ({
 		? (new Date(nextMessage.createdAt).getTime() - new Date(message.createdAt).getTime()) > 300000
 		: true;
 	const showTimestamp = !nextMessage || nextIsSystem || !isNextSameSender || hasGapToNext;
+	const showInlineSendingStatus = isOwn && message.status === "sending" && showTimestamp;
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.getUrl(message._id));
 	const isBlob = message.fileUrl?.startsWith("blob:") ?? false;
@@ -2468,6 +2474,12 @@ const MessageItem = ({
 										<span className="shrink-0 whitespace-nowrap text-[10.5px] font-normal leading-none tabular-nums tracking-normal">
 											{formatMessageTime(new Date(message.createdAt))}
 										</span>
+										{showInlineSendingStatus && (
+											<span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10.5px] font-medium leading-none">
+												<Clock className="size-2.5 animate-spin" />
+												Đang gửi
+											</span>
+										)}
 										{isOwn && message.status === "error" && (
 											<AlertCircle className="size-2.5 shrink-0 text-red-300" />
 										)}
@@ -2476,18 +2488,6 @@ const MessageItem = ({
 
 							</div>
 						</Card>
-
-						{isOwn && !(imageBatchItems && imageBatchItems.length > 1) && (
-							<div className={cn(
-								"flex justify-end mt-0.5 overflow-hidden transition-all duration-300 ease-in-out",
-								message.status === "sending" ? "h-6 opacity-100" : "h-0 opacity-0"
-							)}>
-								<div className="flex items-center gap-1.5 bg-black/20 dark:bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/10 h-5">
-									<Clock className="size-3 text-white/80 animate-spin" />
-									<span className="text-[13px] font-medium text-white/90 sm:text-sm">Đang gửi</span>
-								</div>
-							</div>
-						)}
 
 						{/* Reaction Display */}
 						{reactionSummary && (
