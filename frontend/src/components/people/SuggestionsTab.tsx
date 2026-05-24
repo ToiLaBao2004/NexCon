@@ -60,11 +60,10 @@ export default function SuggestionsTab({
             <div className="flex justify-end px-1">
                 <Button
                     type="button"
-                    variant="outline"
                     size="sm"
                     onClick={onRefresh}
                     disabled={loading}
-                    className="h-9 shrink-0 gap-2 rounded-xl"
+                    className="h-9 shrink-0 gap-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
                     Làm mới

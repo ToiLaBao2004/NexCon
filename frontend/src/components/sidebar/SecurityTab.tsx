@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Shield, KeyRound, ChevronRight, ArrowLeft, Monitor, Trash2, LogOut, Eye, EyeOff } from "lucide-react";
+import { KeyRound, ChevronRight, ArrowLeft, Monitor, Trash2, LogOut, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -259,13 +259,6 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <div>
-                <div className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-primary" />
-                    <h3 className="text-[18px] font-semibold tracking-tight">Bảo mật</h3>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">Bảo vệ thông tin và tài khoản của bạn</p>
-            </div>
             <div className="space-y-4">
                 <div
                     className={cn(

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
 import CachedStickerImage from "./CachedStickerImage";
+import { getAvatarSrc } from "@/lib/avatar";
 import { isUrl, formatBytes } from "@/lib/utils";
 import { draftStorage } from "@/lib/draftStorage";
 import { validateImageFile } from "@/lib/imageCrop";
@@ -189,6 +190,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const restoreInputFocusAfterSendRef = useRef(false);
 	const handledPointerSendRef = useRef(false);
 	const messageScrollSnapshotRef = useRef<{ element: HTMLElement; scrollTop: number } | null>(null);
+	const messageScrollRestoreTimersRef = useRef<ReturnType<typeof window.setTimeout>[]>([]);
 
 	const focusTextInput = useCallback(() => {
 		textInputRef.current?.focus({ preventScroll: true });
@@ -209,9 +211,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		};
 	}, [getMessageScrollContainer]);
 
+	const clearPendingMessageScrollRestore = useCallback(() => {
+		messageScrollRestoreTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+		messageScrollRestoreTimersRef.current = [];
+		messageScrollSnapshotRef.current = null;
+	}, []);
+
 	const restoreMessageScrollPosition = useCallback(() => {
 		const snapshot = messageScrollSnapshotRef.current;
 		if (!snapshot) return;
+		messageScrollRestoreTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+		messageScrollRestoreTimersRef.current = [];
 
 		window.dispatchEvent(new CustomEvent("nexcon:message-input-focus", {
 			detail: { conversationId: selectedConvo._id },
@@ -224,13 +234,15 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		restore();
 		requestAnimationFrame(restore);
-		window.setTimeout(restore, 80);
-		window.setTimeout(() => {
+		messageScrollRestoreTimersRef.current.push(window.setTimeout(restore, 80));
+		const finalTimer = window.setTimeout(() => {
 			restore();
 			if (messageScrollSnapshotRef.current?.element === snapshot.element) {
 				messageScrollSnapshotRef.current = null;
 			}
+			messageScrollRestoreTimersRef.current = messageScrollRestoreTimersRef.current.filter((timer) => timer !== finalTimer);
 		}, 180);
+		messageScrollRestoreTimersRef.current.push(finalTimer);
 	}, [selectedConvo._id]);
 
 	const shouldRestoreTextInputAfterSend = useCallback(() => {
@@ -322,6 +334,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			restoreInputFocusAfterSendRef.current = false;
 			return;
 		}
+		clearPendingMessageScrollRestore();
+		window.dispatchEvent(new CustomEvent("nexcon:message-send", {
+			detail: { conversationId: selectedConvo._id },
+		}));
 
 		const currValue = trimmed;
 		const prevAttachments = currentAttachments;
@@ -557,6 +573,16 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	useEffect(() => {
+		return () => {
+			if (typingTimeoutRef.current) {
+				clearTimeout(typingTimeoutRef.current);
+				typingTimeoutRef.current = null;
+			}
+			emitStopTyping(selectedConvo._id);
+		};
+	}, [emitStopTyping, selectedConvo._id]);
+
+	useEffect(() => {
 		if (!user) return;
 		if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
 
@@ -594,8 +620,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}, [attachments]);
 
 	useEffect(() => () => {
+		clearPendingMessageScrollRestore();
 		revokeAttachmentPreviews(attachmentsRef.current);
-	}, []);
+	}, [clearPendingMessageScrollRestore]);
 
 	useEffect(() => {
 		if (!user) return;
@@ -975,7 +1002,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			{attachments.length > 0 && (
 				<div className="flex items-center gap-2 px-3 pt-2.5">
 					{attachments.every((item) => item.type === "image") ? (
-						<div className="flex max-w-full items-center gap-2 overflow-x-auto pb-1">
+						<div className="flex max-w-full items-center gap-2 overflow-x-auto beautiful-scrollbar pb-1">
 							{attachments.map((item, index) => (
 								<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/80 shrink-0">
 									{item.preview && <img src={item.preview} alt="preview" className="w-full h-full object-cover" />}
@@ -1096,13 +1123,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									? ""
 									: ""
 							}
-							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none scrollbar-none"
+							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto beautiful-scrollbar bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none"
 							disabled={!isMobile && sending}
 						/>
 						{mentionOpen && (
 							<div className="absolute left-0 bottom-full mb-2 z-40 w-60 max-w-full border border-border/60 bg-popover shadow-lg overflow-hidden rounded-sm">
 								{mentionCandidates.length > 0 ? (
-									<ul className="max-h-56 overflow-y-auto py-1">
+									<ul className="max-h-56 overflow-y-auto beautiful-scrollbar py-1">
 										{mentionCandidates.map((candidate, index) => {
 											const isActive = index === activeMentionIndex;
 											return (
@@ -1114,11 +1141,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 														className={`w-full px-3 py-2 text-left flex items-center gap-2.5 transition-colors rounded-sm ${isActive ? "bg-primary/10" : "hover:bg-muted/70"}`}
 													>
 														<span className="size-6 rounded-sm overflow-hidden shrink-0 bg-muted flex items-center justify-center text-[11px] font-semibold text-muted-foreground">
-															{candidate.avatarUrl ? (
-																<img src={candidate.avatarUrl} alt={candidate.displayName} className="w-full h-full object-cover" />
-															) : (
-																candidate.displayName.charAt(0).toUpperCase()
-															)}
+															<img src={getAvatarSrc(candidate.avatarUrl)} alt={candidate.displayName} className="w-full h-full object-cover" />
 														</span>
 														<div className="min-w-0">
 															<span className="text-sm font-medium text-foreground truncate">{candidate.displayName}</span>

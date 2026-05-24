@@ -1,4 +1,4 @@
-import { nameToColor } from '@/lib/utils';
+import { getAvatarSrc } from '@/lib/avatar';
 import { useMeetStore } from '@/stores/useMeetStore';
 import { X } from 'lucide-react';
 
@@ -38,27 +38,18 @@ const WaitingRoomPanel = ({ roomName, isHost, participants, onClose }: WaitingRo
         </button>
       </div>
 
-      <div className="max-h-[42%] space-y-2 overflow-auto px-3 py-3">
+      <div className="max-h-[42%] space-y-2 overflow-auto beautiful-scrollbar px-3 py-3">
         {participants.map((participant) => (
           <div
             key={participant.userId}
             className="rounded-xl border border-border/70 bg-background/70 p-2.5 dark:border-slate-700 dark:bg-slate-800/85"
           >
             <div className="flex items-center gap-2.5">
-              {participant.avatarUrl ? (
-                <img
-                  src={participant.avatarUrl}
-                  alt={participant.displayName}
-                  className="h-10 w-10 rounded-full object-cover"
-                />
-              ) : (
-                <div
-                  className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
-                  style={{ background: nameToColor(participant.displayName) }}
-                >
-                  {participant.displayName.charAt(0).toUpperCase()}
-                </div>
-              )}
+              <img
+                src={getAvatarSrc(participant.avatarUrl)}
+                alt={participant.displayName}
+                className="h-10 w-10 rounded-full object-cover"
+              />
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-foreground dark:text-white">{participant.displayName}</p>
@@ -94,7 +85,7 @@ const WaitingRoomPanel = ({ roomName, isHost, participants, onClose }: WaitingRo
             </div>
           )}
 
-          <div className="max-h-[45%] space-y-2 overflow-auto px-3 pb-3">
+          <div className="max-h-[45%] space-y-2 overflow-auto beautiful-scrollbar px-3 pb-3">
             {waitingRoom.length === 0 && (
               <div className="rounded-xl border border-border/70 bg-muted/40 p-3 text-center text-xs text-muted-foreground dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">
                 Chưa có ai đang chờ duyệt.
@@ -107,20 +98,11 @@ const WaitingRoomPanel = ({ roomName, isHost, participants, onClose }: WaitingRo
                 className="rounded-xl border border-border/70 bg-background/70 p-2.5 dark:border-slate-700 dark:bg-slate-800/85"
               >
                 <div className="flex items-center gap-2.5">
-                  {participant.avatarUrl ? (
-                    <img
-                      src={participant.avatarUrl}
-                      alt={participant.displayName}
-                      className="h-10 w-10 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white"
-                      style={{ background: nameToColor(participant.displayName) }}
-                    >
-                      {participant.displayName.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <img
+                    src={getAvatarSrc(participant.avatarUrl)}
+                    alt={participant.displayName}
+                    className="h-10 w-10 rounded-full object-cover"
+                  />
 
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-foreground dark:text-white">{participant.displayName}</p>

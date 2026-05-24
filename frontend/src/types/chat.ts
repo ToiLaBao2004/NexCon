@@ -177,6 +177,45 @@ export interface Message {
   isDelivered?: boolean;
 }
 
+export interface GlobalSearchUser {
+  _id: string;
+  displayName: string;
+  email: string;
+  avatarUrl?: string | null;
+  phone?: string | null;
+  bio?: string | null;
+  isLocked?: boolean;
+  lock?: {
+    isLocked?: boolean;
+  };
+}
+
+export type GlobalSearchMessage = Omit<Message, "senderId"> & {
+  senderId: string | {
+    _id: string;
+    displayName?: string;
+    avatarUrl?: string | null;
+  };
+  conversation: Conversation;
+};
+
+export type GlobalSearchType = "all" | "users" | "conversations" | "messages";
+
+export interface GlobalSearchPage<T> {
+  items: T[];
+  limit: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export interface GlobalSearchResponse {
+  query: string;
+  type: GlobalSearchType;
+  users: GlobalSearchPage<GlobalSearchUser>;
+  conversations: GlobalSearchPage<Conversation>;
+  messages: GlobalSearchPage<GlobalSearchMessage>;
+}
+
 export interface MentionMessage {
   _id: string;
   content: string;

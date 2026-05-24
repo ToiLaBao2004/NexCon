@@ -35,6 +35,7 @@ const ChatWindowLayout = () => {
     fetchMessages,
     clearConversationCache,
     activeSidebar,
+    infoSidebarOpen,
     setActiveSidebar,
     clearSearch,
   } = useChatStore();
@@ -148,13 +149,26 @@ const ChatWindowLayout = () => {
     }
   }, [activeConversationId, selectedConvo?.type]);
 
-  // Handle sidebar defaults when conversation changes
+  // Preserve the user's info-sidebar preference when conversation changes.
   useEffect(() => {
-    if (activeConversationId) {
-      setActiveSidebar(useOverlayInfoSidebar ? null : 'info');
-      clearSearch();
+    if (!activeConversationId) return;
+
+    clearSearch();
+
+    const {
+      activeSidebar: currentSidebar,
+      infoSidebarOpen: shouldShowInfoSidebar,
+    } = useChatStore.getState();
+
+    if (currentSidebar === 'search') {
+      setActiveSidebar(!useOverlayInfoSidebar && shouldShowInfoSidebar ? 'info' : null);
+      return;
     }
-  }, [activeConversationId, setActiveSidebar, clearSearch]);
+
+    if (!useOverlayInfoSidebar && shouldShowInfoSidebar && currentSidebar !== 'info') {
+      setActiveSidebar('info');
+    }
+  }, [activeConversationId, useOverlayInfoSidebar, setActiveSidebar, clearSearch]);
 
   if (!selectedConvo) {
     return <ChatWelcomeScreen />;
@@ -200,7 +214,7 @@ const ChatWindowLayout = () => {
       {activeSidebar === 'search' && (
         <MessageSearchSidebar
           onClose={() => {
-            setActiveSidebar(useOverlayInfoSidebar ? null : 'info');
+            setActiveSidebar(!useOverlayInfoSidebar && infoSidebarOpen ? 'info' : null);
             clearSearch();
           }}
         />

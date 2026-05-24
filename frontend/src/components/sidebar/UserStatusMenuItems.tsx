@@ -1,7 +1,6 @@
 import { Check, Eye, EyeOff, Loader2, Radio } from "lucide-react";
 import {
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -21,12 +20,12 @@ const MANUAL_STATUS_OPTIONS: {
   label: string;
   dotClass: string;
 }[] = [
-  { status: "online", label: "Trực tuyến", dotClass: "bg-emerald-500" },
-  { status: "away", label: "Vắng mặt", dotClass: "bg-amber-400" },
-  { status: "busy", label: "Bận", dotClass: "bg-red-500" },
-  { status: "do_not_disturb", label: "Không làm phiền", dotClass: "bg-red-600" },
-  { status: "invisible", label: "Ẩn trạng thái", dotClass: "bg-zinc-400" },
-];
+    { status: "online", label: "Trực tuyến", dotClass: "bg-emerald-500" },
+    { status: "away", label: "Vắng mặt", dotClass: "bg-amber-400" },
+    { status: "busy", label: "Bận", dotClass: "bg-red-500" },
+    { status: "do_not_disturb", label: "Không làm phiền", dotClass: "bg-red-600" },
+    { status: "invisible", label: "Ẩn trạng thái", dotClass: "bg-zinc-400" },
+  ];
 
 export function UserStatusMenuItems() {
   const { user, updateMyStatus } = useAuthStore();
@@ -87,39 +86,43 @@ export function UserStatusMenuItems() {
                 Theo kết nối realtime
               </span>
             </div>
-            {savingKey === "auto" ? (
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            ) : currentMode === "auto" ? (
-              <Check className="h-4 w-4 text-primary" />
-            ) : null}
-          </DropdownMenuItem>
+            {
+              savingKey === "auto" ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : currentMode === "auto" ? (
+                <Check className="h-4 w-4 text-primary" />
+              ) : null
+            }
+          </DropdownMenuItem >
 
-          {MANUAL_STATUS_OPTIONS.map((option) => {
-            const selected = currentMode === "manual" && currentManualStatus === option.status;
-            return (
-              <DropdownMenuItem
-                key={option.status}
-                className="cursor-pointer py-2.5"
-                onSelect={(event) => {
-                  event.preventDefault();
-                  void applyStatus(option.status, {
-                    status_mode: "manual",
-                    manual_status: option.status,
-                  });
-                }}
-              >
-                <span className={cn("mr-2 h-3 w-3 rounded-full", option.dotClass)} />
-                <span className="flex-1 truncate">{option.label}</span>
-                {savingKey === option.status ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                ) : selected ? (
-                  <Check className="h-4 w-4 text-primary" />
-                ) : null}
-              </DropdownMenuItem>
-            );
-          })}
+          {
+            MANUAL_STATUS_OPTIONS.map((option) => {
+              const selected = currentMode === "manual" && currentManualStatus === option.status;
+              return (
+                <DropdownMenuItem
+                  key={option.status}
+                  className="cursor-pointer py-2.5"
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    void applyStatus(option.status, {
+                      status_mode: "manual",
+                      manual_status: option.status,
+                    });
+                  }}
+                >
+                  <span className={cn("mr-2 h-3 w-3 rounded-full", option.dotClass)} />
+                  <span className="flex-1 truncate">{option.label}</span>
+                  {savingKey === option.status ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  ) : selected ? (
+                    <Check className="h-4 w-4 text-primary" />
+                  ) : null}
+                </DropdownMenuItem>
+              );
+            })
+          }
 
-          <DropdownMenuSeparator />
+          < DropdownMenuSeparator />
           <DropdownMenuItem
             className="cursor-pointer py-2.5"
             onSelect={(event) => {
@@ -139,13 +142,15 @@ export function UserStatusMenuItems() {
               <Switch checked={showActivity} className="ml-2" />
             )}
           </DropdownMenuItem>
-          {!showActivity && (
-            <div className="px-3 pb-2 text-xs leading-snug text-muted-foreground">
-              Bạn vẫn nhận tin nhắn và cuộc gọi realtime; người khác chỉ thấy bạn ngoại tuyến.
-            </div>
-          )}
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
+          {
+            !showActivity && (
+              <div className="px-3 pb-2 text-xs leading-snug text-muted-foreground">
+                Bạn vẫn nhận tin nhắn và cuộc gọi realtime; người khác chỉ thấy bạn ngoại tuyến.
+              </div>
+            )
+          }
+        </DropdownMenuSubContent >
+      </DropdownMenuSub >
     </>
   );
 }

@@ -7,11 +7,9 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
 } from "@/components/ui/sidebar"
 import NewGroupChatModal from "../chat/NewGroupModal"
-import AddFriendModal from "../chat/AddFriendModal"
-import ConversationMixedList from "../chat/ConversationMixedList"
+import ConversationMixedList, { type ConversationFilter } from "../chat/ConversationMixedList"
 
 import { cn } from "@/lib/utils"
 import { useChatStore } from "@/stores/useChatStore"
@@ -20,6 +18,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const setFocusedConversation = useChatStore((s) => s.setFocusedConversation);
   const [isGroupModalOpen, setIsGroupModalOpen] = React.useState(false);
+  const [conversationFilter, setConversationFilter] = React.useState<ConversationFilter>("all");
   const isMobile = useIsMobile();
 
   return (
@@ -41,23 +40,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </div>
           )}
 
-          <AddFriendModal />
-
           <SidebarGroup className="flex min-h-0 flex-1 flex-col px-5">
-            <SidebarGroupLabel asChild>
-              <div className="flex items-center justify-between px-0 py-3">
-                <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">cuộc trò chuyện</span>
-                <button
-                  type="button"
-                  onClick={() => setIsGroupModalOpen(true)}
-                  className="normal-case rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/50 cursor-pointer"
-                >
-                  Tạo nhóm
-                </button>
-              </div>
-            </SidebarGroupLabel>
             <SidebarGroupContent className="min-h-0 flex-1">
-              <ConversationMixedList />
+              <ConversationMixedList
+                conversationFilter={conversationFilter}
+                onChangeFilter={setConversationFilter}
+                onCreateGroup={() => setIsGroupModalOpen(true)}
+              />
             </SidebarGroupContent>
           </SidebarGroup>
         </div>

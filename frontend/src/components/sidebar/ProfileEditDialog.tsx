@@ -146,7 +146,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="w-screen h-[100dvh] max-w-none rounded-none border-0 p-4 sm:h-auto 
-        sm:max-w-[1000px] sm:rounded-2xl sm:border sm:p-6 overflow-y-auto">
+        sm:max-w-[1000px] sm:rounded-2xl sm:border sm:p-6 overflow-y-auto beautiful-scrollbar">
 
                 <DialogHeader className="mb-4">
                     <DialogTitle className="text-xl font-semibold">Chỉnh sửa hồ sơ</DialogTitle>

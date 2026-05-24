@@ -78,7 +78,7 @@ export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: Pa
             </DialogHeader>
           </div>
 
-          <div className="p-3 overflow-auto h-full bg-card">
+          <div className="p-3 overflow-auto beautiful-scrollbar h-full bg-card">
             {mutualGroups.length === 0 ? (
               <p className="text-sm text-muted-foreground px-2 py-2">Không có nhóm chung</p>
             ) : (
@@ -134,7 +134,7 @@ export function MutualGroupsPopover({
           <PopoverTitle>Nhóm chung</PopoverTitle>
           <PopoverDescription>{mutualGroups.length} nhóm</PopoverDescription>
         </PopoverHeader>
-        <div className="mt-2 flex flex-col gap-1 max-h-60 overflow-auto">
+        <div className="mt-2 flex flex-col gap-1 max-h-60 overflow-auto beautiful-scrollbar">
           {mutualGroups.length === 0 ? (
             <p className="text-sm text-muted-foreground/90 px-2 py-1">Không có nhóm chung</p>
           ) : (

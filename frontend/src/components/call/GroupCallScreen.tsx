@@ -41,7 +41,7 @@ const GroupCallScreen = () => {
           onMinimize={() => setIsMinimized(true)}
           onMaximize={() => setIsMinimized(false)}
           roomType="call"
-          callType={callType as "video" | "audio" | undefined}
+          callType={callType ?? undefined}
         />
       </div>
     );
@@ -59,7 +59,7 @@ const GroupCallScreen = () => {
           onMinimize={() => setIsMinimized(true)}
           onMaximize={() => setIsMinimized(false)}
           roomType="call"
-          callType={callType as "video" | "audio" | undefined}
+          callType={callType ?? undefined}
         />
       </div>
     );

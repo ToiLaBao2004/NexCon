@@ -104,7 +104,7 @@ export default function AdminAppealsPage() {
               Chấp nhận kháng cáo sẽ mở khóa tài khoản và reset số lần vi phạm còn hiệu lực.
             </p>
           </div>
-          <Button variant="outline" className="rounded-md" onClick={() => void loadAppeals()}>
+          <Button className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void loadAppeals()}>
             <RefreshCw className="size-4" />
             Làm mới
           </Button>

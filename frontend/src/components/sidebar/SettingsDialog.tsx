@@ -161,13 +161,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     <div className="flex flex-col sm:flex-row h-[calc(100dvh-32px)] sm:h-[560px] overflow-hidden bg-card">
                         {/* Sidebar */}
                         <div className="w-full sm:w-[240px] bg-muted/30 border-b sm:border-b-0 sm:border-r border-border/50 flex flex-col p-4 sm:p-5 overflow-hidden">
-                            <h2 className="text-[20px] font-bold tracking-tight mb-3 sm:mb-6 px-1">Cài đặt</h2>
+                            <h2 className="mb-3 px-1 text-[22px] font-bold tracking-tight text-foreground sm:mb-6">Cài đặt</h2>
                             <div className="beautiful-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-1 sm:overflow-visible sm:px-0 sm:pb-0">
                                 <button
                                     onClick={() => setActiveTab("notifications")}
                                     className={cn(
-                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-semibold rounded-xl transition-colors sm:w-full sm:shrink",
-                                        (activeTab === "notifications") ? "bg-primary/15 text-primary" : "hover:bg-muted/60 text-foreground/70 hover:text-foreground"
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2.5 text-[15px] font-semibold text-foreground transition-colors sm:w-full sm:shrink",
+                                        (activeTab === "notifications") ? "bg-primary/15" : "hover:bg-muted/60"
                                     )}
                                 >
                                     <Bell className="w-4 h-4 shrink-0" />
@@ -176,8 +176,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                 <button
                                     onClick={() => setActiveTab("security")}
                                     className={cn(
-                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-semibold rounded-xl transition-colors sm:w-full sm:shrink",
-                                        (activeTab === "security") ? "bg-primary/15 text-primary" : "hover:bg-muted/60 text-foreground/70 hover:text-foreground"
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2.5 text-[15px] font-semibold text-foreground transition-colors sm:w-full sm:shrink",
+                                        (activeTab === "security") ? "bg-primary/15" : "hover:bg-muted/60"
                                     )}
                                 >
                                     <Shield className="w-4 h-4 shrink-0" />
@@ -186,8 +186,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                                 <button
                                     onClick={() => setActiveTab("reports")}
                                     className={cn(
-                                        "flex shrink-0 items-center gap-3 whitespace-nowrap px-3 py-2 text-sm font-semibold rounded-xl transition-colors sm:w-full sm:shrink",
-                                        (activeTab === "reports") ? "bg-primary/15 text-primary" : "hover:bg-muted/60 text-foreground/70 hover:text-foreground"
+                                        "flex shrink-0 items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2.5 text-[15px] font-semibold text-foreground transition-colors sm:w-full sm:shrink",
+                                        (activeTab === "reports") ? "bg-primary/15" : "hover:bg-muted/60"
                                     )}
                                 >
                                     <Flag className="w-4 h-4 shrink-0" />

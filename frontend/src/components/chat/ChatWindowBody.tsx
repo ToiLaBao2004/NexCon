@@ -37,6 +37,22 @@ const getMessageSenderId = (message?: Message | null) => {
   return String(senderObj?._id || message.senderId || "");
 };
 
+function TypingIndicatorPill({ name }: { name: string }) {
+  return (
+    <div className="flex min-w-0 max-w-[80%] items-center gap-2.5 rounded-full border border-border/40 bg-white/80 px-3.5 py-1.5 shadow-lg shadow-black/5 backdrop-blur-md dark:bg-slate-900/80 sm:max-w-[360px]">
+      <span className="flex h-5 shrink-0 items-center gap-1">
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:-0.3s]"></span>
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/60 [animation-delay:-0.15s]"></span>
+        <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary/60"></span>
+      </span>
+      <span className="min-w-0 truncate pr-1 text-[12px] font-medium text-foreground/80">
+        <span className="font-bold text-foreground">{name}</span>
+        {" "}đang soạn tin nhắn...
+      </span>
+    </div>
+  );
+}
+
 const ChatWindowBody: React.FC = () => {
   const {
     activeConversationId,
@@ -73,6 +89,7 @@ const ChatWindowBody: React.FC = () => {
   const { user } = useAuthStore();
   const { typingUsers } = useSocketStore();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const prevScrollHeightRef = useRef<number>(0);
   const prevMessageCount = useRef(0);
   const isFirstLoad = useRef(true);
@@ -143,6 +160,7 @@ const ChatWindowBody: React.FC = () => {
   const loadingMoreRef = useRef(false);
   const suppressAutoScrollUntilRef = useRef(0);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [isNearBottom, setIsNearBottom] = useState(true);
   const [pendingNewMessageIds, setPendingNewMessageIds] = useState<string[]>([]);
   const distanceFromBottomRef = useRef(0);
   const scrollToBottom = useCallback((instant: boolean = false, force: boolean = false) => {
@@ -162,6 +180,7 @@ const ChatWindowBody: React.FC = () => {
     const { scrollTop, scrollHeight, clientHeight } = container;
     const distanceFromBottom = Math.max(0, scrollHeight - scrollTop - clientHeight);
     distanceFromBottomRef.current = distanceFromBottom;
+    setIsNearBottom(distanceFromBottom <= NEAR_BOTTOM_THRESHOLD);
     setShowScrollToBottom(distanceFromBottom > SCROLL_TO_BOTTOM_BUTTON_THRESHOLD);
 
     setPendingNewMessageIds((current) => {
@@ -216,6 +235,21 @@ const ChatWindowBody: React.FC = () => {
     window.addEventListener("nexcon:message-input-focus", handleInputFocus as EventListener);
     return () => window.removeEventListener("nexcon:message-input-focus", handleInputFocus as EventListener);
   }, [convoId]);
+
+  useEffect(() => {
+    const handleMessageSend = (event: Event) => {
+      const detail = (event as CustomEvent<{ conversationId?: string }>).detail;
+      if (detail?.conversationId && detail.conversationId !== convoId) return;
+
+      suppressAutoScrollUntilRef.current = 0;
+      requestAnimationFrame(() => scrollToBottom(true, true));
+      setTimeout(() => scrollToBottom(true, true), 80);
+      setTimeout(() => scrollToBottom(true, true), 180);
+    };
+
+    window.addEventListener("nexcon:message-send", handleMessageSend as EventListener);
+    return () => window.removeEventListener("nexcon:message-send", handleMessageSend as EventListener);
+  }, [convoId, scrollToBottom]);
 
 
   // IntersectionObserver for top sentinel (load older)
@@ -473,12 +507,53 @@ const ChatWindowBody: React.FC = () => {
 
 
   useEffect(() => {
+    const container = scrollRef.current;
+    const content = contentRef.current;
+    if (!container || !content) return;
+
+    let lastScrollHeight = container.scrollHeight;
+    let frameId = 0;
+
+    const handleContentResize = () => {
+      const previousScrollHeight = lastScrollHeight;
+      const previousDistanceFromBottom = Math.max(
+        0,
+        previousScrollHeight - container.scrollTop - container.clientHeight
+      );
+      const nextScrollHeight = container.scrollHeight;
+      const heightDelta = nextScrollHeight - previousScrollHeight;
+      lastScrollHeight = nextScrollHeight;
+
+      if (Math.abs(heightDelta) < 1) return;
+      if (loadingMoreRef.current || isJumpMode) return;
+      if (Date.now() < suppressAutoScrollUntilRef.current) return;
+      if (previousDistanceFromBottom > NEAR_BOTTOM_THRESHOLD) return;
+
+      window.cancelAnimationFrame(frameId);
+      frameId = window.requestAnimationFrame(() => {
+        scrollToBottom(true, true);
+        syncScrollState();
+      });
+    };
+
+    const resizeObserver = new ResizeObserver(handleContentResize);
+    resizeObserver.observe(content);
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      resizeObserver.disconnect();
+    };
+  }, [convoId, isJumpMode, scrollToBottom, syncScrollState]);
+
+
+  useEffect(() => {
     isFirstLoad.current = true;
     prevLastItemIdRef.current = undefined;
     prevMessageCount.current = 0;
     loadingMoreRef.current = false;
     prevScrollHeightRef.current = 0;
     distanceFromBottomRef.current = 0;
+    setIsNearBottom(true);
     setPendingNewMessageIds([]);
   }, [convoId]);
 
@@ -499,6 +574,12 @@ const ChatWindowBody: React.FC = () => {
     );
   }
 
+  const typingDisplayName = activeTypingParticipants.length === 1
+    ? activeTypingParticipants[0]?.userId?.nickname || activeTypingParticipants[0]?.userId?.displayName || "Ai đó"
+    : `${activeTypingParticipants.length} người`;
+  const showInlineTyping = activeTypingParticipants.length > 0 && isNearBottom;
+  const showFloatingTyping = activeTypingParticipants.length > 0 && !isNearBottom;
+
   return (
     <div className="flex flex-col h-full bg-chat-surface overflow-hidden relative">
       <PinnedMessagesBanner />
@@ -508,7 +589,8 @@ const ChatWindowBody: React.FC = () => {
         data-chat-scroll-container={convoId}
         className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4 pb-8"
       >
-        <div ref={topSentinelRef} className="h-1 shrink-0" />
+        <div ref={contentRef} className="flex min-h-full flex-col">
+          <div ref={topSentinelRef} className="h-1 shrink-0" />
 
         {messageLoading && (
           <div className="flex justify-center py-4 text-sm text-muted-foreground">
@@ -552,27 +634,21 @@ const ChatWindowBody: React.FC = () => {
             </div>
           );
         })}
-        <div ref={bottomSentinelRef} className="h-1 shrink-0" />
-        <div ref={bottomRef} />
+
+          {showInlineTyping && (
+            <div className="flex justify-start px-1 pb-2 pt-1 md:px-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <TypingIndicatorPill name={typingDisplayName} />
+            </div>
+          )}
+
+          <div ref={bottomSentinelRef} className="h-1 shrink-0" />
+          <div ref={bottomRef} />
+        </div>
       </div>
 
-      {activeTypingParticipants.length > 0 && (
-        <div className="absolute bottom-0 left-4 md:left-6 z-30 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <div className="flex items-center gap-2.5 px-3.5 py-1.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-border/40 rounded-full shadow-lg shadow-black/5">
-            <span className="flex gap-1 items-center h-5">
-              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-              <span className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce"></span>
-            </span>
-            <span className="text-[12px] font-medium text-foreground/80 pr-1">
-              <span className="font-bold text-foreground">
-                {activeTypingParticipants.length === 1
-                  ? activeTypingParticipants[0]?.userId?.nickname || activeTypingParticipants[0]?.userId?.displayName
-                  : `${activeTypingParticipants.length} người`}
-              </span>
-              {" "}đang soạn tin nhắn...
-            </span>
-          </div>
+      {showFloatingTyping && (
+        <div className="pointer-events-none absolute bottom-3 left-4 z-30 flex max-w-[calc(100%-7rem)] animate-in fade-in slide-in-from-bottom-2 duration-300 md:left-6">
+          <TypingIndicatorPill name={typingDisplayName} />
         </div>
       )}
 

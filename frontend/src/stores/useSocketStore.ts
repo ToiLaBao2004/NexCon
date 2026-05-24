@@ -21,6 +21,30 @@ import { consumePendingNativeCallAction } from "@/lib/nativeCallAction";
 import type { UserPresence } from "@/types/user";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
+const TYPING_INDICATOR_TIMEOUT_MS = 3500;
+const typingExpiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+const getTypingTimerKey = (conversationId: string, userId: string) => `${conversationId}:${userId}`;
+
+const clearTypingExpiryTimer = (conversationId: string, userId: string) => {
+  const key = getTypingTimerKey(conversationId, userId);
+  const timer = typingExpiryTimers.get(key);
+  if (!timer) return;
+
+  clearTimeout(timer);
+  typingExpiryTimers.delete(key);
+};
+
+const clearTypingExpiryTimers = (conversationId?: string) => {
+  Array.from(typingExpiryTimers.keys()).forEach((key) => {
+    const [timerConversationId] = key.split(":");
+    if (conversationId && timerConversationId !== conversationId) return;
+
+    const timer = typingExpiryTimers.get(key);
+    if (timer) clearTimeout(timer);
+    typingExpiryTimers.delete(key);
+  });
+};
 
 const normalizeOnlineUsersPayload = (payload: any): {
   onlineUsers: string[];
@@ -237,24 +261,60 @@ export const useSocketStore = create<SocketState>((set, get) => ({
   connectionStatus: 'idle',
   typingUsers: {},
   setTypingUser: (conversationId, userId, isTyping) => {
+    const safeConversationId = conversationId?.toString?.() || "";
+    const safeUserId = userId?.toString?.() || "";
+    if (!safeConversationId || !safeUserId) return;
+
+    if (isTyping) {
+      clearTypingExpiryTimer(safeConversationId, safeUserId);
+      const timer = setTimeout(() => {
+        typingExpiryTimers.delete(getTypingTimerKey(safeConversationId, safeUserId));
+        get().setTypingUser(safeConversationId, safeUserId, false);
+      }, TYPING_INDICATOR_TIMEOUT_MS);
+      typingExpiryTimers.set(getTypingTimerKey(safeConversationId, safeUserId), timer);
+    } else {
+      clearTypingExpiryTimer(safeConversationId, safeUserId);
+    }
+
     set((state) => {
-      const currentTypingUsers = state.typingUsers[conversationId] || [];
-      if (isTyping && !currentTypingUsers.includes(userId)) {
+      const currentTypingUsers = state.typingUsers[safeConversationId] || [];
+      if (isTyping && !currentTypingUsers.includes(safeUserId)) {
         return {
           typingUsers: {
             ...state.typingUsers,
-            [conversationId]: [...currentTypingUsers, userId],
+            [safeConversationId]: [...currentTypingUsers, safeUserId],
           },
         };
-      } else if (!isTyping && currentTypingUsers.includes(userId)) {
+      } else if (!isTyping && currentTypingUsers.includes(safeUserId)) {
+        const nextTypingUsers = { ...state.typingUsers };
+        const nextConversationTypingUsers = currentTypingUsers.filter((id) => id !== safeUserId);
+        if (nextConversationTypingUsers.length > 0) {
+          nextTypingUsers[safeConversationId] = nextConversationTypingUsers;
+        } else {
+          delete nextTypingUsers[safeConversationId];
+        }
+
         return {
-          typingUsers: {
-            ...state.typingUsers,
-            [conversationId]: currentTypingUsers.filter((id) => id !== userId),
-          },
+          typingUsers: nextTypingUsers,
         };
       }
       return state;
+    });
+  },
+  clearTypingUsers: (conversationId) => {
+    const safeConversationId = conversationId?.toString?.();
+    clearTypingExpiryTimers(safeConversationId);
+
+    set((state) => {
+      if (!safeConversationId) {
+        return { typingUsers: {} };
+      }
+
+      if (!state.typingUsers[safeConversationId]) return state;
+
+      const nextTypingUsers = { ...state.typingUsers };
+      delete nextTypingUsers[safeConversationId];
+      return { typingUsers: nextTypingUsers };
     });
   },
   emitTyping: (conversationId) => {
@@ -284,6 +344,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.on("connect", () => {
       console.log("Connected to Socket");
+      get().clearTypingUsers();
       set({ connectionStatus: 'connected' });
       useAppStatusStore.getState().setSocketStatus('connected');
       useAppStatusStore.getState().clearMaintenance();
@@ -338,6 +399,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     socket.on("connect_error", async (err) => {
       console.error("Socket connect_error:", err.message);
       const nextStatus = navigator.onLine ? 'reconnecting' : 'disconnected';
+      get().clearTypingUsers();
       set({ connectionStatus: nextStatus });
       useAppStatusStore.getState().setSocketStatus(nextStatus);
       if (
@@ -363,6 +425,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         : navigator.onLine
           ? 'reconnecting'
           : 'disconnected';
+      get().clearTypingUsers();
       set({ connectionStatus: nextStatus });
       useAppStatusStore.getState().setSocketStatus(nextStatus);
     });
@@ -373,6 +436,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     });
 
     socket.io.on("reconnect", () => {
+      get().clearTypingUsers();
       set({ connectionStatus: 'connected' });
       useAppStatusStore.getState().setSocketStatus('connected');
       useAppStatusStore.getState().clearMaintenance();
@@ -406,19 +470,41 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
     socket.io.on("reconnect_error", () => {
       const nextStatus = navigator.onLine ? 'reconnecting' : 'disconnected';
+      get().clearTypingUsers();
       set({ connectionStatus: nextStatus });
       useAppStatusStore.getState().setSocketStatus(nextStatus);
     });
 
     socket.on("online-users", (payload) => {
       const normalized = normalizeOnlineUsersPayload(payload);
-      set((state) => ({
-        onlineUsers: normalized.onlineUsers,
-        userPresences: {
-          ...state.userPresences,
-          ...normalized.userPresences,
-        },
-      }));
+      const onlineUserSet = new Set(normalized.onlineUsers);
+
+      set((state) => {
+        const nextTypingUsers: Record<string, string[]> = {};
+
+        Object.entries(state.typingUsers).forEach(([conversationId, typingUserIds]) => {
+          const nextConversationTypingUsers = typingUserIds.filter((typingUserId) => {
+            const isStillOnline = onlineUserSet.has(typingUserId);
+            if (!isStillOnline) {
+              clearTypingExpiryTimer(conversationId, typingUserId);
+            }
+            return isStillOnline;
+          });
+
+          if (nextConversationTypingUsers.length > 0) {
+            nextTypingUsers[conversationId] = nextConversationTypingUsers;
+          }
+        });
+
+        return {
+          onlineUsers: normalized.onlineUsers,
+          userPresences: {
+            ...state.userPresences,
+            ...normalized.userPresences,
+          },
+          typingUsers: nextTypingUsers,
+        };
+      });
     });
 
     socket.on("new-message", ({ message, conversation, unreadCounts }) => {
@@ -1418,6 +1504,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     const socket = get().socket;
     if (socket) {
       socket.disconnect();
+      get().clearTypingUsers();
       set({ socket: null, onlineUsers: [], userPresences: {}, connectionStatus: 'idle' });
       useAppStatusStore.getState().setSocketStatus('idle');
       // Reset call state if any

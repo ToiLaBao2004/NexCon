@@ -5,6 +5,7 @@ import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getAvatarSrc } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { adminService, type AdminStats, type AdminUser, type Pagination } from "@/services/adminService";
 
@@ -133,7 +134,7 @@ export default function AdminOverviewPage() {
                 className="h-10 pl-9"
               />
             </div>
-            <Button variant="outline" className="rounded-md" onClick={() => void refresh()}>
+            <Button className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void refresh()}>
               <RefreshCw className="size-4" />
               Làm mới
             </Button>
@@ -168,13 +169,7 @@ export default function AdminOverviewPage() {
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="relative shrink-0">
-                        {user.avatarUrl ? (
-                          <img src={user.avatarUrl} alt={userLabel(user)} className="size-10 rounded-full object-cover" />
-                        ) : (
-                          <div className="flex size-10 items-center justify-center rounded-full bg-muted text-sm font-semibold">
-                            {userLabel(user).slice(0, 1).toUpperCase()}
-                          </div>
-                        )}
+                        <img src={getAvatarSrc(user.avatarUrl)} alt={userLabel(user)} className="size-10 rounded-full object-cover" />
                         <span
                           className={cn(
                             "absolute bottom-0 right-0 size-2.5 rounded-full ring-2 ring-background",
