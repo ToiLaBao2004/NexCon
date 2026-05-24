@@ -1,7 +1,7 @@
 import type { UserPresence, UserPresenceStatus } from "@/types/user";
 
 export const PRESENCE_LABELS: Record<UserPresenceStatus, string> = {
-  online: "Đang hoạt động",
+  online: "Trực tuyến",
   away: "Vắng mặt",
   busy: "Bận",
   do_not_disturb: "Không làm phiền",
@@ -67,7 +67,6 @@ export function getPresenceForUser(
       status: "online",
       status_mode: "auto",
       manual_status: "online",
-      show_activity: true,
       is_online: true,
       last_seen_at: null,
       last_seen_relative: null,
@@ -86,7 +85,6 @@ export function getPresenceText(presence?: UserPresence | null): string {
   if (!presence) return PRESENCE_LABELS.offline;
   const status = normalizePresenceStatus(presence.status);
 
-  if (presence.activity_hidden) return PRESENCE_LABELS.offline;
   if (status === "online") return "Đang hoạt động";
   if (status !== "offline") return PRESENCE_LABELS[status];
 

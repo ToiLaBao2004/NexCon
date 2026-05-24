@@ -35,7 +35,6 @@ export const userService = {
     updateMyStatus: async (data: {
         status_mode?: UserStatusMode;
         manual_status?: Exclude<UserPresenceStatus, 'offline'>;
-        show_activity?: boolean;
     }) => {
         const response = await api.patch('/users/me/status', data);
         return response.data.presence;

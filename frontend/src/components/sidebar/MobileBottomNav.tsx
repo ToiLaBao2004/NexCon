@@ -133,7 +133,7 @@ const MobileBottomNav = () => {
                                 <span>Vi phạm & khiếu nại</span>
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
-                        <UserStatusMenuItems />
+                        <UserStatusMenuItems mobileInline />
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             className="cursor-pointer py-2 text-primary focus:text-primary"
