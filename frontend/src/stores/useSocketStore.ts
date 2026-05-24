@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { io, type Socket } from "socket.io-client";
 import { useAuthStore } from "./useAuthStore";
 import type { GroupCallParticipant, SocketState } from "@/types/store";
-import { useChatStore } from "./useChatStore";
+import { buildConversationPatchFromMessage, useChatStore } from "./useChatStore";
 import { useFriendStore } from "./useFriendStore";
 import { useNotificationStore } from "./useNotificationStore";
 import { useCallStore } from "./useCallStore";
@@ -540,8 +540,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
         useChatStore.getState().addMessage(message);
       }
 
+      const fallbackConversationPatch = buildConversationPatchFromMessage(message);
       const updatedConversation = {
-        ...conversation,
+        ...(fallbackConversationPatch || {}),
+        ...(conversation || {}),
+        lastMessage: conversation?.lastMessage || fallbackConversationPatch?.lastMessage,
+        lastMessageAt: conversation?.lastMessageAt || fallbackConversationPatch?.lastMessageAt,
+        updatedAt: conversation?.updatedAt || fallbackConversationPatch?.updatedAt,
         unreadCounts,
       };
 
