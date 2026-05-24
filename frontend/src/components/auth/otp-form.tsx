@@ -9,6 +9,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useOTPStore } from "@/stores/useOtpStore";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 export function OTPForm() {
   const navigate = useNavigate();
@@ -61,7 +62,7 @@ export function OTPForm() {
 
       navigate("/signin");
     } catch (err: any) {
-      setError(err.response?.data?.message || "Mã OTP không hợp lệ.");
+      setError(getApiErrorMessage(err, "Mã OTP không hợp lệ."));
     } finally {
       setLoading(false);
     }
@@ -72,7 +73,7 @@ export function OTPForm() {
     try {
       await sendOtpCreateUser(signupData.email);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Gửi lại mã OTP thất bại.");
+      setError(getApiErrorMessage(err, "Gửi lại mã OTP thất bại."));
       return;
     }
     setCountdown(60);

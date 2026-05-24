@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { useReminderStore } from '@/stores/useReminderStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { REMINDER_MIN_LEAD_TIME_MS } from '@/pages/reminder/constants';
+import { getApiErrorMessage } from '@/lib/apiMessage';
 import type {
   CreateReminderPayload,
   Reminder,
@@ -112,13 +113,7 @@ const getNowDatetimeLocal = (offsetMs = 0): string => {
 };
 
 const getServerErrorMessage = (error: unknown): string => {
-  if (typeof error === 'object' && error !== null) {
-    const maybeError = error as { response?: { data?: { message?: string } } };
-    if (maybeError.response?.data?.message) {
-      return maybeError.response.data.message;
-    }
-  }
-  return 'Có lỗi xảy ra, vui lòng thử lại.';
+  return getApiErrorMessage(error, 'Có lỗi xảy ra, vui lòng thử lại.');
 };
 
 export default function ReminderFormModal({
@@ -355,4 +350,3 @@ export default function ReminderFormModal({
     </Dialog>
   );
 }
-

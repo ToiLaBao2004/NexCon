@@ -11,6 +11,7 @@ import { useNavigate, useLocation } from "react-router"
 import { useEffect } from "react"
 import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
+import { getApiErrorField, getApiErrorMessage } from "@/lib/apiMessage"
 
 const ResetPassSchema = z.object({
   newPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
@@ -50,14 +51,14 @@ export function ResetPassForm({
       navigate(user ? "/" : "/signin");
     } catch (error: any) {
       console.error("Update Password failed:", error);
-      // Map errors
-      const backendMsg = error.response?.data?.message || "Cập nhật mật khẩu thất bại.";
-      if (backendMsg.toLowerCase().includes("newpassword")) {
-        setError("newPassword", { type: "server", message: backendMsg });
-      } else if (backendMsg.toLowerCase().includes("confirmnewpassword")) {
-        setError("confirmNewPassword", { type: "server", message: backendMsg });
+      const message = getApiErrorMessage(error, "Cập nhật mật khẩu thất bại.");
+      const field = getApiErrorField(error);
+      if (field === "newPassword" || field === "password") {
+        setError("newPassword", { type: "server", message });
+      } else if (field === "confirmPassword") {
+        setError("confirmNewPassword", { type: "server", message });
       } else {
-        setError("root", { type: "server", message: backendMsg });
+        setError("root", { type: "server", message });
       }
     }
   }

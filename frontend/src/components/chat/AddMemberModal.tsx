@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Loader2, Search, UserPlus, Check } from 'lucide-react';
 import type { Conversation } from '@/types/chat';
 import { cn } from '@/lib/utils';
+import { getApiSuccessMessage } from '@/lib/apiMessage';
 
 interface AddMemberModalProps {
     open: boolean;
@@ -83,7 +84,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             const res = await chatService.addMembers(conversation._id, selectedIds);
             
             if (res.approvalRequired) {
-                toast.success(res.message || 'Đã gửi yêu cầu phê duyệt thành viên tới trưởng nhóm');
+                toast.success(getApiSuccessMessage(res, 'Đã gửi yêu cầu phê duyệt thành viên tới trưởng nhóm'));
             } else {
                 toast.success(`Đã thêm ${selectedIds.length} thành viên vào nhóm`);
             }

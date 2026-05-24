@@ -6,6 +6,7 @@ import { moderationService } from "@/services/moderationService";
 import type { ModerationStatusResponse } from "@/types/moderation";
 import { ViolationHistoryList } from "@/components/moderation/ViolationHistoryList";
 import { formatModerationDate } from "@/lib/moderationNotice";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 export default function ModerationStatusPage() {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ export default function ModerationStatusPage() {
       setError(null);
       setData(await moderationService.getMyModerationStatus(50));
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Không thể tải lịch sử vi phạm.");
+      setError(getApiErrorMessage(err, "Không thể tải lịch sử vi phạm."));
     } finally {
       setLoading(false);
       setRefreshing(false);

@@ -2,6 +2,8 @@ import api from '@/lib/axios';
 import type { ConversationResponse, GlobalSearchResponse, Message } from '@/types/chat';
 import type { SendMessagePayload } from '@/types/store';
 import type { ModerationApiErrorPayload } from '@/types/moderation';
+import { getApiErrorMessage, getApiMessageText, translateApiMessage } from '@/lib/apiMessage';
+import { moderationCategoryLabels } from '@/lib/moderationNotice';
 
 interface FetchMessagesParams {
 	conversationId: string;
@@ -22,16 +24,19 @@ interface FetchMessageProps {
 const pageLimit = 20;
 
 function resolveErrorMessage(error: any): string {
-	const status = error?.response?.status;
-	const serverMsg = error?.response?.data?.message ?? '';
+	const serverMsg = getApiMessageText(error);
 	const payload = error?.response?.data as ModerationApiErrorPayload | undefined;
 	const normalizedServerMsg = String(serverMsg).trim().toLowerCase();
 
 	if (!navigator.onLine) return 'Không có kết nối mạng.';
 	if (payload?.code === 'COMMUNITY_STANDARD_VIOLATION') {
-		const label = payload.whatViolated?.label || payload.moderation?.category || 'Vi phạm tiêu chuẩn cộng đồng';
-		const reason = payload.whatViolated?.reason || payload.moderation?.reason || serverMsg;
-		return `${payload.title || 'Nội dung chưa được gửi'}: ${label}. ${reason}`;
+		const category = payload.whatViolated?.category || payload.moderation?.category || 'unknown';
+		const label = moderationCategoryLabels[category] || moderationCategoryLabels.unknown || 'Vi phạm tiêu chuẩn cộng đồng';
+		const reason = translateApiMessage(
+			payload.whatViolated?.reason || payload.moderation?.reason || serverMsg,
+			'Nội dung không phù hợp với tiêu chuẩn cộng đồng.'
+		);
+		return `Nội dung chưa được gửi: ${label}. ${reason}`;
 	}
 	if (normalizedServerMsg.includes('not friends')) {
 		return 'Bạn chỉ có thể nhắn tin cho bạn bè. Hãy kết bạn trước khi gửi tin nhắn.';
@@ -45,11 +50,7 @@ function resolveErrorMessage(error: any): string {
 	if (normalizedServerMsg.includes('recipientid') || normalizedServerMsg.includes('conversationid')) {
 		return 'Thiếu thông tin người nhận. Vui lòng thử lại.';
 	}
-	if (serverMsg) return serverMsg;
-	if (status === 403) return 'Bạn không có quyền gửi tin nhắn tới người này.';
-	if (status === 413) return 'File quá lớn — vui lòng chọn file nhỏ hơn 10MB.';
-	if (status === 400) return 'Dữ liệu gửi lên không hợp lệ.';
-	return 'Đã xảy ra lỗi. Vui lòng thử lại.';
+	return getApiErrorMessage(error, 'Đã xảy ra lỗi. Vui lòng thử lại.');
 }
 
 function createChatError(error: any) {

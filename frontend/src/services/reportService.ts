@@ -1,4 +1,5 @@
 import api from "@/lib/axios";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 export type ReportReasonCategory =
   | "spam"
@@ -62,10 +63,7 @@ export interface MyReport {
 }
 
 function resolveReportError(error: any): string {
-  const serverMessage = error?.response?.data?.message;
-  if (serverMessage) return serverMessage;
-  if (!navigator.onLine) return "Không có kết nối mạng.";
-  return "Không thể gửi báo cáo. Vui lòng thử lại.";
+  return getApiErrorMessage(error, "Không thể gửi báo cáo. Vui lòng thử lại.");
 }
 
 export const reportService = {

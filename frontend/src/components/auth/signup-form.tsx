@@ -12,6 +12,7 @@ import { Link, useNavigate } from "react-router"
 import { useState } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { checkFieldFormat } from "@/lib/fieldFormat"
+import { getApiErrorField, getApiErrorMessage } from "@/lib/apiMessage"
 
 const signUpSchema = z.object({
   firstname: z.string().min(1, "Tên là bắt buộc"),
@@ -67,13 +68,16 @@ export function SignupForm({
       });
     } catch (error: any) {
       console.error("Sign up failed:", error);
-      const backendMsg = error.response?.data?.message || "Đăng ký thất bại.";
-      if (backendMsg.toLowerCase().includes("email")) {
-        setError("email", { type: "server", message: backendMsg });
-      } else if (backendMsg.toLowerCase().includes("password")) {
-        setError("password", { type: "server", message: backendMsg });
+      const message = getApiErrorMessage(error, "Đăng ký thất bại.");
+      const field = getApiErrorField(error);
+      if (field === "email") {
+        setError("email", { type: "server", message });
+      } else if (field === "password") {
+        setError("password", { type: "server", message });
+      } else if (field === "confirmPassword") {
+        setError("confirmPassword", { type: "server", message });
       } else {
-        setError("root", { type: "server", message: backendMsg });
+        setError("root", { type: "server", message });
       }
     }
   }

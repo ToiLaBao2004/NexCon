@@ -8,6 +8,7 @@ import type { CreateReminderPayload } from '@/types/reminder';
 import { buildMeetingUrl, extractMeetingCode } from '@/utils/meetingLink';
 import { toast } from 'sonner';
 import { meetingService } from '@/services/meetingService';
+import { getApiErrorMessage } from '@/lib/apiMessage';
 
 type Mode = 'select' | 'create' | 'join';
 
@@ -16,15 +17,6 @@ interface PreviewData {
     isRejoin?: boolean;
     isHostPreview?: boolean;
 }
-
-const getApiErrorMessage = (error: unknown, fallback = 'Không thể kết nối') => {
-    if (typeof error === 'object' && error !== null) {
-        const maybeError = error as { response?: { data?: { message?: string } } };
-        const message = maybeError.response?.data?.message;
-        if (message) return message;
-    }
-    return fallback;
-};
 
 const MeetPage = () => {
     const { user } = useAuthStore();
@@ -107,7 +99,7 @@ const MeetPage = () => {
                         } else {
                             toast.error('Đã có lỗi xảy ra, thử lại sau');
                         }
-                        setError(getApiErrorMessage(err));
+                        setError(getApiErrorMessage(err, 'Không thể kết nối'));
                     } finally {
                         setLoading(false);
                     }
@@ -202,7 +194,7 @@ const MeetPage = () => {
             } else {
                 toast.error('Đã có lỗi xảy ra, thử lại sau');
             }
-            setError(getApiErrorMessage(err));
+            setError(getApiErrorMessage(err, 'Không thể kết nối'));
         } finally {
             setLoading(false);
         }

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/stores/useAuthStore";
 import type { SessionInfo } from "@/types/authState";
 import { cn } from "@/lib/utils";
+import { getApiErrorField, getApiErrorMessage } from "@/lib/apiMessage";
 
 const changePasswordSchema = z.object({
     currentPassword: z.string().min(1, "Vui lòng nhập mật khẩu hiện tại"),
@@ -65,11 +66,16 @@ export function SecurityTab({ onForgotPassword }: SecurityTabProps) {
             reset();
             setView("overview");
         } catch (error: any) {
-            const backendMsg = error.response?.data?.message || "Đổi mật khẩu thất bại.";
-            if (backendMsg.toLowerCase().includes("hiện tại")) {
-                setError("currentPassword", { type: "server", message: backendMsg });
+            const message = getApiErrorMessage(error, "Đổi mật khẩu thất bại.");
+            const field = getApiErrorField(error);
+            if (field === "currentPassword") {
+                setError("currentPassword", { type: "server", message });
+            } else if (field === "newPassword" || field === "password") {
+                setError("newPassword", { type: "server", message });
+            } else if (field === "confirmPassword") {
+                setError("confirmNewPassword", { type: "server", message });
             } else {
-                setError("root", { type: "server", message: backendMsg });
+                setError("root", { type: "server", message });
             }
         }
     };
