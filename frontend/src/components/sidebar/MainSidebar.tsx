@@ -40,7 +40,7 @@ import { SettingsDialog } from "./SettingsDialog";
 import { UserStatusMenuItems } from "./UserStatusMenuItems";
 import { useSocketStore } from "@/stores/useSocketStore";
 import StatusBadge from "@/components/chat/StatusBadge";
-import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
+import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
 
 const MainSidebar = () => {
     const { user, signOut } = useAuthStore();
@@ -57,7 +57,6 @@ const MainSidebar = () => {
     const friendRequestCount = incomingRequests.length;
     const myPresence = getPresenceForUser(user?._id, userPresences, user?.presence ?? null, onlineUsers);
     const myBadgeStatus = getPresenceBadgeStatus(myPresence);
-    const myPresenceText = getPresenceText(myPresence);
 
     const unreadMessagesCount = conversations.reduce((acc, convo) => {
         if (!user) return acc;
@@ -93,6 +92,18 @@ const MainSidebar = () => {
         return location.pathname === path;
     };
 
+    const navItemClass = (active: boolean) => cn(
+        "h-16 w-full flex items-center justify-center transition-all duration-200 group relative cursor-pointer",
+        active
+            ? "bg-slate-100 dark:bg-white/10 text-black dark:text-white"
+            : "bg-transparent text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
+    );
+
+    const navIconClass = (active: boolean) => cn(
+        "h-[26px] w-[26px] transition-transform",
+        active ? "scale-100 text-[#0068ff]" : "scale-95 group-hover:scale-100"
+    );
+
     return (
         <aside
             onClick={handleSidebarClick}
@@ -124,17 +135,16 @@ const MainSidebar = () => {
                                     {myBadgeStatus && <StatusBadge status={myBadgeStatus} />}
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-80 ml-2" align="start" side="right" sideOffset={15}>
-                                <DropdownMenuLabel className="font-normal px-2 py-3">
+                            <DropdownMenuContent className="w-72 ml-2 overflow-hidden" align="start" side="right" sideOffset={15}>
+                                <DropdownMenuLabel className="font-normal px-2 py-2">
                                     <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10 rounded-lg">
+                                        <Avatar className="h-9 w-9 rounded-lg">
                                             <AvatarImage src={user?.avatarUrl} />
                                             <AvatarFallback>{user?.displayName?.charAt(0)}</AvatarFallback>
                                         </Avatar>
-                                        <div className="flex flex-col space-y-0.5">
+                                        <div className="flex min-w-0 flex-col justify-center">
                                             <p className="text-sm font-semibold leading-none">{user?.displayName}</p>
-                                            <p className="text-xs text-muted-foreground truncate w-60">{user?.email}</p>
-                                            <p className="text-xs text-muted-foreground truncate w-60">{myPresenceText}</p>
+                                            <p className="mt-1 w-52 truncate text-xs leading-4 text-foreground/70">{user?.email}</p>
                                         </div>
                                     </div>
                                 </DropdownMenuLabel>
@@ -142,22 +152,22 @@ const MainSidebar = () => {
                                 <DropdownMenuSeparator />
                                 <DropdownMenuGroup>
                                     <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => setIsProfileOpen(true)}>
-                                        <Users className="mr-2 h-4 w-4" />
+                                        <Users className="mr-2 h-4 w-4 text-foreground" />
                                         <span>Hồ sơ của tôi</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => setIsSettingsOpen(true)}>
-                                        <Settings className="mr-2 h-4 w-4" />
+                                        <Settings className="mr-2 h-4 w-4 text-foreground" />
                                         <span>Cài đặt</span>
                                     </DropdownMenuItem>
                                     <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => navigate("/moderation")}>
-                                        <ShieldAlert className="mr-2 h-4 w-4" />
+                                        <ShieldAlert className="mr-2 h-4 w-4 text-foreground" />
                                         <span>Vi phạm & khiếu nại</span>
                                     </DropdownMenuItem>
                                 </DropdownMenuGroup>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuGroup>
                                     <DropdownMenuItem className="cursor-pointer py-2 text-primary focus:text-primary" onSelect={(e) => { e.preventDefault(); toggleTheme(); }}>
-                                        {isDark ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
+                                        {isDark ? <Moon className="mr-2 h-4 w-4 text-foreground" /> : <Sun className="mr-2 h-4 w-4 text-foreground" />}
                                         <div className="flex-1 capitalize">{isDark ? "Tối" : "Sáng"}</div>
                                         <Switch checked={isDark} className="ml-2" />
                                     </DropdownMenuItem>
@@ -179,16 +189,11 @@ const MainSidebar = () => {
                                 <TooltipTrigger asChild>
                                     <div
                                         onClick={() => navigate(item.path)}
-                                        className={cn(
-                                            "h-16 w-full flex items-center justify-center transition-all duration-200 group relative cursor-pointer",
-                                            active
-                                                ? "bg-slate-100 dark:bg-white/10 text-black dark:text-white"
-                                                : "bg-transparent text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
-                                        )}
+                                        className={navItemClass(active)}
                                     >
                                         <item.icon 
                                             strokeWidth={1.5}
-                                            className={cn("h-[26px] w-[26px] transition-transform", active ? "scale-100 text-[#0068ff]" : "scale-95 group-hover:scale-100")} 
+                                            className={navIconClass(active)}
                                         />
                                         {item.badge > 0 && (
                                             <span className="absolute top-3 right-3 min-w-[1.1rem] h-4.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold border-2 border-white dark:border-[#081c36] px-1">
@@ -215,17 +220,15 @@ const MainSidebar = () => {
                                 <TooltipTrigger asChild>
                                     <div
                                         onClick={() => navigate(item.path)}
-                                        className={cn(
-                                            "h-16 w-full flex items-center justify-center transition-all duration-200 group relative cursor-pointer",
-                                            active
-                                                ? "bg-slate-100 dark:bg-white/10 text-black dark:text-white"
-                                                : "bg-transparent text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
-                                        )}
+                                        className={navItemClass(active)}
                                     >
                                         <item.icon 
                                             strokeWidth={1.5}
-                                            className={cn("h-[26px] w-[26px]", active && "text-[#0068ff]")} 
+                                            className={navIconClass(active)}
                                         />
+                                        {active && (
+                                            <div className="absolute left-0 w-1 h-8 bg-[#0068ff] rounded-r-full" />
+                                        )}
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" sideOffset={10}>{item.label}</TooltipContent>

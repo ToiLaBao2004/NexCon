@@ -169,6 +169,7 @@ export interface ChatState {
 
   // Sidebar
   activeSidebar: 'search' | 'info' | null;
+  infoSidebarOpen: boolean;
   setActiveSidebar: (sidebar: 'search' | 'info' | null) => void;
   searchResults: {
     items: Message[];
@@ -205,6 +206,7 @@ export interface SocketState {
   disconnectSocket: () => void;
   typingUsers: Record<string, string[]>;
   setTypingUser: (conversationId: string, userId: string, isTyping: boolean) => void;
+  clearTypingUsers: (conversationId?: string) => void;
   emitTyping: (conversationId: string) => void;
   emitStopTyping: (conversationId: string) => void;
 }

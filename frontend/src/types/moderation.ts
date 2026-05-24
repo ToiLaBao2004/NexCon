@@ -35,6 +35,16 @@ export interface ViolationHistoryItem {
   conversationId?: string | null;
   messageId?: string | null;
   reportId?: string | null;
+  metadata?: {
+    evidencePreview?: string;
+    messageSnapshot?: {
+      type?: string;
+      content?: string;
+      fileName?: string;
+      mimeType?: string;
+    } | null;
+    [key: string]: any;
+  } | null;
 }
 
 export interface AppealStatus {

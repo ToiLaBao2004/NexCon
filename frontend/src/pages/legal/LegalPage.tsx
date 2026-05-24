@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 type LegalPageType = "terms" | "community" | "privacy";
@@ -9,93 +10,214 @@ interface LegalPageProps {
   type: LegalPageType;
 }
 
-const legalContent: Record<LegalPageType, {
+type LegalSection = {
   title: string;
+  description?: string;
+  body: string[];
+};
+
+type LegalContent = {
+  title: string;
+  label: string;
   updatedAt: string;
   intro: string;
-  sections: Array<{ title: string; body: string[] }>;
-}> = {
+  summary: string[];
+  sections: LegalSection[];
+};
+
+const legalNav: Array<{ type: LegalPageType; label: string; to: string }> = [
+  { type: "terms", label: "Điều khoản sử dụng", to: "/terms" },
+  { type: "community", label: "Tiêu chuẩn cộng đồng", to: "/community-standards" },
+  { type: "privacy", label: "Chính sách quyền riêng tư", to: "/privacy" },
+];
+
+const legalContent: Record<LegalPageType, LegalContent> = {
   terms: {
-    title: "Điều khoản sử dụng",
-    updatedAt: "21/05/2026",
-    intro: "Các điều khoản này quy định cách bạn sử dụng NexCon và trách nhiệm của mỗi bên khi tham gia nền tảng.",
+    title: "Điều khoản sử dụng NexCon",
+    label: "Điều khoản",
+    updatedAt: "24/05/2026",
+    intro:
+      "Tài liệu này mô tả cách bạn có thể sử dụng NexCon, những cam kết của chúng tôi và trách nhiệm của bạn khi tham gia nền tảng.",
+    summary: [
+      "Bạn chịu trách nhiệm về tài khoản, nội dung mình gửi và cách mình tương tác với người khác.",
+      "NexCon có thể giới hạn nội dung hoặc tài khoản khi phát hiện hành vi gây hại, gian lận hoặc vi phạm pháp luật.",
+      "Các quyết định xử lý có thể dựa trên báo cáo người dùng, hệ thống tự động và kiểm tra của quản trị viên.",
+    ],
     sections: [
       {
-        title: "Tài khoản và bảo mật",
+        title: "1. Phạm vi áp dụng",
+        description:
+          "Điều khoản này áp dụng cho tài khoản, cuộc trò chuyện, nhóm, cuộc gọi, nhắc hẹn, thông báo và các tính năng khác do NexCon cung cấp.",
         body: [
-          "Bạn chịu trách nhiệm giữ an toàn thông tin đăng nhập và các thiết bị đang đăng nhập.",
-          "Không sử dụng tài khoản của người khác, giả mạo danh tính hoặc cố tình vượt qua biện pháp bảo mật.",
+          "Khi tạo tài khoản hoặc tiếp tục sử dụng NexCon, bạn xác nhận đã đọc, hiểu và đồng ý tuân thủ các điều khoản này.",
+          "Một số tính năng có thể có quy định bổ sung. Nếu có khác biệt, quy định dành riêng cho tính năng đó sẽ được ưu tiên trong phạm vi liên quan.",
+          "Chúng tôi có thể cập nhật điều khoản để phản ánh thay đổi về sản phẩm, yêu cầu an toàn hoặc quy định pháp luật. Phiên bản mới sẽ được hiển thị công khai trên NexCon.",
         ],
       },
       {
-        title: "Sử dụng dịch vụ",
+        title: "2. Tài khoản và bảo mật",
         body: [
-          "Không gửi nội dung vi phạm pháp luật, gây hại, quấy rối, lừa đảo hoặc xâm phạm quyền riêng tư của người khác.",
-          "NexCon có thể chặn nội dung, hạn chế tính năng hoặc khóa tài khoản khi phát hiện vi phạm rõ ràng.",
+          "Bạn cần cung cấp thông tin chính xác khi đăng ký, cập nhật hồ sơ và sử dụng tài khoản đúng với danh tính hoặc tư cách hợp pháp của mình.",
+          "Bạn chịu trách nhiệm bảo vệ mật khẩu, thiết bị đăng nhập và mọi hoạt động phát sinh từ tài khoản của mình.",
+          "Không được dùng tài khoản của người khác, tạo tài khoản để giả mạo, né hạn chế, quấy rối hoặc che giấu hành vi vi phạm.",
         ],
       },
       {
-        title: "Xử lý vi phạm",
+        title: "3. Cách sử dụng dịch vụ",
         body: [
-          "Các quyết định kiểm duyệt có thể dựa trên AI, báo cáo từ người dùng và xác nhận của admin.",
-          "Bạn có thể gửi khiếu nại khi cho rằng tài khoản bị khóa do nhầm lẫn.",
+          "Bạn có thể dùng NexCon để nhắn tin, gọi, tạo nhóm, nhắc hẹn và trao đổi thông tin một cách hợp pháp, tôn trọng và an toàn.",
+          "Bạn không được can thiệp vào hệ thống, phát tán mã độc, khai thác lỗi, thu thập dữ liệu trái phép hoặc làm gián đoạn trải nghiệm của người khác.",
+          "Bạn giữ quyền đối với nội dung mình tạo, nhưng cho phép NexCon xử lý nội dung đó trong phạm vi cần thiết để truyền tải, lưu trữ, đồng bộ, bảo mật và vận hành dịch vụ.",
+        ],
+      },
+      {
+        title: "4. Nội dung và hành vi không được chấp nhận",
+        body: [
+          "Không đăng, gửi hoặc chia sẻ nội dung lừa đảo, spam, mạo danh, xâm phạm quyền riêng tư, vi phạm sở hữu trí tuệ hoặc vi phạm pháp luật.",
+          "Không quấy rối, đe dọa, hạ nhục, kích động thù ghét, cổ vũ bạo lực, bóc lột trẻ em, gợi dục trái phép hoặc hướng dẫn tự hại.",
+          "Không lợi dụng tính năng báo cáo, khiếu nại hoặc nhóm trò chuyện để gây áp lực, trả đũa hoặc làm phiền người khác.",
+        ],
+      },
+      {
+        title: "5. Xử lý vi phạm",
+        body: [
+          "Tùy mức độ, NexCon có thể cảnh báo, ẩn hoặc chặn nội dung, hạn chế tính năng, tạm khóa hoặc chấm dứt tài khoản.",
+          "Khi có thể, chúng tôi sẽ hiển thị lý do xử lý và hướng dẫn bạn xem trạng thái, lịch sử vi phạm hoặc gửi khiếu nại.",
+          "Trong trường hợp có rủi ro pháp lý, an toàn hệ thống hoặc nguy cơ gây hại nghiêm trọng, NexCon có thể xử lý ngay mà không cần thông báo trước.",
+        ],
+      },
+      {
+        title: "6. Khiếu nại và hỗ trợ",
+        body: [
+          "Nếu bạn cho rằng quyết định xử lý là nhầm lẫn, bạn có thể gửi khiếu nại kèm thông tin giải thích rõ ràng.",
+          "NexCon sẽ xem xét dựa trên dữ liệu hiện có, ngữ cảnh báo cáo và mức độ ảnh hưởng đến cộng đồng.",
+          "Việc gửi khiếu nại không đảm bảo quyết định sẽ được thay đổi, nhưng giúp chúng tôi rà soát và cải thiện cách thực thi chính sách.",
         ],
       },
     ],
   },
   community: {
-    title: "Tiêu chuẩn cộng đồng",
-    updatedAt: "21/05/2026",
-    intro: "Tiêu chuẩn cộng đồng giúp NexCon giữ môi trường trò chuyện an toàn, tôn trọng và phù hợp với người dùng Việt Nam.",
+    title: "Tiêu chuẩn cộng đồng NexCon",
+    label: "Cộng đồng",
+    updatedAt: "24/05/2026",
+    intro:
+      "Tiêu chuẩn cộng đồng giúp NexCon duy trì không gian trò chuyện an toàn, văn minh và đáng tin cậy cho mọi thành viên.",
+    summary: [
+      "Nói chuyện thẳng thắn nhưng không công kích, đe dọa hoặc làm tổn hại người khác.",
+      "Không chia sẻ nội dung nguy hiểm, lừa đảo, xâm phạm riêng tư hoặc gây hại ngoài đời thực.",
+      "Báo cáo vi phạm cần trung thực, có ngữ cảnh và không dùng như công cụ quấy rối.",
+    ],
     sections: [
       {
-        title: "Nội dung bị cấm",
+        title: "1. Nguyên tắc chung",
+        description:
+          "NexCon khuyến khích trao đổi tự nhiên, nhưng quyền thể hiện ý kiến luôn đi cùng trách nhiệm bảo vệ sự an toàn của cộng đồng.",
         body: [
-          "Quấy rối, lăng mạ, hạ nhục, đe dọa, ngôn từ thù ghét hoặc công kích nhóm được bảo vệ.",
-          "Nội dung tình dục rõ ràng, grooming, bạo lực nghiêm trọng, tự hại, ma túy, vũ khí trong ngữ cảnh gây hại.",
-          "Lừa đảo, phishing, malware, giả mạo, spam gây hại hoặc liên kết dẫn đến nội dung nguy hiểm.",
+          "Hãy tôn trọng người đang trò chuyện với bạn, kể cả khi hai bên không đồng ý quan điểm.",
+          "Đặt ngữ cảnh rõ ràng khi thảo luận về chủ đề nhạy cảm, tin tức, cảnh báo rủi ro hoặc nội dung có thể gây hiểu nhầm.",
+          "Không dùng nhóm, tin nhắn riêng hoặc cuộc gọi để ép buộc, đe dọa, bêu xấu hoặc cô lập người khác.",
         ],
       },
       {
-        title: "Nội dung được phép",
+        title: "2. An toàn cá nhân",
         body: [
-          "Trao đổi đời thường, đùa nhẹ giữa bạn bè, nội dung giáo dục, tin tức hoặc báo cáo vi phạm có ngữ cảnh rõ ràng.",
-          "Nội dung mơ hồ hoặc thiếu bằng chứng sẽ không bị chặn chỉ vì AI không chắc chắn.",
+          "Không đe dọa bạo lực, cổ vũ hành vi gây hại, hướng dẫn tự hại hoặc khuyến khích người khác tự làm tổn thương.",
+          "Không chia sẻ nội dung bóc lột, gợi dục hoặc gây nguy hiểm cho trẻ vị thành niên dưới bất kỳ hình thức nào.",
+          "Không phát tán thông tin cá nhân của người khác như số điện thoại, địa chỉ, giấy tờ, tài khoản riêng tư hoặc hình ảnh nhạy cảm khi chưa được đồng ý.",
         ],
       },
       {
-        title: "Cách hệ thống phản ứng",
+        title: "3. Tôn trọng và chống quấy rối",
         body: [
-          "Tin nhắn chỉ bị chặn khi AI hoặc admin xác định rõ nội dung vi phạm.",
-          "Nếu AI lỗi, timeout, hết quota hoặc không đọc được nội dung, tin nhắn vẫn được cho gửi theo nguyên tắc fail-open.",
+          "Không lăng mạ, hạ nhục, miệt thị ngoại hình, giới tính, nguồn gốc, tôn giáo, tình trạng sức khỏe hoặc đặc điểm cá nhân của người khác.",
+          "Không kích động thù ghét, kêu gọi loại trừ, đe dọa hoặc tấn công một cá nhân hay nhóm người được bảo vệ.",
+          "Không gửi tin nhắn lặp lại, spam, gạ gẫm hoặc tiếp tục liên hệ khi người khác đã thể hiện rõ rằng họ không muốn.",
+        ],
+      },
+      {
+        title: "4. Gian lận, mạo danh và an ninh",
+        body: [
+          "Không mạo danh cá nhân, tổ chức, quản trị viên hoặc thương hiệu để lừa người khác tin vào thông tin sai lệch.",
+          "Không gửi liên kết phishing, mã độc, tệp nguy hiểm, hướng dẫn chiếm đoạt tài khoản hoặc nội dung nhằm né hệ thống bảo mật.",
+          "Không dùng NexCon để bán hàng cấm, kêu gọi đầu tư gian dối, lừa chuyển tiền hoặc dụ người khác cung cấp thông tin nhạy cảm.",
+        ],
+      },
+      {
+        title: "5. Nội dung được phép khi có ngữ cảnh",
+        body: [
+          "Bạn có thể thảo luận tin tức, giáo dục, cảnh báo lừa đảo, trải nghiệm cá nhân hoặc nội dung nhạy cảm nếu mục đích là cung cấp thông tin và không cổ vũ hành vi gây hại.",
+          "Trích dẫn nội dung vi phạm để báo cáo, phản biện hoặc cảnh báo cần đủ ngữ cảnh, không lan truyền thêm hình ảnh hoặc chi tiết không cần thiết.",
+          "Những câu đùa giữa bạn bè vẫn có thể bị xử lý nếu chúng đe dọa, làm nhục hoặc gây rủi ro rõ ràng cho người khác.",
+        ],
+      },
+      {
+        title: "6. Cách NexCon thực thi tiêu chuẩn",
+        body: [
+          "Hệ thống có thể dùng tín hiệu tự động, báo cáo từ người dùng và kiểm tra của quản trị viên để phát hiện nội dung vi phạm.",
+          "Một nội dung không tự động bị xử lý chỉ vì có nhiều báo cáo; quyết định sẽ dựa trên chính sách, bằng chứng và ngữ cảnh.",
+          "Nếu quyết định bị sai, bạn có thể khiếu nại. Việc khiếu nại rõ ràng, lịch sự và có thông tin cụ thể sẽ giúp quá trình xem xét chính xác hơn.",
         ],
       },
     ],
   },
   privacy: {
-    title: "Chính sách quyền riêng tư",
-    updatedAt: "21/05/2026",
-    intro: "Chính sách này mô tả dữ liệu NexCon xử lý để vận hành tài khoản, chat, thông báo, bảo mật và kiểm duyệt.",
+    title: "Chính sách quyền riêng tư NexCon",
+    label: "Quyền riêng tư",
+    updatedAt: "24/05/2026",
+    intro:
+      "Chính sách này giải thích những dữ liệu NexCon xử lý, lý do xử lý và các lựa chọn giúp bạn kiểm soát trải nghiệm của mình.",
+    summary: [
+      "NexCon chỉ xử lý dữ liệu cần thiết để cung cấp dịch vụ, bảo mật tài khoản, đồng bộ nội dung và hỗ trợ người dùng.",
+      "Dữ liệu báo cáo và kiểm duyệt được dùng để đánh giá vi phạm, bảo vệ cộng đồng và xử lý khiếu nại.",
+      "Bạn có thể quản lý thông tin tài khoản, quyền riêng tư trong cuộc trò chuyện và yêu cầu hỗ trợ khi cần.",
+    ],
     sections: [
       {
-        title: "Dữ liệu chúng tôi xử lý",
+        title: "1. Dữ liệu bạn cung cấp",
         body: [
-          "Thông tin tài khoản, hồ sơ, phiên đăng nhập, thiết bị, nội dung bạn gửi và dữ liệu cần thiết để báo cáo/kiểm duyệt.",
-          "Khi có báo cáo hoặc AI phát hiện vi phạm, hệ thống có thể lưu lý do, thời điểm và ngữ cảnh kiểm duyệt.",
+          "Thông tin đăng ký và hồ sơ như tên hiển thị, ảnh đại diện, email hoặc thông tin cần thiết để xác thực tài khoản.",
+          "Nội dung bạn chủ động tạo hoặc gửi, bao gồm tin nhắn, tệp, hình ảnh, thông tin nhóm, nhắc hẹn, phản hồi và nội dung báo cáo.",
+          "Thông tin bạn gửi cho đội ngũ hỗ trợ, chẳng hạn mô tả sự cố, khiếu nại, bằng chứng hoặc yêu cầu liên quan đến tài khoản.",
         ],
       },
       {
-        title: "Mục đích sử dụng",
+        title: "2. Dữ liệu được tạo khi sử dụng NexCon",
         body: [
-          "Cung cấp tính năng chat, cuộc gọi, nhắc hẹn, thông báo, bảo mật phiên đăng nhập và hỗ trợ người dùng.",
-          "Phát hiện hành vi gây hại, xử lý báo cáo, chống spam/lừa đảo và cải thiện an toàn cộng đồng.",
+          "Dữ liệu kỹ thuật như phiên đăng nhập, thiết bị, địa chỉ mạng, thời điểm hoạt động, trạng thái kết nối và lỗi hệ thống.",
+          "Dữ liệu tương tác như cuộc trò chuyện đã tham gia, thông báo, lượt đọc, thao tác với nhóm và các tùy chọn bạn thiết lập.",
+          "Dữ liệu an toàn như lý do báo cáo, trạng thái xử lý, lịch sử vi phạm, quyết định khiếu nại và ngữ cảnh cần thiết để kiểm duyệt.",
         ],
       },
       {
-        title: "Quyền của bạn",
+        title: "3. Mục đích sử dụng dữ liệu",
         body: [
-          "Bạn có thể xem lịch sử báo cáo, lịch sử vi phạm và gửi khiếu nại khi tài khoản bị khóa.",
-          "Bạn nên tránh chia sẻ thông tin nhạy cảm trong cuộc trò chuyện nếu không thật sự cần thiết.",
+          "Vận hành các tính năng chính: nhắn tin, gọi, nhóm, nhắc hẹn, thông báo, tìm kiếm, đồng bộ thiết bị và quản lý tài khoản.",
+          "Bảo vệ người dùng khỏi spam, lừa đảo, truy cập trái phép, mạo danh, nội dung gây hại và hành vi phá hoại hệ thống.",
+          "Cải thiện chất lượng dịch vụ, sửa lỗi, đo độ ổn định, hỗ trợ người dùng và phát triển tính năng phù hợp hơn.",
+        ],
+      },
+      {
+        title: "4. Chia sẻ và truy cập dữ liệu",
+        body: [
+          "NexCon không bán thông tin cá nhân của bạn.",
+          "Dữ liệu chỉ được truy cập bởi hệ thống hoặc nhân sự có trách nhiệm khi cần vận hành dịch vụ, xử lý báo cáo, hỗ trợ kỹ thuật hoặc đáp ứng yêu cầu hợp lệ từ cơ quan có thẩm quyền.",
+          "Khi dùng dịch vụ bên thứ ba tích hợp với NexCon, dữ liệu bạn chia sẻ với bên đó sẽ chịu chính sách riêng của họ.",
+        ],
+      },
+      {
+        title: "5. Lưu trữ và bảo vệ",
+        body: [
+          "Dữ liệu được lưu trong thời gian cần thiết để cung cấp dịch vụ, bảo vệ an toàn, tuân thủ nghĩa vụ pháp lý hoặc giải quyết tranh chấp.",
+          "Chúng tôi áp dụng biện pháp kỹ thuật và quy trình nội bộ để giảm rủi ro truy cập trái phép, mất mát hoặc sử dụng sai mục đích.",
+          "Không có hệ thống nào an toàn tuyệt đối, vì vậy bạn nên bảo vệ mật khẩu, kiểm tra thiết bị đăng nhập và cẩn trọng khi chia sẻ thông tin nhạy cảm.",
+        ],
+      },
+      {
+        title: "6. Quyền và lựa chọn của bạn",
+        body: [
+          "Bạn có thể cập nhật hồ sơ, điều chỉnh cài đặt riêng tư, rời nhóm, tắt thông báo hoặc quản lý cách người khác tương tác với mình trong phạm vi tính năng hiện có.",
+          "Bạn có thể xem trạng thái báo cáo, lịch sử vi phạm và gửi khiếu nại nếu cho rằng quyết định xử lý chưa chính xác.",
+          "Khi cần hỗ trợ về dữ liệu cá nhân hoặc tài khoản, hãy gửi yêu cầu với thông tin đủ rõ để chúng tôi xác minh và phản hồi phù hợp.",
         ],
       },
     ],
@@ -115,21 +237,24 @@ export default function LegalPage({ type }: LegalPageProps) {
   const returnPath = fromPath || fallbackPath;
   const linkState = fromPath ? { from: fromPath } : undefined;
 
+  const handleBack = () => {
+    if (fromPath) {
+      navigate(fromPath);
+      return;
+    }
+
+    navigate(returnPath);
+  };
+
   return (
-    <main className="min-h-svh bg-background px-4 py-6 text-foreground md:px-8">
-      <div className="mx-auto max-w-4xl">
-        <header className="mb-5 flex items-center justify-between gap-3">
+    <main className="flex h-svh min-h-0 bg-background px-4 py-6 text-foreground md:px-8">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col">
+        <header className="mb-5 flex shrink-0 items-center justify-between gap-3">
           <Button
             type="button"
-            variant="ghost"
             size="sm"
-            onClick={() => {
-              if (fromPath) {
-                navigate(fromPath);
-                return;
-              }
-              navigate(returnPath);
-            }}
+            className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+            onClick={handleBack}
           >
             <ArrowLeft className="size-4" />
             Quay lại
@@ -139,39 +264,77 @@ export default function LegalPage({ type }: LegalPageProps) {
           </Link>
         </header>
 
-        <section className="rounded-md border border-border/70 bg-card p-5 shadow-sm md:p-7">
-          <div className="mb-5 flex items-start gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <ShieldCheck className="size-5" />
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/70 bg-card shadow-sm">
+          <div className="shrink-0 border-b border-border/70 px-5 py-6 md:px-8 md:py-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {content.label}
+              </span>
+              <span className="rounded-full border border-border/70 px-3 py-1 text-xs font-semibold text-foreground">
+                Cập nhật {content.updatedAt}
+              </span>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Cập nhật: {content.updatedAt}</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight md:text-3xl">{content.title}</h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">{content.intro}</p>
-            </div>
+
+            <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-foreground md:text-[40px]">
+              {content.title}
+            </h1>
           </div>
 
-          <div className="grid gap-4">
-            {content.sections.map((section) => (
-              <section key={section.title} className="rounded-md border border-border/70 bg-background p-4">
-                <h2 className="text-base font-semibold">{section.title}</h2>
-                <ul className="mt-3 grid gap-2 text-sm leading-6 text-muted-foreground">
-                  {section.body.map((item) => (
-                    <li key={item} className="flex gap-2">
-                      <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+          <nav className="flex shrink-0 flex-wrap gap-4 border-b border-border/70 px-5 md:px-8">
+            {legalNav.map((item) => (
+              <Link
+                key={item.type}
+                to={item.to}
+                state={linkState}
+                className={cn(
+                  "relative h-12 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity",
+                  item.type === type
+                    ? "font-semibold after:opacity-100"
+                    : "font-normal after:opacity-0 hover:text-foreground/80"
+                )}
+              >
+                <span className="flex h-full items-center">{item.label}</span>
+              </Link>
             ))}
-          </div>
+          </nav>
 
-          <footer className="mt-6 flex flex-wrap gap-3 border-t border-border/70 pt-4 text-sm">
-            <Link className="text-primary hover:underline" to="/terms" state={linkState}>Điều khoản sử dụng</Link>
-            <Link className="text-primary hover:underline" to="/community-standards" state={linkState}>Tiêu chuẩn cộng đồng</Link>
-            <Link className="text-primary hover:underline" to="/privacy" state={linkState}>Chính sách quyền riêng tư</Link>
-          </footer>
+          <div className="grid min-h-0 flex-1 gap-6 px-5 py-6 md:px-8 lg:grid-cols-[280px_minmax(0,1fr)]">
+            <aside className="min-h-0 self-start">
+              <div className="rounded-md border border-border/70 bg-background p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Tóm tắt chính</p>
+                <div className="mt-4 grid gap-3">
+                  {content.summary.map((item, index) => (
+                    <div key={item} className="flex gap-3">
+                      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                        {index + 1}
+                      </span>
+                      <p className="text-sm leading-6 text-foreground">{item}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </aside>
+
+            <div className="beautiful-scrollbar min-h-0 overflow-y-auto pr-1">
+              <div className="grid gap-4">
+              {content.sections.map((section) => (
+                <section key={section.title} className="rounded-md border border-border/70 bg-background p-5">
+                  <h2 className="text-lg font-semibold leading-7 text-foreground">{section.title}</h2>
+                  {section.description && (
+                    <p className="mt-2 text-sm leading-6 text-foreground">{section.description}</p>
+                  )}
+                  <div className="mt-4 grid gap-3">
+                    {section.body.map((item) => (
+                      <p key={item} className="border-l-2 border-primary/70 pl-3 text-sm leading-6 text-foreground">
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </section>
+              ))}
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     </main>

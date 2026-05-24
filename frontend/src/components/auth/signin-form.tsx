@@ -29,6 +29,9 @@ const APPEAL_REASON_MIN_LENGTH = 20
 
 type SignInFormValues = z.infer<typeof signInSchema>
 
+const legalLinkClass =
+  "font-normal text-primary underline underline-offset-4 decoration-primary/40 transition-colors hover:text-primary/80 hover:decoration-primary"
+
 export function SigninForm({
   className,
   ...props
@@ -305,9 +308,10 @@ export function SigninForm({
           </div>
         </CardContent>
       </Card>
-      <div className="text-xs text-center px-6 text-slate-600 dark:text-white/85 [a]:font-semibold [a]:text-primary dark:[a]:text-cyan-200 [a]:underline [a]:underline-offset-4 [a]:hover:text-primary/80 dark:[a]:hover:text-white text-balance">
-        Bằng cách nhấp vào tiếp tục, bạn đồng ý với <Link to="/terms">Điều khoản sử dụng</Link>,{" "}
-        <Link to="/community-standards">Tiêu chuẩn cộng đồng</Link> và <Link to="/privacy">Chính sách quyền riêng tư</Link>.
+      <div className="px-6 text-center text-xs leading-5 text-slate-600 text-balance dark:text-white/85">
+        Khi tiếp tục sử dụng NexCon, bạn đồng ý với <Link className={legalLinkClass} to="/terms">Điều khoản sử dụng</Link>,{" "}
+        <Link className={legalLinkClass} to="/community-standards">Tiêu chuẩn cộng đồng</Link> và{" "}
+        <Link className={legalLinkClass} to="/privacy">Chính sách quyền riêng tư</Link>.
       </div>
     </div>
   )

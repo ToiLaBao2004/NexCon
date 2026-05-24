@@ -44,6 +44,8 @@ const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewRespon
 /* ── Custom audio player for voice messages ─────────────────────────────────── */
 const AUDIO_BAR_COUNT = 32;
 const MAX_VISIBLE_SEEN_AVATARS = 8;
+const singleImageFrameClass = "relative h-auto w-[280px] max-w-[70vw] aspect-[14/9] overflow-hidden rounded-xl bg-muted";
+const imagePreviewClass = "h-full w-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity";
 
 function MentionChip({ children, isOwn }: { children: React.ReactNode; isOwn: boolean }) {
 	return (
@@ -556,7 +558,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				{message.filePublicId ? (
 					<button
 						type="button"
-						className="relative p-0 border-0 bg-transparent cursor-zoom-in"
+						className={cn(singleImageFrameClass, "border-0 p-0 cursor-zoom-in")}
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
 								messageId: message._id,
@@ -569,7 +571,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<SecureImage
 							messageId={message._id}
 							alt={message.fileName ?? "image"}
-							className="max-w-[280px] max-h-[340px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+							className={imagePreviewClass}
 						/>
 						{uploadOverlay}
 						{errorBadge}
@@ -577,7 +579,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				) : (
 					<button
 						type="button"
-						className="relative p-0 border-0 bg-transparent cursor-zoom-in"
+						className={cn(singleImageFrameClass, "border-0 p-0 cursor-zoom-in")}
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
 								messageId: message._id,
@@ -591,7 +593,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<img
 							src={message.fileUrl!}
 							alt={message.fileName ?? "image"}
-							className="max-w-[280px] max-h-[340px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+							className={imagePreviewClass}
 						/>
 						{uploadOverlay}
 						{errorBadge}
@@ -805,13 +807,13 @@ function ReplyQuoteInline({
 						<SecureImage
 							messageId={replyTo._id}
 							alt="reply-thumbnail"
-							className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+							className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
 						/>
 					) : (
 						<img
 							src={replyTo.fileUrl!}
 							alt="reply-thumbnail"
-							className="w-8 h-8 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+							className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
 						/>
 					)
 				) : null}
@@ -827,7 +829,7 @@ function ReplyQuoteInline({
 					<CachedStickerImage
 						src={replyTo.content}
 						alt="reply-sticker-thumbnail"
-						className="w-8 h-8 rounded-md object-contain bg-white/10 border border-blue-200 dark:border-blue-400"
+						className="size-6 rounded-md object-contain bg-white/10 border border-blue-200 dark:border-blue-400"
 					/>
 				)}
 				<span className="flex items-center gap-1">
@@ -861,13 +863,11 @@ function ReplyQuoteInline({
 	return (
 		<div
 			className={cn(
-				"-mb-5 cursor-pointer transition-colors",
-				"border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30",
-				"px-3 py-1.5 rounded-xl shadow-sm",
-				"flex flex-col gap-0",
-				isOwn ? "border-emerald-500/60 bg-emerald-500/20" : "border-blue-500",
+				"mb-1 w-fit max-w-full min-w-0 self-start cursor-pointer rounded-xl border px-2 py-1.5 shadow-sm transition-colors",
+				isOwn
+					? "border-white/25 bg-white/20 text-white/90 hover:bg-white/25 dark:border-white/20 dark:bg-white/15 dark:hover:bg-white/20"
+					: "border-slate-200/80 bg-slate-100/75 text-slate-900 hover:bg-slate-100 dark:border-slate-700/70 dark:bg-slate-900/55 dark:text-slate-50 dark:hover:bg-slate-900/75",
 			)}
-			style={{ boxShadow: "0 2px 8px 0 rgba(0, 120, 255, 0.08)" }}
 			onClick={async (e) => {
 				e.stopPropagation();
 				const el = document.getElementById(`message-${replyTo._id}`);
@@ -881,25 +881,34 @@ function ReplyQuoteInline({
 				}
 			}}
 		>
-			{senderName && (
+			<div className="flex min-w-0 max-w-[240px] gap-1.5">
 				<span
 					className={cn(
-						"block text-[12px] sm:text-[13px] font-semibold truncate leading-snug mb-0.5",
-						isOwn ? "text-white" : "text-blue-700 dark:text-blue-300",
+						"mt-0.5 w-[3px] self-stretch rounded-full",
+						isOwn ? "bg-emerald-200/80 dark:bg-emerald-300/75" : "bg-blue-500"
 					)}
-				>
-					{senderName}
-				</span>
-			)}
-			<span
-				className={cn(
-					"block truncate text-[12px] sm:text-[13px] leading-snug",
-					senderName ? "mt-px" : "",
-					isOwn ? "text-white/70" : "text-blue-900 dark:text-blue-100",
-				)}
-			>
-				{preview}
-			</span>
+				/>
+				<div className="min-w-0 flex-1">
+					{senderName && (
+						<span
+							className={cn(
+								"block truncate text-[12px] font-semibold leading-tight",
+								isOwn ? "text-white/90" : "text-slate-900 dark:text-slate-50"
+							)}
+						>
+							{senderName}
+						</span>
+					)}
+					<span
+						className={cn(
+							"mt-0.5 block truncate text-[11.5px] leading-tight sm:text-[12px]",
+							isOwn ? "text-white/65" : "text-slate-600 dark:text-slate-300"
+						)}
+					>
+						{preview}
+					</span>
+				</div>
+			</div>
 		</div>
 	);
 }
@@ -2088,6 +2097,17 @@ const MessageItem = ({
 			return (senderObj ? senderObj._id : msg.senderId)?.toString?.() ?? "";
 		};
 
+		const latestSentIndexBySender = new Map<string, number>();
+		messages.forEach((msg, idx) => {
+			if (msg.type === "system" && msg.systemType !== "call") return;
+			if (msg.status && msg.status !== "sent") return;
+
+			const senderId = resolveSenderId(msg);
+			if (senderId) {
+				latestSentIndexBySender.set(senderId, idx);
+			}
+		});
+
 		for (const p of selectedConvo.participants) {
 			const pid = p.userId?._id?.toString();
 			if (!pid || pid === currentUserIdStr) continue;
@@ -2097,15 +2117,23 @@ const MessageItem = ({
 			if (lastReadIndex === undefined) continue;
 
 			let targetMessageId: string | null = null;
+			let targetMessageIndex = -1;
 			for (let i = lastReadIndex; i >= 0; i -= 1) {
 				const msg = messages[i];
-				if (!(msg.type === "system" && msg.systemType !== "call") && resolveSenderId(msg) === currentUserIdStr) {
+				if (msg.type === "system" && msg.systemType !== "call") continue;
+				if (resolveSenderId(msg) === pid) continue;
+
+				if (!msg.status || msg.status === "sent") {
 					targetMessageId = msg._id;
+					targetMessageIndex = i;
 					break;
 				}
 			}
 
 			if (!targetMessageId) continue;
+			const latestSentIndex = latestSentIndexBySender.get(pid);
+			if (latestSentIndex !== undefined && latestSentIndex > targetMessageIndex) continue;
+
 			if (!map[targetMessageId]) map[targetMessageId] = [];
 			map[targetMessageId].push({
 				_id: pid,
@@ -2381,7 +2409,7 @@ const MessageItem = ({
 					<div className={cn("relative", reactionSummary && "mb-3.5")}>
 						<Card
 							className={cn(
-								"shadow-sm overflow-hidden w-fit",
+								"shadow-sm overflow-hidden w-fit gap-0",
 								isOwn && "ms-auto",
 								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[14px] leading-relaxed sm:text-[15px]" : "px-4 py-2.5 text-[14px] leading-relaxed sm:text-[15px]"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
@@ -2411,8 +2439,8 @@ const MessageItem = ({
 									<span>Đã chuyển tiếp tin nhắn</span>
 								</div>
 							)}
-							<div className="flex flex-col gap-0.5 w-fit">
-								<div className="w-fit">
+							<div className="flex w-full min-w-0 flex-col gap-1">
+								<div className="w-fit max-w-full">
 									<MessageContent
 										message={message}
 										isOwn={isOwn}
@@ -2424,9 +2452,9 @@ const MessageItem = ({
 
 								{!isVisualOnly && showTimestamp && (
 									<div className={cn(
-										"flex items-center gap-1 select-none -mt-0.5 pb-1",
-										isOwn ? "self-end" : "self-start",
-										(isOwn && !isLink) ? "text-white/60" : "text-muted-foreground/60"
+										"flex w-full items-end gap-2 select-none",
+										showSmartReminderButton ? "justify-between" : "justify-start",
+										(isOwn && !isLink) ? "text-white/65" : "text-foreground/65"
 									)}>
 										{/* ── Smart Reminder Button ─────────────────────────────────────────── */}
 										{showSmartReminderButton && (
@@ -2437,11 +2465,11 @@ const MessageItem = ({
 												disabled={isBlocked}
 											/>
 										)}
-										<span className="text-[13px] font-medium leading-none whitespace-nowrap sm:text-sm">
+										<span className="shrink-0 whitespace-nowrap text-[10.5px] font-normal leading-none tabular-nums tracking-normal">
 											{formatMessageTime(new Date(message.createdAt))}
 										</span>
 										{isOwn && message.status === "error" && (
-											<AlertCircle className="size-2.5 text-red-300" />
+											<AlertCircle className="size-2.5 shrink-0 text-red-300" />
 										)}
 									</div>
 								)}
@@ -2810,13 +2838,19 @@ const MessageItem = ({
 				</div>
 			</div>
 
-			{isOwn && (!message.status || message.status === "sent") && (
+			{(!message.status || message.status === "sent") && (
 				seenUsersForThisMessage.length > 0 ? (
 					isCoarsePointer ? (
-						<div className="mt-0.5 mx-3 flex justify-end">
+						<div className={cn(
+							"mt-0.5 flex",
+							isOwn ? "mx-3 justify-end" : "ml-[60px] mr-3 justify-start"
+						)}>
 							<button
 								type="button"
-								className="flex min-h-7 items-center justify-end -space-x-1 rounded-full px-1.5 py-1 active:bg-muted/70"
+								className={cn(
+									"flex min-h-7 items-center -space-x-1 rounded-full py-1 active:bg-muted/70",
+									isOwn ? "justify-end px-1.5" : "justify-start pl-0 pr-1.5"
+								)}
 								aria-label={`Xem ${seenUsersForThisMessage.length} người đã xem tin nhắn`}
 								onClick={() => setShowSeenUsersDialog(true)}
 							>
@@ -2838,7 +2872,10 @@ const MessageItem = ({
 						</div>
 					) : (
 						<TooltipProvider delayDuration={120}>
-							<div className="flex items-center justify-end -space-x-1 mt-0.5 mx-3">
+							<div className={cn(
+								"flex items-center -space-x-1 mt-0.5",
+								isOwn ? "mx-3 justify-end" : "ml-[60px] mr-3 justify-start"
+							)}>
 								{visibleSeenUsers.map((seenUser) => (
 									<Tooltip key={seenUser._id}>
 										<TooltipTrigger asChild>
@@ -2864,7 +2901,7 @@ const MessageItem = ({
 										</TooltipTrigger>
 										<TooltipContent side="top" sideOffset={6} className="max-w-56 text-left">
 											<div className="mb-1 text-[12px] sm:text-[13px] font-semibold text-background/80">Đã xem bởi</div>
-											<div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto pr-1">
+											<div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto beautiful-scrollbar pr-1">
 												{seenUsersForThisMessage.map((seenUser) => (
 													<span key={seenUser._id}>{seenUser.displayName}</span>
 												))}
@@ -2906,7 +2943,7 @@ const MessageItem = ({
 							{seenUsersForThisMessage.length} người đã xem tin nhắn này
 						</p>
 					</DialogHeader>
-					<div className="max-h-[60vh] overflow-y-auto px-5 pb-5">
+					<div className="max-h-[60vh] overflow-y-auto beautiful-scrollbar px-5 pb-5">
 						<div className="flex flex-col gap-2">
 							{seenUsersForThisMessage.map((seenUser) => (
 								<div key={seenUser._id} className="flex items-center gap-3 rounded-xl px-1 py-1.5">

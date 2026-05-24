@@ -258,7 +258,7 @@ export default function ReminderFormModal({
                 ? 'Tùy chỉnh thông báo cá nhân'
                 : 'Chỉnh sửa nhắc nhở'}
           </DialogTitle>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-1.5 text-sm leading-relaxed text-foreground">
             {isNotifyOnlyEdit
               ? 'Bạn chỉ thay đổi kênh thông báo cho tài khoản của mình, không ảnh hưởng thành viên khác.'
               : 'Đặt thời gian phù hợp để không bỏ lỡ công việc quan trọng.'}

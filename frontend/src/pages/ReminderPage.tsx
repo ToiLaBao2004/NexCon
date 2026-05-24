@@ -942,46 +942,46 @@ const ReminderPage = () => {
                 )}
 
                 <div className="mt-5 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <div className="inline-flex max-w-full items-center rounded-xl border border-border/60 bg-muted/40 p-1">
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
+                        <div className="flex max-w-full items-center gap-4">
                             <button
                                 type="button"
-                                className={`h-9 rounded-lg px-3 text-sm transition-colors sm:px-4 ${activeTab === 'all' ? 'bg-background text-foreground shadow-sm font-semibold' : 'text-foreground/75 hover:text-foreground hover:bg-background/50'}`}
+                                className={`relative h-8 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${activeTab === 'all' ? 'font-semibold after:opacity-100' : 'font-normal after:opacity-0 hover:text-foreground/80'}`}
                                 onClick={() => setActiveTab('all')}
                             >
                                 Tất cả
                             </button>
                             <button
                                 type="button"
-                                className={`h-9 rounded-lg px-3 text-sm transition-colors sm:px-4 ${activeTab === 'upcoming' ? 'bg-background text-foreground shadow-sm font-semibold' : 'text-foreground/75 hover:text-foreground hover:bg-background/50'}`}
+                                className={`relative h-8 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${activeTab === 'upcoming' ? 'font-semibold after:opacity-100' : 'font-normal after:opacity-0 hover:text-foreground/80'}`}
                                 onClick={() => setActiveTab('upcoming')}
                             >
                                 Sắp tới
                             </button>
                             <button
                                 type="button"
-                                className={`h-9 rounded-lg px-3 text-sm transition-colors sm:px-4 ${activeTab === 'past' ? 'bg-background text-foreground shadow-sm font-semibold' : 'text-foreground/75 hover:text-foreground hover:bg-background/50'}`}
+                                className={`relative h-8 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${activeTab === 'past' ? 'font-semibold after:opacity-100' : 'font-normal after:opacity-0 hover:text-foreground/80'}`}
                                 onClick={() => setActiveTab('past')}
                             >
                                 Đã qua
                             </button>
                         </div>
 
-                        <div className="inline-flex max-w-full items-center rounded-xl border border-border/60 bg-muted/40 p-1">
+                        <div className="flex max-w-full items-center gap-4">
                             <button
                                 type="button"
-                                className={`flex h-9 items-center rounded-lg px-3 text-sm transition-colors sm:px-4 ${viewMode === 'list' ? 'bg-background text-foreground shadow-sm font-semibold' : 'text-foreground/75 hover:text-foreground hover:bg-background/50'}`}
+                                className={`relative flex h-8 items-center px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${viewMode === 'list' ? 'font-semibold after:opacity-100' : 'font-normal after:opacity-0 hover:text-foreground/80'}`}
                                 onClick={() => setViewMode('list')}
                             >
-                                <LayoutList className={`h-4 w-4 transition-colors sm:mr-2 ${viewMode === 'list' ? 'text-foreground' : 'text-foreground/75'}`} strokeWidth={1.65} />
+                                <LayoutList className="h-4 w-4 transition-colors sm:mr-2" strokeWidth={1.65} />
                                 <span className="hidden sm:inline">Danh sách</span>
                             </button>
                             <button
                                 type="button"
-                                className={`flex h-9 items-center rounded-lg px-3 text-sm transition-colors sm:px-4 ${viewMode === 'calendar' ? 'bg-background text-foreground shadow-sm font-semibold' : 'text-foreground/75 hover:text-foreground hover:bg-background/50'}`}
+                                className={`relative flex h-8 items-center px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${viewMode === 'calendar' ? 'font-semibold after:opacity-100' : 'font-normal after:opacity-0 hover:text-foreground/80'}`}
                                 onClick={() => setViewMode('calendar')}
                             >
-                                <CalendarRange className={`h-4 w-4 transition-colors sm:mr-2 ${viewMode === 'calendar' ? 'text-foreground' : 'text-foreground/75'}`} strokeWidth={1.65} />
+                                <CalendarRange className="h-4 w-4 transition-colors sm:mr-2" strokeWidth={1.65} />
                                 <span className="hidden sm:inline">Lịch biểu</span>
                             </button>
                         </div>

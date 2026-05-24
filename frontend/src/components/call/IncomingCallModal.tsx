@@ -230,7 +230,7 @@ const IncomingCallModal = ({
             <p className="text-xs font-medium uppercase text-muted-foreground">
               {visibleQueuedCalls.length} cuộc gọi khác đang chờ
             </p>
-            <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
+            <div className="mt-2 max-h-44 space-y-2 overflow-y-auto beautiful-scrollbar pr-1">
               {visibleQueuedCalls.map((call) => (
                 <div
                   key={call.roomName}

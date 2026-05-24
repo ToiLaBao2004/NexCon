@@ -1,4 +1,3 @@
-import { Bell } from "lucide-react";
 import { usePushNotification } from "@/hooks/usePushNotification";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -45,14 +44,6 @@ export function NotificationTab() {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <div>
-                <div className="flex items-center gap-2">
-                    <Bell className="h-5 w-5 text-primary" />
-                    <h3 className="text-[18px] font-semibold tracking-tight">Thông báo</h3>
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">Quản lý thông báo đẩy cho trình duyệt hiện tại.</p>
-            </div>
-
             <div className="rounded-2xl border border-border/60 bg-card/80 p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-4">
                     <div className="space-y-1">

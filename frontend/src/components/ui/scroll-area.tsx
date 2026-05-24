@@ -16,10 +16,10 @@ function ScrollArea({
 }: ScrollAreaProps) {
   const orientationClass =
     orientation === "horizontal"
-      ? "overflow-x-auto overflow-y-hidden"
+      ? "overflow-x-auto overflow-y-hidden beautiful-scrollbar"
       : orientation === "both"
-        ? "overflow-auto"
-        : "overflow-y-auto overflow-x-hidden"
+        ? "overflow-auto beautiful-scrollbar"
+        : "overflow-y-auto overflow-x-hidden beautiful-scrollbar"
 
   return (
     <div

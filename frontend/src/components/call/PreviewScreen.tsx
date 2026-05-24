@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, MicOff, Video, VideoOff } from 'lucide-react';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useMeetStore } from '@/stores/useMeetStore';
-import { nameToColor } from '@/lib/utils';
+import { getAvatarSrc } from '@/lib/avatar';
 
 interface PreviewScreenProps {
   roomName: string;
@@ -29,7 +29,6 @@ const PreviewScreen = ({
   const currentMeeting = useMeetStore((state) => state.currentMeeting);
   const fetchMeetingInfo = useMeetStore((state) => state.fetchMeetingInfo);
   const displayName = user?.displayName || 'Khách';
-  const initial = displayName.charAt(0).toUpperCase();
 
   useEffect(() => {
     if (!roomName) return;
@@ -120,7 +119,7 @@ const PreviewScreen = ({
   };
 
   return (
-    <div className="flex h-full flex-1 items-center justify-center overflow-auto bg-background px-3 py-4 md:px-6 md:py-6">
+    <div className="flex h-full flex-1 items-center justify-center overflow-auto beautiful-scrollbar bg-background px-3 py-4 md:px-6 md:py-6">
       <div className="w-full max-w-[1120px] rounded-2xl border border-border/60 bg-card/80 p-3 shadow-xl backdrop-blur-sm md:p-4">
         <div className="grid gap-4 md:grid-cols-[minmax(0,1.55fr)_minmax(300px,370px)] md:items-stretch">
           <div className="rounded-2xl border border-border/50 bg-muted/30 p-2.5">
@@ -138,20 +137,11 @@ const PreviewScreen = ({
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-muted via-background to-muted">
-                  {user?.avatarUrl ? (
-                    <img
-                      src={user.avatarUrl}
-                      alt={displayName}
-                      className="h-28 w-28 rounded-full object-cover ring-2 ring-white/30"
-                    />
-                  ) : (
-                    <div
-                      className="flex h-28 w-28 items-center justify-center rounded-full text-5xl font-bold text-white"
-                      style={{ background: nameToColor(displayName) }}
-                    >
-                      {initial}
-                    </div>
-                  )}
+                  <img
+                    src={getAvatarSrc(user?.avatarUrl)}
+                    alt={displayName}
+                    className="h-28 w-28 rounded-full object-cover ring-2 ring-white/30"
+                  />
                 </div>
               )}
 
@@ -181,20 +171,11 @@ const PreviewScreen = ({
 
               <div className="mt-2 rounded-xl border border-border/60 bg-muted/40 px-3 py-2">
                 <div className="flex items-center gap-2.5">
-                  {hostProfile.avatar ? (
-                    <img
-                      src={hostProfile.avatar}
-                      alt={hostProfile.name}
-                      className="h-8 w-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold text-white"
-                      style={{ background: nameToColor(hostProfile.name) }}
-                    >
-                      {hostProfile.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <img
+                    src={getAvatarSrc(hostProfile.avatar)}
+                    alt={hostProfile.name}
+                    className="h-8 w-8 rounded-full object-cover"
+                  />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-foreground">{hostProfile.name}</p>
                     <p className="text-xs text-muted-foreground">Chủ trì cuộc họp</p>

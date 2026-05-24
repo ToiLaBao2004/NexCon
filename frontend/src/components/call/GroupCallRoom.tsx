@@ -18,8 +18,11 @@ import {
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Users, Monitor, MonitorUp, MonitorOff, Minimize2, Maximize2, Pin, PinOff } from 'lucide-react';
-import { cn, nameToColor } from '@/lib/utils';
+import { getAvatarSrc } from '@/lib/avatar';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+
+type GroupRoomCallType = 'video' | 'voice' | 'audio';
 
 interface GroupCallRoomProps {
   roomName: string;
@@ -35,7 +38,7 @@ interface GroupCallRoomProps {
   onParticipantsChange?: (participants: RoomParticipantSummary[]) => void;
   onLeaveIntercept?: (disconnect: () => void) => void;
   roomType?: 'call' | 'meet';
-  callType?: 'video' | 'audio';
+  callType?: GroupRoomCallType;
 }
 
 export interface RoomParticipantSummary {
@@ -75,9 +78,6 @@ const ParticipantCardInner = ({
   const isScreenShare = trackRef.source === Track.Source.ScreenShare;
   const hasVideo = isTrackReference(trackRef) && !(trackRef as TrackReference).publication?.isMuted;
   const displayName = name ?? identity ?? 'Unknown';
-  const initial = displayName.charAt(0).toUpperCase();
-  const avatarColor = nameToColor(displayName);
-
   let avatarUrl = '';
   try {
     const meta = JSON.parse(trackRef.participant.metadata || '{}');
@@ -124,20 +124,11 @@ const ParticipantCardInner = ({
         />
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-3 bg-muted/50">
-          {avatarUrl ? (
-            <img
-              src={avatarUrl}
-              alt={displayName}
-              className="w-20 h-20 rounded-full object-cover ring-2 ring-border shadow-lg select-none"
-            />
-          ) : (
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center text-white text-3xl font-bold ring-2 ring-border shadow-lg select-none"
-              style={{ background: avatarColor }}
-            >
-              {initial}
-            </div>
-          )}
+          <img
+            src={getAvatarSrc(avatarUrl)}
+            alt={displayName}
+            className="w-20 h-20 rounded-full object-cover ring-2 ring-border shadow-lg select-none"
+          />
         </div>
       )}
 
@@ -250,7 +241,7 @@ const Stage = () => {
 
         {otherTracks.length > 0 && (
           <div className={cn(
-            "flex gap-3 overflow-auto sm:h-full sm:w-72 landscape:h-full landscape:w-72 scrollbar-hide",
+            "flex gap-3 overflow-auto sm:h-full sm:w-72 landscape:h-full landscape:w-72 beautiful-scrollbar",
             "flex-row sm:flex-col landscape:flex-col shrink-0"
           )}>
             {otherTracks.map((trackRef) => {
@@ -318,7 +309,7 @@ const RoomHeader = ({
   roomName: string;
   roomLabel?: string;
   roomType?: 'call' | 'meet';
-  callType?: 'video' | 'audio';
+  callType?: GroupRoomCallType;
 }) => {
   const defaultLabel = roomType === 'meet'
     ? 'Cuộc họp video'
@@ -460,7 +451,7 @@ const MiniControls = ({
   onLeaveIntercept?: (disconnect: () => void) => void;
   roomLabel?: string;
   roomType?: 'call' | 'meet';
-  callType?: 'video' | 'audio';
+  callType?: GroupRoomCallType;
 }) => {
   const { toggle: toggleMic, enabled: micOn } = useTrackToggle({ source: Track.Source.Microphone });
   const { toggle: toggleCam, enabled: camOn } = useTrackToggle({ source: Track.Source.Camera });
@@ -743,9 +734,11 @@ const GroupCallRoom = ({
   roomType = 'meet',
   callType = 'video',
 }: GroupCallRoomProps) => {
+  const shouldStartVideo = roomType === 'call' ? callType === 'video' : initialVideoEnabled;
+
   return (
     <LiveKitRoom
-      video={initialVideoEnabled}
+      video={shouldStartVideo}
       audio={initialAudioEnabled}
       token={token}
       serverUrl={LIVEKIT_URL}

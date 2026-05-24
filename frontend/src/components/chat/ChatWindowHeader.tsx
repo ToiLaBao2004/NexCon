@@ -44,7 +44,7 @@ interface ChatWindowHeaderProps {
 }
 
 const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProps) => {
-  const { conversations, activeConversationId, setActiveConversation, activeSidebar, setActiveSidebar } =
+  const { conversations, activeConversationId, setActiveConversation, activeSidebar, infoSidebarOpen, setActiveSidebar } =
     useChatStore();
   const { user } = useAuthStore();
   const { onlineUsers, userPresences } = useSocketStore();
@@ -106,6 +106,11 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
   const canScheduleSharedMeeting = chat.type !== "group"
     || chat.group?.allowMembersCreateSharedReminder !== false
     || isGroupAdmin;
+  const canStartGroupCall =
+    chat.type === "group" &&
+    groupCallStatus === "idle" &&
+    callStatus === "idle" &&
+    chat.disbanded !== true;
 
   const handleVoiceCall = () => {
     if (!canCall || !otherUser) return;
@@ -138,7 +143,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
       // Toggle off search mode. 
       // On desktop, we might want to default back to info. 
       // On mobile/tablet, we want to close it (null).
-      setActiveSidebar(useOverlayInfoSidebar ? null : 'info');
+      setActiveSidebar(!useOverlayInfoSidebar && infoSidebarOpen ? 'info' : null);
     }
   };
 
@@ -183,7 +188,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
             ) : (
               <GroupChatAvatar
                 participants={chat.participants}
-                type="people"
+                type="chat"
                 groupAvatarUrl={chat.group?.avatarUrl}
               />
             )}
@@ -257,7 +262,17 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
                   variant="ghost"
                   size="icon"
                   className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
-                  disabled={groupCallStatus !== "idle" || callStatus !== "idle" || chat.disbanded === true}
+                  disabled={!canStartGroupCall}
+                  title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi thoại nhóm"}
+                  onClick={() => startGroupCall(chat._id, "voice")}
+                >
+                  <Phone className="h-5 w-5" strokeWidth={1.65} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="inline-flex h-10 w-10 rounded-xl text-foreground hover:bg-muted/60 hover:text-foreground fade-in transition-colors"
+                  disabled={!canStartGroupCall}
                   title={chat.disbanded === true ? "Nhóm đã giải tán" : "Gọi nhóm"}
                   onClick={() => startGroupCall(chat._id, "video")}
                 >

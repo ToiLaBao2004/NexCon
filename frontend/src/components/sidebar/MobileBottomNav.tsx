@@ -121,15 +121,15 @@ const MobileBottomNav = () => {
                     <DropdownMenuContent className="w-64 mr-1" align="end" side="top" sideOffset={8}>
                         <DropdownMenuGroup>
                             <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => setIsProfileOpen(true)}>
-                                <User className="mr-2 h-4 w-4" />
+                                <User className="mr-2 h-4 w-4 text-foreground" />
                                 <span>Hồ sơ của tôi</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => setIsSettingsOpen(true)}>
-                                <Settings className="mr-2 h-4 w-4" />
+                                <Settings className="mr-2 h-4 w-4 text-foreground" />
                                 <span>Cài đặt</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer py-2" onSelect={() => navigate("/moderation")}>
-                                <ShieldAlert className="mr-2 h-4 w-4" />
+                                <ShieldAlert className="mr-2 h-4 w-4 text-foreground" />
                                 <span>Vi phạm & khiếu nại</span>
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
@@ -142,7 +142,7 @@ const MobileBottomNav = () => {
                                 toggleTheme();
                             }}
                         >
-                            {isDark ? <Moon className="mr-2 h-4 w-4" /> : <Sun className="mr-2 h-4 w-4" />}
+                            {isDark ? <Moon className="mr-2 h-4 w-4 text-foreground" /> : <Sun className="mr-2 h-4 w-4 text-foreground" />}
                             <div className="flex-1 capitalize">{isDark ? "Tối" : "Sáng"}</div>
                             <Switch checked={isDark} className="ml-2" />
                         </DropdownMenuItem>

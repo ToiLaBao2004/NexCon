@@ -1,12 +1,12 @@
 import type { UserPresence, UserPresenceStatus } from "@/types/user";
 
 export const PRESENCE_LABELS: Record<UserPresenceStatus, string> = {
-  online: "Online",
-  away: "Away",
-  busy: "Busy",
-  do_not_disturb: "Do Not Disturb",
-  invisible: "Invisible",
-  offline: "Offline",
+  online: "Đang hoạt động",
+  away: "Vắng mặt",
+  busy: "Bận",
+  do_not_disturb: "Không làm phiền",
+  invisible: "Ẩn trạng thái",
+  offline: "Ngoại tuyến",
 };
 
 export function normalizePresenceStatus(status?: string | null): UserPresenceStatus {

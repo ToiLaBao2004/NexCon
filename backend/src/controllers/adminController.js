@@ -323,6 +323,13 @@ async function applyReportResolution({ report, decision, note, adminId, aiModera
                 reportId: report._id.toString(),
                 targetType: report.targetType,
                 targetMessageId: report.targetMessageId?.toString?.() || null,
+                evidencePreview,
+                messageSnapshot: report.messageSnapshot ? {
+                    type: report.messageSnapshot.type || '',
+                    content: report.messageSnapshot.content || '',
+                    fileName: report.messageSnapshot.fileName || '',
+                    mimeType: report.messageSnapshot.mimeType || '',
+                } : null,
                 aiModeration: normalizeAiModerationForReport(aiModeration),
             },
             notify: false,

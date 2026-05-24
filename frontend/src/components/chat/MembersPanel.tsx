@@ -202,7 +202,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
                         <div className="flex items-center gap-1.5 min-w-0">
                           <div className="font-medium text-[14px] text-foreground truncate">{name}</div>
                           {isLeader && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 shrink-0">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm shrink-0">
                               <KeyRound className="h-3 w-3" />
                               Trưởng nhóm
                             </span>

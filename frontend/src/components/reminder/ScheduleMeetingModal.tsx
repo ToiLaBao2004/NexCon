@@ -101,7 +101,7 @@ export default function ScheduleMeetingModal({ open, onOpenChange, conversationI
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1 min-h-0 bg-muted/20">
+          <div className="px-6 py-5 space-y-4 overflow-y-auto beautiful-scrollbar flex-1 min-h-0 bg-muted/20">
             <div className="space-y-2 rounded-xl border border-border/60 bg-card p-4 shadow-sm">
               <Label htmlFor="schedule-meeting-name" className="text-[15px] font-semibold text-foreground">Tên buổi họp</Label>
               <Input
