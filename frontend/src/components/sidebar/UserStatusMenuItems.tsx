@@ -21,12 +21,12 @@ const MANUAL_STATUS_OPTIONS: {
   label: string;
   dotClass: string;
 }[] = [
-  { status: "online", label: "Trực tuyến", dotClass: "bg-emerald-500" },
-  { status: "away", label: "Vắng mặt", dotClass: "bg-amber-400" },
-  { status: "busy", label: "Bận", dotClass: "bg-red-500" },
-  { status: "do_not_disturb", label: "Không làm phiền", dotClass: "bg-red-600" },
-  { status: "invisible", label: "Ẩn trạng thái", dotClass: "bg-zinc-400" },
-];
+    { status: "online", label: "Trực tuyến", dotClass: "bg-emerald-500" },
+    { status: "away", label: "Vắng mặt", dotClass: "bg-amber-400" },
+    { status: "busy", label: "Bận", dotClass: "bg-red-500" },
+    { status: "do_not_disturb", label: "Không làm phiền", dotClass: "bg-red-600" },
+    { status: "invisible", label: "Ẩn trạng thái", dotClass: "bg-zinc-400" },
+  ];
 
 type UserStatusMenuItemsProps = {
   mobileInline?: boolean;
@@ -84,9 +84,6 @@ export function UserStatusMenuItems({
               <Radio className="h-4 w-4 text-primary" />
               <div className="min-w-0 flex-1">
                 <span className="block truncate">Tự động</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  Theo kết nối realtime
-                </span>
               </div>
               {savingKey === "auto" ? (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -170,9 +167,6 @@ export function UserStatusMenuItems({
             <Radio className="mr-2 h-4 w-4 text-primary" />
             <div className="min-w-0 flex-1">
               <span className="block truncate">Tự động</span>
-              <span className="block truncate text-xs text-muted-foreground">
-                Theo kết nối realtime
-              </span>
             </div>
             {savingKey === "auto" ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
