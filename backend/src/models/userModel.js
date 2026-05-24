@@ -60,7 +60,11 @@ const userSchema = new mongoose.Schema({
         sparse: true // allows multiple null values
     },
     music: {
-        trackId: String
+        trackId: {
+            type: String,
+            trim: true,
+            maxlength: 22,
+        }
     },
     role: {
         type: String,
@@ -86,6 +90,7 @@ const userSchema = new mongoose.Schema({
     fcmTokens: [{
         type: String,
         trim: true,
+        maxlength: 4096,
     }],
 }, { timestamps: true });
 

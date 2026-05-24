@@ -9,6 +9,8 @@ const MAX_FRIENDS = 500;
 const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
 const MAX_PENDING_SENT_REQUESTS = 100;
 const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX_PENDING_SENT_REQUESTS} lời mời kết bạn đang chờ xử lý.`;
+const MAX_FRIEND_REQUEST_MESSAGE_LENGTH = 300;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const useFriendStore = create<FriendState>((set, get) => ({
 	loading: false,
@@ -131,6 +133,16 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	sendFriendRequest: async (email: string, message?: string) => {
+		const normalizedEmail = String(email || '').trim().toLowerCase();
+		const normalizedMessage = String(message || '').trim();
+		if (!normalizedEmail || !EMAIL_PATTERN.test(normalizedEmail)) {
+			toast.error('Email không hợp lệ.');
+			return;
+		}
+		if (normalizedMessage.length > MAX_FRIEND_REQUEST_MESSAGE_LENGTH) {
+			toast.error(`Lời nhắn kết bạn không được vượt quá ${MAX_FRIEND_REQUEST_MESSAGE_LENGTH} ký tự.`);
+			return;
+		}
 		if (get().friends.length >= MAX_FRIENDS) {
 			toast.error(FRIEND_LIMIT_MESSAGE);
 			return;
@@ -142,10 +154,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 
 		try {
 			set({ sendingRequest: true });
-			const data = await friendService.sendFriendRequest(email, message);
+			const data = await friendService.sendFriendRequest(normalizedEmail, normalizedMessage || undefined);
 			set((state) => ({
-				blockedUsers: state.blockedUsers.filter(u => u.email.toLowerCase() !== email.toLowerCase()),
-				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion.email.toLowerCase() !== email.toLowerCase())
+				blockedUsers: state.blockedUsers.filter(u => u.email.toLowerCase() !== normalizedEmail),
+				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion.email.toLowerCase() !== normalizedEmail)
 			}));
 
 			toast.success(getApiSuccessMessage(data, 'Đã gửi lời mời kết bạn!'));

@@ -252,6 +252,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                             placeholder="Lời nhắn kết bạn..."
                             value={requestMessage}
                             onChange={(e) => setRequestMessage(e.target.value)}
+                            maxLength={300}
                             className="bg-muted/30 rounded-xl h-10 text-xs"
                         />
                     </div>
