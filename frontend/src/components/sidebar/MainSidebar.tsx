@@ -92,6 +92,18 @@ const MainSidebar = () => {
         return location.pathname === path;
     };
 
+    const navItemClass = (active: boolean) => cn(
+        "h-16 w-full flex items-center justify-center transition-all duration-200 group relative cursor-pointer",
+        active
+            ? "bg-slate-100 dark:bg-white/10 text-black dark:text-white"
+            : "bg-transparent text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
+    );
+
+    const navIconClass = (active: boolean) => cn(
+        "h-[26px] w-[26px] transition-transform",
+        active ? "scale-100 text-[#0068ff]" : "scale-95 group-hover:scale-100"
+    );
+
     return (
         <aside
             onClick={handleSidebarClick}
@@ -177,16 +189,11 @@ const MainSidebar = () => {
                                 <TooltipTrigger asChild>
                                     <div
                                         onClick={() => navigate(item.path)}
-                                        className={cn(
-                                            "h-16 w-full flex items-center justify-center transition-all duration-200 group relative cursor-pointer",
-                                            active
-                                                ? "bg-slate-100 dark:bg-white/10 text-black dark:text-white"
-                                                : "bg-transparent text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
-                                        )}
+                                        className={navItemClass(active)}
                                     >
                                         <item.icon 
                                             strokeWidth={1.5}
-                                            className={cn("h-[26px] w-[26px] transition-transform", active ? "scale-100 text-[#0068ff]" : "scale-95 group-hover:scale-100")} 
+                                            className={navIconClass(active)}
                                         />
                                         {item.badge > 0 && (
                                             <span className="absolute top-3 right-3 min-w-[1.1rem] h-4.5 flex items-center justify-center rounded-full bg-red-500 text-white text-[9px] font-bold border-2 border-white dark:border-[#081c36] px-1">
@@ -213,17 +220,15 @@ const MainSidebar = () => {
                                 <TooltipTrigger asChild>
                                     <div
                                         onClick={() => navigate(item.path)}
-                                        className={cn(
-                                            "h-16 w-full flex items-center justify-center transition-all duration-200 group relative cursor-pointer",
-                                            active
-                                                ? "bg-slate-100 dark:bg-white/10 text-black dark:text-white"
-                                                : "bg-transparent text-black dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/5"
-                                        )}
+                                        className={navItemClass(active)}
                                     >
                                         <item.icon 
                                             strokeWidth={1.5}
-                                            className={cn("h-[26px] w-[26px]", active && "text-[#0068ff]")} 
+                                            className={navIconClass(active)}
                                         />
+                                        {active && (
+                                            <div className="absolute left-0 w-1 h-8 bg-[#0068ff] rounded-r-full" />
+                                        )}
                                     </div>
                                 </TooltipTrigger>
                                 <TooltipContent side="right" sideOffset={10}>{item.label}</TooltipContent>

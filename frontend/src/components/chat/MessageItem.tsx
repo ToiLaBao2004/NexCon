@@ -44,6 +44,8 @@ const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewRespon
 /* ── Custom audio player for voice messages ─────────────────────────────────── */
 const AUDIO_BAR_COUNT = 32;
 const MAX_VISIBLE_SEEN_AVATARS = 8;
+const singleImageFrameClass = "relative h-auto w-[280px] max-w-[70vw] aspect-[14/9] overflow-hidden rounded-xl bg-muted";
+const imagePreviewClass = "h-full w-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity";
 
 function MentionChip({ children, isOwn }: { children: React.ReactNode; isOwn: boolean }) {
 	return (
@@ -556,7 +558,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				{message.filePublicId ? (
 					<button
 						type="button"
-						className="relative p-0 border-0 bg-transparent cursor-zoom-in"
+						className={cn(singleImageFrameClass, "border-0 p-0 cursor-zoom-in")}
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
 								messageId: message._id,
@@ -569,7 +571,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<SecureImage
 							messageId={message._id}
 							alt={message.fileName ?? "image"}
-							className="max-w-[280px] max-h-[340px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+							className={imagePreviewClass}
 						/>
 						{uploadOverlay}
 						{errorBadge}
@@ -577,7 +579,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				) : (
 					<button
 						type="button"
-						className="relative p-0 border-0 bg-transparent cursor-zoom-in"
+						className={cn(singleImageFrameClass, "border-0 p-0 cursor-zoom-in")}
 						onClick={() =>
 							useImageViewerStore.getState().openViewer({
 								messageId: message._id,
@@ -591,7 +593,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 						<img
 							src={message.fileUrl!}
 							alt={message.fileName ?? "image"}
-							className="max-w-[280px] max-h-[340px] rounded-xl object-cover cursor-zoom-in hover:opacity-90 transition-opacity"
+							className={imagePreviewClass}
 						/>
 						{uploadOverlay}
 						{errorBadge}

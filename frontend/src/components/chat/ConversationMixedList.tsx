@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from "react";
-import { Search, X, Loader2, UsersRound } from "lucide-react";
+import { Search, X, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useChatStore } from "@/stores/useChatStore";
 import { chatService } from "@/services/chatService";
@@ -335,7 +335,6 @@ function UserResultRow({
           {locked ? "Tài khoản bị khóa" : highlightKeyword(user.email || user.phone || "", keyword)}
         </p>
       </div>
-      <UsersRound className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.65} />
     </button>
   );
 }
