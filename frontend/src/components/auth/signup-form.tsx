@@ -22,9 +22,6 @@ const signUpSchema = z.object({
   termsAccepted: z.boolean().refine((value) => value, {
     message: "Vui lòng đồng ý với điều khoản và chính sách của NexCon",
   }),
-  moderationAccepted: z.boolean().refine((value) => value, {
-    message: "Vui lòng xác nhận chính sách kiểm duyệt an toàn của NexCon",
-  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Mật khẩu không khớp",
   path: ["confirmPassword"],
@@ -49,7 +46,6 @@ export function SignupForm({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
       termsAccepted: false,
-      moderationAccepted: false,
     },
   });
 
@@ -173,11 +169,7 @@ export function SignupForm({
               </div>
               {errors.confirmPassword && <p className="text-sm text-destructive">{errors.confirmPassword.message}</p>}
             </div>
-            <div className="mt-4 space-y-3 rounded-md border border-primary/20 bg-primary/5 p-3 text-xs leading-5 text-muted-foreground">
-              <p className="text-justify">
-                Khi có báo cáo hoặc dấu hiệu vi phạm Tiêu chuẩn cộng đồng, NexCon có thể kiểm tra các tin nhắn liên quan trong phạm vi cần thiết để xác minh, bảo vệ người dùng và xử lý khiếu nại.
-              </p>
-
+            <div className="mt-4 rounded-md border border-primary/20 bg-primary/5 p-3 text-xs leading-5 text-muted-foreground">
               <label className="flex cursor-pointer items-start gap-2">
                 <input
                   type="checkbox"
@@ -191,18 +183,6 @@ export function SignupForm({
                 </span>
               </label>
               {errors.termsAccepted && <p className="text-xs text-destructive">{errors.termsAccepted.message}</p>}
-
-              <label className="flex cursor-pointer items-start gap-2">
-                <input
-                  type="checkbox"
-                  className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded border-border accent-primary"
-                  {...register("moderationAccepted")}
-                />
-                <span className="text-justify">
-                  Tôi hiểu NexCon có thể xem xét nội dung liên quan khi cần xử lý vi phạm, bảo mật tài khoản hoặc yêu cầu khiếu nại theo chính sách đã công bố.
-                </span>
-              </label>
-              {errors.moderationAccepted && <p className="text-xs text-destructive">{errors.moderationAccepted.message}</p>}
             </div>
             {/* submit button */}
             <Button type="submit" className="w-full mt-5" disabled={isSubmitting}>
