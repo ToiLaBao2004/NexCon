@@ -9,6 +9,7 @@ import { createNotification } from "../services/notificationServices.js";
 import { checkFieldFormat } from "../utils/fieldFormat.js";
 import { maskLockedUserDoc } from "../utils/lockedUser.js";
 import { getVisiblePresencesForUsers } from "../services/userStatusService.js";
+import validator from "validator";
 
 const toFriendItem = (friendship, user) => {
     const safeUser = maskLockedUserDoc(user);
@@ -25,6 +26,7 @@ const MAX_FRIENDS = 500;
 const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
 const MAX_PENDING_SENT_REQUESTS = 100;
 const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX_PENDING_SENT_REQUESTS} lời mời kết bạn đang chờ xử lý.`;
+const MAX_FRIEND_REQUEST_MESSAGE_LENGTH = 300;
 const DEFAULT_SUGGESTION_LIMIT = 20;
 const MAX_SUGGESTION_LIMIT = 50;
 const GENERIC_EMAIL_DOMAINS = new Set([
@@ -112,10 +114,20 @@ export async function sendFriendRequest(req, res) {
     try {
         const sender = req.user;
         const { email, message } = req.body;
-        if (!email) {
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        const normalizedMessage = String(message || '').trim();
+        if (!normalizedEmail) {
             return res.status(400).json({ message: "Email is required." });
         }
-        const receiver = await User.findOne({ email: email.toLowerCase() }).select('_id displayName email avatarUrl lock').lean();
+        if (!validator.isEmail(normalizedEmail)) {
+            return res.status(400).json({ message: "Invalid email format." });
+        }
+        if (normalizedMessage.length > MAX_FRIEND_REQUEST_MESSAGE_LENGTH) {
+            return res.status(400).json({
+                message: `Friend request message cannot exceed ${MAX_FRIEND_REQUEST_MESSAGE_LENGTH} characters.`,
+            });
+        }
+        const receiver = await User.findOne({ email: normalizedEmail }).select('_id displayName email avatarUrl lock').lean();
         if (!receiver) {
             return res.status(404).json({ message: "User with this email not found." });
         }
@@ -170,11 +182,11 @@ export async function sendFriendRequest(req, res) {
         });
         if (rejectedRequest) {
             rejectedRequest.status = 'pending';
-            rejectedRequest.message = message ? message.trim().slice(0, 300) : undefined;
+            rejectedRequest.message = normalizedMessage || undefined;
             await rejectedRequest.save();
             await createNotification(receiver._id,
                 "Friend Request Resent",
-                `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${message ? `"${message}"` : ""}`,
+                `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${normalizedMessage ? `"${normalizedMessage}"` : ""}`,
                 `${process.env.FRONTEND_URL}/people?tab=requests`,
                 { actorId: sender._id });
             const populatedRequest = await FriendRequest.findById(rejectedRequest._id)
@@ -224,13 +236,13 @@ export async function sendFriendRequest(req, res) {
         const friendRequest = new FriendRequest({
             from: sender._id,
             to: receiver._id,
-            message: message ? message.trim().slice(0, 300) : undefined,
+            message: normalizedMessage || undefined,
             status: 'pending'
         });
         await friendRequest.save();
         await createNotification(receiver._id,
             "New Friend Request",
-            `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${message ? `"${message}"` : ""}`,
+            `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${normalizedMessage ? `"${normalizedMessage}"` : ""}`,
             `${process.env.FRONTEND_URL}/people?tab=requests`,
             { actorId: sender._id });
         const populatedRequest = await FriendRequest.findById(friendRequest._id)

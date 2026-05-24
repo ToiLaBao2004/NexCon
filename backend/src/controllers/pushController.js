@@ -3,10 +3,59 @@ import User from '../models/userModel.js';
 import { verifyCallActionToken } from '../utils/callActionToken.js';
 import { handlePushCallAction } from '../socket/index.js';
 
+const MAX_FCM_TOKEN_LENGTH = 4096;
+const FCM_TOKEN_PATTERN = /^[A-Za-z0-9:_-]+$/;
+const MAX_PUSH_ENDPOINT_LENGTH = 2048;
+const MAX_PUSH_KEY_LENGTH = 512;
+const MAX_PUSH_USER_AGENT_LENGTH = 512;
+const PUSH_KEY_PATTERN = /^[A-Za-z0-9_-]+={0,2}$/;
+
+function normalizeFcmToken(rawToken) {
+    const token = String(rawToken || '').trim();
+    if (!token) return { error: 'token is required.' };
+    if (token.length > MAX_FCM_TOKEN_LENGTH || !FCM_TOKEN_PATTERN.test(token)) {
+        return { error: 'Invalid FCM token format.' };
+    }
+    return { token };
+}
+
+function normalizePushEndpoint(rawEndpoint, { required = true } = {}) {
+    const endpoint = String(rawEndpoint || '').trim();
+    if (!endpoint) {
+        return required ? { error: 'endpoint is required.' } : { endpoint: '' };
+    }
+    if (endpoint.length > MAX_PUSH_ENDPOINT_LENGTH) {
+        return { error: `endpoint cannot exceed ${MAX_PUSH_ENDPOINT_LENGTH} characters.` };
+    }
+    try {
+        const url = new URL(endpoint);
+        if (url.protocol !== 'https:') {
+            return { error: 'endpoint must be a valid HTTPS URL.' };
+        }
+    } catch {
+        return { error: 'endpoint must be a valid HTTPS URL.' };
+    }
+    return { endpoint };
+}
+
+function normalizePushKey(rawKey, fieldName) {
+    const value = String(rawKey || '').trim();
+    if (!value) return { error: `${fieldName} is required.` };
+    if (value.length > MAX_PUSH_KEY_LENGTH || !PUSH_KEY_PATTERN.test(value)) {
+        return { error: `Invalid ${fieldName} format.` };
+    }
+    return { value };
+}
+
+function normalizeUserAgent(rawUserAgent) {
+    const value = String(rawUserAgent || '').trim();
+    return value.slice(0, MAX_PUSH_USER_AGENT_LENGTH);
+}
+
 export async function saveFcmToken(req, res) {
     try {
-        const token = String(req.body?.token || '').trim();
-        if (!token) return res.status(400).json({ message: 'token is required.' });
+        const { token, error } = normalizeFcmToken(req.body?.token);
+        if (error) return res.status(400).json({ message: error });
 
         await User.updateMany(
             { _id: { $ne: req.user._id } },
@@ -26,8 +75,8 @@ export async function saveFcmToken(req, res) {
 
 export async function removeFcmToken(req, res) {
     try {
-        const token = String(req.body?.token || '').trim();
-        if (!token) return res.status(400).json({ message: 'token is required.' });
+        const { token, error } = normalizeFcmToken(req.body?.token);
+        if (error) return res.status(400).json({ message: error });
 
         await User.updateOne(
             { _id: req.user._id },
@@ -46,11 +95,23 @@ export async function subscribePush(req, res) {
         const userId = req.user?._id;
         const { endpoint, keys, userAgent } = req.body || {};
 
-        if (!endpoint || !keys?.p256dh || !keys?.auth) {
-            return res.status(400).json({ message: 'Invalid subscription payload.' });
-        }
+        const endpointResult = normalizePushEndpoint(endpoint);
+        if (endpointResult.error) return res.status(400).json({ message: endpointResult.error });
 
-        await saveSubscription(userId, { endpoint, keys, userAgent });
+        const p256dhResult = normalizePushKey(keys?.p256dh, 'keys.p256dh');
+        if (p256dhResult.error) return res.status(400).json({ message: p256dhResult.error });
+
+        const authResult = normalizePushKey(keys?.auth, 'keys.auth');
+        if (authResult.error) return res.status(400).json({ message: authResult.error });
+
+        await saveSubscription(userId, {
+            endpoint: endpointResult.endpoint,
+            keys: {
+                p256dh: p256dhResult.value,
+                auth: authResult.value,
+            },
+            userAgent: normalizeUserAgent(userAgent),
+        });
         return res.status(201).json({ message: 'Push subscription saved.' });
     } catch (error) {
         console.error('Subscribe push error:', error);
@@ -60,10 +121,8 @@ export async function subscribePush(req, res) {
 
 export async function unsubscribePush(req, res) {
     try {
-        const endpoint = req.body?.endpoint;
-        if (!endpoint) {
-            return res.status(400).json({ message: 'endpoint is required.' });
-        }
+        const { endpoint, error } = normalizePushEndpoint(req.body?.endpoint);
+        if (error) return res.status(400).json({ message: error });
 
         await removeSubscription(endpoint);
         return res.status(200).json({ message: 'Push subscription removed.' });

@@ -23,6 +23,7 @@ import {
 	decryptMessagesPayload,
 } from '../utils/messageCrypto.js';
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
+import { checkFieldFormat } from '../utils/fieldFormat.js';
 import { GROUP_CLEANUP_RETENTION_DAYS, enqueueGroupCleanup, getGroupCleanupDeleteAfter } from '../config/groupCleanupQueue.js';
 import { enqueueConversationClearCleanup } from '../config/conversationClearCleanupQueue.js';
 import { getVisiblePresencesForUsers } from '../services/userStatusService.js';
@@ -192,9 +193,16 @@ export async function createConversation(req, res) {
 	try {
 		const { type, name, memberIds } = req.body;
 		const userId = req.user._id;
-		if (!type || (type === 'group' && (!name || name.trim() === '')) ||
+		if (!type || (type === 'group' && (!name || String(name).trim() === '')) ||
 			!memberIds || !Array.isArray(memberIds) || memberIds.length === 0) {
 			return res.status(400).json({ message: 'Group name and members are required.' });
+		}
+		const normalizedGroupName = type === 'group' ? String(name || '').trim() : '';
+		if (type === 'group') {
+			const groupNameError = checkFieldFormat('groupName', normalizedGroupName);
+			if (groupNameError) {
+				return res.status(400).json({ message: groupNameError });
+			}
 		}
 		let conversation;
 		if (type === 'direct') {
@@ -237,7 +245,7 @@ export async function createConversation(req, res) {
 			conversation = new Conversation({
 				type: 'group',
 				group: {
-					name: name,
+					name: normalizedGroupName,
 					createdBy: userId,
 					admins: [userId]
 				},
@@ -1077,10 +1085,11 @@ export async function updateGroupName(req, res) {
 		const { conversationId } = req.params;
 		const { name } = req.body;
 		const userId = req.user._id.toString();
-		if (!name || name.trim() === '') {
-			return res.status(400).json({ message: 'Group name is required.' });
+		const normalizedName = String(name || '').trim();
+		const groupNameError = checkFieldFormat('groupName', normalizedName);
+		if (groupNameError) {
+			return res.status(400).json({ message: groupNameError });
 		}
-		const normalizedName = name.trim();
 		const conversation = await Conversation.findById(conversationId);
 		if (!conversation) {
 			return res.status(404).json({ message: "Conversation not found" });

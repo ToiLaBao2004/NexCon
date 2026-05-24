@@ -67,10 +67,14 @@ export function buildModerationNotice(payload?: ModerationApiErrorPayload | null
   const countLine = count && threshold ? `Lần vi phạm: ${count}/${threshold}.` : "";
   const restrictionLine = translateApiMessage(payload?.restriction?.message || payload?.detail, "");
   const untilLine = blockedUntil ? `Thời gian hạn chế đến: ${formatModerationDate(blockedUntil)}.` : "";
+  const isMessageBlock = payload?.restriction?.type === "message_block";
+  const description = isMessageBlock
+    ? `${label}. Tin nhắn chưa được gửi. Vui lòng chỉnh sửa rồi gửi lại.`
+    : [label, reason, countLine, restrictionLine, untilLine].filter(Boolean).join("\n");
 
   return {
     title: translateApiMessage(payload?.title, "Nội dung chưa được gửi"),
-    description: [label, reason, countLine, restrictionLine, untilLine].filter(Boolean).join("\n"),
+    description,
     category,
     label,
     reason,

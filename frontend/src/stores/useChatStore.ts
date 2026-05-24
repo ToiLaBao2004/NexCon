@@ -1200,6 +1200,8 @@ export const useChatStore = create<ChatState>()(
                     }))
                 } catch (error) {
                     console.error("Lỗi khi cập nhật tên nhóm:", error);
+                    toast.error(getApiErrorMessage(error, 'Không thể cập nhật tên nhóm.'));
+                    throw error;
                 }
             },
             updateGroupAvatar: async (conversationId: string, file: File, onProgress?: (percent: number) => void) => {

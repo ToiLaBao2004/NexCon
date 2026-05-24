@@ -38,11 +38,11 @@ const NotificationPage = () => {
 
     return (
         <div className="relative h-full flex-1 overflow-hidden rounded-none border-0 bg-background md:rounded-l-none md:rounded-r-2xl md:border-y md:border-r md:border-l-0 md:border-border/50">
-            <div className="flex h-full justify-center overflow-hidden px-3 py-4 md:px-6">
-                <section className="flex h-full w-full max-w-[850px] min-h-0 flex-col overflow-hidden rounded-2xl bg-card shadow-sm md:border md:border-border/50">
-                    <div className="z-20 shrink-0 rounded-t-2xl bg-card/95 px-5 pb-3 pt-4 backdrop-blur-md">
+            <div className="flex h-full justify-center overflow-hidden px-0 py-0 md:px-6 md:py-4">
+                <section className="flex h-full w-full max-w-[850px] min-h-0 flex-col overflow-hidden rounded-none bg-card shadow-sm md:rounded-2xl md:border md:border-border/50">
+                    <div className="mobile-page-header z-20 shrink-0 rounded-none bg-card/95 px-5 pb-3 pt-4 backdrop-blur-md md:rounded-t-2xl">
                         <div className="flex items-center justify-between gap-3">
-                            <h1 className="text-[28px] font-bold leading-tight tracking-tight text-foreground">
+                            <h1 className="mobile-page-title text-[28px] font-bold leading-tight tracking-tight text-foreground">
                                 Thông báo
                             </h1>
                             <Button

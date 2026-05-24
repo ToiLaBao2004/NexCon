@@ -176,6 +176,7 @@ const UserSearchItem = ({ user, onOpenChat }: { user: SearchedUser, onOpenChat?:
                             placeholder="Nhập lời nhắn..."
                             value={requestMessage}
                             onChange={(e) => setRequestMessage(e.target.value)}
+                            maxLength={300}
                             className="h-9 text-sm bg-muted/20 border-border/40"
                         />
                     </div>

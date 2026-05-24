@@ -43,7 +43,8 @@ const participantSchema = new mongoose.Schema({
 const groupSchema = new mongoose.Schema({
     name: {
         type: String,
-        trim: true
+        trim: true,
+        maxlength: 100
     },
     avatarUrl: {
         type: String,

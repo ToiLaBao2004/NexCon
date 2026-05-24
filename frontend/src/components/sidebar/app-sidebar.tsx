@@ -36,7 +36,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <div className="flex h-full min-h-0 flex-col" onClick={(e) => e.stopPropagation()}>
           {isMobile && (
             <div className="shrink-0 px-4 pt-4 pb-3 bg-card border-b border-border/70">
-              <h1 className="text-[28px] leading-none font-bold tracking-tight text-primary">NextCon</h1>
+              <h1 className="text-[28px] leading-none font-bold tracking-tight text-primary">NexCon</h1>
             </div>
           )}
 

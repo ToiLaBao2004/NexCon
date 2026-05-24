@@ -77,25 +77,26 @@ const MobileBottomNav = () => {
                     const active = isPathActive(item.path);
                     return (
                         <button
+                            type="button"
                             key={item.path}
                             onClick={() => {
                                 setFocusedConversation(null);
                                 navigate(item.path);
                             }}
+                            aria-label={item.label}
                             className={cn(
-                                "relative flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition-colors",
+                                "relative flex h-full flex-1 items-center justify-center rounded-2xl transition-colors",
                                 active ? "bg-primary/15 text-primary font-semibold" : "text-foreground/75 hover:bg-muted/50 hover:text-foreground"
                             )}
                         >
                             <div className="relative">
-                                <item.icon className="h-5 w-5" strokeWidth={active ? 1.85 : 1.65} />
+                                <item.icon className="h-6 w-6" strokeWidth={active ? 1.85 : 1.65} />
                                 {item.badge > 0 && (
                                     <span className="absolute -top-1.5 -right-2.5 min-w-4 h-4 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold border border-card">
                                         {item.badge > 99 ? "99+" : item.badge}
                                     </span>
                                 )}
                             </div>
-                            <span className="text-[10.5px] font-medium leading-none">{item.label}</span>
                         </button>
                     );
                 })}
@@ -103,11 +104,12 @@ const MobileBottomNav = () => {
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <button
-                            className="relative flex h-full flex-1 flex-col items-center justify-center gap-1 rounded-2xl text-foreground/75 transition-colors hover:bg-muted/50 hover:text-foreground"
+                            type="button"
+                            className="relative flex h-full flex-1 items-center justify-center rounded-2xl text-foreground/75 transition-colors hover:bg-muted/50 hover:text-foreground"
                             aria-label="Tài khoản"
                         >
                             <span className="relative">
-                                <Avatar className="h-5 w-5 rounded-full border border-border/60">
+                                <Avatar className="h-6 w-6 rounded-full border border-border/60">
                                     <AvatarImage src={user?.avatarUrl} alt={user?.displayName} />
                                     <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
                                         {user?.displayName?.charAt(0) || "U"}
@@ -115,7 +117,6 @@ const MobileBottomNav = () => {
                                 </Avatar>
                                 {myBadgeStatus && <StatusBadge status={myBadgeStatus} />}
                             </span>
-                            <span className="text-[10.5px] font-medium leading-none">Tài khoản</span>
                         </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="w-64 mr-1" align="end" side="top" sideOffset={8}>

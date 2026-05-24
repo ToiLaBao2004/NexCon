@@ -13,6 +13,8 @@ import {
 } from '../services/userStatusService.js';
 import { emitOnlineUsers, isUserOnline } from '../socket/index.js';
 
+const SPOTIFY_TRACK_ID_PATTERN = /^[A-Za-z0-9]{22}$/;
+
 export async function getCurrentUser(req, res) {
     try {
         const userId = req.user._id || req.user.id;
@@ -253,12 +255,21 @@ export async function updateMusic(req, res) {
     try {
         const userId = req.user._id;
         const { trackId } = req.body;
+        const normalizedTrackId = String(trackId || '').trim();
+
+        if (!normalizedTrackId) {
+            return res.status(400).json({ message: 'trackId is required.' });
+        }
+
+        if (!SPOTIFY_TRACK_ID_PATTERN.test(normalizedTrackId)) {
+            return res.status(400).json({ message: 'Invalid Spotify trackId format.' });
+        }
 
         const updatedUser = await User.findByIdAndUpdate(
             userId,
             {
                 $set: {
-                    music: { trackId }
+                    music: { trackId: normalizedTrackId }
                 }
             },
             { new: true }

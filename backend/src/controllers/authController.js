@@ -19,6 +19,8 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const ACCESS_TOKEN_TTL = '30m';
 const REFRESH_TOKEN_TTL = 14 * 24 * 60 * 60 * 1000 // 14 days in milliseconds
 const MAX_ACTIVE_SESSIONS_PER_USER = 20;
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 128;
 
 function hashRefreshToken(token) {
     return crypto.createHash('sha256').update(String(token || '')).digest('hex');
@@ -147,25 +149,40 @@ async function sendLockedAccountResponse(res, user) {
     });
 }
 
+function validateSignupCredentials({ email, password, confirmPassword }) {
+    if (!email || !password || (confirmPassword !== undefined && !confirmPassword)) {
+        return 'All fields are required.';
+    }
+    if (!validator.isEmail(email)) {
+        return 'Invalid email format.';
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+        return `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`;
+    }
+    if (password.length > MAX_PASSWORD_LENGTH) {
+        return `Password cannot exceed ${MAX_PASSWORD_LENGTH} characters.`;
+    }
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+        return 'Passwords do not match.';
+    }
+    return null;
+}
+
 export async function verifyValidFieldsSignUp(req, res) {
     try {
         let { email, password, confirmNewPassword } = req.body;
-        email = email?.trim();
-        if (!email || !password || !confirmNewPassword) {
-            return res.status(400).json({ message: 'All fields are required.' });
-        }
-        if (password !== confirmNewPassword) {
-            return res.status(400).json({ message: 'Passwords do not match.' });
+        email = String(email || '').trim().toLowerCase();
+        const credentialError = validateSignupCredentials({
+            email,
+            password: String(password || ''),
+            confirmPassword: String(confirmNewPassword || ''),
+        });
+        if (credentialError) {
+            return res.status(400).json({ message: credentialError });
         }
         const existingEmail = await User.findOne({ email: email })
         if (existingEmail) {
             return res.status(409).json({ message: 'Email already in use.' });
-        }
-        if (!validator.isEmail(email)) {
-            return res.status(400).json({ message: 'Invalid email format.' });
-        }
-        if (password.length < 8) {
-            return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
         }
         return res.status(200).json({ success: true, message: 'All fields are valid.' });
     } catch (error) {
@@ -177,17 +194,29 @@ export async function verifyValidFieldsSignUp(req, res) {
 export async function signUp(req, res) {
     try {
         let { email, password, firstname, lastname, otp } = req.body;
-        email = email?.trim();
-        if (!email || !password || !firstname || !lastname) {
+        email = String(email || '').trim().toLowerCase();
+        password = String(password || '');
+        const normalizedFirstname = String(firstname || '').trim();
+        const normalizedLastname = String(lastname || '').trim();
+        const normalizedOtp = String(otp || '').trim();
+        if (!email || !password || !normalizedFirstname || !normalizedLastname || !normalizedOtp) {
             return res.status(400).json({ message: 'All fields are required.' });
         }
-        const displayName = `${firstname} ${lastname}`.trim();
+        const credentialError = validateSignupCredentials({ email, password });
+        if (credentialError) {
+            return res.status(400).json({ message: credentialError });
+        }
+        const displayName = `${normalizedFirstname} ${normalizedLastname}`.trim();
         const displayNameError = checkFieldFormat('displayName', displayName);
         if (displayNameError) {
             return res.status(400).json({ message: displayNameError });
         }
+        const existingEmail = await User.findOne({ email });
+        if (existingEmail) {
+            return res.status(409).json({ message: 'Email already in use.' });
+        }
         const otpRecord = await Otp.findOne({ email: email, type: 'verification' }).sort({ createdAt: -1 });
-        if (!otpRecord || otpRecord.otp !== otp || otpRecord.expiresAt < Date.now()) {
+        if (!otpRecord || otpRecord.otp !== normalizedOtp || otpRecord.expiresAt < Date.now()) {
             return res.status(400).json({ message: 'Invalid or expired OTP.' });
         }
         const hashedPassword = await bcrypt.hash(password, 10);

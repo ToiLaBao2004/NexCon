@@ -231,10 +231,10 @@ const MeetPage = () => {
     if (isInMeeting) {
         return (
             <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-background md:rounded-l-none md:rounded-r-2xl md:border-y md:border-r md:border-l-0 md:border-border/50">
-                <div className="border-b border-border/50 bg-card px-5 py-5 md:px-7">
+                <div className="mobile-page-header border-b border-border/50 bg-card px-5 py-5 md:px-7">
                     <div className="flex min-w-0 items-center gap-3">
                         <div className="min-w-0">
-                            <h1 className="truncate text-[28px] font-bold leading-tight tracking-tight text-foreground">Cuộc họp</h1>
+                            <h1 className="mobile-page-title truncate text-[28px] font-bold leading-tight tracking-tight text-foreground">Cuộc họp</h1>
                             <p className="hidden text-sm text-muted-foreground md:block">Quản lý cuộc họp video của bạn</p>
                         </div>
                     </div>
@@ -387,10 +387,10 @@ const MeetPage = () => {
 
     return (
         <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-background md:rounded-l-none md:rounded-r-2xl md:border-y md:border-r md:border-l-0 md:border-border/50">
-            <div className="border-b border-border/50 bg-card px-5 py-5 md:px-7">
+            <div className="mobile-page-header border-b border-border/50 bg-card px-5 py-5 md:px-7">
                 <div className="flex min-w-0 items-center gap-3">
                     <div className="min-w-0">
-                        <h1 className="truncate text-[28px] font-bold leading-tight tracking-tight text-foreground">Cuộc họp</h1>
+                        <h1 className="mobile-page-title truncate text-[28px] font-bold leading-tight tracking-tight text-foreground">Cuộc họp</h1>
                         <p className="hidden text-sm text-muted-foreground md:block">Tạo và tham gia cuộc họp video nhanh chóng</p>
                     </div>
                 </div>

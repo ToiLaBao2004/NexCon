@@ -177,7 +177,7 @@ const PeoplePage = () => {
 					<div className="flex h-full min-h-0 flex-col overflow-hidden">
 						{isMobile && (
 							<div className="sticky top-0 z-20 px-4 pt-4 pb-3 bg-card border-b border-border/40">
-								<h1 className="text-[28px] leading-none font-bold tracking-tight text-primary">NextCon</h1>
+								<h1 className="text-[28px] leading-none font-bold tracking-tight text-primary">NexCon</h1>
 							</div>
 						)}
 

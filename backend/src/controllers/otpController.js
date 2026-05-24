@@ -3,6 +3,7 @@ import { sendOtp } from "../utils/sendEmail.js";
 import crypto from "crypto";
 import User from "../models/userModel.js";
 import jwt from "jsonwebtoken";
+import validator from "validator";
 
 function getCooldownMessage(remainingMs) {
     const seconds = Math.ceil(remainingMs / 1000);
@@ -30,7 +31,10 @@ function checkOtpCooldown(latestOtp, cooldownMs = 60000) {
 export async function sendOtpMakeUser(req, res) {
     try {
         let { email } = req.body;
-        email = email?.trim();
+        email = String(email || '').trim().toLowerCase();
+        if (!email || !validator.isEmail(email)) {
+            return res.status(400).json({ message: 'Invalid email format.' });
+        }
         const latestOtp = await Otp.findOne({ email: email, type: 'verification' }).sort({ createdAt: -1 });
         const cooldownMessage = checkOtpCooldown(latestOtp);
         if (cooldownMessage) {
@@ -55,7 +59,10 @@ export async function sendOtpMakeUser(req, res) {
 export async function sendOtpResetPassword(req, res) {
     try {
         let { email } = req.body;
-        email = email?.trim();
+        email = String(email || '').trim().toLowerCase();
+        if (!email || !validator.isEmail(email)) {
+            return res.status(400).json({ message: 'Invalid email format.' });
+        }
         const existingEmail = await User.findOne({ email: email });
         if (!existingEmail) {
             return res.json({ message: "If this email exists, an OTP will be sent." });
@@ -84,9 +91,12 @@ export async function sendOtpResetPassword(req, res) {
 export async function verifyOtpResetPassword(req, res) {
     try {
         let { email, otp } = req.body;
-        email = email?.trim();
+        email = String(email || '').trim().toLowerCase();
         if (!email || !otp) {
             return res.status(400).json({ message: 'Email and OTP are required.' });
+        }
+        if (!validator.isEmail(email)) {
+            return res.status(400).json({ message: 'Invalid email format.' });
         }
         const otpRecord = await Otp.findOne({ email: email, type: 'reset_password' }).sort({ createdAt: -1 });
         if (!otpRecord || otpRecord.otp !== otp || otpRecord.expiresAt < Date.now()) {

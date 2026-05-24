@@ -18,8 +18,8 @@ const signUpSchema = z.object({
   firstname: z.string().min(1, "Tên là bắt buộc"),
   lastname: z.string().min(1, "Họ là bắt buộc"),
   email: z.string().trim().email("Địa chỉ email không hợp lệ"),
-  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
-  confirmPassword: z.string().min(1, "Xác nhận mật khẩu là bắt buộc"),
+  password: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự").max(128, "Mật khẩu không được vượt quá 128 ký tự"),
+  confirmPassword: z.string().min(1, "Xác nhận mật khẩu là bắt buộc").max(128, "Mật khẩu không được vượt quá 128 ký tự"),
   termsAccepted: z.boolean().refine((value) => value, {
     message: "Vui lòng đồng ý với điều khoản và chính sách của NexCon",
   }),

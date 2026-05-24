@@ -43,6 +43,7 @@ ActionBtnLocal.displayName = "ActionBtnLocal";
 import { Bell, BellOff, Pin, UserPlus, Pencil, Camera, Loader2 } from "lucide-react";
 import { isMuted } from "@/utils/isMuted";
 import { MuteDropdown } from "./MuteDropdown";
+import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { MutualGroupsPanel } from "./MutualGroups";
 import ConversationLists from "./ConversationLists";
 import { ConversationRemindersPanel } from "./ConversationRemindersPanel";
@@ -56,7 +57,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropDialog";
 import { validateImageFile } from "@/lib/imageCrop";
 import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
@@ -192,7 +192,12 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
 
   const handleSubmitGroupName = async () => {
     const val = groupNameDraft.trim();
-    if (!val || val === groupDisplayName) {
+    const groupNameError = checkFieldFormat("groupName", val);
+    if (groupNameError) {
+      toast.error(groupNameError);
+      return;
+    }
+    if (val === groupDisplayName) {
       setOpenGroupRename(false);
       return;
     }
@@ -509,6 +514,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           <Input
             value={groupNameDraft}
             onChange={(e) => setGroupNameDraft(e.target.value)}
+            maxLength={FIELD_LIMITS.groupName}
             placeholder="Nhập tên nhóm mới"
             autoFocus
             onKeyDown={(e) => {
