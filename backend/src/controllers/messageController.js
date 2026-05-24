@@ -29,6 +29,7 @@ import { isMuted } from '../utils/isMuted.js';
 import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
+const MAX_REMINDER_SYSTEM_CONTENT_LENGTH = 1200;
 const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
@@ -715,11 +716,30 @@ export async function createReminderSystemMessage(req, res) {
         const normalizedReminderContent = String(reminderContent || '').trim();
         const normalizedRemindAt = String(remindAt || '').trim();
 
+        if (normalizedReminderId && !mongoose.Types.ObjectId.isValid(normalizedReminderId)) {
+            return res.status(400).json({ message: 'Invalid reminderId.' });
+        }
+
+        if (normalizedReminderContent.length > MAX_REMINDER_SYSTEM_CONTENT_LENGTH) {
+            return res.status(400).json({
+                message: `Reminder content cannot exceed ${MAX_REMINDER_SYSTEM_CONTENT_LENGTH} characters.`,
+            });
+        }
+
+        let normalizedRemindAtIso = '';
+        if (normalizedRemindAt) {
+            const remindAtDate = new Date(normalizedRemindAt);
+            if (Number.isNaN(remindAtDate.getTime())) {
+                return res.status(400).json({ message: 'remindAt must be a valid date.' });
+            }
+            normalizedRemindAtIso = remindAtDate.toISOString();
+        }
+
         const metadata = {
             visibleToUserIds: [senderId.toString()],
             ...(normalizedReminderId ? { reminderId: normalizedReminderId } : {}),
             ...(normalizedReminderContent ? { reminderContent: normalizedReminderContent } : {}),
-            ...(normalizedRemindAt ? { remindAt: normalizedRemindAt } : {}),
+            ...(normalizedRemindAtIso ? { remindAt: normalizedRemindAtIso } : {}),
         };
 
         const messageData = {

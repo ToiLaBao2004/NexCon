@@ -14,4 +14,11 @@ describe('checkFieldFormat', () => {
     expect(checkFieldFormat('phone', '09012abc')).toEqual(expect.any(String));
     expect(checkFieldFormat('nickname', 'x'.repeat(51))).toContain('50');
   });
+
+  it('validates group names', () => {
+    expect(checkFieldFormat('groupName', '  NexCon Team  ')).toBeNull();
+    expect(checkFieldFormat('groupName', '   ')).toEqual(expect.any(String));
+    expect(checkFieldFormat('groupName', 'x'.repeat(101))).toContain('100');
+    expect(checkFieldFormat('groupName', '!!!')).toEqual(expect.any(String));
+  });
 });

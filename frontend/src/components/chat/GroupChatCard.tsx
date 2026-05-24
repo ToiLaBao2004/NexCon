@@ -29,6 +29,8 @@ import { Button } from "@/components/ui/button";
 import UserAvatar from "./UserAvatar";
 import { ConfirmationModal } from "../shared/ConfirmationModal";
 import { getSystemMessageText } from "@/utils/chatUtils";
+import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
+import { toast } from "sonner";
 
 const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
 
@@ -135,7 +137,11 @@ const GroupChatCard = ({
 
 	const onSubmitGroupName = async () => {
 		const value = groupNameDraft.trim();
-		if (!value) return;
+		const groupNameError = checkFieldFormat("groupName", value);
+		if (groupNameError) {
+			toast.error(groupNameError);
+			return;
+		}
 
 		if (value === currentGroupName.trim()) {
 			setOpenRename(false);
@@ -283,6 +289,7 @@ const GroupChatCard = ({
 					<Input
 						value={groupNameDraft}
 						onChange={(e) => setGroupNameDraft(e.target.value)}
+						maxLength={FIELD_LIMITS.groupName}
 						placeholder="Nhập tên nhóm mới"
 						autoFocus
 						onKeyDown={(e) => {

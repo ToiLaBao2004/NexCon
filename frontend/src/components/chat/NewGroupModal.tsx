@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { Search, UserPlus2, Check } from 'lucide-react';
 import { removeAccents } from '@/lib/utils';
 import EmojiPicker from './EmojiPicker';
+import { FIELD_LIMITS, checkFieldFormat } from '@/lib/fieldFormat';
 
 interface NewGroupModalProps {
   isOpen: boolean;
@@ -76,8 +77,10 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
   }, [isOpen, initialSelected]);
 
   const handleCreateGroup = async () => {
-    if (!groupName.trim()) {
-      toast.error('Vui lòng nhập tên nhóm');
+    const normalizedGroupName = groupName.trim();
+    const groupNameError = checkFieldFormat('groupName', normalizedGroupName);
+    if (groupNameError) {
+      toast.error(groupNameError);
       return;
     }
 
@@ -93,7 +96,7 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
 
     try {
       setCreating(true);
-      await createGroup(groupName.trim(), selectedFriends);
+      await createGroup(normalizedGroupName, selectedFriends);
       toast.success('Đã tạo nhóm thành công!');
       onClose();
       // Reset state
@@ -129,6 +132,7 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
                 id="groupName"
                 value={groupName}
                 onChange={(e) => setGroupName(e.target.value)}
+                maxLength={FIELD_LIMITS.groupName}
                 className="pr-10 border-border focus:ring-primary/50"
                 placeholder="Nhập tên nhóm..."
               />
@@ -140,7 +144,7 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
                   className="size-8 hover:bg-gray-100 transition-smooth"
                 >
                   <div>
-                    <EmojiPicker onChange={(emoji: string) => setGroupName(`${groupName}${emoji}`)} />
+                    <EmojiPicker onChange={(emoji: string) => setGroupName(`${groupName}${emoji}`.slice(0, FIELD_LIMITS.groupName))} />
                   </div>
                 </Button>
               </div>

@@ -19,3 +19,10 @@ test('checkFieldFormat rejects invalid phone and overly long nickname', () => {
     assert.equal(typeof checkFieldFormat('phone', '09012abc'), 'string');
     assert.match(checkFieldFormat('nickname', 'x'.repeat(51)), /50/);
 });
+
+test('checkFieldFormat validates group names', () => {
+    assert.equal(checkFieldFormat('groupName', '  NexCon Team  '), null);
+    assert.equal(typeof checkFieldFormat('groupName', '   '), 'string');
+    assert.match(checkFieldFormat('groupName', 'x'.repeat(101)), /100/);
+    assert.equal(typeof checkFieldFormat('groupName', '!!!'), 'string');
+});
