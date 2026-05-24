@@ -60,7 +60,6 @@ const normalizeOnlineUsersPayload = (payload: any): {
           status: "online",
           status_mode: "auto",
           manual_status: "online",
-          show_activity: true,
           is_online: true,
           last_seen_at: null,
           last_seen_relative: null,

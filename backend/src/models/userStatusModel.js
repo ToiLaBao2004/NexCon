@@ -33,11 +33,6 @@ const userStatusSchema = new mongoose.Schema({
         default: Date.now,
         index: true,
     },
-    show_activity: {
-        type: Boolean,
-        default: true,
-        index: true,
-    },
 }, { timestamps: true });
 
 userStatusSchema.index({ userId: 1, status_mode: 1 });

@@ -68,7 +68,6 @@ export default interface AuthState {
   updateMyStatus: (data: {
     status_mode?: UserStatusMode;
     manual_status?: Exclude<UserPresenceStatus, "offline">;
-    show_activity?: boolean;
   }) => Promise<void>;
 
   getSessions: () => Promise<void>;

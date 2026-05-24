@@ -49,7 +49,6 @@ export async function updateMyUserStatus(req, res) {
         const requestedStatus = req.body?.status;
         const requestedMode = req.body?.status_mode ?? req.body?.statusMode;
         const requestedManualStatus = req.body?.manual_status ?? req.body?.manualStatus;
-        const requestedShowActivity = req.body?.show_activity ?? req.body?.showActivity;
 
         const updates = {};
         if (requestedMode !== undefined) {
@@ -63,9 +62,6 @@ export async function updateMyUserStatus(req, res) {
             } else {
                 updates.manual_status = requestedStatus;
             }
-        }
-        if (requestedShowActivity !== undefined) {
-            updates.show_activity = requestedShowActivity;
         }
 
         await updateUserStatusPreference(userId, updates);
