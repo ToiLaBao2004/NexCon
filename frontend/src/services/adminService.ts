@@ -17,23 +17,13 @@ export interface ViolationSummary {
   source: "redis" | "mongo-cache";
 }
 
-export interface AdminAssetCounts {
-  image: number;
-  file: number;
-  link: number;
-  audio: number;
-  total: number;
-}
-
 export interface AdminUser extends User {
   online?: boolean;
   violationSummary?: ViolationSummary;
   openReportCount?: number;
-  assetCounts?: AdminAssetCounts;
   counters?: {
     reports: Array<{ _id: { targetType: ReportTargetType; status: ReportStatus }; count: number }>;
     groups: number;
-    assets: AdminAssetCounts;
     resolvedReports: number;
   };
 }
@@ -262,12 +252,6 @@ export const adminService = {
     if (conversationId) query.set("conversationId", conversationId);
     const res = await api.get(`/admin/users/${userId}/messages?${query.toString()}`);
     return res.data as { messages: AdminMessage[]; pagination: Pagination };
-  },
-
-  async getUserAssets(userId: string, type = "all") {
-    const query = new URLSearchParams({ limit: "50", type });
-    const res = await api.get(`/admin/users/${userId}/assets?${query.toString()}`);
-    return res.data as { assets: AdminMessage[]; pagination: Pagination };
   },
 
   async getUserResolvedReports(userId: string) {

@@ -1,16 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   Activity,
-  Archive,
   CalendarDays,
   FileText,
-  Images,
-  LinkIcon,
   Loader2,
   Lock,
   Mail,
-  Paperclip,
   Phone,
   RefreshCw,
   ShieldAlert,
@@ -35,28 +31,18 @@ import {
   adminService,
   type AdminAuditLog,
   type AdminConversation,
-  type AdminMessage,
   type AdminReport,
   type AdminUser,
 } from "@/services/adminService";
 import AdminEvidencePreview from "@/components/admin/AdminEvidencePreview";
 
-type DrawerTab = "profile" | "groups" | "assets" | "reports" | "audit";
-type AssetType = "all" | "image" | "file" | "link" | "audio";
+type DrawerTab = "profile" | "groups" | "reports" | "audit";
 
 const tabs: Array<{ value: DrawerTab; label: string; icon: typeof Users }> = [
   { value: "profile", label: "Hồ sơ", icon: Users },
   { value: "groups", label: "Nhóm", icon: Users },
-  { value: "assets", label: "Tài nguyên", icon: Archive },
   { value: "reports", label: "Report đã xử lý", icon: FileText },
   { value: "audit", label: "Audit", icon: Activity },
-];
-
-const assetTabs: Array<{ value: AssetType; label: string; icon: typeof Archive }> = [
-  { value: "all", label: "Tất cả", icon: Archive },
-  { value: "image", label: "Ảnh", icon: Images },
-  { value: "file", label: "File", icon: Paperclip },
-  { value: "link", label: "Link", icon: LinkIcon },
 ];
 
 const statusLabels: Record<string, string> = {
@@ -85,10 +71,6 @@ function displayName(user?: AdminUser | null) {
   return user?.displayName || user?.email || "Người dùng";
 }
 
-function assetCounts(user?: AdminUser | null) {
-  return user?.assetCounts || user?.counters?.assets || { image: 0, file: 0, link: 0, audio: 0, total: 0 };
-}
-
 export default function AdminUserDrawer({
   userId,
   open,
@@ -107,20 +89,15 @@ export default function AdminUserDrawer({
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [loadingTab, setLoadingTab] = useState<DrawerTab | null>(null);
   const [groups, setGroups] = useState<AdminConversation[]>([]);
-  const [assets, setAssets] = useState<AdminMessage[]>([]);
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [loadedTabs, setLoadedTabs] = useState<Record<DrawerTab, boolean>>({
     profile: false,
     groups: false,
-    assets: false,
     reports: false,
     audit: false,
   });
-  const [assetType, setAssetType] = useState<AssetType>("all");
   const [manualReason, setManualReason] = useState("");
-
-  const counts = useMemo(() => assetCounts(user), [user]);
 
   const loadProfile = async (id: string) => {
     try {
@@ -140,11 +117,6 @@ export default function AdminUserDrawer({
     setGroups(result.conversations);
   };
 
-  const loadAssets = async (id: string, type: AssetType = assetType) => {
-    const result = await adminService.getUserAssets(id, type);
-    setAssets(result.assets);
-  };
-
   const loadReports = async (id: string) => {
     const result = await adminService.getUserResolvedReports(id);
     setReports(result.reports);
@@ -162,7 +134,6 @@ export default function AdminUserDrawer({
     try {
       setLoadingTab(tab);
       if (tab === "groups") await loadGroups(userId);
-      if (tab === "assets") await loadAssets(userId);
       if (tab === "reports") await loadReports(userId);
       if (tab === "audit") await loadAudit(userId);
       setLoadedTabs((current) => ({ ...current, [tab]: true }));
@@ -179,12 +150,10 @@ export default function AdminUserDrawer({
     setUser(initialUser || null);
     setActiveTab("profile");
     setGroups([]);
-    setAssets([]);
     setReports([]);
     setAuditLogs([]);
-    setAssetType("all");
     setManualReason("");
-    setLoadedTabs({ profile: false, groups: false, assets: false, reports: false, audit: false });
+    setLoadedTabs({ profile: false, groups: false, reports: false, audit: false });
     void loadProfile(userId);
   }, [open, userId]);
 
@@ -220,21 +189,6 @@ export default function AdminUserDrawer({
       toast.success("Đã khóa tài khoản");
     }
     await refreshCurrent();
-  };
-
-  const handleAssetType = async (type: AssetType) => {
-    if (!userId) return;
-    setAssetType(type);
-    try {
-      setLoadingTab("assets");
-      const result = await adminService.getUserAssets(userId, type);
-      setAssets(result.assets);
-      setLoadedTabs((current) => ({ ...current, assets: true }));
-    } catch (error: any) {
-      toast.error(getApiErrorMessage(error, "Không thể tải tài nguyên"));
-    } finally {
-      setLoadingTab(null);
-    }
   };
 
   return (
@@ -290,7 +244,6 @@ export default function AdminUserDrawer({
               {activeTab === "profile" && (
                 <ProfileTab
                   user={user}
-                  counts={counts}
                   manualReason={manualReason}
                   onManualReasonChange={setManualReason}
                   onManualViolation={() => void handleManualViolation()}
@@ -300,15 +253,6 @@ export default function AdminUserDrawer({
               {activeTab === "groups" && (
                 <TabBody loading={loadingTab === "groups"}>
                   <GroupsTab groups={groups} />
-                </TabBody>
-              )}
-              {activeTab === "assets" && (
-                <TabBody loading={loadingTab === "assets"}>
-                  <AssetsTab
-                    assets={assets}
-                    activeType={assetType}
-                    onTypeChange={(type) => void handleAssetType(type)}
-                  />
                 </TabBody>
               )}
               {activeTab === "reports" && (
@@ -331,14 +275,12 @@ export default function AdminUserDrawer({
 
 function ProfileTab({
   user,
-  counts,
   manualReason,
   onManualReasonChange,
   onManualViolation,
   onLockToggle,
 }: {
   user: AdminUser;
-  counts: ReturnType<typeof assetCounts>;
   manualReason: string;
   onManualReasonChange: (value: string) => void;
   onManualViolation: () => void;
@@ -368,11 +310,10 @@ function ProfileTab({
 
         <section className="rounded-md border border-border/70">
           <div className="border-b border-border/70 px-4 py-3 font-medium">Tóm tắt kiểm duyệt</div>
-          <div className="grid gap-3 p-4 md:grid-cols-4">
-            <Metric label="Ảnh" value={counts.image} />
-            <Metric label="File" value={counts.file} />
-            <Metric label="Link" value={counts.link} />
+          <div className="grid gap-3 p-4 md:grid-cols-3">
             <Metric label="Report mở" value={user.openReportCount || 0} />
+            <Metric label="Vi phạm" value={user.violationSummary?.count ?? user.moderation?.violationCountCache ?? 0} />
+            <Metric label="Report đã xử lý" value={user.counters?.resolvedReports ?? 0} />
           </div>
           <div className="grid gap-4 border-t border-border/70 p-4 text-sm md:grid-cols-2">
             <Info label="Trạng thái khóa" value={locked(user) ? user.lock?.reason || "Đang khóa" : "Bình thường"} />
@@ -437,48 +378,6 @@ function GroupsTab({ groups }: { groups: AdminConversation[] }) {
           </Button>
         </div>
       ))}
-    </div>
-  );
-}
-
-function AssetsTab({
-  assets,
-  activeType,
-  onTypeChange,
-}: {
-  assets: AdminMessage[];
-  activeType: AssetType;
-  onTypeChange: (type: AssetType) => void;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        {assetTabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <Button
-              key={tab.value}
-              type="button"
-              variant={activeType === tab.value ? "default" : "outline"}
-              size="sm"
-              className="h-8 rounded-md"
-              onClick={() => onTypeChange(tab.value)}
-            >
-              <Icon className="size-4" />
-              {tab.label}
-            </Button>
-          );
-        })}
-      </div>
-      {assets.length === 0 ? (
-        <Empty text="Chưa có tài nguyên trong bộ lọc này." />
-      ) : (
-        <div className="grid gap-3">
-          {assets.map((asset) => (
-            <AdminEvidencePreview key={asset._id} message={asset} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
