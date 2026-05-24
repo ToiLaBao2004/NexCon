@@ -11,7 +11,7 @@ import {
     getVisiblePresencesForUsers,
     updateUserStatus as updateUserStatusPreference,
 } from '../services/userStatusService.js';
-import { emitOnlineUsers, isUserOnline } from '../socket/index.js';
+import { emitOnlineUsers, emitToUser, isUserOnline } from '../socket/index.js';
 
 const SPOTIFY_TRACK_ID_PATTERN = /^[A-Za-z0-9]{22}$/;
 
@@ -163,6 +163,10 @@ export async function updateProfile(req, res) {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        emitToUser(userId, 'profile-updated', {
+            user: updatedUser.toObject ? updatedUser.toObject() : updatedUser,
+        });
+
         return res.status(200).json({
             message: 'Profile updated successfully',
             user: updatedUser
@@ -223,6 +227,10 @@ export async function updateAvatar(req, res) {
         if (!updatedUser) {
             return res.status(404).json({ message: 'User not found' });
         }
+
+        emitToUser(userId, 'profile-updated', {
+            user: updatedUser.toObject ? updatedUser.toObject() : updatedUser,
+        });
 
         return res.status(200).json({
             message: 'Avatar updated successfully',
