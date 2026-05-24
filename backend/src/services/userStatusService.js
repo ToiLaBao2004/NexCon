@@ -16,12 +16,12 @@ export const DISPLAY_STATUSES = [
 ];
 
 const STATUS_LABELS = {
-    online: 'Online',
-    away: 'Away',
-    busy: 'Busy',
-    do_not_disturb: 'Do Not Disturb',
-    invisible: 'Invisible',
-    offline: 'Offline',
+    online: 'Trực tuyến',
+    away: 'Vắng mặt',
+    busy: 'Bận',
+    do_not_disturb: 'Không làm phiền',
+    invisible: 'Ẩn trạng thái',
+    offline: 'Ngoại tuyến',
 };
 
 const DEFAULT_STATUS = {
