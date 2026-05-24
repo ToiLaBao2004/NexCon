@@ -21,6 +21,7 @@ import ResetPassPage from "./pages/ResetPassPage";
 import { Toaster } from "sonner";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import AdminRoute from "./components/auth/AdminRoute";
+import PublicAuthRoute from "./components/auth/PublicAuthRoute";
 import OAuthSuccess from "./components/auth/OAuthSuccess";
 import { useThemeStore } from "./stores/useThemeStore";
 import { useEffect } from "react";
@@ -285,8 +286,10 @@ function App() {
             </>
           )}
           <Routes>
-            <Route path="/signin" element={<SignInPage />} />
-            <Route path="/signup" element={<SignUpPage />} />
+            <Route element={<PublicAuthRoute />}>
+              <Route path="/signin" element={<SignInPage />} />
+              <Route path="/signup" element={<SignUpPage />} />
+            </Route>
             <Route path="/terms" element={<LegalPage type="terms" />} />
             <Route path="/community-standards" element={<LegalPage type="community" />} />
             <Route path="/privacy" element={<LegalPage type="privacy" />} />
