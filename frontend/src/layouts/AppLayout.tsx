@@ -30,7 +30,7 @@ const AppLayout = () => {
 
             <div
                 className={cn(
-                    "flex-1 min-w-0 relative h-full md:pb-0",
+                    "safe-area-top flex-1 min-w-0 relative h-full md:pb-0",
                     shouldHideMobileBottomNav ? "pb-0" : "pb-14"
                 )}
             >

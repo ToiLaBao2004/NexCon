@@ -281,6 +281,26 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+.safe-area-top {
+    padding-top: 0;
+}
+
+@media (max-width: 767px) {
+    .safe-area-top {
+        padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+    }
+
+    .mobile-page-header {
+        min-height: 4rem;
+        padding: 0.875rem 1.25rem;
+    }
+
+    .mobile-page-title {
+        font-size: 1.25rem;
+        line-height: 1.75rem;
+    }
+}
+
 [data-sonner-toaster] {
   z-index: 2147483647 !important;
 }

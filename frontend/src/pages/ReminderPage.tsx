@@ -901,12 +901,12 @@ const ReminderPage = () => {
 
     return (
         <div className="flex h-full flex-1 flex-col overflow-hidden rounded-none border-0 bg-card md:rounded-l-none md:rounded-r-2xl md:border-y md:border-r md:border-l-0 md:border-border/50">
-            <div className="border-b border-border/50 bg-card px-5 py-5 md:px-7">
+            <div className="mobile-page-header border-b border-border/50 bg-card px-5 py-5 md:px-7">
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
                         <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
-                                <h1 className="truncate text-[28px] font-bold leading-tight tracking-tight text-foreground">Nhắc hẹn</h1>
+                                <h1 className="mobile-page-title truncate text-[28px] font-bold leading-tight tracking-tight text-foreground">Nhắc hẹn</h1>
                             </div>
                             <p className="hidden text-sm text-muted-foreground md:block">
                                 Quản lý các việc cần nhớ của bạn
