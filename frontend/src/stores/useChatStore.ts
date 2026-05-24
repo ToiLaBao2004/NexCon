@@ -808,14 +808,14 @@ export const useChatStore = create<ChatState>()(
                             const prev = state.messages[convoId];
                             if (!prev) return state;
 
-                            const alreadyExists = prev.items.some((m) => m._id === realMsg._id);
+                            const sentMessage = { ...realMsg, isOwn: true, status: 'sent' as const };
+                            const withoutTemp = prev.items.filter((m) => m._id !== tempId);
+                            const alreadyExists = withoutTemp.some((m) => m._id === realMsg._id);
                             const items = alreadyExists
-                                ? prev.items.filter((m) => m._id !== tempId)
-                                : prev.items.map((m) =>
-                                    m._id === tempId
-                                        ? { ...realMsg, isOwn: true, status: 'sent' as const }
-                                        : m
-                                );
+                                ? withoutTemp.map((m) =>
+                                    m._id === realMsg._id ? { ...m, ...sentMessage } : m
+                                )
+                                : [...withoutTemp, sentMessage];
                             const prevMedia = state.media[convoId];
                             let nextMedia = prevMedia;
                             if (prevMedia) {
