@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { reminderService } from '@/services/reminderService';
 import { useReminderStore } from '@/stores/useReminderStore';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { getApiErrorMessage } from '@/lib/apiMessage';
 
 interface ScheduleMeetingModalProps {
   open: boolean;
@@ -72,9 +73,7 @@ export default function ScheduleMeetingModal({ open, onOpenChange, conversationI
       toast.success('Đã lên lịch cuộc họp thành công ✓');
       handleClose();
     } catch (err: unknown) {
-      const maybeErr = err as { response?: { data?: { message?: string } } };
-      const msg = maybeErr?.response?.data?.message || 'Không thể lên lịch cuộc họp lúc này.';
-      setError(msg);
+      setError(getApiErrorMessage(err, 'Không thể lên lịch cuộc họp lúc này.'));
     } finally {
       setIsSubmitting(false);
     }

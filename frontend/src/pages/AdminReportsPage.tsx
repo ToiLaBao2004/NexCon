@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { adminService, type AdminReport } from "@/services/adminService";
 import type { ReportStatus, ReportTargetType } from "@/services/reportService";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 const statusOptions: Array<ReportStatus | "all"> = ["pending", "reviewing", "resolved", "dismissed", "all"];
 
@@ -88,7 +89,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
         ? current
         : result.reports[0]?._id || null);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể tải danh sách báo cáo");
+      toast.error(getApiErrorMessage(error, "Không thể tải danh sách báo cáo"));
     } finally {
       setLoading(false);
     }
@@ -117,7 +118,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
       toast.success(decision === "violation" ? "Đã xác nhận vi phạm" : "Đã đóng báo cáo không vi phạm");
       await loadReports();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể xử lý báo cáo");
+      toast.error(getApiErrorMessage(error, "Không thể xử lý báo cáo"));
     } finally {
       setSubmitting(false);
     }
@@ -150,7 +151,7 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
 
       await loadReports();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể lọc báo cáo bằng AI");
+      toast.error(getApiErrorMessage(error, "Không thể lọc báo cáo bằng AI"));
     } finally {
       setAiReviewing(false);
     }

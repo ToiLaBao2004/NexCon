@@ -1,5 +1,6 @@
 import { chatService } from '@/services/chatService';
 import { toast } from 'sonner';
+import { getApiErrorMessage } from '@/lib/apiMessage';
 import type { ChatState, DraftInfo, SendMessagePayload } from '@/types/store';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -1186,7 +1187,7 @@ export const useChatStore = create<ChatState>()(
                     }
                 } catch (error) {
                     console.error('Lỗi khi ghim hội thoại:', error);
-                    toast.error((error as any)?.response?.data?.message || 'Không thể cập nhật trạng thái ghim hội thoại.');
+                    toast.error(getApiErrorMessage(error, 'Không thể cập nhật trạng thái ghim hội thoại.'));
                     await get().fetchConversations(true);
                     throw error;
                 }

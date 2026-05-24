@@ -21,6 +21,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Bell, Flag, Shield, Eye, EyeOff } from "lucide-react";
 import { ReportHistoryContent } from "@/pages/ReportHistoryPage";
+import { getApiErrorField, getApiErrorMessage } from "@/lib/apiMessage";
 
 const resetPassSchema = z.object({
     newPassword: z.string().min(8, "Mật khẩu phải có ít nhất 8 ký tự"),
@@ -80,8 +81,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             resetResetForm();
         } catch (error: any) {
             console.error("Lỗi gửi OTP:", error);
-            const backendMsg = error.response?.data?.message || "Gửi mã OTP thất bại.";
-            toast.error(backendMsg);
+            toast.error(getApiErrorMessage(error, "Gửi mã OTP thất bại."));
         }
     };
 
@@ -95,7 +95,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             setResetToken(resetToken);
             setForgotPassStep("reset");
         } catch (err: any) {
-            setOtpError(err.response?.data?.message || "Mã OTP không hợp lệ.");
+            setOtpError(getApiErrorMessage(err, "Mã OTP không hợp lệ."));
         } finally {
             setOtpLoading(false);
         }
@@ -108,7 +108,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             setCountdown(60);
             setOtpError(null);
         } catch (err: any) {
-            setOtpError(err.response?.data?.message || "Gửi lại mã OTP thất bại.");
+            setOtpError(getApiErrorMessage(err, "Gửi lại mã OTP thất bại."));
         }
     };
 
@@ -117,11 +117,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             await resetNewPassword(resetToken, data.newPassword, data.confirmNewPassword);
             onOpenChange(false);
         } catch (error: any) {
-            const backendMsg = error.response?.data?.message || "Cập nhật mật khẩu thất bại.";
-            if (backendMsg.toLowerCase().includes("mới") || backendMsg.toLowerCase().includes("new")) {
-                setErrorReset("newPassword", { type: "server", message: backendMsg });
+            const message = getApiErrorMessage(error, "Cập nhật mật khẩu thất bại.");
+            const field = getApiErrorField(error);
+            if (field === "newPassword" || field === "password") {
+                setErrorReset("newPassword", { type: "server", message });
+            } else if (field === "confirmPassword") {
+                setErrorReset("confirmNewPassword", { type: "server", message });
             } else {
-                setErrorReset("root", { type: "server", message: backendMsg });
+                setErrorReset("root", { type: "server", message });
             }
         }
     };

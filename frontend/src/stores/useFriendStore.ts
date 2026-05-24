@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { friendService } from '@/services/friendService';
 import type { FriendState } from '@/types/store';
 import { checkFieldFormat } from '@/lib/fieldFormat';
+import { getApiErrorMessage, getApiSuccessMessage } from '@/lib/apiMessage';
 
 const MAX_FRIENDS = 500;
 const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
@@ -122,9 +123,7 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			toast.success('Biệt danh đã được cập nhật.');
 		} catch (error: any) {
 			console.error('Lỗi khi đặt biệt danh:', error);
-			toast.error(
-				error.response?.data?.message || 'Cập nhật biệt danh thất bại. Vui lòng thử lại.'
-			);
+			toast.error(getApiErrorMessage(error, 'Cập nhật biệt danh thất bại. Vui lòng thử lại.'));
 			throw error;
 		} finally {
 			set({ loading: false });
@@ -149,12 +148,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion.email.toLowerCase() !== email.toLowerCase())
 			}));
 
-			toast.success(data.message || 'Đã gửi lời mời kết bạn!');
+			toast.success(getApiSuccessMessage(data, 'Đã gửi lời mời kết bạn!'));
 		} catch (error: any) {
 			console.error('Lỗi khi gửi lời mời kết bạn:', error);
-			toast.error(
-				error.response?.data?.message || 'Gửi lời mời kết bạn thất bại.'
-			);
+			toast.error(getApiErrorMessage(error, 'Gửi lời mời kết bạn thất bại.'));
 			throw error;
 		} finally {
 			set({ sendingRequest: false });
@@ -169,12 +166,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 				sentRequests: state.sentRequests.filter((r) => r._id !== requestId),
 				friendSuggestionsFetched: false
 			}));
-			toast.success(data.message || 'Đã hủy lời mời kết bạn.');
+			toast.success(getApiSuccessMessage(data, 'Đã hủy lời mời kết bạn.'));
 		} catch (error: any) {
 			console.error('Lỗi khi hủy lời mời kết bạn:', error);
-			toast.error(
-				error.response?.data?.message || 'Hủy lời mời thất bại.'
-			);
+			toast.error(getApiErrorMessage(error, 'Hủy lời mời thất bại.'));
 			throw error;
 		} finally {
 			set({ loading: false });
@@ -196,9 +191,7 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			}));
 		} catch (error: any) {
 			console.error('Lỗi khi chấp nhận kết bạn:', error);
-			toast.error(
-				error.response?.data?.message || 'Chấp nhận lời mời thất bại.'
-			);
+			toast.error(getApiErrorMessage(error, 'Chấp nhận lời mời thất bại.'));
 			throw error;
 		} finally {
 			set({ loading: false });
@@ -212,12 +205,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			set((state) => ({
 				incomingRequests: state.incomingRequests.filter((r) => r._id !== requestId)
 			}));
-			toast.success(data.message || 'Đã từ chối lời mời kết bạn.');
+			toast.success(getApiSuccessMessage(data, 'Đã từ chối lời mời kết bạn.'));
 		} catch (error: any) {
 			console.error('Lỗi khi từ chối kết bạn:', error);
-			toast.error(
-				error.response?.data?.message || 'Từ chối lời mời thất bại.'
-			);
+			toast.error(getApiErrorMessage(error, 'Từ chối lời mời thất bại.'));
 			throw error;
 		} finally {
 			set({ loading: false });
@@ -297,12 +288,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 				friends: state.friends.filter((f) => f.friendId !== friendId),
 				friendSuggestionsFetched: false
 			}));
-			toast.success(data.message || 'Đã hủy kết bạn.');
+			toast.success(getApiSuccessMessage(data, 'Đã hủy kết bạn.'));
 		} catch (error: any) {
 			console.error('Lỗi khi hủy kết bạn:', error);
-			toast.error(
-				error.response?.data?.message || 'Hủy kết bạn thất bại.'
-			);
+			toast.error(getApiErrorMessage(error, 'Hủy kết bạn thất bại.'));
 			throw error;
 		} finally {
 			set({ loading: false });
@@ -341,10 +330,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 				friends: state.friends.filter(f => f.friendId !== userId),
 				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion._id !== userId)
 			}));
-			toast.success(data.message || 'Đã chặn.');
+			toast.success(getApiSuccessMessage(data, 'Đã chặn.'));
 		} catch (error: any) {
 			console.error('Lỗi khi chặn người dùng:', error);
-			toast.error(error.response?.data?.message || 'Chặn thất bại.');
+			toast.error(getApiErrorMessage(error, 'Chặn thất bại.'));
 		} finally {
 			set({ loading: false });
 		}
@@ -358,10 +347,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 				blockedUsers: state.blockedUsers.filter(u => u._id !== userId),
 				blockedUsersFetched: true,
 			}));
-			toast.success(data.message || 'Đã bỏ chặn.');
+			toast.success(getApiSuccessMessage(data, 'Đã bỏ chặn.'));
 		} catch (error: any) {
 			console.error('Lỗi khi bỏ chặn người dùng:', error);
-			toast.error(error.response?.data?.message || 'Bỏ chặn thất bại.');
+			toast.error(getApiErrorMessage(error, 'Bỏ chặn thất bại.'));
 		} finally {
 			set({ loading: false });
 		}

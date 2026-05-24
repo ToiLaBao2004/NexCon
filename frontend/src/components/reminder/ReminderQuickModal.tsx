@@ -8,6 +8,7 @@ import { useReminderStore } from '@/stores/useReminderStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import ReminderFormModal from './ReminderFormModal';
 import type { CreateReminderPayload, Reminder } from '@/types/reminder';
+import { getApiErrorMessage } from '@/lib/apiMessage';
 
 interface ReminderQuickModalProps {
   conversationId: string;
@@ -96,10 +97,11 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
       closeAll();
     } catch (error) {
       console.error('Create reminder quick failed:', error);
-      const maybeError = error as { response?: { data?: { message?: string } } };
       toast.error(
-        maybeError?.response?.data?.message
-        || (isSharedMode ? 'Không thể tạo nhắc hẹn chung lúc này' : 'Không thể tạo nhắc hẹn cá nhân lúc này')
+        getApiErrorMessage(
+          error,
+          isSharedMode ? 'Không thể tạo nhắc hẹn chung lúc này' : 'Không thể tạo nhắc hẹn cá nhân lúc này'
+        )
       );
     } finally {
       setIsSubmitting(false);
@@ -317,4 +319,3 @@ export default function ReminderQuickModal({ conversationId, messageId, messageP
     </>
   );
 }
-

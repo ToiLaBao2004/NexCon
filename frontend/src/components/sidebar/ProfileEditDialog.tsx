@@ -20,6 +20,7 @@ import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropDialog";
 import { validateImageFile } from "@/lib/imageCrop";
 import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 interface ProfileEditDialogProps {
     open: boolean;
@@ -31,8 +32,7 @@ const avatarCropPresets: CropPreset[] = [
 ];
 
 const getUploadErrorMessage = (error: unknown, fallback: string) => {
-    const maybeError = error as { response?: { data?: { message?: string } } };
-    return maybeError.response?.data?.message || fallback;
+    return getApiErrorMessage(error, fallback);
 };
 
 export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps) {
@@ -108,7 +108,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             onOpenChange(false);
             toast.success("Cập nhật thông tin thành công!");
         } catch (error: any) {
-            toast.error(error.response?.data?.message || "Cập nhật thất bại");
+            toast.error(getApiErrorMessage(error, "Cập nhật thất bại"));
         } finally {
             setLoading(false);
         }

@@ -14,6 +14,7 @@ import { getPresenceForUser, getPresenceText } from "@/utils/userPresence";
 import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { getApiErrorMessage } from "@/lib/apiMessage";
 
 const MANUAL_STATUS_OPTIONS: {
   status: Exclude<UserPresenceStatus, "offline">;
@@ -57,7 +58,7 @@ export function UserStatusMenuItems({
       setSavingKey(key);
       await updateMyStatus(data);
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || "Không thể cập nhật trạng thái.");
+      toast.error(getApiErrorMessage(error, "Không thể cập nhật trạng thái."));
     } finally {
       setSavingKey(null);
     }
