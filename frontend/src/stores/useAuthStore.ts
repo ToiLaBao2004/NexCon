@@ -258,7 +258,7 @@ export const useAuthStore = create<AuthState>()(
     refreshToken: async () => {
       try {
         set({ loading: true });
-        const { user, fetchMe, setAccessToken } = get();
+        const { fetchMe, setAccessToken } = get();
         let body = {};
         const { Capacitor } = await import('@capacitor/core');
         if (Capacitor.isNativePlatform()) {
@@ -269,9 +269,7 @@ export const useAuthStore = create<AuthState>()(
         }
         const accessToken = await authService.refreshToken(body);
         setAccessToken(accessToken);
-        if (!user) {
-          await fetchMe();
-        }
+        await fetchMe(true);
       } catch (error) {
         console.error('Lỗi khi làm mới token:', error);
         get().clearState();

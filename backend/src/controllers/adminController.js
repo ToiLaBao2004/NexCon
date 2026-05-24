@@ -186,27 +186,6 @@ function serializeMessage(message) {
     };
 }
 
-function emptyAssetCounts() {
-    return { image: 0, file: 0, link: 0, audio: 0, total: 0 };
-}
-
-function buildAssetCountMap(rows = []) {
-    const map = new Map();
-
-    rows.forEach((row) => {
-        const senderId = row._id?.senderId?.toString?.();
-        const type = row._id?.type;
-        if (!senderId || !type) return;
-
-        const current = map.get(senderId) || emptyAssetCounts();
-        current[type] = row.count;
-        current.total += row.count;
-        map.set(senderId, current);
-    });
-
-    return map;
-}
-
 async function attachReportEvidence(reports) {
     const messageIds = reports
         .filter((report) => report.targetType === 'message' && report.targetMessageId)
@@ -628,26 +607,20 @@ export async function listAdminUsers(req, res) {
         ]);
 
         const userIds = users.map((user) => user._id);
-        const [reportCounts, assetCounts] = await Promise.all([
+        const [reportCounts] = await Promise.all([
             Report.aggregate([
                 { $match: { targetUserId: { $in: userIds }, status: { $in: ['pending', 'reviewing'] } } },
                 { $group: { _id: '$targetUserId', count: { $sum: 1 } } },
             ]),
-            Message.aggregate([
-                { $match: { senderId: { $in: userIds }, type: { $in: ['image', 'file', 'link', 'audio'] } } },
-                { $group: { _id: { senderId: '$senderId', type: '$type' }, count: { $sum: 1 } } },
-            ]),
         ]);
 
         const reportCountMap = new Map(reportCounts.map((item) => [item._id.toString(), item.count]));
-        const assetCountMap = buildAssetCountMap(assetCounts);
         const enrichedUsers = await Promise.all(users.map(async (user) => {
             const violationSummary = await getViolationSummary(user._id);
             return toUserSummary(user, {
                 online: isUserOnline(user._id),
                 violationSummary,
                 openReportCount: reportCountMap.get(user._id.toString()) || 0,
-                assetCounts: assetCountMap.get(user._id.toString()) || emptyAssetCounts(),
             });
         }));
 
@@ -671,17 +644,13 @@ export async function getAdminUserProfile(req, res) {
         }
 
         const now = new Date();
-        const [violationSummary, reportCounts, groupCount, assetCounts, resolvedReportCount] = await Promise.all([
+        const [violationSummary, reportCounts, groupCount, resolvedReportCount] = await Promise.all([
             getViolationSummary(user._id),
             Report.aggregate([
                 { $match: { $or: [{ reporterId: user._id }, { targetUserId: user._id }] } },
                 { $group: { _id: { targetType: '$targetType', status: '$status' }, count: { $sum: 1 } } },
             ]),
             Conversation.countDocuments({ type: 'group', 'participants.userId': user._id }),
-            Message.aggregate([
-                { $match: { senderId: user._id, type: { $in: ['image', 'file', 'link', 'audio'] } } },
-                { $group: { _id: { senderId: '$senderId', type: '$type' }, count: { $sum: 1 } } },
-            ]),
             Report.countDocuments({
                 targetUserId: user._id,
                 status: { $in: ['resolved', 'dismissed'] },
@@ -689,17 +658,13 @@ export async function getAdminUserProfile(req, res) {
             }),
         ]);
 
-        const assetCountMap = buildAssetCountMap(assetCounts);
-
         return res.status(200).json({
             user: toUserSummary(user, {
                 online: isUserOnline(user._id),
                 violationSummary,
-                assetCounts: assetCountMap.get(user._id.toString()) || emptyAssetCounts(),
                 counters: {
                     reports: reportCounts,
                     groups: groupCount,
-                    assets: assetCountMap.get(user._id.toString()) || emptyAssetCounts(),
                     resolvedReports: resolvedReportCount,
                 },
             }),
@@ -821,37 +786,6 @@ export async function getAdminUserConversations(req, res) {
         });
     } catch (error) {
         return handleAdminError(res, error, 'Error fetching user groups:');
-    }
-}
-
-export async function getAdminUserAssets(req, res) {
-    try {
-        const { userId } = req.params;
-        requireObjectId(userId, 'userId');
-        const { limit, skip, page } = parsePagination(req.query, 30, 100);
-        const type = String(req.query.type || 'all');
-        const allowedTypes = ['image', 'file', 'link', 'audio'];
-        const filter = { senderId: userId, type: { $in: allowedTypes } };
-
-        if (allowedTypes.includes(type)) {
-            filter.type = type;
-        }
-
-        const [messages, total] = await Promise.all([
-            Message.find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean(),
-            Message.countDocuments(filter),
-        ]);
-
-        return res.status(200).json({
-            assets: messages.map(serializeMessage),
-            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-        });
-    } catch (error) {
-        return handleAdminError(res, error, 'Error fetching user assets:');
     }
 }
 
@@ -1036,37 +970,6 @@ export async function getAdminUserMessages(req, res) {
         });
     } catch (error) {
         return handleAdminError(res, error, 'Error fetching user messages:');
-    }
-}
-
-export async function getAdminUserAssets(req, res) {
-    try {
-        const { userId } = req.params;
-        requireObjectId(userId, 'userId');
-        const { limit, skip, page } = parsePagination(req.query, 30, 100);
-        const type = String(req.query.type || 'all');
-        const allowedTypes = ['image', 'file', 'link', 'audio'];
-        const filter = { senderId: userId, type: { $in: allowedTypes } };
-
-        if (allowedTypes.includes(type)) {
-            filter.type = type;
-        }
-
-        const [messages, total] = await Promise.all([
-            Message.find(filter)
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean(),
-            Message.countDocuments(filter),
-        ]);
-
-        return res.status(200).json({
-            assets: messages.map(serializeMessage),
-            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-        });
-    } catch (error) {
-        return handleAdminError(res, error, 'Error fetching user assets:');
     }
 }
 

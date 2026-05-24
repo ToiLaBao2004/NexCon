@@ -83,6 +83,23 @@ const normalizeOnlineUsersPayload = (payload: any): {
   return { onlineUsers, userPresences };
 };
 
+const syncCurrentUserProfile = (updatedUser: any) => {
+  const updatedUserId = updatedUser?._id?.toString?.() || updatedUser?._id;
+  const currentUser = useAuthStore.getState().user;
+  if (!updatedUserId || !currentUser || String(currentUser._id) !== String(updatedUserId)) {
+    return;
+  }
+
+  useAuthStore.setState({
+    user: {
+      ...currentUser,
+      ...updatedUser,
+    },
+  });
+
+  void useChatStore.getState().fetchConversations(true);
+};
+
 const canShowBrowserNotification = () => {
   return typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted";
 };
@@ -504,6 +521,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           typingUsers: nextTypingUsers,
         };
       });
+    });
+
+    socket.on("profile-updated", ({ user }) => {
+      syncCurrentUserProfile(user);
     });
 
     socket.on("new-message", ({ message, conversation, unreadCounts }) => {

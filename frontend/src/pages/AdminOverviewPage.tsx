@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type UIEvent } from "react";
-import { Archive, FileText, Images, LinkIcon, Loader2, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
+import { Loader2, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
 import { toast } from "sonner";
 import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
 import { Badge } from "@/components/ui/badge";
@@ -25,10 +25,6 @@ function locked(user?: AdminUser | null) {
 
 function userLabel(user: AdminUser) {
   return user.displayName || user.email;
-}
-
-function counts(user: AdminUser) {
-  return user.assetCounts || { image: 0, file: 0, link: 0, audio: 0, total: 0 };
 }
 
 export default function AdminOverviewPage() {
@@ -110,7 +106,7 @@ export default function AdminOverviewPage() {
               <h1 className="text-2xl font-semibold tracking-normal">Tổng quan admin</h1>
             </div>
             <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-              Danh sách người dùng chỉ hiển thị thông tin tổng quan. Chi tiết, nhóm, file, ảnh và link được tải khi admin mở từng hồ sơ.
+              Danh sách người dùng chỉ hiển thị thông tin tài khoản và kiểm duyệt cần thiết.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
@@ -154,19 +150,16 @@ export default function AdminOverviewPage() {
             </div>
           ) : (
             <div className="mx-auto w-full max-w-7xl overflow-hidden rounded-md border border-border/70">
-              <div className="hidden grid-cols-[minmax(220px,1.2fr)_minmax(260px,1fr)_130px_120px_92px] gap-4 border-b border-border/70 bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid">
+              <div className="hidden grid-cols-[minmax(260px,1.4fr)_170px_140px_92px] gap-4 border-b border-border/70 bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid">
                 <span>Người dùng</span>
-                <span>Tài nguyên</span>
                 <span>Report mở</span>
                 <span>Tham gia</span>
                 <span />
               </div>
-              {users.map((user) => {
-                const c = counts(user);
-                return (
+              {users.map((user) => (
                   <div
                     key={user._id}
-                    className="grid gap-3 border-b border-border/60 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(220px,1.2fr)_minmax(260px,1fr)_130px_120px_92px] lg:items-center"
+                    className="grid gap-3 border-b border-border/60 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(260px,1.4fr)_170px_140px_92px] lg:items-center"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="relative shrink-0">
@@ -187,12 +180,6 @@ export default function AdminOverviewPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <AssetBadge icon={Images} label="ảnh" value={c.image} />
-                      <AssetBadge icon={PaperclipIcon} label="file" value={c.file} />
-                      <AssetBadge icon={LinkIcon} label="link" value={c.link} />
-                    </div>
-
                     <div className="flex flex-wrap items-center gap-2">
                       {(user.openReportCount || 0) > 0 ? (
                         <Badge variant="destructive">{user.openReportCount} report</Badge>
@@ -210,8 +197,7 @@ export default function AdminOverviewPage() {
                       Xem
                     </Button>
                   </div>
-                );
-              })}
+              ))}
             </div>
           )}
 
@@ -251,14 +237,3 @@ function Metric({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
-
-function AssetBadge({ icon: Icon, label, value }: { icon: typeof Archive; label: string; value: number }) {
-  return (
-    <Badge variant="outline" className="gap-1.5 rounded-md px-2.5 py-1">
-      <Icon className="size-3.5" />
-      {value} {label}
-    </Badge>
-  );
-}
-
-const PaperclipIcon = FileText;

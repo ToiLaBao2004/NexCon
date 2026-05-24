@@ -4,7 +4,6 @@ import {
     aiReviewMessageReports,
     getAdminObservability,
     getAdminStats,
-    getAdminUserAssets,
     getAdminUserAuditLogs,
     getAdminUserConversations,
     getAdminUserMessages,
@@ -32,7 +31,6 @@ adminRouter.get('/users/:userId/profile', getAdminUserProfile);
 adminRouter.get('/users/:userId/audit-logs', getAdminUserAuditLogs);
 adminRouter.get('/users/:userId/conversations', getAdminUserConversations);
 adminRouter.get('/users/:userId/messages', getAdminUserMessages);
-adminRouter.get('/users/:userId/assets', getAdminUserAssets);
 adminRouter.get('/users/:userId/resolved-reports', getAdminUserResolvedReports);
 adminRouter.post('/users/:userId/violations', addAdminUserViolation);
 adminRouter.post('/users/:userId/lock', lockAdminUser);
