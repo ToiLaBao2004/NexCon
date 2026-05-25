@@ -8,6 +8,7 @@ import { io, getReceiverSocketId, emitToUser, emitOnlineUsers, isUserOnline } fr
 import { createNotification } from "../services/notificationServices.js";
 import { checkFieldFormat } from "../utils/fieldFormat.js";
 import { maskLockedUserDoc } from "../utils/lockedUser.js";
+import { applyProfileVisibility } from "../utils/profilePrivacy.js";
 import { getVisiblePresencesForUsers } from "../services/userStatusService.js";
 import validator from "validator";
 
@@ -42,6 +43,7 @@ const GENERIC_EMAIL_DOMAINS = new Set([
 ]);
 
 const NON_ADMIN_USER_FILTER = { role: { $ne: 'admin' } };
+const PROFILE_USER_SELECT = 'displayName email avatarUrl bio phone music profileVisibility lock';
 
 const getIdString = (value) => {
     if (!value) return '';
@@ -56,6 +58,10 @@ const normalizeEmailDomain = (email = '') => {
 };
 
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const sanitizeProfileForViewer = (user, viewerId, isFriend = false) => {
+    return applyProfileVisibility(maskLockedUserDoc(user), { viewerId, isFriend });
+};
 
 const getGroupName = (conversation) => {
     const name = conversation?.group?.name?.trim();
@@ -99,11 +105,11 @@ async function hasReachedPendingRequestLimit(userId) {
 
 async function emitSentRequestUpdated(senderId, requestId) {
     const friendRequest = await FriendRequest.findById(requestId)
-        .populate('to', 'displayName email avatarUrl bio phone lock');
+        .populate('to', PROFILE_USER_SELECT);
 
     if (friendRequest) {
         const payload = friendRequest.toObject?.() || friendRequest;
-        payload.to = maskLockedUserDoc(friendRequest.to);
+        payload.to = sanitizeProfileForViewer(friendRequest.to, senderId, false);
         emitToUser(senderId.toString(), "friend-request-sent-updated", {
             friendRequest: payload
         });
@@ -113,13 +119,17 @@ async function emitSentRequestUpdated(senderId, requestId) {
 export async function sendFriendRequest(req, res) {
     try {
         const sender = req.user;
-        const { email, message } = req.body;
+        const { email, message, targetUserId, userId } = req.body;
         const normalizedEmail = String(email || '').trim().toLowerCase();
+        const normalizedTargetUserId = String(targetUserId || userId || '').trim();
         const normalizedMessage = String(message || '').trim();
-        if (!normalizedEmail) {
-            return res.status(400).json({ message: "Email is required." });
+        if (!normalizedEmail && !normalizedTargetUserId) {
+            return res.status(400).json({ message: "Email or user ID is required." });
         }
-        if (!validator.isEmail(normalizedEmail)) {
+        if (normalizedTargetUserId && !validator.isMongoId(normalizedTargetUserId)) {
+            return res.status(400).json({ message: "Invalid user ID format." });
+        }
+        if (!normalizedTargetUserId && !validator.isEmail(normalizedEmail)) {
             return res.status(400).json({ message: "Invalid email format." });
         }
         if (normalizedMessage.length > MAX_FRIEND_REQUEST_MESSAGE_LENGTH) {
@@ -127,9 +137,11 @@ export async function sendFriendRequest(req, res) {
                 message: `Friend request message cannot exceed ${MAX_FRIEND_REQUEST_MESSAGE_LENGTH} characters.`,
             });
         }
-        const receiver = await User.findOne({ email: normalizedEmail }).select('_id displayName email avatarUrl lock').lean();
+        const receiver = normalizedTargetUserId
+            ? await User.findOne({ _id: normalizedTargetUserId, ...NON_ADMIN_USER_FILTER }).select('_id displayName email avatarUrl lock').lean()
+            : await User.findOne({ email: normalizedEmail, ...NON_ADMIN_USER_FILTER }).select('_id displayName email avatarUrl lock').lean();
         if (!receiver) {
-            return res.status(404).json({ message: "User with this email not found." });
+            return res.status(404).json({ message: normalizedTargetUserId ? "User not found." : "User with this email not found." });
         }
         if (receiver.lock?.isLocked) {
             return res.status(423).json({ message: 'Không thể gửi lời mời kết bạn tới tài khoản đã bị khóa.' });
@@ -189,8 +201,12 @@ export async function sendFriendRequest(req, res) {
                 `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${normalizedMessage ? `"${normalizedMessage}"` : ""}`,
                 `${process.env.FRONTEND_URL}/people?tab=requests`,
                 { actorId: sender._id });
-            const populatedRequest = await FriendRequest.findById(rejectedRequest._id)
-                .populate('from', 'displayName email avatarUrl');
+            const populatedRequestDoc = await FriendRequest.findById(rejectedRequest._id)
+                .populate('from', PROFILE_USER_SELECT);
+            const populatedRequest = populatedRequestDoc?.toObject?.() || populatedRequestDoc;
+            if (populatedRequest?.from) {
+                populatedRequest.from = sanitizeProfileForViewer(populatedRequest.from, receiver._id, false);
+            }
             await emitSentRequestUpdated(sender._id, rejectedRequest._id);
             const receiverSocketId = getReceiverSocketId(receiver._id.toString());
             if (receiverSocketId) {
@@ -245,8 +261,12 @@ export async function sendFriendRequest(req, res) {
             `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${normalizedMessage ? `"${normalizedMessage}"` : ""}`,
             `${process.env.FRONTEND_URL}/people?tab=requests`,
             { actorId: sender._id });
-        const populatedRequest = await FriendRequest.findById(friendRequest._id)
-            .populate('from', 'displayName email avatarUrl bio phone');
+        const populatedRequestDoc = await FriendRequest.findById(friendRequest._id)
+            .populate('from', PROFILE_USER_SELECT);
+        const populatedRequest = populatedRequestDoc?.toObject?.() || populatedRequestDoc;
+        if (populatedRequest?.from) {
+            populatedRequest.from = sanitizeProfileForViewer(populatedRequest.from, receiver._id, false);
+        }
         await emitSentRequestUpdated(sender._id, friendRequest._id);
         const receiverSocketId = getReceiverSocketId(receiver._id.toString());
         if (receiverSocketId) {
@@ -440,7 +460,7 @@ export async function getFriendRequests(req, res) {
     try {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ to: user._id, status: 'pending' })
-            .populate('from', 'displayName email avatarUrl bio phone lock')
+            .populate('from', PROFILE_USER_SELECT)
             .sort({ createdAt: -1 })
             .lean();
         if (friendRequests.length === 0) {
@@ -449,7 +469,7 @@ export async function getFriendRequests(req, res) {
         return res.status(200).json({
             friendRequests: friendRequests.map((request) => ({
                 ...request,
-                from: maskLockedUserDoc(request.from),
+                from: sanitizeProfileForViewer(request.from, user._id, false),
             })),
         });
     } catch (error) {
@@ -621,12 +641,12 @@ export async function getAllFriends(req, res) {
                 { userB: user._id }
             ]
         }).populate([
-            { path: 'userA', select: 'displayName avatarUrl email bio phone lock' },
-            { path: 'userB', select: 'displayName avatarUrl email bio phone lock' }
+            { path: 'userA', select: PROFILE_USER_SELECT },
+            { path: 'userB', select: PROFILE_USER_SELECT }
         ]).lean();
         let listedFriends = friends.map(friend => {
             const isUserA = friend.userA._id.toString() === user._id.toString();
-            const friendUser = maskLockedUserDoc(isUserA ? friend.userB : friend.userA);
+            const friendUser = sanitizeProfileForViewer(isUserA ? friend.userB : friend.userA, user._id, true);
             return {
                 _id: friend._id,
                 friendId: friendUser._id,
@@ -819,7 +839,7 @@ export async function getFriendSuggestions(req, res) {
             _id: { $in: candidateIds },
             'lock.isLocked': { $ne: true },
             ...NON_ADMIN_USER_FILTER
-        }).select('displayName email avatarUrl bio phone createdAt lock').lean();
+        }).select(`${PROFILE_USER_SELECT} createdAt`).lean();
 
         const rankedCandidates = candidateUsers.map((candidateUser) => {
             const candidateId = getIdString(candidateUser._id);
@@ -873,10 +893,13 @@ export async function getFriendSuggestions(req, res) {
         const mutualFriendDocs = mutualFriendIds.length > 0
             ? await User.find({ _id: { $in: mutualFriendIds }, ...NON_ADMIN_USER_FILTER }).select('displayName avatarUrl lock').lean()
             : [];
-        const mutualFriendById = new Map(mutualFriendDocs.map((friend) => [getIdString(friend._id), maskLockedUserDoc(friend)]));
+        const mutualFriendById = new Map(mutualFriendDocs.map((friend) => [
+            getIdString(friend._id),
+            sanitizeProfileForViewer(friend, user._id, true),
+        ]));
 
         const suggestions = rankedCandidates.map(({ user: candidateUser, stats, score }) => {
-            const safeUser = maskLockedUserDoc(candidateUser);
+            const safeUser = sanitizeProfileForViewer(candidateUser, user._id, false);
             const mutualFriends = Array.from(stats.mutualFriendIds)
                 .map((friendId) => mutualFriendById.get(friendId))
                 .filter(Boolean)
@@ -918,7 +941,7 @@ export async function getFriendRequestsSended(req, res) {
     try {
         const user = req.user;
         const friendRequests = await FriendRequest.find({ from: user._id, status: 'pending' })
-            .populate('to', 'displayName email avatarUrl bio phone lock')
+            .populate('to', PROFILE_USER_SELECT)
             .sort({ createdAt: -1 })
             .lean();
         if (friendRequests.length === 0) {
@@ -927,7 +950,7 @@ export async function getFriendRequestsSended(req, res) {
         return res.status(200).json({
             friendRequests: friendRequests.map((request) => ({
                 ...request,
-                to: maskLockedUserDoc(request.to),
+                to: sanitizeProfileForViewer(request.to, user._id, false),
             })),
         });
     } catch (error) {
@@ -940,16 +963,21 @@ export async function getUserBlockedList(req, res) {
     try {
         const user = req.user;
         const [blockedUsers, blockedByEntries] = await Promise.all([
-            BlockUser.find({ from: user._id }).populate('to', 'displayName email avatarUrl'),
+            BlockUser.find({ from: user._id }).populate('to', PROFILE_USER_SELECT),
             BlockUser.find({ to: user._id }).select('from').lean(),
         ]);
-        const listedBlockedUsers = blockedUsers.map(entry => ({
-            _id: entry.to._id,
-            displayName: entry.to.displayName,
-            email: entry.to.email,
-            avatarUrl: entry.to.avatarUrl,
-            blockedAt: entry.createdAt
-        }));
+        const listedBlockedUsers = blockedUsers.map(entry => {
+            const visibleUser = sanitizeProfileForViewer(entry.to, user._id, false);
+            return {
+                _id: visibleUser._id,
+                displayName: visibleUser.displayName,
+                email: visibleUser.email,
+                avatarUrl: visibleUser.avatarUrl,
+                profileVisibility: visibleUser.profileVisibility,
+                profileVisibleToViewer: visibleUser.profileVisibleToViewer,
+                blockedAt: entry.createdAt
+            };
+        });
         return res.status(200).json({
             blockedUsers: listedBlockedUsers,
             blockedBy: blockedByEntries.map(entry => entry.from.toString()),

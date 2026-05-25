@@ -1,8 +1,8 @@
 import api from '@/lib/axios';
-import type { UserMusic, UserPresenceStatus, UserStatusMode } from '@/types/user';
+import type { ProfileVisibility, UserMusic, UserPresenceStatus, UserStatusMode } from '@/types/user';
 
 export const userService = {
-    updateProfile: async (data: { displayName?: string; bio?: string; phone?: string }) => {
+    updateProfile: async (data: { displayName?: string; bio?: string; phone?: string; profileVisibility?: ProfileVisibility }) => {
         const response = await api.put('/users/update-profile', data);
         return response.data;
     },

@@ -37,7 +37,7 @@ export default function BlockedTab() {
 
     const handleUnblockAndSendRequest = async (user: any) => {
         try {
-            await sendFriendRequest(user.email);
+            await sendFriendRequest({ userId: user._id, email: user.email });
             await fetchBlockedList(true);
             setIsProfileOpen(false);
         } catch (error) {

@@ -117,7 +117,7 @@ export default function SuggestionsTab({
                                             ? `Bạn chung: ${mutualNames}`
                                             : groupNames
                                                 ? `Nhóm chung: ${groupNames}`
-                                                : suggestion.email}
+                                                : suggestion.email || "Thông tin liên hệ đã ẩn"}
                                     </p>
 
                                     <div className="mt-2 flex flex-wrap gap-1.5">

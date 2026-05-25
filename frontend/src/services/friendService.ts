@@ -1,8 +1,12 @@
 import api from '@/lib/axios';
 
 export const friendService = {
-	sendFriendRequest: async (email: string, message?: string) => {
-		const response = await api.post('/friends/send-request', { email, message });
+	sendFriendRequest: async (target: { email?: string; userId?: string }, message?: string) => {
+		const response = await api.post('/friends/send-request', {
+			email: target.email,
+			targetUserId: target.userId,
+			message
+		});
 		return response.data;
 	},
 

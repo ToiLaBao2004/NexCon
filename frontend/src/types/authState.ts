@@ -1,4 +1,4 @@
-import type { User, UserPresenceStatus, UserStatusMode } from './user';
+import type { ProfileVisibility, User, UserPresenceStatus, UserStatusMode } from './user';
 
 export interface SessionInfo {
   sessionId: string;
@@ -61,7 +61,7 @@ export default interface AuthState {
 
   handleGoogleCallback: () => Promise<void>;
 
-  updateProfile: (data: { displayName?: string; bio?: string; phone?: string }) => Promise<void>;
+  updateProfile: (data: { displayName?: string; bio?: string; phone?: string; profileVisibility?: ProfileVisibility }) => Promise<void>;
 
   updateAvatar: (file: File, onProgress?: (percent: number) => void) => Promise<void>;
 

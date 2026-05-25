@@ -11,6 +11,7 @@ export type UserPresenceStatus =
   | "offline";
 
 export type UserStatusMode = "auto" | "manual";
+export type ProfileVisibility = "public" | "friends" | "private";
 
 export interface UserPresence {
   userId: string;
@@ -31,6 +32,8 @@ export interface User {
   avatarUrl?: string;
   bio?: string;
   phone?: string;
+  profileVisibility?: ProfileVisibility;
+  profileVisibleToViewer?: boolean;
   googleId?: string;
   music?: UserMusic;
   role?: "user" | "admin";
@@ -68,10 +71,12 @@ export interface FriendItem {
 export interface FriendSuggestion {
   _id: string;
   displayName: string;
-  email: string;
+  email?: string;
   avatarUrl?: string;
   bio?: string;
   phone?: string;
+  profileVisibility?: ProfileVisibility;
+  profileVisibleToViewer?: boolean;
   score: number;
   reasons: {
     mutualFriendsCount: number;
@@ -98,7 +103,7 @@ export interface FriendRequest {
   from: {
     _id: string;
     displayName: string;
-    email: string;
+    email?: string;
     avatarUrl: string;
   };
   message?: string;
@@ -111,7 +116,7 @@ export interface SentFriendRequest {
   to: {
     _id: string;
     displayName: string;
-    email: string;
+    email?: string;
     avatarUrl: string;
   };
   message?: string;

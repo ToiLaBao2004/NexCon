@@ -7,6 +7,7 @@ import Friend from '../models/friendModel.js';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
 import { maskLockedUser } from '../utils/lockedUser.js';
+import { applyProfileVisibility } from '../utils/profilePrivacy.js';
 
 const MAX_SEARCH_QUERY_LENGTH = 100;
 const DEFAULT_USER_LIMIT = 5;
@@ -17,7 +18,7 @@ const MAX_SCANNED_MESSAGES = 800;
 const MAX_SCANNED_CONVERSATIONS = 200;
 const SEARCH_TYPES = new Set(['all', 'users', 'conversations', 'messages']);
 
-const PARTICIPANT_SELECT = 'displayName avatarUrl email bio phone lock';
+const PARTICIPANT_SELECT = 'displayName avatarUrl profileVisibility lock';
 const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
 
 function clampLimit(value, defaultLimit) {
@@ -488,7 +489,7 @@ async function searchUsersForGlobal({ keyword, keywordRegex, currentUserId, bloc
             $or: searchClauses,
         }],
     })
-        .select('_id displayName avatarUrl email phone bio lock')
+        .select('_id displayName avatarUrl email phone bio music profileVisibility lock')
         .sort({ _id: 1 })
         .limit(limit + 1)
         .lean();
@@ -499,7 +500,11 @@ async function searchUsersForGlobal({ keyword, keywordRegex, currentUserId, bloc
         ? getIdString(pageUsers[pageUsers.length - 1])
         : null;
 
-    return toPage(pageUsers.map(maskLockedUser), limit, hasMore, nextCursor);
+    const friendIdSet = new Set(friendIds.map((id) => id.toString()));
+    return toPage(pageUsers.map((user) => applyProfileVisibility(maskLockedUser(user), {
+        viewerId: currentUserId,
+        isFriend: friendIdSet.has(getIdString(user)),
+    })), limit, hasMore, nextCursor);
 }
 
 async function getConversationMatchedUserIds(keywordRegex, currentUserId) {

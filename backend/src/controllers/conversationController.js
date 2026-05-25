@@ -37,9 +37,9 @@ const MAX_GROUP_MEMBERS = 100;
 const MAX_PINNED_CONVERSATIONS = 5;
 const MAX_SEARCH_QUERY_LENGTH = 100;
 
-const PARTICIPANT_SELECT = 'displayName avatarUrl email bio phone lock';
+const PARTICIPANT_SELECT = 'displayName avatarUrl profileVisibility lock';
 const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
-const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname email bio phone status lastSeen about lock';
+const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname profileVisibility status lastSeen about lock';
 
 function clampPageLimit(value, defaultLimit = 50, maxLimit = 100) {
 	const parsed = Number.parseInt(value, 10);

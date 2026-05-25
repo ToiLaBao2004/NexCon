@@ -605,7 +605,7 @@ export async function sendMessage(req, res) {
         if (createdDirectConversation) {
             const populatedConversation = await Conversation.findById(conversation._id).populate({
                 path: 'participants.userId',
-                select: 'displayName avatarUrl nickname email bio phone status lastSeen',
+                select: 'displayName avatarUrl nickname profileVisibility status lastSeen',
             });
 
             for (const participant of conversation.participants) {

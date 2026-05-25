@@ -102,7 +102,7 @@ const PeoplePage = () => {
 	};
 
 	const handleSendSuggestionRequest = async (suggestion: FriendSuggestion) => {
-		await sendFriendRequest(suggestion.email);
+		await sendFriendRequest({ userId: suggestion._id, email: suggestion.email });
 		await fetchSentRequests(true);
 		await fetchFriendSuggestions(true);
 	};

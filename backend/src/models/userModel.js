@@ -54,6 +54,11 @@ const userSchema = new mongoose.Schema({
         trim: true,
         sparse: true // allows multiple null values
     },
+    profileVisibility: {
+        type: String,
+        enum: ['public', 'friends', 'private'],
+        default: 'public',
+    },
     googleId: {
         type: String,
         unique: true,

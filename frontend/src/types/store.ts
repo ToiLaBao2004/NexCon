@@ -230,7 +230,7 @@ export interface FriendState {
   fetchIncomingRequests: (force?: boolean) => Promise<void>;
   fetchSentRequests: (force?: boolean) => Promise<void>;
   setNickName: (friendId: string, nickName: string) => Promise<void>;
-  sendFriendRequest: (email: string, message?: string) => Promise<void>;
+  sendFriendRequest: (target: string | { email?: string; userId?: string }, message?: string) => Promise<void>;
   cancelFriendRequest: (requestId: string) => Promise<void>;
   acceptFriendRequest: (requestId: string) => Promise<void>;
   rejectFriendRequest: (requestId: string) => Promise<void>;

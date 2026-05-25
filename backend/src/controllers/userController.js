@@ -1,5 +1,6 @@
 import User from '../models/userModel.js';
 import BlockUser from '../models/blockUserModel.js';
+import Friend from '../models/friendModel.js';
 import { MAX_IMAGE_SIZE, upLoadImageFromBuffer, deleteImage } from '../middlewares/uploadMiddleware.js';
 import bcrypt from 'bcrypt';
 import { searchSpotifyTracks } from '../services/spotifyService.js';
@@ -12,6 +13,7 @@ import {
     updateUserStatus as updateUserStatusPreference,
 } from '../services/userStatusService.js';
 import { emitOnlineUsers, emitToUser, isUserOnline } from '../socket/index.js';
+import { applyProfileVisibility, areFriends, normalizeProfileVisibility, PROFILE_VISIBILITY } from '../utils/profilePrivacy.js';
 
 const SPOTIFY_TRACK_ID_PATTERN = /^[A-Za-z0-9]{22}$/;
 
@@ -120,11 +122,36 @@ export async function searchUsers(req, res) {
             $or: [{ role: 'user' }, { role: { $exists: false } }, { role: null }],
             _id: { $nin: blockedIds }
         })
-            .select('_id displayName avatarUrl email lock')
+            .select('_id displayName avatarUrl email profileVisibility lock')
             .limit(20)
             .lean();
 
-        return res.status(200).json({ users: users.map(maskLockedUser) });
+        if (users.length === 0) {
+            return res.status(200).json({ users: [] });
+        }
+
+        const friendships = await Friend.find({
+            $or: users.map((foundUser) => ({
+                $or: [
+                    { userA: currentUserId, userB: foundUser._id },
+                    { userA: foundUser._id, userB: currentUserId },
+                ],
+            })),
+        }).select('userA userB').lean();
+        const friendIdSet = new Set(friendships.flatMap((friendship) => [
+            friendship.userA.toString(),
+            friendship.userB.toString(),
+        ]));
+
+        return res.status(200).json({
+            users: users.map((foundUser) => {
+                const safeUser = maskLockedUser(foundUser);
+                return applyProfileVisibility(safeUser, {
+                    viewerId: currentUserId,
+                    isFriend: friendIdSet.has(foundUser._id.toString()),
+                });
+            }),
+        });
     } catch (error) {
         console.error('Search users error:', error);
         return res.status(500).json({ message: 'Server error' });
@@ -135,6 +162,10 @@ export async function updateProfile(req, res) {
     try {
         const userId = req.user._id;
         const { displayName, bio, phone } = req.body;
+        const requestedProfileVisibility = req.body?.profileVisibility;
+        const profileVisibility = requestedProfileVisibility === undefined
+            ? undefined
+            : normalizeProfileVisibility(requestedProfileVisibility);
         const displayNameError = checkFieldFormat('displayName', displayName);
         const phoneError = checkFieldFormat('phone', phone);
 
@@ -147,14 +178,31 @@ export async function updateProfile(req, res) {
             return res.status(400).json({ message: 'Tiểu sử không được quá 150 ký tự' });
         }
 
+        if (
+            requestedProfileVisibility !== undefined &&
+            !Object.values(PROFILE_VISIBILITY).includes(requestedProfileVisibility)
+        ) {
+            return res.status(400).json({ message: 'Invalid profile visibility.' });
+        }
+
+        const setFields = {};
+        if (displayName !== undefined) {
+            setFields.displayName = displayName?.trim();
+        }
+        if (bio !== undefined) {
+            setFields.bio = bio;
+        }
+        if (phone !== undefined) {
+            setFields.phone = phone?.trim();
+        }
+        if (profileVisibility) {
+            setFields.profileVisibility = profileVisibility;
+        }
+
         const updatedUser = await User.findByIdAndUpdate(
             userId,
             {
-                $set: {
-                    displayName: displayName?.trim(),
-                    bio,
-                    phone: phone?.trim()
-                }
+                $set: setFields
             },
             { new: true, runValidators: true }
         ).select('-password');
@@ -381,7 +429,13 @@ export async function getUserById(req, res) {
             socketOnlineUserIds: await isUserOnline(id) ? [id] : [],
             viewerId: currentUserId,
         });
-        const visibleUser = currentUserId && id === currentUserId ? user : maskLockedUser(user);
+        const isSelf = currentUserId && id === currentUserId;
+        const visibleUser = isSelf
+            ? applyProfileVisibility(user, { viewerId: currentUserId })
+            : applyProfileVisibility(maskLockedUser(user), {
+                viewerId: currentUserId,
+                isFriend: await areFriends(currentUserId, id),
+            });
 
         return res.status(200).json({
             user: {
