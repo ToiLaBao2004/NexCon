@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/stores/useAuthStore";
-import type { Conversation, Mention, MessageType } from "@/types/chat";
+import type { Conversation, MessageType } from "@/types/chat";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Button } from "../ui/button";
 import { useNavigate } from "react-router";
@@ -18,6 +18,19 @@ import { draftStorage } from "@/lib/draftStorage";
 import { validateImageFile } from "@/lib/imageCrop";
 import { buildModerationNotice, getModerationPayload, isModerationBlockError } from "@/lib/moderationNotice";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+	buildMentionMessagePayload,
+	decodeMentionTokens,
+	getActiveMentionToken,
+	insertMentionIntoText,
+	isDraftMentionIntact,
+	normalizeMentionSearch,
+	reconcileDraftMentions,
+	sanitizeDraftMentions,
+	type DraftMention,
+	type MentionCandidate,
+	type MentionTokenRange,
+} from "@/utils/mentions";
 
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -46,152 +59,6 @@ const createClientBatchId = () => {
 		return crypto.randomUUID();
 	}
 	return `batch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-};
-
-interface MentionCandidate {
-	userId: string;
-	displayName: string;
-	canonicalDisplayName: string;
-	avatarUrl?: string | null;
-}
-
-interface SelectedMention extends Omit<MentionCandidate, "avatarUrl"> {
-	avatarUrl: string | null;
-	start: number;
-	end: number;
-}
-
-interface MentionTokenRange {
-	start: number;
-	end: number;
-}
-
-const normalizeMentionSearch = (value: string) =>
-	value
-		.trim()
-		.toLowerCase()
-		.normalize("NFD")
-		.replace(/[\u0300-\u036f]/g, "");
-
-const getMentionDisplayText = (mention: Pick<MentionCandidate, "displayName">) => `@${mention.displayName}`;
-
-const getActiveMentionToken = (text: string, cursor: number) => {
-	const beforeCursor = text.slice(0, cursor);
-	const match = beforeCursor.match(/(^|\s)@([^\s@]*)$/);
-
-	if (!match) {
-		return null;
-	}
-
-	const query = match[2] || "";
-	const start = beforeCursor.length - query.length - 1;
-	const end = cursor;
-
-	if (start < 0 || beforeCursor[start] !== "@") {
-		return null;
-	}
-
-	return {
-		query,
-		start,
-		end,
-	};
-};
-
-const isSelectedMentionIntact = (text: string, mention: SelectedMention) =>
-	mention.start >= 0 &&
-	mention.end > mention.start &&
-	mention.end <= text.length &&
-	text.slice(mention.start, mention.end) === getMentionDisplayText(mention);
-
-const reconcileSelectedMentions = (
-	previousText: string,
-	nextText: string,
-	mentions: SelectedMention[],
-) => {
-	if (!mentions.length) return mentions;
-	if (previousText === nextText) return mentions.filter((mention) => isSelectedMentionIntact(nextText, mention));
-
-	let prefixLength = 0;
-	const minLength = Math.min(previousText.length, nextText.length);
-	while (prefixLength < minLength && previousText[prefixLength] === nextText[prefixLength]) {
-		prefixLength += 1;
-	}
-
-	let previousSuffixStart = previousText.length;
-	let nextSuffixStart = nextText.length;
-	while (
-		previousSuffixStart > prefixLength &&
-		nextSuffixStart > prefixLength &&
-		previousText[previousSuffixStart - 1] === nextText[nextSuffixStart - 1]
-	) {
-		previousSuffixStart -= 1;
-		nextSuffixStart -= 1;
-	}
-
-	const replacedStart = prefixLength;
-	const replacedEnd = previousSuffixStart;
-	const delta = (nextSuffixStart - prefixLength) - (previousSuffixStart - prefixLength);
-
-	return mentions
-		.map((mention) => {
-			if (mention.end <= replacedStart) {
-				return mention;
-			}
-
-			if (mention.start >= replacedEnd) {
-				return {
-					...mention,
-					start: mention.start + delta,
-					end: mention.end + delta,
-				};
-			}
-
-			return null;
-		})
-		.filter((mention): mention is SelectedMention => Boolean(mention))
-		.filter((mention) => isSelectedMentionIntact(nextText, mention));
-};
-
-const buildMentionsFromText = (text: string, mentions: SelectedMention[]): { content: string; mentions: Mention[] } => {
-	const matchedRanges = mentions
-		.filter((mention) => isSelectedMentionIntact(text, mention))
-		.sort((a, b) => a.start - b.start);
-
-	if (!matchedRanges.length) {
-		return { content: text, mentions: [] };
-	}
-
-	let cursor = 0;
-	let tokenizedContent = "";
-	const result: Mention[] = [];
-
-	for (const mention of matchedRanges) {
-		if (mention.start < cursor) {
-			continue;
-		}
-
-		tokenizedContent += text.slice(cursor, mention.start);
-		const mentionToken = `@[USER:${mention.userId}]`;
-		const offset = tokenizedContent.length;
-		tokenizedContent += mentionToken;
-
-		result.push({
-			userId: mention.userId,
-			displayName: mention.canonicalDisplayName || mention.displayName,
-			offset,
-			length: mentionToken.length,
-		});
-
-		cursor = mention.end;
-	}
-
-	tokenizedContent += text.slice(cursor);
-
-	return {
-		content: tokenizedContent,
-		mentions: result,
-	};
 };
 
 function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: number, label?: string }) {
@@ -228,7 +95,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const [mentionRange, setMentionRange] = useState<MentionTokenRange | null>(null);
 	const [mentionOpen, setMentionOpen] = useState(false);
 	const [activeMentionIndex, setActiveMentionIndex] = useState(0);
-	const [selectedMentions, setSelectedMentions] = useState<SelectedMention[]>([]);
+	const [selectedMentions, setSelectedMentions] = useState<DraftMention[]>([]);
 	const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const valueRef = useRef(value);
 	const attachmentsRef = useRef<Attachment[]>([]);
@@ -335,6 +202,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const participants = selectedConvo.participants;
 	const attachment = attachments[0] ?? null;
+	const replyingToPreview = useMemo(() => {
+		if (!replyingTo) return "";
+		if (replyingTo.isRecalled) return "Tin nhắn đã thu hồi";
+		if (replyingTo.type === "image") return "Hình ảnh";
+		if (replyingTo.type === "sticker") return "Nhãn dán";
+		if (replyingTo.type === "audio") return "Tin nhắn thoại";
+		if (replyingTo.type === "file") return replyingTo.fileName ?? "Tệp đính kèm";
+
+		const decoded = decodeMentionTokens(replyingTo.content ?? "", selectedConvo, replyingTo.mentions);
+		return decoded.length > 50 ? `${decoded.slice(0, 50)}...` : decoded;
+	}, [replyingTo, selectedConvo]);
 	const mentionCandidates = useMemo(() => {
 		const keyword = normalizeMentionSearch(mentionQuery);
 
@@ -399,7 +277,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const prevAttachments = currentAttachments;
 		const prevMentions = selectedMentions;
 		const shouldRestoreFocus = shouldRestoreTextInputAfterSend();
-		const tokenized = buildMentionsFromText(currValue, prevMentions);
+		const tokenized = buildMentionMessagePayload(currValue, prevMentions);
 		const tokenizedContent = tokenized.content.trim();
 		if (type === "text" && tokenizedContent.length > MAX_TEXT_MESSAGE_LENGTH) {
 			toast.error(`Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
@@ -583,25 +461,16 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const insertMention = useCallback((candidate: MentionCandidate) => {
 		const range = mentionRange ?? { start: value.length, end: value.length };
-		const mentionText = getMentionDisplayText(candidate);
-		const nextValue = `${value.slice(0, range.start)}${mentionText} ${value.slice(range.end)}`;
-		const nextCursor = range.start + mentionText.length + 1;
-		const selectedMention: SelectedMention = {
-			...candidate,
-			avatarUrl: candidate.avatarUrl ?? null,
-			start: range.start,
-			end: range.start + mentionText.length,
-		};
-
-		valueRef.current = nextValue;
-		setValue(nextValue);
-		setSelectedMentions((current) => {
-			const reconciled = reconcileSelectedMentions(value, nextValue, current);
-			return [
-				...reconciled.filter((item) => item.end <= selectedMention.start || item.start >= selectedMention.end),
-				selectedMention,
-			].sort((a, b) => a.start - b.start);
+		const nextDraft = insertMentionIntoText({
+			text: value,
+			range,
+			candidate,
+			mentions: selectedMentions,
 		});
+
+		valueRef.current = nextDraft.text;
+		setValue(nextDraft.text);
+		setSelectedMentions(nextDraft.mentions);
 		setMentionOpen(false);
 		setMentionQuery("");
 		setMentionRange(null);
@@ -611,9 +480,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			const textarea = textInputRef.current;
 			if (!textarea) return;
 			textarea.focus();
-			textarea.setSelectionRange(nextCursor, nextCursor);
+			textarea.setSelectionRange(nextDraft.cursor, nextDraft.cursor);
 		});
-	}, [mentionRange, value]);
+	}, [mentionRange, selectedMentions, value]);
 
 	const handleMentionSelect = (candidate: MentionCandidate) => {
 		insertMention(candidate);
@@ -625,7 +494,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const nextValue = e.target.value;
 		valueRef.current = nextValue;
 		setValue(nextValue);
-		setSelectedMentions((current) => reconcileSelectedMentions(previousValue, nextValue, current));
+		setSelectedMentions((current) => reconcileDraftMentions(previousValue, nextValue, current));
 		e.target.style.height = "auto";
 		e.target.style.height = `${e.target.scrollHeight}px`;
 
@@ -634,7 +503,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		if (activeToken) {
 			setMentionOpen(true);
 			setMentionQuery(activeToken.query);
-			setMentionRange({ start: activeToken.start, end: activeToken.end });
+			setMentionRange(activeToken);
 			setActiveMentionIndex(0);
 		} else {
 			setMentionOpen(false);
@@ -681,7 +550,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						file: persistedAttachment.file,
 						preview: persistedAttachment.preview
 					} : null,
-					mentions: selectedMentions.filter((mention) => isSelectedMentionIntact(value, mention)),
+					mentions: selectedMentions.filter((mention) => isDraftMentionIntact(value, mention)),
 				});
 				if (persistedAttachment) {
 					draftStorage.save(selectedConvo._id, persistedAttachment.file, persistedAttachment.type);
@@ -717,23 +586,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const rawDraft = useChatStore.getState().drafts[selectedConvo._id];
 		const existingDraft = typeof rawDraft === "string" ? rawDraft : (rawDraft?.content || "");
 		const draftAttachment = (rawDraft && typeof rawDraft === 'object') ? rawDraft.attachment : null;
-		const draftMentions = (rawDraft && typeof rawDraft === 'object' && Array.isArray(rawDraft.mentions))
-			? rawDraft.mentions
-				.map((mention) => ({
-					userId: String(mention.userId || ""),
-					displayName: String(mention.displayName || ""),
-					canonicalDisplayName: String(mention.canonicalDisplayName || mention.displayName || ""),
-					avatarUrl: mention.avatarUrl ?? null,
-					start: Number(mention.start),
-					end: Number(mention.end),
-				}))
-				.filter((mention): mention is SelectedMention => Boolean(
-					mention.userId &&
-					mention.displayName &&
-					Number.isFinite(mention.start) &&
-					Number.isFinite(mention.end) &&
-					isSelectedMentionIntact(existingDraft, mention)
-				))
+		const draftMentions = (rawDraft && typeof rawDraft === 'object')
+			? sanitizeDraftMentions(rawDraft.mentions, existingDraft)
 			: [];
 
 		setAttachments((current) => {
@@ -826,7 +680,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			const previousValue = valueRef.current;
 			valueRef.current = truncatedValue;
 			setValue(truncatedValue);
-			setSelectedMentions((current) => reconcileSelectedMentions(previousValue, truncatedValue, current));
+			setSelectedMentions((current) => reconcileDraftMentions(previousValue, truncatedValue, current));
 			requestAnimationFrame(() => {
 				const nextCursor = start + insertedText.length;
 				textarea.style.height = "auto";
@@ -1096,19 +950,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									/>
 								)}
 								<span className="text-[11px] text-muted-foreground truncate leading-snug mt-px">
-									{replyingTo.isRecalled
-										? "Tin nhắn đã thu hồi"
-										: replyingTo.type === "image"
-											? "Hình ảnh"
-											: replyingTo.type === "sticker"
-												? "Nhãn dán"
-												: replyingTo.type === "audio"
-													? "🎙️ Tin nhắn thoại"
-													: replyingTo.type === "file"
-														? (replyingTo.fileName ?? "Tệp đính kèm")
-														: (replyingTo.content && replyingTo.content.length > 50
-															? replyingTo.content.slice(0, 50) + "…"
-															: replyingTo.content ?? "")}
+									{replyingToPreview}
 								</span>
 							</div>
 						</div>

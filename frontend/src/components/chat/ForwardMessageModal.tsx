@@ -17,6 +17,7 @@ import UserAvatar from "./UserAvatar";
 import GroupChatAvatar from "./GroupChatAvatar";
 import CachedStickerImage from "./CachedStickerImage";
 import { toast } from "sonner";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 const createClientBatchId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -33,7 +34,7 @@ interface ForwardMessageModalProps {
 }
 
 // ─── Preview helpers ───────────────────────────────────────────────────────────
-function getMessagePreview(message: Message): { text: string; Icon: React.ElementType } {
+function getMessagePreview(message: Message, source?: Conversation): { text: string; Icon: React.ElementType } {
   if (message.isRecalled) return { text: "Tin nhắn đã được thu hồi", Icon: AlertCircle };
   switch (message.type) {
     case "image":
@@ -41,11 +42,11 @@ function getMessagePreview(message: Message): { text: string; Icon: React.Elemen
     case "file":
       return { text: message.fileName ?? "Tệp đính kèm", Icon: FileText };
     case "link":
-      return { text: message.content ?? "Liên kết", Icon: Link2 };
+      return { text: decodeMentionTokens(message.content ?? "Liên kết", source, message.mentions), Icon: Link2 };
     case "sticker":
       return { text: "Nhãn dán", Icon: StickerIcon };
     default:
-      return { text: message.content ?? "(tin nhắn trống)", Icon: MessageSquare };
+      return { text: decodeMentionTokens(message.content ?? "(tin nhắn trống)", source, message.mentions), Icon: MessageSquare };
   }
 }
 
@@ -132,7 +133,11 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
   const batchMessages = messages?.length ? messages : [message];
   const isImageBatch = batchMessages.length > 1 && batchMessages.every((item) => item.type === "image");
   const isSingleImage = batchMessages.length === 1 && message.type === "image" && (message.filePublicId || message.fileUrl);
-  const { text: previewText, Icon: PreviewIcon } = getMessagePreview(message);
+  const sourceConversation = useMemo(
+    () => conversations.find((conversation) => conversation._id === message.conversationId),
+    [conversations, message.conversationId]
+  );
+  const { text: previewText, Icon: PreviewIcon } = getMessagePreview(message, sourceConversation);
   const resolvedPreviewText = isImageBatch
     ? `${batchMessages.length} hình ảnh`
     : (isSingleImage ? "Hình ảnh" : previewText);

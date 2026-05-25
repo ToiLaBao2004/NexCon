@@ -1,5 +1,8 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { decryptConversationPayload, decryptMessagePayload } from './messageCrypto.js';
+import { replaceMentionTags } from './mentions.js';
+
+export { replaceMentionTags };
 
 const resolveLastMessagePreview = (rawMessage) => {
     const message = decryptMessagePayload(rawMessage);
@@ -105,6 +108,7 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
             systemType: safeMessage.systemType || null,
             metadata: metadata,
             senderId: senderId,
+            mentions: safeMessage.mentions || [],
             deliveredTo: safeMessage.deliveredTo || [],
             createdAt: safeMessage.createdAt,
         },
@@ -183,14 +187,3 @@ export function generateSignedUrl(filePublicId, type = 'image') {
         secure: true
     });
 }
-
-export const replaceMentionTags = (content, mentions = []) => {
-    if (!content || !mentions || mentions.length === 0) return content;
-    let result = content;
-    mentions.forEach((mention) => {
-        const userId = mention.userId?.toString() || String(mention.userId);
-        const tag = `@[USER:${userId}]`;
-        result = result.split(tag).join(`@${mention.displayName || 'Người dùng'}`);
-    });
-    return result;
-};

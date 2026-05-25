@@ -105,6 +105,12 @@ const lastMessageSchema = new mongoose.Schema({
         displayName: { type: String },
         avatarUrl: { type: String }
     },
+    mentions: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        displayName: { type: String },
+        offset: { type: Number },
+        length: { type: Number },
+    }],
     deliveredTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     createdAt: {
         type: Date

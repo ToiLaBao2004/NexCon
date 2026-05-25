@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AdminMessage } from "@/services/adminService";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 function formatBytes(value?: number) {
   if (!value) return "";
@@ -57,6 +58,8 @@ export default function AdminEvidencePreview({
   }
 
   const safeSignedUrl = isTrustedMediaUrl(message.signedUrl) ? message.signedUrl : null;
+  const safeContent = decodeMentionTokens(message.content || "", null, message.mentions);
+  const safePreview = decodeMentionTokens(message.preview || "");
   const fileMeta = [message.mimeType, formatBytes(message.fileSize)].filter(Boolean).join(" · ");
 
   if (message.type === "image") {
@@ -141,7 +144,7 @@ export default function AdminEvidencePreview({
                 Không mở trực tiếp
               </Badge>
             </div>
-            <p className="mt-1 break-all text-sm text-muted-foreground">{message.content || message.preview}</p>
+            <p className="mt-1 break-all text-sm text-muted-foreground">{safeContent || safePreview}</p>
             {displayUrl && (
               <Button
                 type="button"
@@ -164,7 +167,7 @@ export default function AdminEvidencePreview({
 
   return (
     <div className="rounded-md border border-border/70 bg-muted/30 p-3 text-sm">
-      {message.preview || message.content || fallbackText}
+      {safePreview || safeContent || fallbackText}
     </div>
   );
 }

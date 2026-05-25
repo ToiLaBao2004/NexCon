@@ -22,6 +22,7 @@ import GroupChatCard from "./GroupChatCard";
 import GroupChatAvatar from "./GroupChatAvatar";
 import UserAvatar from "./UserAvatar";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 export type ConversationFilter = "all" | "unread";
 
@@ -146,7 +147,7 @@ const getConversationSubtitle = (conversation: Conversation, currentUserId?: str
     ? (isOwn ? "Bạn" : sender?.userId?.nickname?.trim() || sender?.userId?.displayName || "Ai đó")
     : (isOwn ? "Bạn" : "");
 
-  const content = lastMessage.content || "";
+  const content = decodeMentionTokens(lastMessage.content || "", conversation);
   const fallbackByType: Record<string, string> = {
     image: "Đã gửi một ảnh",
     audio: "Tin nhắn thoại",
@@ -196,14 +197,14 @@ const getMatchedGroupMemberLabel = (
   return `${matchedMembers.slice(0, 2).join(", ")} +${matchedMembers.length - 2}`;
 };
 
-type MessagePreviewLike = Pick<Message, "type" | "systemType" | "metadata" | "content" | "fileName">;
+type MessagePreviewLike = Pick<Message, "type" | "systemType" | "metadata" | "content" | "fileName" | "mentions">;
 
-const getMessagePreview = (message: MessagePreviewLike, currentUserId?: string) => {
+const getMessagePreview = (message: MessagePreviewLike, currentUserId?: string, source?: Conversation) => {
   if (message.type === "system") {
     return getSystemMessageText(message, currentUserId || "");
   }
 
-  if (message.content?.trim()) return message.content;
+  if (message.content?.trim()) return decodeMentionTokens(message.content, source, message.mentions);
   if (message.fileName) return message.fileName;
 
   const fallbackByType: Record<string, string> = {
@@ -414,7 +415,7 @@ function MessageResultRow({
     ? "Bạn"
     : senderParticipant?.userId?.nickname?.trim() || sender?.displayName || "Người dùng";
   const conversationName = getConversationTitle(message.conversation, currentUserId);
-  const content = getMessagePreview(message, currentUserId);
+  const content = getMessagePreview(message, currentUserId, message.conversation);
   const isGroupMessage = message.conversation?.type === "group";
 
   return (

@@ -20,6 +20,12 @@ const messageSnapshotSchema = new mongoose.Schema({
     content: { type: String, default: '' },
     fileName: { type: String, default: '' },
     mimeType: { type: String, default: '' },
+    mentions: [{
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        displayName: { type: String, default: '' },
+        offset: { type: Number, default: 0 },
+        length: { type: Number, default: 0 },
+    }],
     createdAt: { type: Date, default: null },
     senderInfo: {
         type: mongoose.Schema.Types.Mixed,

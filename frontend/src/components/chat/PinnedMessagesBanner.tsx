@@ -17,6 +17,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 interface PinnedMessagesBannerProps {
 	onPinClick?: (messageId: string) => void;
@@ -95,7 +96,7 @@ export function PinnedMessagesBanner({
 
 	const getPreview = (msg: Message) => {
 		if (msg.isRecalled) return "[Tin nhắn đã thu hồi]";
-		if (msg.content?.trim()) return msg.content.trim();
+		if (msg.content?.trim()) return decodeMentionTokens(msg.content.trim(), participants, msg.mentions);
 		if (msg.type === 'image') return "[Hình ảnh]";
 		if (msg.type === 'file')  return `[File: ${msg.fileName ?? 'Tệp đính kèm'}]`;
 		if (msg.type === 'link')  return "[Liên kết]";

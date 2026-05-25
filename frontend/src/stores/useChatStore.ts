@@ -48,6 +48,7 @@ const buildLastMessageFromMessage = (message: any) => {
         type: message.type,
         systemType: message.systemType ?? null,
         metadata: message.metadata,
+        mentions: message.mentions ?? [],
         createdAt: message.createdAt ?? new Date().toISOString(),
         senderId: message.senderId,
         deliveredTo: message.deliveredTo ?? [],
@@ -413,6 +414,40 @@ export const useChatStore = create<ChatState>()(
                 } catch (error) {
                     console.error('Lỗi khi tải danh sách cuộc trò chuyện:', error);
                     set({ convoLoading: false });
+                }
+            },
+            ensureConversation: async (conversationId: string) => {
+                const targetId = String(conversationId || '').trim();
+                if (!targetId) return null;
+
+                const existing = get().conversations.find((conversation) => conversation._id === targetId);
+                if (existing) {
+                    if (!isVisibleConversation(existing)) {
+                        get().markGroupAsDisbanded(targetId);
+                        return null;
+                    }
+
+                    return existing;
+                }
+
+                try {
+                    const conversation = await chatService.fetchConversation(targetId);
+                    if (!conversation || !isVisibleConversation(conversation)) {
+                        get().markGroupAsDisbanded(targetId);
+                        return null;
+                    }
+
+                    set((state) => ({
+                        conversations: mergeConversations(state.conversations, [conversation]),
+                        groupConversations: conversation.type === 'group'
+                            ? mergeConversations(state.groupConversations, [conversation])
+                            : state.groupConversations,
+                    }));
+
+                    return conversation;
+                } catch (error) {
+                    console.error('Lỗi khi tải cuộc trò chuyện:', error);
+                    return null;
                 }
             },
             fetchMoreConversations: async () => {
@@ -838,6 +873,7 @@ export const useChatStore = create<ChatState>()(
                         senderId: user._id,
                         type: payload.type,
                         content: payload.content ?? null,
+                        mentions: payload.mentions ?? [],
                         metadata: payload.metadata,
                         fileName: payload.file?.name,
                         fileSize: payload.file?.size,

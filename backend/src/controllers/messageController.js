@@ -27,6 +27,7 @@ import { moderateImageMessage } from '../services/moderation/imageModerationServ
 import { maskLockedUserDoc } from '../utils/lockedUser.js';
 import { isMuted } from '../utils/isMuted.js';
 import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
+import { buildMentionsForContent, parseMentionPayload } from '../utils/mentions.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
 const MAX_REMINDER_SYSTEM_CONTENT_LENGTH = 1200;
@@ -34,7 +35,6 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
 const SEARCH_MAX_SCANNED_MESSAGES = 500;
-const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
 const moderationCategoryLabels = {
     abusive: 'Ngôn từ xúc phạm',
     harassment: 'Quấy rối hoặc công kích cá nhân',
@@ -110,29 +110,6 @@ function respondWithModerationBlock(req, res, moderationResult, message, message
     });
 }
 
-const parseMentionPayload = (rawMentions) => {
-    if (Array.isArray(rawMentions)) {
-        return rawMentions;
-    }
-
-    if (rawMentions == null || rawMentions === '') {
-        return [];
-    }
-
-    if (typeof rawMentions === 'string') {
-        try {
-            const parsed = JSON.parse(rawMentions);
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            const error = new Error('mentions must be a JSON array.');
-            error.statusCode = 400;
-            throw error;
-        }
-    }
-
-    return [];
-};
-
 const parseMessageMetadata = (rawMetadata) => {
     if (!rawMetadata) {
         return {};
@@ -196,59 +173,6 @@ const parseForwardBatch = (rawBatch) => {
     }
 
     return batch;
-};
-
-const normalizeMentionEntry = (mention) => {
-    const userId = String(mention?.userId || '').trim();
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-        return null;
-    }
-
-    return {
-        userId,
-        displayName: typeof mention?.displayName === 'string' ? mention.displayName.trim().slice(0, 120) : '',
-        offset: Number.isFinite(Number(mention?.offset)) ? Math.max(0, Math.trunc(Number(mention.offset))) : 0,
-        length: Number.isFinite(Number(mention?.length)) ? Math.max(0, Math.trunc(Number(mention.length))) : 0,
-    };
-};
-
-const buildValidMentions = (conversation, rawMentions, content = '') => {
-    const participants = new Set(
-        (conversation?.participants || []).map((participant) => participant.userId.toString())
-    );
-    const mentionMetaByUserId = new Map();
-    for (const mention of rawMentions) {
-        const normalized = normalizeMentionEntry(mention);
-        if (normalized && !mentionMetaByUserId.has(normalized.userId)) {
-            mentionMetaByUserId.set(normalized.userId, normalized);
-        }
-    }
-
-    const seen = new Set();
-    const mentions = [];
-    const safeContent = String(content || '');
-    let match;
-
-    MENTION_TOKEN_REGEX.lastIndex = 0;
-    while ((match = MENTION_TOKEN_REGEX.exec(safeContent)) !== null) {
-        const mentionToken = match[0];
-        const userId = String(match[1] || '').trim();
-
-        if (!mongoose.Types.ObjectId.isValid(userId) || !participants.has(userId) || seen.has(userId)) {
-            continue;
-        }
-
-        const normalized = mentionMetaByUserId.get(userId);
-        seen.add(userId);
-        mentions.push({
-            userId: new mongoose.Types.ObjectId(userId),
-            displayName: normalized?.displayName || '',
-            offset: match.index,
-            length: mentionToken.length,
-        });
-    }
-
-    return mentions;
 };
 
 function participantUserId(participant) {
@@ -373,7 +297,7 @@ export async function sendMessage(req, res) {
         const senderId = req.user._id;
         const { type = 'text', recipientId, content, replyTo } = req.body;
         const uploadedFile = req.file;
-        const rawMentions = parseMentionPayload(req.body.mentions);
+        parseMentionPayload(req.body.mentions);
         const metadata = parseMessageMetadata(req.body.metadata);
 
         let conversation = req.conversation;
@@ -588,8 +512,18 @@ export async function sendMessage(req, res) {
                 return res.status(400).json({ message: `Unsupported message type: ${type}` });
         }
 
-        const mentions = buildValidMentions(conversation, rawMentions, messageData.content || '');
-        messageData.mentions = mentions;
+        const mentionableTypes = new Set(['text', 'link', 'image', 'file']);
+        if (messageData.content && mentionableTypes.has(type)) {
+            const mentionResult = await buildMentionsForContent({
+                content: messageData.content,
+                conversation,
+                UserModel: User,
+            });
+            messageData.content = mentionResult.content;
+            messageData.mentions = mentionResult.mentions;
+        }
+
+        const mentions = messageData.mentions || [];
 
         if (replyTo) {
             const repliedMessage = await Message.findById(replyTo);
@@ -604,7 +538,7 @@ export async function sendMessage(req, res) {
         if (message.replyTo) {
             message = await message.populate({
                 path: 'replyTo',
-                select: '_id senderId type content fileName isRecalled reportStatus',
+                select: '_id senderId type content fileName isRecalled reportStatus mentions',
                 populate: { path: 'senderId', select: 'displayName' },
             });
         }
@@ -1107,7 +1041,7 @@ export async function searchMessages(req, res) {
                 .populate('senderId', 'displayName avatarUrl lock')
                 .populate({
                     path: 'replyTo',
-                    select: '_id senderId type content fileName isRecalled reportStatus',
+                    select: '_id senderId type content fileName isRecalled reportStatus mentions',
                     populate: { path: 'senderId', select: 'displayName avatarUrl lock' },
                 })
                 .lean();
@@ -1477,12 +1411,26 @@ export async function forwardMessage(req, res) {
                     metadata: forwardedMetadata,
                 };
 
+                const mentionableTypes = new Set(['text', 'link', 'image', 'file']);
+                if (msgData.content && mentionableTypes.has(source.type)) {
+                    const mentionResult = await buildMentionsForContent({
+                        content: msgData.content,
+                        conversation: targetConvo,
+                        UserModel: User,
+                    });
+                    msgData.content = mentionResult.content;
+                    msgData.mentions = mentionResult.mentions;
+                } else {
+                    msgData.mentions = [];
+                }
+
                 const newMsg = await Message.create(msgData);
 
                 const savedTargetConvo = await saveConversationForNewMessage({
                     conversationId: targetConvo._id,
                     message: newMsg,
                     senderId,
+                    mentions: msgData.mentions,
                 });
 
                 const signedUrl = generateSignedUrl(newMsg.filePublicId, newMsg.type);

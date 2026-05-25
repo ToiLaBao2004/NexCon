@@ -1,5 +1,5 @@
 import api from '@/lib/axios';
-import type { ConversationResponse, GlobalSearchResponse, Message } from '@/types/chat';
+import type { Conversation, ConversationResponse, GlobalSearchResponse, Message } from '@/types/chat';
 import type { SendMessagePayload } from '@/types/store';
 import type { ModerationApiErrorPayload } from '@/types/moderation';
 import { getApiErrorMessage, getApiMessageText, translateApiMessage } from '@/lib/apiMessage';
@@ -90,6 +90,11 @@ export const chatService = {
 		if (params?.search) query.append('search', params.search);
 		const res = await api.get(`/conversations/get-groups?${query}`);
 		return res.data as { groups: any[]; hasMore: boolean; nextCursor: string | null };
+	},
+
+	async fetchConversation(conversationId: string): Promise<Conversation> {
+		const res = await api.get(`/conversations/${conversationId}`);
+		return res.data.conversation;
 	},
 
 	async globalSearch(

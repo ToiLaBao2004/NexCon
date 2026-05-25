@@ -3,6 +3,7 @@ import Report, { REPORT_REASON_CATEGORIES } from '../models/reportModel.js';
 import User from '../models/userModel.js';
 import Message from '../models/messageModel.js';
 import Conversation from '../models/conversationModel.js';
+import { replaceMentionTags } from '../utils/mentions.js';
 
 const ACTIVE_REPORT_STATUSES = ['pending', 'reviewing'];
 const MAX_DESCRIPTION_LENGTH = 1000;
@@ -34,9 +35,10 @@ const buildUserSnapshot = (user) => ({
 
 const buildMessageSnapshot = (message) => ({
     type: message?.type || '',
-    content: message?.content || '',
+    content: replaceMentionTags(message?.content || '', message?.mentions),
     fileName: message?.fileName || '',
     mimeType: message?.mimeType || '',
+    mentions: [],
     createdAt: message?.createdAt || null,
     senderInfo: message?.senderInfo || null,
 });

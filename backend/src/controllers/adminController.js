@@ -24,6 +24,7 @@ import {
 } from '../services/systemMetricsService.js';
 import { io, isUserOnline } from '../socket/index.js';
 import { decryptMessagePayload } from '../utils/messageCrypto.js';
+import { replaceMentionTags } from '../utils/mentions.js';
 
 const COMPLETED_REPORT_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const COMPLETED_APPEAL_TTL_MS = 180 * 24 * 60 * 60 * 1000;
@@ -138,14 +139,14 @@ function messagePreview(message) {
     if (message.type === 'file') return message.fileName || '[File]';
     if (message.type === 'audio') return '[Tin nhắn thoại]';
     if (message.type === 'sticker') return '[Nhãn dán]';
-    return message.content || '';
+    return replaceMentionTags(message.content || '', message.mentions);
 }
 
 function violationEvidencePreview(message) {
     if (!message) return 'Không có nội dung xem trước.';
     if (message.type === 'image') {
         return message.content
-            ? `Ảnh đính kèm kèm nội dung: "${message.content}"`
+            ? `Ảnh đính kèm kèm nội dung: "${replaceMentionTags(message.content, message.mentions)}"`
             : 'Ảnh đính kèm trong đoạn chat.';
     }
     if (message.type === 'file') {
@@ -153,16 +154,16 @@ function violationEvidencePreview(message) {
     }
     if (message.type === 'audio') {
         return message.content
-            ? `Tin nhắn thoại được chuyển thành văn bản: "${message.content}"`
+            ? `Tin nhắn thoại được chuyển thành văn bản: "${replaceMentionTags(message.content, message.mentions)}"`
             : 'Tin nhắn thoại trong đoạn chat.';
     }
     if (message.type === 'link') {
-        return `Liên kết đã gửi: ${message.content || 'không rõ liên kết'}.`;
+        return `Liên kết đã gửi: ${replaceMentionTags(message.content || '', message.mentions) || 'không rõ liên kết'}.`;
     }
     if (message.type === 'sticker') {
         return 'Nhãn dán trong đoạn chat.';
     }
-    return `"${String(message.content || '').slice(0, 500)}"`;
+    return `"${replaceMentionTags(String(message.content || ''), message.mentions).slice(0, 500)}"`;
 }
 
 function serializeMessage(message) {
@@ -178,6 +179,7 @@ function serializeMessage(message) {
         fileName: raw.fileName || '',
         mimeType: raw.mimeType || '',
         fileSize: raw.fileSize || 0,
+        mentions: raw.mentions || [],
         signedUrl: raw.filePublicId ? generateSignedUrl(raw.filePublicId, raw.type) : null,
         preview: messagePreview(raw),
         reportStatus: Boolean(raw.reportStatus),
@@ -196,7 +198,7 @@ async function attachReportEvidence(reports) {
     }
 
     const messages = await Message.find({ _id: { $in: messageIds } })
-        .select('_id conversationId senderId type content fileName mimeType fileSize filePublicId reportStatus createdAt updatedAt')
+        .select('_id conversationId senderId type content fileName mimeType fileSize filePublicId reportStatus mentions createdAt updatedAt')
         .lean();
 
     const messageMap = new Map(messages.map((message) => [message._id.toString(), serializeMessage(message)]));

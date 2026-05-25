@@ -17,6 +17,7 @@ import {
   type ReportReasonCategory,
   type ReportStatus,
 } from "@/services/reportService";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 const reasonLabels: Record<ReportReasonCategory, string> = {
   spam: "Spam hoặc quảng cáo",
@@ -80,7 +81,11 @@ function getMessagePreview(report: MyReport) {
   if (messageType === "audio") return "[Tin nhắn thoại]";
   if (messageType === "file") return report.messageSnapshot?.fileName || "[File]";
   if (messageType === "sticker") return "[Nhãn dán]";
-  return report.messageSnapshot?.content || "[Tin nhắn]";
+  return decodeMentionTokens(
+    report.messageSnapshot?.content || "[Tin nhắn]",
+    null,
+    report.messageSnapshot?.mentions
+  );
 }
 
 function getReportStats(reports: MyReport[]) {

@@ -7,6 +7,8 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useMaxWidth } from "@/hooks/use-max-width";
 import type { Conversation } from "@/types/chat";
 import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
+import { useEffect, useRef } from "react";
+import { useSearchParams } from "react-router";
 
 interface ChatAppPageContentProps {
   activeConversationId: string | null;
@@ -92,11 +94,53 @@ const ChatAppPageContent = ({
 };
 
 const ChatAppPage = () => {
-  const { activeConversationId, conversations, activeSidebar, setActiveSidebar } = useChatStore();
+  const {
+    activeConversationId,
+    conversations,
+    activeSidebar,
+    ensureConversation,
+    setActiveConversation,
+    setActiveSidebar,
+  } = useChatStore();
   const isMobile = useIsMobile();
   const isTabletOrBelow = useMaxWidth(TABLET_OVERLAY_MAX_WIDTH);
+  const [searchParams] = useSearchParams();
+  const openingDeepLinkConversationRef = useRef<string | null>(null);
 
   const showInfo = activeSidebar === 'info';
+  const deepLinkConversationId = searchParams.get('conversationId')?.trim() || '';
+
+  useEffect(() => {
+    if (!deepLinkConversationId || activeConversationId === deepLinkConversationId) {
+      return;
+    }
+    if (openingDeepLinkConversationRef.current === deepLinkConversationId) {
+      return;
+    }
+
+    let cancelled = false;
+    openingDeepLinkConversationRef.current = deepLinkConversationId;
+
+    const openDeepLinkConversation = async () => {
+      const conversation = await ensureConversation(deepLinkConversationId);
+      if (cancelled) return;
+
+      if (conversation) {
+        setActiveConversation(deepLinkConversationId);
+      }
+
+      openingDeepLinkConversationRef.current = null;
+    };
+
+    void openDeepLinkConversation();
+
+    return () => {
+      cancelled = true;
+      if (openingDeepLinkConversationRef.current === deepLinkConversationId) {
+        openingDeepLinkConversationRef.current = null;
+      }
+    };
+  }, [activeConversationId, deepLinkConversationId, ensureConversation, setActiveConversation]);
 
   return (
     <SidebarProvider

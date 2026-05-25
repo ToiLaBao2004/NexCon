@@ -40,6 +40,7 @@ import { DetailDialog } from "./ConversationRemindersPanel";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import CachedStickerImage from "./CachedStickerImage";
+import { decodeMentionTokens, getMentionTextSegments } from "@/utils/mentions";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -64,106 +65,35 @@ function MentionChip({ children, isOwn }: { children: React.ReactNode; isOwn: bo
 	);
 }
 
-const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
-
-const resolveMentionDisplayName = (
-	userId: string,
-	participants: Participant[],
-	mentions: Mention[] | undefined,
-) => {
-	const participant = participants.find(
-		(item) => String(item.userId?._id || item.userId) === String(userId)
-	);
-
-	if (participant) {
-		return participant.userId?.nickname?.trim() || participant.userId?.displayName || "Người dùng";
-	}
-
-	const mentionMeta = (mentions ?? []).find((item) => String(item.userId) === String(userId));
-	if (mentionMeta?.displayName?.trim()) {
-		return mentionMeta.displayName.trim();
-	}
-
-	return "Người dùng";
-};
-
 function renderMentionedText(
 	text: string,
 	mentions: Mention[] | undefined,
 	isOwn: boolean,
 	participants: Participant[],
 ) {
-	const safeText = text ?? "";
-
-	const tokenParts: React.ReactNode[] = [];
-	let tokenCursor = 0;
-	let tokenMatched = false;
-	let tokenMatch: RegExpExecArray | null = null;
-
-	MENTION_TOKEN_REGEX.lastIndex = 0;
-	while ((tokenMatch = MENTION_TOKEN_REGEX.exec(safeText)) !== null) {
-		tokenMatched = true;
-		const tokenStart = tokenMatch.index;
-		const tokenRaw = tokenMatch[0] || "";
-		const tokenUserId = (tokenMatch[1] || "").trim();
-
-		if (tokenStart > tokenCursor) {
-			tokenParts.push(<span key={`token-text-${tokenCursor}`}>{safeText.slice(tokenCursor, tokenStart)}</span>);
-		}
-
-		const mentionLabel = resolveMentionDisplayName(tokenUserId, participants, mentions);
-		tokenParts.push(
-			<MentionChip key={`token-mention-${tokenStart}-${tokenUserId}`} isOwn={isOwn}>
-				{`@${mentionLabel}`}
-			</MentionChip>
-		);
-
-		tokenCursor = tokenStart + tokenRaw.length;
-	}
-
-	if (tokenMatched) {
-		if (tokenCursor < safeText.length) {
-			tokenParts.push(<span key={`token-tail-${tokenCursor}`}>{safeText.slice(tokenCursor)}</span>);
-		}
-
-		return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{tokenParts}</span>;
-	}
-
-	const validMentions = (mentions ?? [])
-		.filter((mention) => Number.isFinite(mention.offset) && Number.isFinite(mention.length) && mention.length > 0)
-		.sort((a, b) => a.offset - b.offset);
-
-	if (!validMentions.length) {
-		return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{safeText}</span>;
-	}
-
-	const parts: React.ReactNode[] = [];
-	let cursor = 0;
-
-	for (const mention of validMentions) {
-		const mentionStart = Math.max(0, mention.offset);
-		const mentionEnd = Math.max(mentionStart, mentionStart + mention.length);
-
-		if (mentionStart > cursor) {
-			parts.push(<span key={`text-${cursor}`}>{safeText.slice(cursor, mentionStart)}</span>);
-		}
-
-		if (mentionStart < safeText.length && mentionEnd <= safeText.length) {
-			parts.push(
-				<MentionChip key={`mention-${mentionStart}-${mentionEnd}`} isOwn={isOwn}>
-					{safeText.slice(mentionStart, mentionEnd)}
+	const parts = getMentionTextSegments(text, mentions, participants).map((segment, index) => {
+		if (segment.type === "mention") {
+			return (
+				<MentionChip key={`mention-${segment.userId}-${index}`} isOwn={isOwn}>
+					{segment.text}
 				</MentionChip>
 			);
-			cursor = mentionEnd;
 		}
-	}
 
-	if (cursor < safeText.length) {
-		parts.push(<span key={`text-tail-${cursor}`}>{safeText.slice(cursor)}</span>);
-	}
+		return <span key={`text-${index}`}>{segment.text}</span>;
+	});
 
 	return <span className="text-[14px] whitespace-pre-wrap break-words sm:text-[15px]">{parts}</span>;
 }
+
+const getMentionSafeText = (
+	text: string | null | undefined,
+	participants: Participant[],
+	mentions?: Mention[],
+) => decodeMentionTokens(text ?? "", participants, mentions);
+
+const truncatePreviewText = (text: string, maxLength: number) =>
+	text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 
 function AudioPlayer({ src, isOwn }: { src: string; isOwn: boolean }) {
 	const [isPlaying, setIsPlaying] = useState(false);
@@ -857,14 +787,15 @@ function ReplyQuoteInline({
 			</span>
 		);
 	} else if (replyTo.type === "link") {
+		const linkText = getMentionSafeText(replyTo.content ?? "Liên kết", participants, replyTo.mentions) || "Liên kết";
 		preview = (
 			<span className="flex items-center gap-1">
-				<Link2 className="size-3 shrink-0" /> {replyTo.content ?? "Liên kết"}
+				<Link2 className="size-3 shrink-0" /> {linkText}
 			</span>
 		);
 	} else {
-		const text = replyTo.content ?? "";
-		preview = text.length > 80 ? text.slice(0, 80) + "…" : text;
+		const text = getMentionSafeText(replyTo.content, participants, replyTo.mentions);
+		preview = truncatePreviewText(text, 80);
 	}
 
 	return (
@@ -2404,12 +2335,20 @@ const MessageItem = ({
 		return detectDateTimeInText(message.content);
 	}, [isRecalled, isViolationMessage, isDisbanded, message.type, message.content]);
 
+	const messagePreviewText = useMemo(() => {
+		if (message.type === "image") return "[Hình ảnh]";
+		if (message.type === "file") return message.fileName || "[File]";
+		if (message.type === "sticker") return "[Nhãn dán]";
+		if (message.type === "audio") return "[Tin nhắn thoại]";
+		return getMentionSafeText(message.content, selectedConvo.participants, message.mentions) || "Tin nhắn";
+	}, [message.content, message.fileName, message.mentions, message.type, selectedConvo.participants]);
+
 	const openSmartReminder = useCallback(() => {
 		setReminderTargetMessage({
 			messageId: message._id,
-			messagePreview: message.content ?? "Tin nhắn",
+			messagePreview: messagePreviewText,
 		});
-	}, [message._id, message.content]);
+	}, [message._id, messagePreviewText]);
 	// ─────────────────────────────────────────────────────────────────────────
 
 	const handleEmojiSelect = async (emoji: any) => {
@@ -2436,7 +2375,7 @@ const MessageItem = ({
 
 	const handleCopy = () => {
 		if (message.content) {
-			navigator.clipboard.writeText(message.content);
+			navigator.clipboard.writeText(getMentionSafeText(message.content, selectedConvo.participants, message.mentions));
 			toast.success("Đã sao chép vào bộ nhớ tạm");
 		}
 	};
@@ -2788,7 +2727,7 @@ const MessageItem = ({
 															setShowTouchActions(false);
 															setReminderTargetMessage({
 																messageId: message._id,
-																messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn"),
+																messagePreview: messagePreviewText,
 															});
 														}
 													}}
@@ -2903,7 +2842,7 @@ const MessageItem = ({
 															onClick={() => {
 																if(!isBlocked) {
 																	setShowTouchActions(false);
-																	setReminderTargetMessage({ messageId: message._id, messagePreview: message.type === "image" ? "[Hình ảnh]" : (message.content ?? "Tin nhắn") });
+																	setReminderTargetMessage({ messageId: message._id, messagePreview: messagePreviewText });
 																}
 															}}
 															className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
@@ -3179,7 +3118,7 @@ const MessageItem = ({
 					targetId={message._id}
 					targetName={message.senderInfo?.displayName}
 					conversationId={message.conversationId}
-					preview={message.type === "image" ? "[Hình ảnh]" : message.type === "file" ? (message.fileName || "[File]") : message.content}
+					preview={messagePreviewText}
 				/>
 			)}
 		</>
