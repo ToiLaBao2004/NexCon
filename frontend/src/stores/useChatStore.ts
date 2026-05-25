@@ -1208,19 +1208,20 @@ export const useChatStore = create<ChatState>()(
                 const deliveredMarker = deliveredUserId || "delivered_placeholder";
                 set((state) => {
                     const convoIdx = state.conversations.findIndex(c => c._id === conversationId);
-                    if (convoIdx === -1) return state;
-
                     const nextConvos = [...state.conversations];
-                    const convo = nextConvos[convoIdx];
 
-                    if (convo.lastMessage?._id === messageId) {
-                        const nextLastMsg = {
-                            ...convo.lastMessage,
-                            isDelivered: true,
-                            deliveredTo: Array.from(new Set([...(convo.lastMessage.deliveredTo || []), deliveredMarker]))
-                        };
+                    if (convoIdx !== -1) {
+                        const convo = nextConvos[convoIdx];
 
-                        nextConvos[convoIdx] = { ...convo, lastMessage: nextLastMsg };
+                        if (convo.lastMessage?._id === messageId) {
+                            const nextLastMsg = {
+                                ...convo.lastMessage,
+                                isDelivered: true,
+                                deliveredTo: Array.from(new Set([...(convo.lastMessage.deliveredTo || []), deliveredMarker]))
+                            };
+
+                            nextConvos[convoIdx] = { ...convo, lastMessage: nextLastMsg };
+                        }
                     }
 
                     const convoMessages = state.messages[conversationId];
