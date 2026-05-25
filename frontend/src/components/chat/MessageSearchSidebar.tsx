@@ -270,9 +270,9 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
           "flex flex-col bg-background border-l border-border/40 overflow-hidden",
           useOverlay
             // Mobile/Tablet: fixed right-side panel full height, sits above backdrop
-            ? "fixed right-0 top-0 bottom-0 z-50 w-[min(350px,100vw)] shadow-2xl animate-in slide-in-from-right duration-300"
+            ? "fixed right-0 top-0 bottom-0 z-50 w-full max-w-[380px] shadow-2xl animate-in slide-in-from-right duration-300"
             // Desktop: flex sibling, fixed width
-            : "h-full w-[350px] min-w-[350px]"
+            : "h-full w-[380px] min-w-[380px] shrink-0"
         )}
       >
       {/* Header */}
