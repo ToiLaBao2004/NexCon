@@ -132,10 +132,15 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 		}
 	},
 
-	sendFriendRequest: async (email: string, message?: string) => {
-		const normalizedEmail = String(email || '').trim().toLowerCase();
+	sendFriendRequest: async (target: string | { email?: string; userId?: string }, message?: string) => {
+		const normalizedEmail = typeof target === "string"
+			? String(target || '').trim().toLowerCase()
+			: String(target.email || '').trim().toLowerCase();
+		const targetUserId = typeof target === "string"
+			? ""
+			: String(target.userId || '').trim();
 		const normalizedMessage = String(message || '').trim();
-		if (!normalizedEmail || !EMAIL_PATTERN.test(normalizedEmail)) {
+		if (!targetUserId && (!normalizedEmail || !EMAIL_PATTERN.test(normalizedEmail))) {
 			toast.error('Email không hợp lệ.');
 			return;
 		}
@@ -154,10 +159,17 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 
 		try {
 			set({ sendingRequest: true });
-			const data = await friendService.sendFriendRequest(normalizedEmail, normalizedMessage || undefined);
+			const data = await friendService.sendFriendRequest(
+				{ email: normalizedEmail || undefined, userId: targetUserId || undefined },
+				normalizedMessage || undefined
+			);
 			set((state) => ({
-				blockedUsers: state.blockedUsers.filter(u => u.email.toLowerCase() !== normalizedEmail),
-				friendSuggestions: state.friendSuggestions.filter((suggestion) => suggestion.email.toLowerCase() !== normalizedEmail)
+				blockedUsers: state.blockedUsers.filter((u) => (
+					targetUserId ? u._id !== targetUserId : u.email?.toLowerCase() !== normalizedEmail
+				)),
+				friendSuggestions: state.friendSuggestions.filter((suggestion) => (
+					targetUserId ? suggestion._id !== targetUserId : suggestion.email?.toLowerCase() !== normalizedEmail
+				))
 			}));
 
 			toast.success(getApiSuccessMessage(data, 'Đã gửi lời mời kết bạn!'));

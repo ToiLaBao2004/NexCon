@@ -14,13 +14,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Eye, Loader2 } from "lucide-react";
+import { Camera, ChevronDown, Eye, Loader2, LockKeyhole, UsersRound } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import EditMusicProfile from "@/components/ui/editmusicprofile";
 import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropDialog";
 import { validateImageFile } from "@/lib/imageCrop";
 import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import { getApiErrorMessage } from "@/lib/apiMessage";
+import type { ProfileVisibility } from "@/types/user";
 
 interface ProfileEditDialogProps {
     open: boolean;
@@ -30,6 +38,16 @@ interface ProfileEditDialogProps {
 const avatarCropPresets: CropPreset[] = [
     { id: "square", label: "1:1", aspect: 1, outputWidth: 1024, outputHeight: 1024 },
 ];
+
+const profileVisibilityOptions: Array<{
+    value: ProfileVisibility;
+    label: string;
+    icon: typeof Eye;
+}> = [
+        { value: "public", label: "Công khai", icon: Eye },
+        { value: "friends", label: "Chỉ bạn bè", icon: UsersRound },
+        { value: "private", label: "Chỉ mình tôi", icon: LockKeyhole },
+    ];
 
 const getUploadErrorMessage = (error: unknown, fallback: string) => {
     return getApiErrorMessage(error, fallback);
@@ -50,6 +68,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
         displayName: user?.displayName || "",
         bio: user?.bio || "",
         phone: user?.phone || "",
+        profileVisibility: (user?.profileVisibility || "public") as ProfileVisibility,
     });
 
     useEffect(() => {
@@ -58,6 +77,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                 displayName: user.displayName || "",
                 bio: user.bio || "",
                 phone: user.phone || "",
+                profileVisibility: (user.profileVisibility || "public") as ProfileVisibility,
             });
         }
     }, [open, user]);
@@ -73,6 +93,8 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
         avatarUrl: user.avatarUrl,
         bio: formData.bio,
         phone: formData.phone,
+        music: user.music,
+        profileVisibility: formData.profileVisibility,
     } : null;
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -142,6 +164,11 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             setUploadProgress(null);
         }
     };
+
+    const selectedProfileVisibility = profileVisibilityOptions.find(
+        (option) => option.value === formData.profileVisibility
+    ) || profileVisibilityOptions[0];
+    const SelectedProfileVisibilityIcon = selectedProfileVisibility.icon;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -244,6 +271,49 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                         <div>
                             <Label className="mb-2 block text-sm font-medium">Nhạc trên profile</Label>
                             <EditMusicProfile />
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label className="text-sm font-medium">Quyền riêng tư hồ sơ</Label>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="h-11 w-full justify-between rounded-xl px-3 text-sm font-semibold"
+                                    >
+                                        <span className="flex min-w-0 items-center gap-2">
+                                            <SelectedProfileVisibilityIcon className="h-4 w-4 shrink-0 text-primary" />
+                                            <span className="truncate">{selectedProfileVisibility.label}</span>
+                                        </span>
+                                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="start" className="z-[250] w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl">
+                                    <DropdownMenuRadioGroup
+                                        value={formData.profileVisibility}
+                                        onValueChange={(value) => setFormData((prev) => ({
+                                            ...prev,
+                                            profileVisibility: value as ProfileVisibility,
+                                        }))}
+                                    >
+                                        {profileVisibilityOptions.map((option) => {
+                                            const Icon = option.icon;
+
+                                            return (
+                                                <DropdownMenuRadioItem
+                                                    key={option.value}
+                                                    value={option.value}
+                                                    className="py-2 text-sm font-medium"
+                                                >
+                                                    <Icon className="h-4 w-4 text-primary" />
+                                                    {option.label}
+                                                </DropdownMenuRadioItem>
+                                            );
+                                        })}
+                                    </DropdownMenuRadioGroup>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     </div>
                 </div>

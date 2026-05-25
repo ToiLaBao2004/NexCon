@@ -18,7 +18,7 @@ import { Input } from "../ui/input";
 import { ConfirmationModal } from "./ConfirmationModal";
 import { Flag, Loader2, UserMinus, UserPlus, Mail, Phone, Info, Check, X as CloseIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { User } from "@/types/user";
+import type { ProfileVisibility, User } from "@/types/user";
 import { ReportDialog } from "./ReportDialog";
 import { useSocketStore } from "@/stores/useSocketStore";
 import StatusBadge from "@/components/chat/StatusBadge";
@@ -27,10 +27,13 @@ import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/u
 interface UserProfile {
     _id: string;
     displayName: string;
-    email: string;
+    email?: string;
     avatarUrl?: string;
     bio?: string;
     phone?: string;
+    music?: User["music"];
+    profileVisibility?: ProfileVisibility;
+    profileVisibleToViewer?: boolean;
 }
 
 interface UserProfileDialogProps {
@@ -66,6 +69,14 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
             setFullUser(null);
             setAlbumArt(null);
             setProfileAccessBlocked(false);
+            if (previewAsOther) {
+                setFullUser({
+                    ...(user as User),
+                    profileVisibleToViewer: (user.profileVisibility || "public") === "public",
+                });
+                setProfileLoading(false);
+                return;
+            }
             setProfileLoading(true);
             void fetchBlockedList();
             getUserById(user._id).then((u) => {
@@ -87,7 +98,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                 console.error(error);
             });
         }
-    }, [fetchBlockedList, getUserById, open, user?._id]);
+    }, [fetchBlockedList, getUserById, open, previewAsOther, user]);
 
     if (!user) return null;
 
@@ -98,12 +109,18 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
     const isBlockedByMe = blockedUsers.some((blockedUser) => blockedUser._id === user._id);
     const isBlockedByOther = blockedBy.includes(user._id);
     const isBlockedRelation = !isSelf && (profileAccessBlocked || isBlockedByMe || isBlockedByOther);
-    const shouldHideProfileDetails = profileLoading || isBlockedRelation;
+    const profileDetails = fullUser ?? user;
+    const profileDetailsHiddenByPrivacy = !profileLoading && !isBlockedRelation && fullUser?.profileVisibleToViewer === false;
+    const shouldHideProfileDetails = profileLoading || isBlockedRelation || profileDetailsHiddenByPrivacy;
     const profileAvatarUrl = fullUser?.avatarUrl || user.avatarUrl || "";
     const canOpenAvatar = Boolean(profileAvatarUrl && !shouldHideProfileDetails);
     const profilePresence = getPresenceForUser(user._id, userPresences, fullUser?.presence ?? null, onlineUsers);
     const profileBadgeStatus = !shouldHideProfileDetails ? getPresenceBadgeStatus(profilePresence) : undefined;
     const profilePresenceText = !shouldHideProfileDetails ? getPresenceText(profilePresence) : "";
+    const profileEmail = fullUser ? fullUser.email || "" : user.email || "";
+    const profilePhone = profileDetails.phone || "";
+    const profileBio = profileDetails.bio || "";
+    const canSendFriendRequest = Boolean(user._id);
 
     const handleOpenAvatar = () => {
         if (!canOpenAvatar) return;
@@ -125,7 +142,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
 
     const onSendRequest = async () => {
         await handleAction(async () => {
-            await sendFriendRequest(user.email, requestMessage);
+            await sendFriendRequest({ userId: user._id, email: user.email }, requestMessage);
             await fetchSentRequests();
             setRequestMessage("");
         });
@@ -146,7 +163,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
 
     const onUnblockAndSendRequest = async () => {
         await handleAction(async () => {
-            await sendFriendRequest(user.email, requestMessage);
+            await sendFriendRequest({ userId: user._id, email: user.email }, requestMessage);
             await fetchSentRequests();
             await fetchBlockedList(true);
             setRequestMessage("");
@@ -257,10 +274,10 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                         />
                     </div>
                 )}
-                <Button
-                    onClick={pendingRequest ? onCancelRequest : onSendRequest}
-                    variant={pendingRequest ? "outline" : "default"}
-                    disabled={actionLoading}
+                    <Button
+                        onClick={pendingRequest ? onCancelRequest : onSendRequest}
+                        variant={pendingRequest ? "outline" : "default"}
+                        disabled={actionLoading || !canSendFriendRequest}
                     className={cn(
                         "w-full gap-2 rounded-xl h-10 font-semibold transition-all active:scale-[0.98]",
                         pendingRequest ? "border-destructive/30 text-destructive hover:bg-destructive/10" : "shadow-glow"
@@ -285,7 +302,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
             <DialogContent className="sm:max-w-md border-primary/10 shadow-2xl p-0 overflow-hidden rounded-2xl bg-background z-[210]">
 
                 {/* Banner */}
-                <div className="relative overflow-hidden" style={{ height: !isBlockedRelation && fullUser?.music?.trackId ? "152px" : "128px" }}>
+                <div className="relative overflow-hidden" style={{ height: !shouldHideProfileDetails && fullUser?.music?.trackId ? "152px" : "128px" }}>
                     {/* Background: album art blur hoặc gradient */}
                     {albumArt ? (
                         <>
@@ -305,7 +322,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                         <DialogDescription className="opacity-0">.</DialogDescription>
                     </DialogHeader>
 
-                    {!isBlockedRelation && fullUser?.music?.trackId && (
+                    {!shouldHideProfileDetails && fullUser?.music?.trackId && (
                         <div className="absolute bottom-4 left-0 right-1 px-4 pb-0">
                             <iframe
                                 src={`https://open.spotify.com/embed/track/${fullUser.music.trackId}?utm_source=generator&theme=0`}
@@ -351,15 +368,17 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
 
                         {!shouldHideProfileDetails && (
                             <div className="flex flex-col gap-3 mt-6 w-full text-left bg-muted/20 p-4 rounded-xl border border-border/40">
-                                <div className="flex items-center gap-3 text-sm">
-                                    <Mail className="h-4 w-4 text-primary shrink-0" />
-                                    <span className="text-foreground/80 truncate" title={user.email}>{user.email}</span>
-                                </div>
+                                {profileEmail && (
+                                    <div className="flex items-center gap-3 text-sm">
+                                        <Mail className="h-4 w-4 text-primary shrink-0" />
+                                        <span className="text-foreground/80 truncate" title={profileEmail}>{profileEmail}</span>
+                                    </div>
+                                )}
 
-                                {user.phone && (
+                                {profilePhone && (
                                     <div className="flex items-center gap-3 text-sm">
                                         <Phone className="h-4 w-4 text-primary shrink-0" />
-                                        <span className="text-foreground/80">{user.phone}</span>
+                                        <span className="text-foreground/80">{profilePhone}</span>
                                     </div>
                                 )}
 
@@ -368,7 +387,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                                     <div className="flex-1">
                                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Tiểu sử</p>
                                         <p className="text-foreground/90 italic leading-relaxed">
-                                            {user.bio || "Chưa có tiểu sử."}
+                                            {profileBio || "Chưa có tiểu sử."}
                                         </p>
                                     </div>
                                 </div>

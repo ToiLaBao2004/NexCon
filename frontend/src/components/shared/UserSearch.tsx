@@ -16,7 +16,7 @@ import { userService } from "@/services/userService";
 interface SearchedUser {
     _id: string;
     displayName: string;
-    email: string;
+    email?: string;
     avatarUrl: string;
     phone?: string;
     bio?: string;
@@ -60,7 +60,7 @@ const UserSearchItem = ({ user, onOpenChat }: { user: SearchedUser, onOpenChat?:
     const onSendRequest = (e: React.MouseEvent) => {
         e.stopPropagation();
         handleAction(async () => {
-            await sendFriendRequest(user.email, requestMessage);
+            await sendFriendRequest({ userId: user._id, email: user.email }, requestMessage);
             await fetchSentRequests();
             setRequestMessage("");
         });
@@ -164,7 +164,7 @@ const UserSearchItem = ({ user, onOpenChat }: { user: SearchedUser, onOpenChat?:
                     </Avatar>
                     <div className="flex-1 min-w-0">
                         <p className="text-base font-semibold text-foreground truncate">{displayAlias} {isSelf && "(Bạn)"}</p>
-                        <p className="text-sm text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-sm text-muted-foreground truncate">{user.email || "Thông tin liên hệ đã ẩn"}</p>
                     </div>
                     <div className="shrink-0 flex items-center" onClick={(e) => e.stopPropagation()}>
                         {renderSecondaryActions("icon")}
@@ -189,7 +189,7 @@ const UserSearchItem = ({ user, onOpenChat }: { user: SearchedUser, onOpenChat?:
                 user={{
                     _id: user._id,
                     displayName: user.displayName,
-                    email: user.email,
+                    email: user.email || "",
                     avatarUrl: user.avatarUrl,
                     bio: user.bio,
                     phone: user.phone,

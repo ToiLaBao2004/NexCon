@@ -107,6 +107,7 @@ function buildSafeUser(user) {
         avatarUrl: user.avatarUrl,
         bio: user.bio,
         phone: user.phone,
+        profileVisibility: user.profileVisibility || 'public',
         googleId: user.googleId,
         music: user.music,
         role: user.role || 'user',

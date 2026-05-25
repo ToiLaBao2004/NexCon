@@ -79,7 +79,7 @@ export default function RequestsTab({
                                             {request.to.displayName}
                                         </p>
                                         <p className="mt-1 truncate text-sm text-muted-foreground">
-                                            {request.message || request.to.email}
+                                            {request.message || request.to.email || "Thông tin liên hệ đã ẩn"}
                                         </p>
                                     </div>
                                     <Button
@@ -123,7 +123,7 @@ export default function RequestsTab({
                                                 {request.from.displayName}
                                             </p>
                                             <p className="mt-1 truncate text-sm text-muted-foreground">
-                                                {request.message || request.from.email}
+                                                {request.message || request.from.email || "Thông tin liên hệ đã ẩn"}
                                             </p>
                                         </div>
                                         <div className="flex shrink-0 items-center gap-1.5 md:gap-2">

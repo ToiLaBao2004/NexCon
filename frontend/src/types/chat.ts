@@ -1,4 +1,4 @@
-import type { UserPresence } from "./user";
+import type { ProfileVisibility, UserPresence } from "./user";
 
 export interface Participant {
   userId: {
@@ -6,9 +6,11 @@ export interface Participant {
     displayName: string;
     avatarUrl?: string | null;
     nickname?: string | null;
-    email: string;
+    email?: string;
     bio?: string;
     phone?: string;
+    profileVisibility?: ProfileVisibility;
+    profileVisibleToViewer?: boolean;
     isLocked?: boolean;
     lock?: {
       isLocked?: boolean;
@@ -37,7 +39,7 @@ export interface ApprovalQueueItem {
     _id: string;
     displayName: string;
     avatarUrl?: string | null;
-    email: string;
+    email?: string;
   };
   addedBy: {
     _id: string;
@@ -181,10 +183,12 @@ export interface Message {
 export interface GlobalSearchUser {
   _id: string;
   displayName: string;
-  email: string;
+  email?: string;
   avatarUrl?: string | null;
   phone?: string | null;
   bio?: string | null;
+  profileVisibility?: ProfileVisibility;
+  profileVisibleToViewer?: boolean;
   isLocked?: boolean;
   lock?: {
     isLocked?: boolean;
