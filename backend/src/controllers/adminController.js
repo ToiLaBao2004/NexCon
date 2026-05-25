@@ -618,7 +618,7 @@ export async function listAdminUsers(req, res) {
         const enrichedUsers = await Promise.all(users.map(async (user) => {
             const violationSummary = await getViolationSummary(user._id);
             return toUserSummary(user, {
-                online: isUserOnline(user._id),
+                online: await isUserOnline(user._id),
                 violationSummary,
                 openReportCount: reportCountMap.get(user._id.toString()) || 0,
             });
@@ -660,7 +660,7 @@ export async function getAdminUserProfile(req, res) {
 
         return res.status(200).json({
             user: toUserSummary(user, {
-                online: isUserOnline(user._id),
+                online: await isUserOnline(user._id),
                 violationSummary,
                 counters: {
                     reports: reportCounts,

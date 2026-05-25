@@ -3,6 +3,11 @@ import Meeting from '../models/meetingModel.js';
 import BlockUser from '../models/blockUserModel.js';
 import Conversation from '../models/conversationModel.js';
 import { getSocketGateway } from '../socket/socketGateway.js';
+import {
+    removeMeetingWaitingTimeout,
+    removeMeetingWaitingTimeoutsForRoom,
+    scheduleMeetingWaitingTimeout,
+} from '../config/realtimeTimeoutQueue.js';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
@@ -11,8 +16,6 @@ const ROOM_CODE_CHARS = 'abcdefghjkmnpqrstuvwxyz';
 const MEETING_CODE_REGEX = /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
 export const MAX_MEETING_PARTICIPANTS = 100;
 export const MAX_MEETING_WAITING_USERS = 100;
-
-export const waitingTimeouts = new Map();
 
 export function normalizeRoomName(roomName) {
     return String(roomName || '').trim().toLowerCase();
@@ -61,7 +64,7 @@ const serializeMeeting = (meeting) => {
     };
 };
 
-const emitToUserById = (targetUserId, event, payload) => {
+const emitToUserById = async (targetUserId, event, payload) => {
     const { emitToUser } = getSocketGateway();
     if (!emitToUser || !targetUserId) {
         return false;
@@ -85,7 +88,7 @@ export async function emitWaitingRoomUpdate(roomName, hostId) {
         return;
     }
 
-    emitToUserById(meeting.hostId?.toString?.() || hostId, 'waiting-room-update', {
+    await emitToUserById(meeting.hostId?.toString?.() || hostId, 'waiting-room-update', {
         roomName,
         waitingRoom: toWaitingRoomPayload(meeting.waitingRoom),
     });
@@ -144,51 +147,36 @@ export async function generateParticipantToken(roomName, userId, user = null) {
 }
 
 export function clearWaitingTimeout(roomName, userId) {
-    const key = `${roomName}:${userId}`;
-    if (!waitingTimeouts.has(key)) {
-        return;
-    }
-
-    clearTimeout(waitingTimeouts.get(key));
-    waitingTimeouts.delete(key);
+    return removeMeetingWaitingTimeout(roomName, userId);
 }
 
-export function scheduleWaitingTimeout(roomName, userId, meetingId) {
-    clearWaitingTimeout(roomName, userId);
+export async function processMeetingWaitingTimeout({ roomName, userId, meetingId }) {
+    const meeting = await Meeting.findByIdAndUpdate(
+        meetingId,
+        { $pull: { waitingRoom: userId } },
+        { new: true }
+    ).populate('waitingRoom', 'displayName fullName avatarUrl avatar');
 
-    const key = `${roomName}:${userId}`;
-    const timeout = setTimeout(async () => {
-        waitingTimeouts.delete(key);
+    await emitToUserById(userId, 'participant-rejected', {
+        roomName,
+        reason: 'timeout',
+    });
 
-        const meeting = await Meeting.findByIdAndUpdate(
-            meetingId,
-            { $pull: { waitingRoom: userId } },
-            { new: true }
-        ).populate('waitingRoom', 'displayName fullName avatarUrl avatar');
-
-        emitToUserById(userId, 'participant-rejected', {
+    if (meeting) {
+        await emitToUserById(meeting.hostId?.toString?.(), 'waiting-room-update', {
             roomName,
-            reason: 'timeout',
+            waitingRoom: toWaitingRoomPayload(meeting.waitingRoom),
         });
+    }
+}
 
-        if (meeting) {
-            emitToUserById(meeting.hostId?.toString?.(), 'waiting-room-update', {
-                roomName,
-                waitingRoom: toWaitingRoomPayload(meeting.waitingRoom),
-            });
-        }
-    }, 5 * 60 * 1000);
-
-    waitingTimeouts.set(key, timeout);
+export async function scheduleWaitingTimeout(roomName, userId, meetingId) {
+    await clearWaitingTimeout(roomName, userId);
+    return scheduleMeetingWaitingTimeout(roomName, userId, meetingId, 5 * 60 * 1000);
 }
 
 export function clearWaitingTimeoutsForRoom(roomName) {
-    for (const [key, timeout] of waitingTimeouts.entries()) {
-        if (key.startsWith(`${roomName}:`)) {
-            clearTimeout(timeout);
-            waitingTimeouts.delete(key);
-        }
-    }
+    return removeMeetingWaitingTimeoutsForRoom(roomName);
 }
 
 async function createUniqueRoomName(maxAttempts = 6) {
@@ -366,12 +354,12 @@ export async function joinMeeting(req, res) {
             $addToSet: { waitingRoom: userId },
         });
 
-        scheduleWaitingTimeout(roomName, userId, meeting._id);
+        await scheduleWaitingTimeout(roomName, userId, meeting._id);
 
         const updatedMeeting = await Meeting.findOne({ roomName })
             .populate('waitingRoom', 'displayName fullName avatarUrl avatar');
 
-        emitToUserById(hostId, 'waiting-room-update', {
+        await emitToUserById(hostId, 'waiting-room-update', {
             roomName,
             waitingRoom: toWaitingRoomPayload(updatedMeeting?.waitingRoom || []),
         });
@@ -425,16 +413,16 @@ export async function endMeeting(req, res) {
         meeting.waitingRoom = [];
         await meeting.save();
 
-        clearWaitingTimeoutsForRoom(roomName);
+        await clearWaitingTimeoutsForRoom(roomName);
 
-        emitToUserById(userId, 'meeting-ended', { roomName });
+        await emitToUserById(userId, 'meeting-ended', { roomName });
 
         for (const participant of meeting.participants) {
-            emitToUserById(participant.userId?.toString?.(), 'meeting-ended', { roomName });
+            await emitToUserById(participant.userId?.toString?.(), 'meeting-ended', { roomName });
         }
 
         for (const waitingUserId of waitingUserIds) {
-            emitToUserById(waitingUserId, 'participant-rejected', {
+            await emitToUserById(waitingUserId, 'participant-rejected', {
                 roomName,
                 reason: 'meeting-ended',
             });

@@ -650,7 +650,7 @@ export async function sendMessage(req, res) {
 
                 mentionTargets.add(mentionUserId);
 
-                const delivered = emitToUser(mentionUserId, 'user_mentioned', {
+                const delivered = await emitToUser(mentionUserId, 'user_mentioned', {
                     messageId: message._id,
                     conversationId: message.conversationId,
                     mentionedBy: {

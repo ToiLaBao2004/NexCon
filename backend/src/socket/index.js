@@ -11,6 +11,14 @@ import { registerGroupCallHandlers, handleGroupCallDisconnect, emitPendingGroupC
 import { configureSocketGateway } from "./socketGateway.js";
 import Message from "../models/messageModel.js";
 import { buildPresencePayloadForViewer, touchUserActivity } from "../services/userStatusService.js";
+import { configureSocketIoRedisAdapter } from "../config/socketIoRedisAdapter.js";
+import {
+    getOnlineUserIdsFromRedis,
+    isUserOnlineInRedis,
+    refreshSocketPresence,
+    registerSocketPresence,
+    removeSocketPresence,
+} from "../services/socketPresenceService.js";
 
 const app = express();
 
@@ -23,15 +31,15 @@ const io = new Server(server, {
     }
 });
 
+const socketRedisAdapterReady = configureSocketIoRedisAdapter(io).catch((error) => {
+    console.error("[Socket.IO] Redis adapter setup failed:", error.message);
+    return false;
+});
+
 io.use(socketAuthMiddleware);
 
 const USER_ROOM_PREFIX = "user:";
 const SESSION_ROOM_PREFIX = "session:";
-
-// Track active direct calls by sorted user pair.
-const activeCalls = new Map();
-const activeTyping = new Map();
-const socketTypingKeys = new Map();
 
 function getUserRoom(userId) {
     return `${USER_ROOM_PREFIX}${userId.toString()}`;
@@ -41,24 +49,17 @@ function getSessionRoom(sessionId) {
     return `${SESSION_ROOM_PREFIX}${sessionId.toString()}`;
 }
 
-function getOnlineUserIds() {
-    const onlineUserIds = [];
-    for (const [roomName, sockets] of io.sockets.adapter.rooms) {
-        if (roomName.startsWith(USER_ROOM_PREFIX) && sockets.size > 0) {
-            onlineUserIds.push(roomName.slice(USER_ROOM_PREFIX.length));
-        }
-    }
-    return onlineUserIds;
+async function getOnlineUserIds() {
+    return getOnlineUserIdsFromRedis();
 }
 
-function isUserOnline(userId) {
-    const roomSockets = io.sockets.adapter.rooms.get(getUserRoom(userId));
-    return Boolean(roomSockets && roomSockets.size > 0);
+async function isUserOnline(userId) {
+    return isUserOnlineInRedis(userId);
 }
 
-async function emitOnlineUsers() {
+async function emitOnlineUsers({ broadcast = false } = {}) {
     try {
-        const allOnlineIds = getOnlineUserIds();
+        const allOnlineIds = await getOnlineUserIds();
         const sockets = Array.from(io.sockets.sockets.values());
 
         const userSocketsMap = new Map();
@@ -81,20 +82,28 @@ async function emitOnlineUsers() {
                 console.error(`Error filtering online users for ${userId}:`, err);
             }
         }));
+
+        if (broadcast) {
+            try {
+                io.serverSideEmit("presence-changed");
+            } catch (error) {
+                console.warn("[Socket.IO] Cannot broadcast presence update:", error.message);
+            }
+        }
     } catch (err) {
         console.error("Critical error in emitOnlineUsers:", err);
     }
 }
 
 function getReceiverSocketId(userId) {
-    return isUserOnline(userId) ? getUserRoom(userId) : null;
+    return userId ? getUserRoom(userId) : null;
 }
 
 async function handlePushCallAction(payload, action) {
     if (action !== 'decline') return false;
 
     if (payload?.type === 'direct-call') {
-        return declineDirectCallFromPush(activeCalls, io, getReceiverSocketId, payload);
+        return declineDirectCallFromPush(io, getReceiverSocketId, payload);
     }
 
     if (payload?.type === 'group-call') {
@@ -104,108 +113,35 @@ async function handlePushCallAction(payload, action) {
     return false;
 }
 
-function emitToUser(userId, event, data) {
+async function emitToUser(userId, event, data) {
     const room = getUserRoom(userId);
-    const roomSockets = io.sockets.adapter.rooms.get(room);
-    if (!roomSockets || roomSockets.size === 0) return false;
+    const online = await isUserOnline(userId);
     io.to(room).emit(event, data);
-    return true;
-}
-
-function getTypingKey(conversationId, userId) {
-    return `${conversationId.toString()}:${userId.toString()}`;
-}
-
-function markSocketTyping(socketId, conversationId, userId) {
-    const key = getTypingKey(conversationId, userId);
-    let entry = activeTyping.get(key);
-    if (!entry) {
-        entry = {
-            conversationId: conversationId.toString(),
-            userId: userId.toString(),
-            socketIds: new Set(),
-        };
-        activeTyping.set(key, entry);
-    }
-    entry.socketIds.add(socketId);
-
-    let keys = socketTypingKeys.get(socketId);
-    if (!keys) {
-        keys = new Set();
-        socketTypingKeys.set(socketId, keys);
-    }
-    keys.add(key);
-}
-
-function clearTypingKeyForSocket(socketId, key) {
-    const entry = activeTyping.get(key);
-    const keys = socketTypingKeys.get(socketId);
-    if (keys) {
-        keys.delete(key);
-        if (keys.size === 0) {
-            socketTypingKeys.delete(socketId);
-        }
-    }
-
-    if (!entry) return "unknown";
-
-    entry.socketIds.delete(socketId);
-    if (entry.socketIds.size > 0) {
-        return "still-typing";
-    }
-
-    activeTyping.delete(key);
-    return {
-        conversationId: entry.conversationId,
-        userId: entry.userId,
-    };
-}
-
-function clearSocketTyping(socketId, conversationId, userId) {
-    return clearTypingKeyForSocket(socketId, getTypingKey(conversationId, userId));
-}
-
-function clearAllSocketTyping(socketId) {
-    const keys = Array.from(socketTypingKeys.get(socketId) ?? []);
-    const stoppedTyping = [];
-
-    keys.forEach((key) => {
-        const result = clearTypingKeyForSocket(socketId, key);
-        if (result && typeof result === "object") {
-            stoppedTyping.push(result);
-        }
-    });
-
-    return stoppedTyping;
+    return online;
 }
 
 function joinUserSocketsToRoom(userId, roomName) {
-    if (!isUserOnline(userId)) return false;
     io.in(getUserRoom(userId)).socketsJoin(roomName.toString());
     return true;
 }
 
 function leaveUserSocketsFromRoom(userId, roomName) {
-    if (!isUserOnline(userId)) return false;
     io.in(getUserRoom(userId)).socketsLeave(roomName.toString());
     return true;
 }
 
-function disconnectSocketRoom(roomName, reason = "session-revoked") {
-    const roomSockets = io.sockets.adapter.rooms.get(roomName);
-    if (!roomSockets || roomSockets.size === 0) return 0;
-
-    let disconnectedCount = 0;
-    for (const socketId of Array.from(roomSockets)) {
-        const targetSocket = io.sockets.sockets.get(socketId);
-        if (!targetSocket) continue;
-
-        targetSocket.emit("session-revoked", { reason });
-        targetSocket.disconnect(true);
-        disconnectedCount += 1;
+async function disconnectSocketRoom(roomName, reason = "session-revoked") {
+    try {
+        const sockets = await io.in(roomName).fetchSockets();
+        io.to(roomName).emit("session-revoked", { reason });
+        io.in(roomName).disconnectSockets(true);
+        return sockets.length;
+    } catch (error) {
+        console.error(`Error disconnecting socket room ${roomName}:`, error.message);
+        io.to(roomName).emit("session-revoked", { reason });
+        io.in(roomName).disconnectSockets(true);
+        return 0;
     }
-
-    return disconnectedCount;
 }
 
 function disconnectSessionSockets(sessionId, reason = "session-revoked") {
@@ -227,6 +163,12 @@ configureSocketGateway({
     leaveUserSocketsFromRoom,
 });
 
+io.on("presence-changed", () => {
+    emitOnlineUsers().catch((error) => {
+        console.error("Error handling remote presence update:", error);
+    });
+});
+
 io.on("connection", async (socket) => {
     const user = socket.user;
     const userId = user._id.toString();
@@ -238,8 +180,14 @@ io.on("connection", async (socket) => {
     if (sessionId) {
         socket.join(getSessionRoom(sessionId));
     }
+    await registerSocketPresence({ socketId: socket.id, userId, sessionId });
+    socket.data.presenceInterval = setInterval(() => {
+        refreshSocketPresence(socket.id, userId).catch((error) => {
+            console.error("Error refreshing socket presence:", error);
+        });
+    }, 45_000);
     await touchUserActivity(userId);
-    await emitOnlineUsers();
+    await emitOnlineUsers({ broadcast: true });
 
     let lastActivityTouchAt = Date.now();
     socket.use(async (_packet, next) => {
@@ -321,13 +269,6 @@ io.on("connection", async (socket) => {
                 }
             }
 
-            if (event === "user-typing") {
-                markSocketTyping(socket.id, conversationId, myId);
-            } else {
-                const result = clearSocketTyping(socket.id, conversationId, myId);
-                if (result === "still-typing") return;
-            }
-
             socket.to(conversationId).emit(event, { conversationId, userId: myId });
         } catch (error) {
             console.error(`Error handling ${event}:`, error);
@@ -365,7 +306,7 @@ io.on("connection", async (socket) => {
                 { new: true, select: 'senderId' }
             );
             if (msg) {
-                emitToUser(userId, "message-delivered-sync", {
+                await emitToUser(userId, "message-delivered-sync", {
                     messageId,
                     conversationId,
                     deliveredUserId: userId,
@@ -386,30 +327,42 @@ io.on("connection", async (socket) => {
     });
 
     // Call handlers (tách riêng)
-    registerCallHandlers(socket, user, activeCalls, io, getReceiverSocketId);
+    registerCallHandlers(socket, user, io, getReceiverSocketId);
 
     // Group call handlers
-    registerGroupCallHandlers(socket, user, io, getReceiverSocketId, activeCalls);
+    registerGroupCallHandlers(socket, user, io, getReceiverSocketId);
 
-    emitPendingDirectCallsForUser(socket, userId, activeCalls, io, getReceiverSocketId);
-    emitPendingGroupCallsForUser(socket, userId);
+    await emitPendingDirectCallsForUser(socket, userId, io, getReceiverSocketId);
+    await emitPendingGroupCallsForUser(socket, userId);
+
+    socket.on("disconnecting", () => {
+        const conversationRooms = Array.from(socket.rooms)
+            .filter((roomName) => (
+                roomName !== socket.id
+                && roomName !== getUserRoom(userId)
+                && roomName !== getSessionRoom(sessionId)
+            ));
+        conversationRooms.forEach((conversationId) => {
+            io.to(conversationId).except(socket.id).emit("user-stopped-typing", {
+                conversationId,
+                userId,
+            });
+        });
+    });
 
     // Disconnect
     socket.on("disconnect", async () => {
         const userId = user._id.toString();
-        const stoppedTyping = clearAllSocketTyping(socket.id);
-        stoppedTyping.forEach(({ conversationId, userId: typingUserId }) => {
-            io.to(conversationId).except(socket.id).emit("user-stopped-typing", {
-                conversationId,
-                userId: typingUserId,
-            });
-        });
+        if (socket.data.presenceInterval) {
+            clearInterval(socket.data.presenceInterval);
+        }
 
+        await removeSocketPresence(socket.id, userId);
         await touchUserActivity(userId);
-        await emitOnlineUsers();
+        await emitOnlineUsers({ broadcast: true });
 
         // Xử lý cuộc gọi đang active (lưu DB + thông báo đối phương)
-        await handleCallDisconnect(userId, socket.id, activeCalls, io, getReceiverSocketId);
+        await handleCallDisconnect(userId, socket.id, io, getReceiverSocketId);
 
         // Xử lý group call đang active
         await handleGroupCallDisconnect(userId, socket.id, io);
@@ -422,6 +375,7 @@ export {
     io,
     app,
     server,
+    socketRedisAdapterReady,
     getReceiverSocketId,
     emitToUser,
     isUserOnline,

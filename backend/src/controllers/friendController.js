@@ -560,7 +560,7 @@ export async function blockUser(req, res) {
             });
         }
 
-        emitOnlineUsers();
+        await emitOnlineUsers({ broadcast: true });
 
         return res.status(200).json({
             message: `Bạn đã chặn ${userBlocked.displayName}.`,
@@ -603,7 +603,7 @@ export async function unblockUser(req, res) {
             });
         }
 
-        emitOnlineUsers();
+        await emitOnlineUsers({ broadcast: true });
 
         return res.status(200).json({ message: `Bạn đã bỏ chặn ${userUnblocked.displayName}.` });
     } catch (error) {
@@ -641,8 +641,12 @@ export async function getAllFriends(req, res) {
             };
         });
         const friendIds = listedFriends.map((friend) => friend.friendId?.toString()).filter(Boolean);
+        const socketOnlineFlags = await Promise.all(friendIds.map(async (id) => ({
+            id,
+            online: await isUserOnline(id),
+        })));
         const presences = await getVisiblePresencesForUsers(friendIds, {
-            socketOnlineUserIds: friendIds.filter((id) => isUserOnline(id)),
+            socketOnlineUserIds: socketOnlineFlags.filter((item) => item.online).map((item) => item.id),
             viewerId: user._id,
         });
         const presenceByUserId = new Map(presences.map((presence) => [presence.userId, presence]));
