@@ -31,14 +31,23 @@ function getBackendApiBaseUrl() {
   return url;
 }
 
+function getProxyPath(req, requestUrl) {
+  const queryPath = req.query?.path ?? requestUrl.searchParams.get('path') ?? '';
+  const rawPath = Array.isArray(queryPath) ? queryPath.join('/') : String(queryPath);
+
+  return rawPath.replace(/^\/+/, '');
+}
+
 function getTargetUrl(req) {
   const requestUrl = new URL(req.url || '/', 'http://nexcon.local');
   const targetUrl = getBackendApiBaseUrl();
   const basePath = targetUrl.pathname.replace(/\/$/, '');
-  const requestPath = requestUrl.pathname.replace(/^\/api\/?/, '');
+  const requestPath = getProxyPath(req, requestUrl);
+
+  requestUrl.searchParams.delete('path');
 
   targetUrl.pathname = requestPath ? `${basePath}/${requestPath}` : basePath;
-  targetUrl.search = requestUrl.search;
+  targetUrl.search = requestUrl.searchParams.toString();
 
   return targetUrl;
 }
