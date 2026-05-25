@@ -116,7 +116,7 @@ services:
       dockerfile: Dockerfile
       args:
         # Vite nhúng env vào JS tại BUILD TIME nên phải truyền qua build args
-        VITE_NATIVE_API_URL: ${VITE_NATIVE_API_URL:-http://localhost:5001/api}
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5001/api}
         VITE_SOCKET_URL: ${VITE_SOCKET_URL:-http://localhost:5001/}
         VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
     container_name: nexcon_client

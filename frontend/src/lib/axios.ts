@@ -1,11 +1,10 @@
 import { useAuthStore } from '@/stores/useAuthStore';
+import { Capacitor } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import axios from 'axios';
 import { useAppStatusStore } from '@/stores/useAppStatusStore';
-import { getApiBaseUrl, isNativeClient } from '@/lib/apiBaseUrl';
 
-const isMobile = isNativeClient;
-export const API_BASE_URL = getApiBaseUrl();
+const isMobile = () => Capacitor.isNativePlatform();
 
 // Helpers lưu/lấy refresh token trên mobile
 export const getRefreshToken = async (): Promise<string | null> => {
@@ -27,7 +26,7 @@ export const clearRefreshToken = async () => {
 };
 
 const api = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: import.meta.env.VITE_API_URL,
     withCredentials: true,
 });
 
