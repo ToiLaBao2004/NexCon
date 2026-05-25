@@ -1,5 +1,6 @@
 import { cn, formatMessageTime, formatBytes, normalizeUrl } from "@/lib/utils";
 import type { Conversation, Mention, Message, MessageType, Participant, ReplyToMessage } from "@/types/chat";
+import type { ProfileVisibility } from "@/types/user";
 import UserAvatar from "./UserAvatar";
 import { Card } from "../ui/card";
 import {
@@ -11,7 +12,7 @@ import {
 import { useChatStore } from "@/stores/useChatStore";
 import { useReminderStore } from "@/stores/useReminderStore";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { toast } from "sonner";
 import SecureImage from "../SecureImage";
 import { Input } from "@/components/ui/input";
@@ -37,6 +38,7 @@ import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence
 import ForwardMessageModal from "./ForwardMessageModal";
 import { DetailDialog } from "./ConversationRemindersPanel";
 import { ReportDialog } from "@/components/shared/ReportDialog";
+import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import CachedStickerImage from "./CachedStickerImage";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
@@ -1003,6 +1005,7 @@ function SystemMessageComponent({
 	const reminders = useReminderStore((state) => state.reminders);
 	const removedReminderIds = useReminderStore((state) => state.removedReminderIds);
 	const convoMessages = useChatStore((state) => state.messages[selectedConvo._id]?.items ?? []);
+	const openChat = useChatStore((state) => state.openChat);
 	const updateSharedReminderParticipationAsync = useReminderStore((state) => state.updateSharedReminderParticipationAsync);
 	const sharedKey = String(metadata.sharedKey || '').trim();
 	const reminderIdFromMeta = String(metadata.reminderId || '').trim();
@@ -1025,6 +1028,16 @@ function SystemMessageComponent({
 	const [editingReminder, setEditingReminder] = useState<Reminder | null>(null);
 	const [selectedReminderForDialog, setSelectedReminderForDialog] = useState<Reminder | null>(null);
 	const [isSharedReminderUnavailable, setIsSharedReminderUnavailable] = useState(false);
+	const [profileUser, setProfileUser] = useState<{
+		_id: string;
+		displayName: string;
+		email?: string;
+		avatarUrl?: string;
+		bio?: string;
+		phone?: string;
+		profileVisibility?: ProfileVisibility;
+		profileVisibleToViewer?: boolean;
+	} | null>(null);
 	const lastSharedOverviewRefreshTriggerRef = useRef<string | null>(null);
 	const isSharedReminderCancelled = useMemo(() => {
 		if (!sharedKey) return false;
@@ -1076,35 +1089,93 @@ function SystemMessageComponent({
 		);
 	}, [addedUserIds, addedUsersInfo, selectedConvo.participants]);
 
-	type Actor = { id: string; name: string; avatarUrl?: string | null };
+	type Actor = {
+		id: string;
+		name: string;
+		avatarUrl?: string | null;
+		email?: string;
+		bio?: string;
+		phone?: string;
+		profileVisibility?: ProfileVisibility;
+		profileVisibleToViewer?: boolean;
+	};
 
-	const getViewerName = (actor: Actor) => {
+	const getViewerName = useCallback((actor: Actor) => {
 		const actorId = actor.id?.startsWith("name:") ? null : actor.id?.toString?.();
 		return actorId && actorId === currentUserId?.toString() ? "Bạn" : actor.name;
-	};
+	}, [currentUserId]);
 
-	const makeActor = (id: any, name: any, avatarUrl?: any): Actor | null => {
+	const makeActor = useCallback((id: any, name: any, avatarUrl?: any): Actor | null => {
 		const normalizedId = id?.toString?.() || "";
 		const normalizedName = (name || "Người dùng").toString();
-		if (!normalizedId && !normalizedName) return null;
+		const participant = normalizedId && !normalizedId.startsWith("name:")
+			? participantsById.get(normalizedId)
+			: null;
+		const displayName = participant?.nickname?.trim() || normalizedName || participant?.displayName || "Người dùng";
+		if (!normalizedId && !displayName) return null;
 		return {
-			id: normalizedId || `name:${normalizedName}`,
-			name: normalizedName,
-			avatarUrl: avatarUrl ?? undefined,
+			id: normalizedId || `name:${displayName}`,
+			name: displayName,
+			avatarUrl: avatarUrl ?? participant?.avatarUrl ?? undefined,
+			email: participant?.email,
+			bio: participant?.bio,
+			phone: participant?.phone,
+			profileVisibility: participant?.profileVisibility,
+			profileVisibleToViewer: participant?.profileVisibleToViewer,
 		};
-	};
+	}, [participantsById]);
 
-	const actorBadge = (actor: Actor, key?: string) => (
-		<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap mx-0.5">
-			<UserAvatar
-				type="seen"
-				name={getViewerName(actor)}
-				avatarUrl={actor.avatarUrl ?? undefined}
-				className="size-[20px] shrink-0 border border-background shadow-sm"
-			/>
-			<span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">{getViewerName(actor)}</span>
-		</span>
-	);
+	const openActorProfile = useCallback((actor: Actor, event: ReactMouseEvent | ReactPointerEvent) => {
+		event.stopPropagation();
+		const actorId = actor.id?.startsWith("name:") ? "" : actor.id?.toString?.();
+		if (!actorId) return;
+
+		setProfileUser({
+			_id: actorId,
+			displayName: actor.name || "Người dùng",
+			email: actor.email || "",
+			avatarUrl: actor.avatarUrl || undefined,
+			bio: actor.bio,
+			phone: actor.phone,
+			profileVisibility: actor.profileVisibility,
+			profileVisibleToViewer: actor.profileVisibleToViewer,
+		});
+	}, []);
+
+	const actorBadge = useCallback((actor: Actor, key?: string) => {
+		const canOpenProfile = Boolean(actor.id && !actor.id.startsWith("name:"));
+		const content = (
+			<>
+				<UserAvatar
+					type="seen"
+					name={getViewerName(actor)}
+					avatarUrl={actor.avatarUrl ?? undefined}
+					className="size-[20px] shrink-0 border border-background shadow-sm"
+				/>
+				<span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">{getViewerName(actor)}</span>
+			</>
+		);
+
+		if (!canOpenProfile) {
+			return (
+				<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap mx-0.5">
+					{content}
+				</span>
+			);
+		}
+
+		return (
+			<button
+				key={key || actor.id}
+				type="button"
+				onClick={(event) => openActorProfile(actor, event)}
+				onPointerDown={(event) => event.stopPropagation()}
+				className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap mx-0.5 rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+			>
+				{content}
+			</button>
+		);
+	}, [getViewerName, openActorProfile]);
 
 	const textPart = (value: string, key?: string) => (
 		<span key={key || value} className="inline align-middle font-normal text-[13px] text-slate-600 dark:text-slate-300">
@@ -1172,6 +1243,16 @@ function SystemMessageComponent({
 		const MAX_VISIBLE = 3;
 		const visibleActors = uniqueActors.slice(0, MAX_VISIBLE);
 		const remainingCount = Math.max(0, uniqueActors.length - MAX_VISIBLE);
+		return (
+			<span className="inline-flex flex-wrap items-center gap-1 align-middle mx-0.5">
+				{visibleActors.map((actor, idx) => actorBadge(actor, `added-actor-${actor.id}-${idx}`))}
+				{remainingCount > 0 && (
+					<span className="inline-flex items-center whitespace-nowrap rounded-full px-1.5 text-[13px] font-semibold text-slate-700 dark:text-slate-200">
+						và {remainingCount} người khác
+					</span>
+				)}
+			</span>
+		);
 		const visibleNames = visibleActors.map((actor) => getViewerName(actor)).join(", ");
 		const namesText = remainingCount > 0
 			? `${visibleNames} và ${remainingCount} người khác`
@@ -1525,6 +1606,20 @@ function SystemMessageComponent({
 		text,
 	]);
 
+	const actorProfileDialog = (
+		<UserProfileDialog
+			open={Boolean(profileUser)}
+			onOpenChange={(open) => {
+				if (!open) setProfileUser(null);
+			}}
+			user={profileUser}
+			onOpenChat={async (targetUser) => {
+				setProfileUser(null);
+				await openChat({ userId: targetUser.friendId || targetUser._id });
+			}}
+		/>
+	);
+
 	const loadSharedOverview = useCallback(async (forceRefresh = false) => {
 		const isCancelledFromMetadata = metadata?.isCancelled === true;
 
@@ -1752,6 +1847,7 @@ function SystemMessageComponent({
 						</p>
 					</div>
 				</div>
+				{actorProfileDialog}
 
 				<div className="my-2 mx-auto w-full max-w-[520px] space-y-2 font-sans animate-in fade-in duration-300">
 					<div
@@ -1961,13 +2057,16 @@ function SystemMessageComponent({
 	}
 
 	return (
-		<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300 px-3">
-			<div className="max-w-[95%] sm:max-w-[85%] text-center rounded-[20px] border border-border/70 bg-card/90 px-4 py-2 shadow-sm backdrop-blur-sm">
-				<p className="text-[13px] font-normal leading-[1.6] break-words text-slate-600 dark:text-slate-300">
-					{systemContent}
-				</p>
+		<>
+			<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300 px-3">
+				<div className="max-w-[95%] sm:max-w-[85%] text-center rounded-[20px] border border-border/70 bg-card/90 px-4 py-2 shadow-sm backdrop-blur-sm">
+					<p className="text-[13px] font-normal leading-[1.6] break-words text-slate-600 dark:text-slate-300">
+						{systemContent}
+					</p>
+				</div>
 			</div>
-		</div>
+			{actorProfileDialog}
+		</>
 	);
 }
 
@@ -2161,7 +2260,7 @@ const MessageItem = ({
 		shouldAlignSeenReceiptsRight ? "ml-auto mr-3 justify-end" : "ml-[60px] mr-3 justify-start"
 	);
 
-	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage } = useChatStore();
+	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage, openChat } = useChatStore();
 	const { isDark } = useThemeStore();
 	const { blockedUsers, blockedBy } = useFriendStore();
 
@@ -2186,8 +2285,36 @@ const MessageItem = ({
 	const [showForwardModal, setShowForwardModal] = useState(false);
 	const [showSeenUsersDialog, setShowSeenUsersDialog] = useState(false);
 	const [showReportDialog, setShowReportDialog] = useState(false);
+	const [profileUser, setProfileUser] = useState<{
+		_id: string;
+		displayName: string;
+		email?: string;
+		avatarUrl?: string;
+		bio?: string;
+		phone?: string;
+		profileVisibility?: ProfileVisibility;
+		profileVisibleToViewer?: boolean;
+	} | null>(null);
 	const messageRootRef = useRef<HTMLDivElement | null>(null);
 	const longPressTimeoutRef = useRef<number | null>(null);
+
+	const openSenderProfile = useCallback((event: ReactMouseEvent | ReactPointerEvent) => {
+		event.stopPropagation();
+		const sender = participant?.userId;
+		const senderId = sender?._id?.toString?.();
+		if (!sender || !senderId || selectedConvo.type !== "group") return;
+
+		setProfileUser({
+			_id: senderId,
+			displayName: sender.displayName || sender.nickname?.trim() || "Người dùng",
+			email: sender.email || "",
+			avatarUrl: sender.avatarUrl || undefined,
+			bio: sender.bio,
+			phone: sender.phone,
+			profileVisibility: sender.profileVisibility,
+			profileVisibleToViewer: sender.profileVisibleToViewer,
+		});
+	}, [participant?.userId, selectedConvo.type]);
 
 	const clearLongPressTimer = useCallback(() => {
 		if (longPressTimeoutRef.current !== null) {
@@ -2402,13 +2529,30 @@ const MessageItem = ({
 				{!isOwn && (
 					<div className="w-10 shrink-0 pt-0.5">
 						{isGroupBreak && (
-							<UserAvatar
-								type="chat"
-								name={participant?.userId.nickname?.trim() || participant?.userId.displayName || "User"}
-								avatarUrl={participant?.userId.avatarUrl ?? undefined}
-								className="size-10 text-base"
-								status={selectedConvo.type === "group" ? senderBadgeStatus : undefined}
-							/>
+							selectedConvo.type === "group" ? (
+								<button
+									type="button"
+									onClick={openSenderProfile}
+									onPointerDown={(event) => event.stopPropagation()}
+									className="block rounded-full outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+									aria-label={`Xem thông tin ${participant?.userId.displayName || "người dùng"}`}
+								>
+									<UserAvatar
+										type="chat"
+										name={participant?.userId.nickname?.trim() || participant?.userId.displayName || "User"}
+										avatarUrl={participant?.userId.avatarUrl ?? undefined}
+										className="size-10 text-base"
+										status={senderBadgeStatus}
+									/>
+								</button>
+							) : (
+								<UserAvatar
+									type="chat"
+									name={participant?.userId.nickname?.trim() || participant?.userId.displayName || "User"}
+									avatarUrl={participant?.userId.avatarUrl ?? undefined}
+									className="size-10 text-base"
+								/>
+							)
 						)}
 					</div>
 				)}
@@ -3014,6 +3158,18 @@ const MessageItem = ({
 					messages={bubbleMessages.filter((item) => item.isRecalled !== true && (!item.status || item.status === "sent"))}
 				/>
 			)}
+
+			<UserProfileDialog
+				open={Boolean(profileUser)}
+				onOpenChange={(open) => {
+					if (!open) setProfileUser(null);
+				}}
+				user={profileUser}
+				onOpenChat={async (targetUser) => {
+					setProfileUser(null);
+					await openChat({ userId: targetUser.friendId || targetUser._id });
+				}}
+			/>
 
 			{canReportMessage && (
 				<ReportDialog
