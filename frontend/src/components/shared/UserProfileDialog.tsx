@@ -139,7 +139,8 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
     const isBlockedRelation = !isSelf && (profileAccessBlocked || isBlockedByMe || isBlockedByOther);
     const profileDetails = fullUser ?? user;
     const profileDetailsHiddenByPrivacy = !profileLoading && !isBlockedRelation && fullUser?.profileVisibleToViewer === false;
-    const shouldHideProfileDetails = profileLoading || isBlockedRelation || profileDetailsHiddenByPrivacy;
+    const shouldHideProfileDetails = isBlockedRelation || profileDetailsHiddenByPrivacy;
+    const canRenderProfileDetails = !profileLoading && !shouldHideProfileDetails;
     const profileAvatarUrl = fullUser?.avatarUrl || user.avatarUrl || "";
     const canOpenAvatar = Boolean(profileAvatarUrl && !shouldHideProfileDetails);
     const profilePresence = getPresenceForUser(user._id, userPresences, fullUser?.presence ?? null, onlineUsers);
@@ -166,6 +167,74 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
         } finally {
             setActionLoading(false);
         }
+    };
+
+    const renderProfileDetailsCard = () => {
+        if (profileLoading) {
+            return (
+                <div className="flex min-h-[132px] flex-col gap-3 mt-6 w-full text-left bg-muted/20 p-4 rounded-xl border border-border/40">
+                    <div className="flex items-center gap-3">
+                        <div className="h-4 w-4 shrink-0 rounded bg-primary/20" />
+                        <div className="h-4 w-2/3 rounded bg-muted animate-pulse" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="h-4 w-4 shrink-0 rounded bg-primary/20" />
+                        <div className="h-4 w-1/2 rounded bg-muted animate-pulse" />
+                    </div>
+                    <div className="flex gap-3 text-sm pt-2 border-t border-border/40">
+                        <div className="h-4 w-4 shrink-0 rounded-full bg-primary/20 mt-0.5" />
+                        <div className="flex-1 space-y-2">
+                            <div className="h-3 w-16 rounded bg-muted animate-pulse" />
+                            <div className="h-4 w-3/4 rounded bg-muted animate-pulse" />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (shouldHideProfileDetails) {
+            return (
+                <div className="flex min-h-[132px] flex-col justify-center gap-2 mt-6 w-full text-left bg-muted/20 p-4 rounded-xl border border-border/40">
+                    <div className="flex gap-3 text-sm">
+                        <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Thông tin cá nhân</p>
+                            <p className="text-foreground/80 leading-relaxed">
+                                Người dùng đã giới hạn hiển thị thông tin cá nhân.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="flex min-h-[132px] flex-col gap-3 mt-6 w-full text-left bg-muted/20 p-4 rounded-xl border border-border/40">
+                {profileEmail && (
+                    <div className="flex items-center gap-3 text-sm">
+                        <Mail className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-foreground/80 truncate" title={profileEmail}>{profileEmail}</span>
+                    </div>
+                )}
+
+                {profilePhone && (
+                    <div className="flex items-center gap-3 text-sm">
+                        <Phone className="h-4 w-4 text-primary shrink-0" />
+                        <span className="text-foreground/80">{profilePhone}</span>
+                    </div>
+                )}
+
+                <div className="flex gap-3 text-sm pt-2 border-t border-border/40">
+                    <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Tiểu sử</p>
+                        <p className="text-foreground/90 italic leading-relaxed">
+                            {profileBio || "Chưa có tiểu sử."}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     const onSendRequest = async () => {
@@ -330,7 +399,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
             <DialogContent className="sm:max-w-md border-primary/10 shadow-2xl p-0 overflow-hidden rounded-2xl bg-background z-[210]">
 
                 {/* Banner */}
-                <div className="relative overflow-hidden" style={{ height: !shouldHideProfileDetails && fullUser?.music?.trackId ? "152px" : "128px" }}>
+                <div className="relative h-[152px] overflow-hidden">
                     {/* Background: album art blur hoặc gradient */}
                     {albumArt ? (
                         <>
@@ -350,7 +419,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                         <DialogDescription className="opacity-0">.</DialogDescription>
                     </DialogHeader>
 
-                    {!shouldHideProfileDetails && fullUser?.music?.trackId && (
+                    {canRenderProfileDetails && fullUser?.music?.trackId && (
                         <div className="absolute bottom-4 left-0 right-1 px-4 pb-0">
                             <iframe
                                 src={`https://open.spotify.com/embed/track/${fullUser.music.trackId}?utm_source=generator&theme=0`}
@@ -394,33 +463,7 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                             <p className="mt-1 text-sm text-muted-foreground">{profilePresenceText}</p>
                         )}
 
-                        {!shouldHideProfileDetails && (
-                            <div className="flex flex-col gap-3 mt-6 w-full text-left bg-muted/20 p-4 rounded-xl border border-border/40">
-                                {profileEmail && (
-                                    <div className="flex items-center gap-3 text-sm">
-                                        <Mail className="h-4 w-4 text-primary shrink-0" />
-                                        <span className="text-foreground/80 truncate" title={profileEmail}>{profileEmail}</span>
-                                    </div>
-                                )}
-
-                                {profilePhone && (
-                                    <div className="flex items-center gap-3 text-sm">
-                                        <Phone className="h-4 w-4 text-primary shrink-0" />
-                                        <span className="text-foreground/80">{profilePhone}</span>
-                                    </div>
-                                )}
-
-                                <div className="flex gap-3 text-sm pt-2 border-t border-border/40">
-                                    <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                                    <div className="flex-1">
-                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Tiểu sử</p>
-                                        <p className="text-foreground/90 italic leading-relaxed">
-                                            {profileBio || "Chưa có tiểu sử."}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {renderProfileDetailsCard()}
                     </div>
 
                     {renderActions()}

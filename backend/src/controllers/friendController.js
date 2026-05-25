@@ -340,6 +340,8 @@ export async function acceptFriendRequest(req, res) {
             }
         });
 
+        await emitOnlineUsers({ broadcast: true });
+
         return res.status(200).json({
             message: `Bạn đã chấp nhận lời mời kết bạn từ ${sender.displayName}.`,
             newFriend: {
@@ -519,6 +521,8 @@ export async function unfriendUser(req, res) {
                 friendId: user._id
             });
         }
+
+        await emitOnlineUsers({ broadcast: true });
 
         return res.status(200).json({ message: `Bạn đã hủy kết bạn với ${friend.displayName}.` });
     } catch (error) {

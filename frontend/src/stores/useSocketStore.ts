@@ -53,18 +53,7 @@ const normalizeOnlineUsersPayload = (payload: any): {
   if (Array.isArray(payload)) {
     return {
       onlineUsers: payload.map((id) => String(id)),
-      userPresences: Object.fromEntries(payload.map((id) => {
-        const userId = String(id);
-        return [userId, {
-          userId,
-          status: "online",
-          status_mode: "auto",
-          manual_status: "online",
-          is_online: true,
-          last_seen_at: null,
-          last_seen_relative: null,
-        } satisfies UserPresence];
-      })),
+      userPresences: {},
     };
   }
 
@@ -514,10 +503,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
         return {
           onlineUsers: normalized.onlineUsers,
-          userPresences: {
-            ...state.userPresences,
-            ...normalized.userPresences,
-          },
+          userPresences: normalized.userPresences,
           typingUsers: nextTypingUsers,
         };
       });
