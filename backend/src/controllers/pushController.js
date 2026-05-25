@@ -1,5 +1,6 @@
 import { removeSubscription, saveSubscription } from '../services/pushNotificationService.js';
 import User from '../models/userModel.js';
+import Session from '../models/sessionModel.js';
 import { verifyCallActionToken } from '../utils/callActionToken.js';
 import { handlePushCallAction } from '../socket/index.js';
 
@@ -65,6 +66,16 @@ export async function saveFcmToken(req, res) {
             { _id: req.user._id },
             { $addToSet: { fcmTokens: token } }
         );
+        if (req.session?._id) {
+            await Session.updateMany(
+                { _id: { $ne: req.session._id }, fcmTokens: token },
+                { $pull: { fcmTokens: token } }
+            );
+            await Session.updateOne(
+                { _id: req.session._id, userId: req.user._id },
+                { $addToSet: { fcmTokens: token } }
+            );
+        }
 
         return res.status(200).json({ message: 'FCM token saved.' });
     } catch (error) {
@@ -80,6 +91,10 @@ export async function removeFcmToken(req, res) {
 
         await User.updateOne(
             { _id: req.user._id },
+            { $pull: { fcmTokens: token } }
+        );
+        await Session.updateMany(
+            { userId: req.user._id },
             { $pull: { fcmTokens: token } }
         );
 

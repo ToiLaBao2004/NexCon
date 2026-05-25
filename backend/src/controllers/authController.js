@@ -57,12 +57,32 @@ function createSessionPayload({ userId, refreshToken, expiresAt, deviceInfo }) {
     };
 }
 
+function collectSessionFcmTokens(sessions) {
+    const list = Array.isArray(sessions) ? sessions : [sessions];
+    return Array.from(new Set(
+        list
+            .flatMap((session) => session?.fcmTokens || [])
+            .map((token) => String(token || '').trim())
+            .filter(Boolean)
+    ));
+}
+
+async function removeSessionFcmTokensFromUser(userId, sessions) {
+    const tokens = collectSessionFcmTokens(sessions);
+    if (!userId || tokens.length === 0) return;
+
+    await User.updateOne(
+        { _id: userId },
+        { $pull: { fcmTokens: { $in: tokens } } }
+    );
+}
+
 async function enforceSessionLimit(userId, currentSessionId) {
     const overflowSessions = await Session.find({
         userId,
         _id: { $ne: currentSessionId },
     })
-        .select('_id')
+        .select('_id fcmTokens')
         .sort({ createdAt: -1 })
         .skip(MAX_ACTIVE_SESSIONS_PER_USER - 1)
         .lean();
@@ -70,6 +90,7 @@ async function enforceSessionLimit(userId, currentSessionId) {
     if (!overflowSessions.length) return;
 
     const overflowIds = overflowSessions.map((session) => session._id);
+    await removeSessionFcmTokensFromUser(userId, overflowSessions);
     await Session.deleteMany({ _id: { $in: overflowIds } });
     overflowIds.forEach((sessionId) => disconnectSessionSockets(sessionId, 'session-limit'));
 }
@@ -323,13 +344,14 @@ export async function signOut(req, res) {
 
         const refreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
         const requestedSession = refreshToken
-            ? await findSessionByRefreshToken(refreshToken, '_id userId')
+            ? await findSessionByRefreshToken(refreshToken, '_id userId fcmTokens')
             : null;
         if (requestedSession && requestedSession.userId?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ message: 'Cannot sign out another user session.' });
         }
         const session = requestedSession || req.session;
         if (session) {
+            await removeSessionFcmTokensFromUser(session.userId || req.user._id, session);
             await Session.deleteOne({ _id: session._id });
         }
         if (session) {
@@ -351,6 +373,7 @@ export async function signOutAll(req, res) {
     try {
         const userId = req.user._id;
         await Session.deleteMany({ userId });
+        await User.updateOne({ _id: userId }, { $set: { fcmTokens: [] } });
         disconnectUserSockets(userId, 'signed-out-all');
         res.clearCookie('refreshToken', { httpOnly: true, secure: true, sameSite: 'none' });
         return res.status(200).json({ message: 'Logged out from all devices successfully.' });
@@ -408,6 +431,7 @@ export async function signOutBySession(req, res) {
             return res.status(404).json({ message: 'Session not found.' });
         }
 
+        await removeSessionFcmTokensFromUser(currentSession.userId, targetSession);
         await Session.deleteOne({ _id: sessionId });
         disconnectSessionSockets(sessionId, 'session-removed');
 

@@ -1,5 +1,6 @@
 import { fcm } from '../config/firebase.js';
 import User from '../models/userModel.js';
+import Session from '../models/sessionModel.js';
 
 function normalizeData(data = {}) {
     return Object.fromEntries(
@@ -9,12 +10,39 @@ function normalizeData(data = {}) {
     );
 }
 
+async function getSessionBoundTokens(userId, tokens) {
+    const sessions = await Session.find({
+        userId,
+        expiresAt: { $gt: new Date() },
+        fcmTokens: { $in: tokens },
+    })
+        .select('fcmTokens')
+        .lean();
+
+    const boundTokens = new Set(
+        sessions
+            .flatMap((session) => session.fcmTokens || [])
+            .filter(Boolean)
+    );
+    const deliverableTokens = tokens.filter((token) => boundTokens.has(token));
+    const staleTokens = tokens.filter((token) => !boundTokens.has(token));
+
+    if (staleTokens.length > 0) {
+        await User.updateOne(
+            { _id: userId },
+            { $pull: { fcmTokens: { $in: staleTokens } } }
+        );
+    }
+
+    return deliverableTokens;
+}
+
 export async function sendFCMToUser(userId, { title, body, data = {}, dataOnly = false }) {
     try {
         const user = await User.findById(userId).select('fcmTokens');
         if (!user?.fcmTokens?.length) return;
 
-        const validTokens = user.fcmTokens.filter(Boolean);
+        const validTokens = await getSessionBoundTokens(userId, user.fcmTokens.filter(Boolean));
         if (!validTokens.length) return;
         const isCallPush = data?.type === 'direct-call' || data?.type === 'group-call';
         const isMessagePush = data?.type === 'message';
