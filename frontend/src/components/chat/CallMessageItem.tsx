@@ -14,6 +14,8 @@ interface CallMessageItemProps {
   isLastMyMessage?: boolean;
 }
 
+const getCallDisplayName = (user: any) => user?.nickname?.trim() || user?.displayName || "User";
+
 /**
  * Wrapper cho CallMessageBubble, xử lý layout avatar + vị trí (trái/phải)
  * giống như MessageItem nhưng cho cuộc gọi.
@@ -34,7 +36,7 @@ const CallMessageItem = ({
       if (p.lastReadMessageId === message._id) {
         users.push({
           _id: pid,
-          displayName: p.userId.displayName ?? "User",
+          displayName: getCallDisplayName(p.userId),
           avatarUrl: p.userId.avatarUrl,
         });
       }
@@ -49,13 +51,16 @@ const CallMessageItem = ({
   const otherCallParticipant = snapshot.participants.find(
     (p) => (p.userId?._id || p.userId)?.toString?.() !== currentUserId?.toString()
   )?.userId;
+  const initiatorConversationParticipant = selectedConvo.participants.find(
+    (p: Participant) => p.userId?._id?.toString() === snapshot.initiatorUser._id
+  )?.userId;
   const otherConversationParticipant = selectedConvo.participants.find(
     (p: Participant) => p.userId?._id?.toString() !== currentUserId
   )?.userId;
 
   const avatarUser = !isInitiator
-    ? (snapshot.initiatorUser || otherCallParticipant || otherConversationParticipant)
-    : (otherCallParticipant || otherConversationParticipant || snapshot.initiatorUser);
+    ? (initiatorConversationParticipant || snapshot.initiatorUser || otherCallParticipant || otherConversationParticipant)
+    : (otherConversationParticipant || otherCallParticipant || snapshot.initiatorUser);
 
   return (
     <div
@@ -69,7 +74,7 @@ const CallMessageItem = ({
         <div className="w-8 shrink-0 pt-0.5">
           <UserAvatar
             type="chat"
-            name={avatarUser?.displayName ?? "User"}
+            name={getCallDisplayName(avatarUser)}
             avatarUrl={avatarUser?.avatarUrl ?? undefined}
           />
         </div>
@@ -85,6 +90,7 @@ const CallMessageItem = ({
           message={message}
           currentUserId={currentUserId}
           isOwn={isInitiator}
+          selectedConvo={selectedConvo}
         />
 
         {/* Thời gian */}

@@ -63,6 +63,9 @@ const DATE_OPTIONS: { value: DateOption; label: string }[] = [
   { value: 'custom', label: 'Tùy chỉnh' },
 ];
 
+const getUserDisplayName = (user: any, fallback = "Người dùng") =>
+  user?.nickname?.trim() || user?.displayName || fallback;
+
 const computeDateRange = (option: DateOption, customFrom: string, customTo: string)
   : { fromDate?: string; toDate?: string } => {
   const now = new Date();
@@ -242,7 +245,7 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
 
   // Derived label for sender dropdown
   const senderLabel = selectedSenderId
-    ? (participants.find(p => p.userId._id === selectedSenderId)?.userId.displayName ?? 'Người gửi')
+    ? getUserDisplayName(participants.find(p => p.userId._id === selectedSenderId)?.userId, 'Người gửi')
     : 'Người gửi';
 
   // Derived label for date dropdown
@@ -322,15 +325,16 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
             {participants.map((p) => {
               const u = p.userId;
               const isSelected = selectedSenderId === u._id;
+              const displayName = getUserDisplayName(u);
               return (
                 <button
                   key={u._id}
                   onClick={() => { setSelectedSenderId(isSelected ? "" : u._id); setSenderOpen(false); }}
                   className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-muted/40 transition-colors"
                 >
-                  <UserAvatar type="profile" name={u.displayName} avatarUrl={u.avatarUrl ?? undefined}
+                  <UserAvatar type="profile" name={displayName} avatarUrl={u.avatarUrl ?? undefined}
                     className="!h-7 !w-7 !text-xs shrink-0" />
-                  <span className="flex-1 text-sm text-left truncate">{u.displayName}</span>
+                  <span className="flex-1 text-sm text-left truncate">{displayName}</span>
                   {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
                 </button>
               );
@@ -410,8 +414,10 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
             {visibleItems.map((msg) => {
               const sender = typeof msg.senderId === 'object' && msg.senderId !== null
                 ? (msg.senderId as any) : null;
-              const senderName: string = sender?.displayName ?? 'Người dùng';
-              const senderAvatar: string | undefined = sender?.avatarUrl ?? undefined;
+              const senderId = sender?._id || msg.senderId;
+              const senderParticipant = participants.find((p) => p.userId?._id?.toString?.() === senderId?.toString?.());
+              const senderName: string = getUserDisplayName(senderParticipant?.userId || sender, 'Người dùng');
+              const senderAvatar: string | undefined = senderParticipant?.userId?.avatarUrl ?? sender?.avatarUrl ?? undefined;
               const contentText: string = msg.content ?? (msg as any).fileName ?? '';
 
               return (

@@ -89,7 +89,7 @@ const GroupChatAvatar = ({ participants, type, groupAvatarUrl }: GroupChatAvatar
             <div key={i} className={cn("absolute rounded-full", positions[i])}>
                 <UserAvatar
                     type={type === "people" ? "card" : type}
-                    name={member.userId?.displayName ?? ""}
+                    name={member.userId?.nickname?.trim() || member.userId?.displayName || ""}
                     avatarUrl={member.userId?.avatarUrl ?? undefined}
                     className={cn(
                         childSizeClass,

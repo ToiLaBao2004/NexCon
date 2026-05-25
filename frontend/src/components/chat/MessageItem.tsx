@@ -2145,7 +2145,7 @@ const MessageItem = ({
 			if (!map[targetMessageId]) map[targetMessageId] = [];
 			map[targetMessageId].push({
 				_id: pid,
-				displayName: p.userId.nickname ?? p.userId.displayName ?? "User",
+				displayName: p.userId.nickname?.trim() || p.userId.displayName || "User",
 				avatarUrl: p.userId.avatarUrl,
 			});
 		}
@@ -2404,7 +2404,7 @@ const MessageItem = ({
 						{isGroupBreak && (
 							<UserAvatar
 								type="chat"
-								name={participant?.userId.nickname ?? participant?.userId.displayName ?? "User"}
+								name={participant?.userId.nickname?.trim() || participant?.userId.displayName || "User"}
 								avatarUrl={participant?.userId.avatarUrl ?? undefined}
 								className="size-10 text-base"
 								status={selectedConvo.type === "group" ? senderBadgeStatus : undefined}

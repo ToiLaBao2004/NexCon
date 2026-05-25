@@ -117,7 +117,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
     startCall(
       {
         _id: otherUser.userId._id,
-        displayName: otherUser.userId.displayName,
+        displayName,
         avatarUrl: otherUser.userId.avatarUrl ?? null,
       },
       "voice",
@@ -129,7 +129,7 @@ const ChatWindowHeader = ({ chat, showInfo, onToggleInfo }: ChatWindowHeaderProp
     startCall(
       {
         _id: otherUser.userId._id,
-        displayName: otherUser.userId.displayName,
+        displayName,
         avatarUrl: otherUser.userId.avatarUrl ?? null,
       },
       "video",

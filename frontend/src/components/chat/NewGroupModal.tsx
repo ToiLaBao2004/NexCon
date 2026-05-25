@@ -185,7 +185,7 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
                       </Avatar>
                       <div>
                         <p className="text-sm font-semibold text-foreground">
-                          {friend.nickname || friend.displayName}
+                          {friend.nickname?.trim() || friend.displayName}
                         </p>
                         {friend.nickname && (
                           <p className="text-xs text-muted-foreground">{friend.displayName}</p>

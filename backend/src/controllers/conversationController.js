@@ -563,7 +563,46 @@ export async function getGroups(req, res) {
 			? rawGroups[rawGroups.length - 1].updatedAt
 			: null;
 
-		const formatted = decryptConversationsPayload(rawGroups).map((c) => {
+		const decryptedGroups = decryptConversationsPayload(rawGroups);
+		const allOtherIds = [
+			...new Set(
+				decryptedGroups
+					.flatMap((c) => (c.participants || []).map((p) => p.userId?._id?.toString()))
+					.filter((id) => id && id !== myId)
+			),
+		];
+		const nickMap = new Map();
+
+		if (allOtherIds.length) {
+			const friends = await Friend.find({
+				$or: [
+					{ userA: myId, userB: { $in: allOtherIds } },
+					{ userB: myId, userA: { $in: allOtherIds } },
+				],
+			})
+				.select("userA userB nicknameA nicknameB")
+				.lean();
+
+			for (const f of friends) {
+				const a = f.userA.toString();
+				const b = f.userB.toString();
+
+				let otherId, nick;
+				if (a === myId) {
+					otherId = b;
+					nick = f.nicknameB;
+				} else if (b === myId) {
+					otherId = a;
+					nick = f.nicknameA;
+				}
+
+				if (otherId && nick != null) {
+					nickMap.set(otherId, nick);
+				}
+			}
+		}
+
+		const formatted = decryptedGroups.map((c) => {
 			const myParticipant = c.participants?.find((p) => {
 				const pid = p?.userId?._id?.toString?.() || p?.userId?.toString?.();
 				return pid === myId;
@@ -587,7 +626,16 @@ export async function getGroups(req, res) {
 					} else if (!userObj) {
 						userObj = { _id: null, displayName: 'Người dùng đã xóa', avatarUrl: null };
 					}
-					return { ...p, userId: sanitizeParticipantUser(userObj) };
+					userObj = sanitizeParticipantUser(userObj);
+					const pid = userObj?._id?.toString();
+					const nickname = userObj?.isLocked ? null : (pid && pid !== myId ? nickMap.get(pid) || null : null);
+					return {
+						...p,
+						userId: {
+							...userObj,
+							nickname,
+						},
+					};
 				}),
 				unreadCounts: c.unreadCounts || {},
 			};

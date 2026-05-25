@@ -17,6 +17,8 @@ import UserAvatar from "./UserAvatar";
 import { Search } from "lucide-react";
 import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
 
+const getMemberDisplayName = (member: any) => member?.nickname?.trim() || member?.displayName || "Người dùng";
+
 interface LeaveGroupModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -51,7 +53,7 @@ export function LeaveGroupModal({
     const q = searchQuery.trim().toLowerCase();
     if (!q) return eligibleNewAdmins;
     return eligibleNewAdmins.filter((u) => {
-      const name = (u.displayName || "Người dùng").toLowerCase();
+      const name = getMemberDisplayName(u).toLowerCase();
       return name.includes(q);
     });
   }, [eligibleNewAdmins, searchQuery]);
@@ -104,6 +106,7 @@ export function LeaveGroupModal({
               {filteredNewAdmins.map((member) => {
                 const presence = getPresenceForUser(member._id?.toString?.() || "", userPresences, member.presence ?? null, onlineUsers);
                 const badgeStatus = getPresenceBadgeStatus(presence);
+                const memberName = getMemberDisplayName(member);
                 return (
                   <label
                     key={member._id}
@@ -118,14 +121,14 @@ export function LeaveGroupModal({
                     />
                     <UserAvatar
                       type="sidebar"
-                      name={member.displayName || "Người dùng"}
+                      name={memberName}
                       avatarUrl={member.avatarUrl}
                       className="h-8 w-8"
                       status={badgeStatus}
                     />
                     <div className="min-w-0">
                       <span className="block text-sm text-foreground truncate">
-                        {member.displayName || "Người dùng"}
+                        {memberName}
                       </span>
                     </div>
                   </label>

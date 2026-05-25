@@ -100,6 +100,71 @@ const filterVisibleConversations = (conversations: any[]) => {
     return conversations.filter(isVisibleConversation);
 };
 
+const normalizeNickname = (nickname?: string | null) => {
+    const value = String(nickname ?? '').trim();
+    return value || null;
+};
+
+const getParticipantUserId = (participant: any) => {
+    const userId = participant?.userId;
+    return String(userId?._id || userId || '');
+};
+
+const patchParticipantNickname = (conversation: any, friendId: string, nickname?: string | null) => {
+    const normalizedFriendId = String(friendId || '');
+    if (!normalizedFriendId || !Array.isArray(conversation?.participants)) return conversation;
+
+    const nextNickname = normalizeNickname(nickname);
+    let changed = false;
+    const participants = conversation.participants.map((participant: any) => {
+        if (getParticipantUserId(participant) !== normalizedFriendId) return participant;
+        if (!participant?.userId || typeof participant.userId !== 'object') return participant;
+
+        if (normalizeNickname(participant.userId.nickname) === nextNickname) return participant;
+        changed = true;
+        return {
+            ...participant,
+            userId: {
+                ...participant.userId,
+                nickname: nextNickname,
+            },
+        };
+    });
+
+    return changed ? { ...conversation, participants } : conversation;
+};
+
+const preserveExistingParticipantNicknames = (incomingParticipants: any[] | undefined, existingParticipants: any[] | undefined) => {
+    if (!Array.isArray(incomingParticipants) || !Array.isArray(existingParticipants)) return incomingParticipants;
+
+    const nicknameByUserId = new Map<string, string | null>();
+    existingParticipants.forEach((participant: any) => {
+        if (!participant?.userId || typeof participant.userId !== 'object') return;
+        const userId = getParticipantUserId(participant);
+        if (!userId) return;
+        if (Object.prototype.hasOwnProperty.call(participant.userId, 'nickname')) {
+            nicknameByUserId.set(userId, normalizeNickname(participant.userId.nickname));
+        }
+    });
+
+    if (!nicknameByUserId.size) return incomingParticipants;
+
+    return incomingParticipants.map((participant: any) => {
+        if (!participant?.userId || typeof participant.userId !== 'object') return participant;
+        const userId = getParticipantUserId(participant);
+        if (!userId || !nicknameByUserId.has(userId)) return participant;
+        if (Object.prototype.hasOwnProperty.call(participant.userId, 'nickname')) return participant;
+
+        return {
+            ...participant,
+            userId: {
+                ...participant.userId,
+                nickname: nicknameByUserId.get(userId),
+            },
+        };
+    });
+};
+
 const CONVERSATION_PAGE_LIMIT = 50;
 
 const mergeConversations = (current: any[], incoming: any[]) => {
@@ -110,7 +175,15 @@ const mergeConversations = (current: any[], incoming: any[]) => {
             byId.delete(conversation._id);
             return;
         }
-        byId.set(conversation._id, { ...(byId.get(conversation._id) || {}), ...conversation });
+        const existing = byId.get(conversation._id) || {};
+        const nextConversation = {
+            ...existing,
+            ...conversation,
+            participants: Array.isArray(conversation.participants)
+                ? preserveExistingParticipantNicknames(conversation.participants, existing.participants) || conversation.participants
+                : existing.participants,
+        };
+        byId.set(conversation._id, nextConversation);
     });
     return sortConversations(Array.from(byId.values()));
 };
@@ -1072,6 +1145,30 @@ export const useChatStore = create<ChatState>()(
                     throw error;
                 }
             },
+            updateParticipantNickname: (friendId, nickname) => {
+                const normalizedFriendId = String(friendId || '');
+                if (!normalizedFriendId) return;
+
+                set((state) => ({
+                    conversations: state.conversations.map((conversation) =>
+                        patchParticipantNickname(conversation, normalizedFriendId, nickname)
+                    ),
+                    groupConversations: state.groupConversations.map((conversation) =>
+                        patchParticipantNickname(conversation, normalizedFriendId, nickname)
+                    ),
+                    searchResults: {
+                        ...state.searchResults,
+                        items: state.searchResults.items.map((message: any) => (
+                            message?.conversation
+                                ? {
+                                    ...message,
+                                    conversation: patchParticipantNickname(message.conversation, normalizedFriendId, nickname),
+                                }
+                                : message
+                        )),
+                    },
+                }));
+            },
             updateConversation: (conversation) => {
                 if (!isVisibleConversation(conversation)) {
                     get().markGroupAsDisbanded(conversation._id);
@@ -1097,12 +1194,15 @@ export const useChatStore = create<ChatState>()(
                             ?? conversation.lastMessageAt
                             ?? conversation.updatedAt
                             ?? existingConv.updatedAt;
+                        const nextParticipants = isPopulated
+                            ? preserveExistingParticipantNicknames(newParticipants, existingConv.participants)
+                            : existingConv.participants;
 
                         const updatedConv = {
                             ...existingConv,
                             ...conversation,
                             ...(nextActivityAt ? { updatedAt: nextActivityAt, lastMessageAt: nextActivityAt } : {}),
-                            participants: (isPopulated ? newParticipants : null) || existingConv.participants
+                            participants: nextParticipants || existingConv.participants
                         };
 
                         const updatedConversations = state.conversations.map((c) =>
@@ -1119,7 +1219,11 @@ export const useChatStore = create<ChatState>()(
                                             ...c,
                                             ...conversation,
                                             ...(nextActivityAt ? { updatedAt: nextActivityAt, lastMessageAt: nextActivityAt } : {}),
-                                            participants: (isPopulated ? newParticipants : null) || c.participants,
+                                            participants: (
+                                                isPopulated
+                                                    ? preserveExistingParticipantNicknames(newParticipants, c.participants)
+                                                    : c.participants
+                                            ) || c.participants,
                                         }
                                         : c
                                 ) as any

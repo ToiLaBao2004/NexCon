@@ -143,7 +143,7 @@ const getConversationSubtitle = (conversation: Conversation, currentUserId?: str
   const isOwn = senderIdString === currentUserId;
   const sender = conversation.participants.find((participant) => getParticipantId(participant) === senderIdString);
   const senderName = conversation.type === "group"
-    ? (isOwn ? "Bạn" : sender?.userId?.nickname || sender?.userId?.displayName || "Ai đó")
+    ? (isOwn ? "Bạn" : sender?.userId?.nickname?.trim() || sender?.userId?.displayName || "Ai đó")
     : (isOwn ? "Bạn" : "");
 
   const content = lastMessage.content || "";
@@ -407,7 +407,12 @@ function MessageResultRow({
   const sender = rawSender && typeof rawSender === "object" ? rawSender : message.senderInfo;
   const senderId = rawSender && typeof rawSender === "object" ? rawSender._id : rawSender;
   const isOwnSender = senderId?.toString?.() === currentUserId;
-  const senderName = isOwnSender ? "Bạn" : sender?.displayName || "Người dùng";
+  const senderParticipant = message.conversation?.participants?.find(
+    (participant) => (participant.userId?._id || participant.userId)?.toString?.() === senderId?.toString?.()
+  );
+  const senderName = isOwnSender
+    ? "Bạn"
+    : senderParticipant?.userId?.nickname?.trim() || sender?.displayName || "Người dùng";
   const conversationName = getConversationTitle(message.conversation, currentUserId);
   const content = getMessagePreview(message, currentUserId);
   const isGroupMessage = message.conversation?.type === "group";

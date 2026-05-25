@@ -144,7 +144,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
                         {approvalQueue.map((item: any) => {
                           const u = item.userId;
                           if (!u) return null;
-                          const name = u.displayName || "Người dùng";
+                          const name = u.nickname?.trim() || u.displayName || "Người dùng";
                           const presence = getPresenceForUser(u._id?.toString?.() || "", userPresences, u.presence ?? null, onlineUsers);
                           const badgeStatus = getPresenceBadgeStatus(presence);
                           return (
@@ -178,7 +178,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
                 </div>
                 {participants.map((p: any) => {
                   const u = p.userId || p;
-                  const name = u?.displayName || "Người dùng";
+                  const name = u?.nickname?.trim() || u?.displayName || "Người dùng";
                   const isMe = u?._id?.toString() === currentUserId?.toString();
                   const presence = getPresenceForUser(u?._id?.toString?.() || "", userPresences, u?.presence ?? null, onlineUsers);
                   const badgeStatus = getPresenceBadgeStatus(presence);
