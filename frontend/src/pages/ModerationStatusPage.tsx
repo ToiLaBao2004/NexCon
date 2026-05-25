@@ -39,29 +39,29 @@ export default function ModerationStatusPage() {
 
   return (
     <div className="relative flex h-full flex-1 overflow-hidden bg-background md:rounded-r-2xl md:border-y md:border-r md:border-l-0 md:border-border/50">
-      <div className="beautiful-scrollbar flex-1 overflow-y-auto p-5 md:p-7">
+      <div className="beautiful-scrollbar flex-1 overflow-y-auto p-4 sm:p-5 md:p-7">
         <div className="mx-auto grid max-w-5xl gap-5">
-          <header className="rounded-2xl border border-border/70 bg-card px-6 py-5 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 items-start gap-4">
-                <Button size="sm" className="h-9 rounded-xl bg-primary px-4 font-medium text-primary-foreground hover:bg-primary/90" onClick={() => navigate("/chat")}>
+          <header className="rounded-2xl border border-border/70 bg-card px-4 py-4 shadow-sm sm:px-6 sm:py-5">
+            <div className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start">
+              <div className="flex items-center justify-between gap-2 sm:contents">
+                <Button size="sm" className="h-9 shrink-0 rounded-xl bg-primary px-4 font-medium text-primary-foreground hover:bg-primary/90 sm:col-start-1 sm:row-start-1" onClick={() => navigate("/chat")}>
                   Quay lại
                 </Button>
-                <div className="min-w-0">
-                  <h1 className="text-[28px] font-bold leading-tight tracking-tight text-foreground">Trạng thái tiêu chuẩn cộng đồng</h1>
-                  <p className="mt-1.5 text-sm leading-6 text-foreground">
-                    Xem số lần vi phạm, lý do, thời gian ghi nhận và trạng thái xử lý của tài khoản.
-                  </p>
-                </div>
+                <Button
+                  size="sm"
+                  className="h-9 shrink-0 rounded-xl bg-primary px-4 font-medium text-primary-foreground hover:bg-primary/90 sm:col-start-3 sm:row-start-1"
+                  disabled={loading || refreshing}
+                  onClick={() => void loadStatus("refresh")}
+                >
+                  {refreshing ? "Đang tải..." : "Làm mới"}
+                </Button>
               </div>
-              <Button
-                size="sm"
-                className="h-9 rounded-xl bg-primary px-4 font-medium text-primary-foreground hover:bg-primary/90"
-                disabled={loading || refreshing}
-                onClick={() => void loadStatus("refresh")}
-              >
-                {refreshing ? "Đang tải..." : "Làm mới"}
-              </Button>
+              <div className="min-w-0 sm:col-start-2 sm:row-start-1">
+                <h1 className="text-2xl font-bold leading-tight tracking-tight text-foreground sm:text-[28px]">Trạng thái tiêu chuẩn cộng đồng</h1>
+                <p className="mt-1.5 text-sm leading-6 text-foreground">
+                  Xem số lần vi phạm, lý do, thời gian ghi nhận và trạng thái xử lý của tài khoản.
+                </p>
+              </div>
             </div>
           </header>
 
