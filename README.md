@@ -31,6 +31,19 @@ Dự án được thiết kế theo hướng production-ready với:
 - Database sử dụng **MongoDB Atlas**.
 - CI tự động bằng **GitHub Actions**.
 - CD tự động thông qua Railway/Vercel khi nhánh `main` được cập nhật.
+- Nhánh `main` được bảo vệ bằng GitHub Ruleset, yêu cầu CI checks pass trước khi merge.
+
+### Trạng thái hiện tại
+
+| Hạng mục             | Trạng thái                                                                 |
+| -------------------- | -------------------------------------------------------------------------- |
+| Repository visibility | Public                                                                     |
+| Production branch    | `main`                                                                     |
+| Branch ruleset       | Active, target branch `main`                                               |
+| Required checks      | `Backend`, `Frontend`                                                      |
+| Backend deploy       | Railway tự deploy sau khi `main` thay đổi                                  |
+| Frontend deploy      | Vercel tự deploy sau khi `main` thay đổi                                   |
+| CI lint frontend     | Đang chạy ở chế độ báo cáo, chưa chặn merge do còn lỗi lint legacy         |
 
 ---
 
@@ -45,6 +58,7 @@ NexCon hướng tới việc xây dựng một nền tảng giao tiếp hiện �
 | Gọi trực tuyến      | Audio/video call cá nhân và nhóm thông qua LiveKit              |
 | Quản lý lịch nhắc   | Tạo reminder cá nhân/nhóm, lịch họp, thông báo nhắc hẹn         |
 | Bảo mật tài khoản   | JWT, refresh token, Google OAuth, OTP, quản lý phiên đăng nhập  |
+| Trạng thái người dùng | Online/offline, manual status, last seen, presence realtime    |
 | Quản trị hệ thống   | Admin dashboard, report, lock appeal, moderation, audit log     |
 | Kiểm duyệt nội dung | AI moderation cho text/link/image và lưu ngữ cảnh training      |
 
@@ -61,6 +75,7 @@ NexCon hướng tới việc xây dựng một nền tảng giao tiếp hiện �
 - 💬 **Realtime Chat**
   - Chat 1-1 và group chat.
   - Socket.IO realtime event.
+  - Presence realtime: online/offline, manual status, last seen.
   - Gửi ảnh, sticker, emoji, voice/audio.
   - Reaction, pin/unpin message, forward message.
   - Xóa/làm sạch hội thoại theo lịch.
@@ -111,6 +126,64 @@ flowchart LR
     Workers --> DB
 ```
 
+### Multi-replica Socket.IO
+
+Khi backend được scale thành nhiều replica, Socket.IO không thể chỉ dựa vào memory local của từng process. NexCon xử lý hướng này bằng **Socket.IO Redis Adapter** và **Redis-backed presence state**.
+
+```mermaid
+flowchart TB
+    ClientA[Client A] --> LB[Load Balancer / Railway Routing]
+    ClientB[Client B] --> LB
+    ClientC[Client C] --> LB
+
+    LB --> API1[Backend Replica 1<br/>Express + Socket.IO]
+    LB --> API2[Backend Replica 2<br/>Express + Socket.IO]
+    LB --> API3[Backend Replica 3<br/>Express + Socket.IO]
+
+    API1 <-->|pub/sub| RA[(Redis<br/>Socket.IO Adapter)]
+    API2 <-->|pub/sub| RA
+    API3 <-->|pub/sub| RA
+
+    API1 --> PR[(Redis Presence Store)]
+    API2 --> PR
+    API3 --> PR
+
+    API1 --> DB[(MongoDB Atlas)]
+    API2 --> DB
+    API3 --> DB
+
+    API1 --> Q[(Redis Queues / BullMQ)]
+    API2 --> Q
+    API3 --> Q
+    Q --> WK[Worker Replica(s)]
+    WK --> DB
+```
+
+Luồng xử lý chính:
+
+1. Client kết nối Socket.IO vào một backend replica bất kỳ.
+2. Socket được join vào các room như `user:<userId>`, `session:<sessionId>` và conversation room.
+3. Khi một replica gọi `io.to(room).emit(...)`, Redis Adapter publish event sang các replica khác.
+4. Replica nào đang giữ socket thuộc room đó sẽ emit event xuống đúng client.
+5. Presence online/offline không lưu trong memory local mà lưu ở Redis thông qua `socketPresenceService`, nên nhiều replica vẫn đọc được trạng thái nhất quán.
+
+Các file liên quan:
+
+| File | Vai trò |
+| --- | --- |
+| `backend/src/socket/index.js` | Khởi tạo Socket.IO server, room, presence và call handlers |
+| `backend/src/config/socketIoRedisAdapter.js` | Cấu hình `@socket.io/redis-adapter` với Redis pub/sub |
+| `backend/src/config/redisIOClient.js` | Redis client dùng cho adapter, BullMQ và realtime state |
+| `backend/src/services/socketPresenceService.js` | Lưu socket/user presence trong Redis |
+| `backend/src/services/directCallStateService.js` | Lưu trạng thái direct call realtime |
+| `backend/src/services/groupCallStateService.js` | Lưu trạng thái group call realtime |
+
+Lưu ý vận hành:
+
+- Tất cả backend replica phải dùng cùng `REDIS_URL`.
+- Load balancer cần hỗ trợ WebSocket ổn định. Nếu Socket.IO vẫn dùng HTTP long-polling fallback, nên bật sticky session ở tầng load balancer hoặc cấu hình client/server dùng WebSocket transport nhất quán.
+- Redis Adapter giúp broadcast event giữa replica, nhưng không thay thế database. Message, conversation, report, reminder vẫn phải lưu bền vững ở MongoDB.
+
 ### Frontend
 
 Frontend nằm trong thư mục:
@@ -152,17 +225,39 @@ Vai trò chính:
 | Layer         | Công nghệ                                                     |
 | ------------- | ------------------------------------------------------------- |
 | Frontend      | React 19, Vite 7, TypeScript, Tailwind CSS, Radix UI, Zustand |
-| Realtime      | Socket.IO, LiveKit                                            |
+| Realtime      | Socket.IO, Socket.IO Redis Adapter, LiveKit                   |
 | Mobile bridge | Capacitor                                                     |
 | Backend       | Node.js, Express 5, Mongoose, JWT, Passport Google OAuth      |
 | Database      | MongoDB Atlas                                                 |
-| Queue/Cache   | Redis, BullMQ                                                 |
+| Queue/Cache   | Redis, BullMQ, Redis pub/sub                                  |
 | Media Storage | Cloudinary                                                    |
 | Notification  | Firebase Admin, Web Push                                      |
 | AI/Moderation | Google Gemini, AssemblyAI                                     |
 | Testing       | Node Test Runner, Vitest                                      |
 | CI/CD         | GitHub Actions, Vercel, Railway                               |
 | Container     | Docker, Docker Compose, Nginx                                 |
+
+---
+
+## ✅ Chất lượng code và kiểm thử
+
+Repo hiện có test tự động cho cả backend và frontend.
+
+| Khu vực | Test runner | Test hiện có |
+| --- | --- | --- |
+| Backend | Node.js built-in test runner | Field format, mute state, moderation prompt, user status |
+| Frontend | Vitest | Field format, meeting link utilities |
+
+Các file test chính:
+
+```text
+backend/test/fieldFormat.test.js
+backend/test/isMuted.test.js
+backend/test/moderationPromptService.test.js
+backend/test/userStatusService.test.js
+frontend/tests/fieldFormat.test.ts
+frontend/tests/meetingLink.test.ts
+```
 
 ---
 
@@ -359,6 +454,8 @@ Docker Compose sẽ khởi động:
 
 ## 🧪 Testing
 
+### Backend test
+
 Backend:
 
 ```bash
@@ -366,12 +463,28 @@ cd backend
 npm test
 ```
 
+Hiện chạy các nhóm test:
+
+- `fieldFormat.test.js`
+- `isMuted.test.js`
+- `moderationPromptService.test.js`
+- `userStatusService.test.js`
+
+### Frontend test
+
 Frontend:
 
 ```bash
 cd frontend
 npm test
 ```
+
+Hiện chạy các nhóm test:
+
+- `fieldFormat.test.ts`
+- `meetingLink.test.ts`
+
+### Build và lint
 
 Build frontend production:
 
@@ -418,11 +531,26 @@ Workflow chạy khi:
 feature branch
 → Pull Request vào main
 → GitHub Actions chạy Backend + Frontend checks
+→ Branch ruleset kiểm tra required status checks
 → Checks pass
 → Merge vào main
 → Railway deploy backend
 → Vercel deploy frontend
 ```
+
+### Branch protection / Ruleset
+
+Nhánh `main` đang được bảo vệ bằng GitHub Ruleset:
+
+| Rule | Giá trị |
+| --- | --- |
+| Enforcement status | `Active` |
+| Target branch | `main` |
+| Required status checks | `Backend`, `Frontend` |
+| Require branch up to date | Enabled |
+| Block force pushes | Enabled |
+
+Ý nghĩa: code không nên đi thẳng vào `main`; thay vào đó cần đi qua Pull Request để GitHub Actions kiểm tra trước. Sau khi merge vào `main`, Railway và Vercel mới thực hiện CD.
 
 Chi tiết hơn xem:
 
@@ -509,7 +637,7 @@ Backend expose API với prefix `/api`.
 | OTP           | `/api/otp`           | OTP tạo tài khoản và đặt lại mật khẩu                    |
 | Push          | `/api/push`          | Đăng ký push subscription                                |
 | Admin         | `/api/admin`         | Dashboard admin, report review, user management          |
-| Users         | `/api/users`         | Hồ sơ người dùng, cập nhật thông tin                     |
+| Users         | `/api/users`         | Hồ sơ người dùng, trạng thái online/last seen, cập nhật thông tin |
 | Friends       | `/api/friends`       | Kết bạn, lời mời, danh sách bạn bè, block                |
 | Messages      | `/api/messages`      | Gửi, đọc, tìm kiếm, reaction, media message              |
 | Conversations | `/api/conversations` | Quản lý hội thoại cá nhân và nhóm                        |
@@ -525,6 +653,7 @@ Backend expose API với prefix `/api`.
 | ---------------------------- | ------------------------- |
 | `socket/index.js`            | Khởi tạo Socket.IO server |
 | `socket/socketGateway.js`    | Điều phối realtime events |
+| `services/socketPresenceService.js` | Theo dõi presence realtime qua Redis |
 | `socket/callHandler.js`      | Call cá nhân              |
 | `socket/groupCallHandler.js` | Group call                |
 
