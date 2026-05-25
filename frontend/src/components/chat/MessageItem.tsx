@@ -2051,7 +2051,9 @@ const MessageItem = ({
 		? (new Date(nextMessage.createdAt).getTime() - new Date(message.createdAt).getTime()) > 300000
 		: true;
 	const showTimestamp = !nextMessage || nextIsSystem || !isNextSameSender || hasGapToNext;
-	const showInlineSendingStatus = isOwn && message.status === "sending" && showTimestamp;
+	const showSendingReceipt = isOwn && message.status === "sending" && isLastMyMessage;
+	const canShowSettledReceipt = !message.status || message.status === "sent";
+	const messageReceiptClassName = "ml-auto mr-3 mt-0.5 flex h-5 w-20 items-center justify-end gap-1 whitespace-nowrap text-[12px] sm:text-[13px] leading-none text-muted-foreground";
 
 	const cachedMediaUrl = useMediaCacheStore(state => state.getUrl(message._id));
 	const isBlob = message.fileUrl?.startsWith("blob:") ?? false;
@@ -2475,12 +2477,6 @@ const MessageItem = ({
 										<span className="shrink-0 whitespace-nowrap text-[10.5px] font-normal leading-none tabular-nums tracking-normal">
 											{formatMessageTime(new Date(message.createdAt))}
 										</span>
-										{showInlineSendingStatus && (
-											<span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-[10.5px] font-medium leading-none">
-												<Clock className="size-2.5 animate-spin" />
-												Đang gửi
-											</span>
-										)}
 										{isOwn && message.status === "error" && (
 											<AlertCircle className="size-2.5 shrink-0 text-red-300" />
 										)}
@@ -2839,8 +2835,13 @@ const MessageItem = ({
 				</div>
 			</div>
 
-			{(!message.status || message.status === "sent") && (
-				seenUsersForThisMessage.length > 0 ? (
+			{(canShowSettledReceipt || showSendingReceipt) && (
+				showSendingReceipt ? (
+					<div className={messageReceiptClassName}>
+						<Clock className="size-3.5 animate-spin" strokeWidth={2.2} />
+						<span>Đang gửi</span>
+					</div>
+				) : seenUsersForThisMessage.length > 0 ? (
 					isCoarsePointer ? (
 						<div className={cn(
 							"mt-0.5 flex",
@@ -2915,7 +2916,7 @@ const MessageItem = ({
 					)
 				) : isLastMyMessage ? (
 					selectedConvo.type === "direct" ? (
-						<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end text-[12px] sm:text-[13px] text-muted-foreground">
+						<div className={messageReceiptClassName}>
 							{message.isDelivered ? (
 								<>
 									<CheckCheck className="size-3.5" strokeWidth={2.2} />
@@ -2929,8 +2930,8 @@ const MessageItem = ({
 							)}
 						</div>
 					) : (
-						<div className="flex items-center gap-1 mt-0.5 mx-3 justify-end">
-							<span className="text-[12px] sm:text-[13px] text-muted-foreground">Đã gửi</span>
+						<div className={messageReceiptClassName}>
+							<span>Đã gửi</span>
 						</div>
 					)
 				) : null
