@@ -2,6 +2,7 @@ import { AlertTriangle, Loader2, ServerCrash, WifiOff } from 'lucide-react';
 import { useEffect } from 'react';
 import { useAppStatusStore } from '@/stores/useAppStatusStore';
 import { cn } from '@/lib/utils';
+import { getApiBaseUrl } from '@/lib/apiBaseUrl';
 
 const HEALTHCHECK_INTERVAL_MS = 15000;
 const HEALTHCHECK_TIMEOUT_MS = 5000;
@@ -149,7 +150,7 @@ export default function AppStatusLayer() {
   useEffect(() => {
     let stopped = false;
     let consecutiveFailures = 0;
-    const apiBaseUrl = String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+    const apiBaseUrl = String(getApiBaseUrl() || '').replace(/\/$/, '');
     const isLocalApi = isLocalApiUrl(apiBaseUrl);
     const shouldProbe =
       isOffline ||

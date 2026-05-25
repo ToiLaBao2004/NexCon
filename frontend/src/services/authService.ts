@@ -1,7 +1,9 @@
-import api, { getRefreshToken } from '@/lib/axios';
+import api, { API_BASE_URL, getRefreshToken } from '@/lib/axios';
 import { Capacitor } from '@capacitor/core';
 
-const BACKEND_URL = import.meta.env.VITE_API_URL;
+function buildApiUrl(path: string) {
+  return `${API_BASE_URL.replace(/\/$/, '')}${path}`;
+}
 
 async function getMobileRefreshToken(): Promise<string | null> {
   if (!Capacitor.isNativePlatform()) return null;
@@ -104,7 +106,7 @@ export const authService = {
   },
 
   loginGoogle: () => {
-    window.location.href = `${BACKEND_URL}/auth/google`;
+    window.location.href = buildApiUrl('/auth/google');
   },
 
   fetchMe: async () => {
