@@ -93,6 +93,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
         avatarUrl: user.avatarUrl,
         bio: formData.bio,
         phone: formData.phone,
+        music: user.music,
         profileVisibility: formData.profileVisibility,
     } : null;
 

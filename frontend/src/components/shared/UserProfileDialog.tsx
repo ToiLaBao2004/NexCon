@@ -31,6 +31,7 @@ interface UserProfile {
     avatarUrl?: string;
     bio?: string;
     phone?: string;
+    music?: User["music"];
     profileVisibility?: ProfileVisibility;
     profileVisibleToViewer?: boolean;
 }
