@@ -63,23 +63,38 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
     const [profileAccessBlocked, setProfileAccessBlocked] = useState(false);
     const [profileLoading, setProfileLoading] = useState(false);
     const { onlineUsers, userPresences } = useSocketStore();
+    const userId = user?._id;
+    const userDisplayName = user?.displayName;
+    const userEmail = user?.email;
+    const userAvatarUrl = user?.avatarUrl;
+    const userBio = user?.bio;
+    const userPhone = user?.phone;
+    const userMusicTrackId = user?.music?.trackId;
+    const userProfileVisibility = user?.profileVisibility;
 
     useEffect(() => {
-        if (open && user?._id) {
+        if (open && userId) {
             setFullUser(null);
             setAlbumArt(null);
             setProfileAccessBlocked(false);
             if (previewAsOther) {
                 setFullUser({
-                    ...(user as User),
-                    profileVisibleToViewer: (user.profileVisibility || "public") === "public",
+                    _id: userId,
+                    displayName: userDisplayName || "Người dùng",
+                    email: userEmail || "",
+                    avatarUrl: userAvatarUrl,
+                    bio: userBio,
+                    phone: userPhone,
+                    music: userMusicTrackId ? { trackId: userMusicTrackId } : undefined,
+                    profileVisibility: userProfileVisibility,
+                    profileVisibleToViewer: (userProfileVisibility || "public") === "public",
                 });
                 setProfileLoading(false);
                 return;
             }
             setProfileLoading(true);
             void fetchBlockedList();
-            getUserById(user._id).then((u) => {
+            getUserById(userId).then((u) => {
                 setFullUser(u);
                 if (u?.music?.trackId) {
                     fetch(`https://open.spotify.com/oembed?url=https://open.spotify.com/track/${u.music.trackId}`)
@@ -98,7 +113,20 @@ export function UserProfileDialog({ user, open, onOpenChange, onOpenChat, previe
                 console.error(error);
             });
         }
-    }, [fetchBlockedList, getUserById, open, previewAsOther, user]);
+    }, [
+        fetchBlockedList,
+        getUserById,
+        open,
+        previewAsOther,
+        userId,
+        userDisplayName,
+        userEmail,
+        userAvatarUrl,
+        userBio,
+        userPhone,
+        userMusicTrackId,
+        userProfileVisibility,
+    ]);
 
     if (!user) return null;
 

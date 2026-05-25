@@ -276,18 +276,15 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                         <div className="grid gap-2">
                             <Label className="text-sm font-medium">Quyền riêng tư hồ sơ</Label>
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        className="h-11 w-full justify-between rounded-xl px-3 text-sm font-semibold"
-                                    >
-                                        <span className="flex min-w-0 items-center gap-2">
-                                            <SelectedProfileVisibilityIcon className="h-4 w-4 shrink-0 text-primary" />
-                                            <span className="truncate">{selectedProfileVisibility.label}</span>
-                                        </span>
-                                        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                    </Button>
+                                <DropdownMenuTrigger
+                                    type="button"
+                                    className="inline-flex h-11 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border bg-background px-3 text-sm font-semibold shadow-xs transition-all hover:bg-accent hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none disabled:pointer-events-none disabled:opacity-50 dark:bg-input/30 dark:border-input dark:hover:bg-input/50"
+                                >
+                                    <span className="flex min-w-0 items-center gap-2">
+                                        <SelectedProfileVisibilityIcon className="h-4 w-4 shrink-0 text-primary" />
+                                        <span className="truncate">{selectedProfileVisibility.label}</span>
+                                    </span>
+                                    <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="start" className="z-[250] w-[var(--radix-dropdown-menu-trigger-width)] rounded-xl">
                                     <DropdownMenuRadioGroup
