@@ -22,6 +22,14 @@ export interface DraftInfo {
   content: string;
   type?: MessageType;
   attachment?: DraftAttachment | null;
+  mentions?: Array<{
+    userId: string;
+    displayName: string;
+    canonicalDisplayName?: string;
+    avatarUrl?: string | null;
+    start: number;
+    end: number;
+  }>;
 }
 
 export interface SendMessagePayload {

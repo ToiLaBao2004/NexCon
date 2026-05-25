@@ -55,10 +55,25 @@ interface MentionCandidate {
 	avatarUrl?: string | null;
 }
 
+interface SelectedMention extends Omit<MentionCandidate, "avatarUrl"> {
+	avatarUrl: string | null;
+	start: number;
+	end: number;
+}
+
 interface MentionTokenRange {
 	start: number;
 	end: number;
 }
+
+const normalizeMentionSearch = (value: string) =>
+	value
+		.trim()
+		.toLowerCase()
+		.normalize("NFD")
+		.replace(/[\u0300-\u036f]/g, "");
+
+const getMentionDisplayText = (mention: Pick<MentionCandidate, "displayName">) => `@${mention.displayName}`;
 
 const getActiveMentionToken = (text: string, cursor: number) => {
 	const beforeCursor = text.slice(0, cursor);
@@ -83,57 +98,92 @@ const getActiveMentionToken = (text: string, cursor: number) => {
 	};
 };
 
-const buildMentionsFromText = (text: string, mentions: MentionCandidate[]): { content: string; mentions: Mention[] } => {
-	const remainingMentions = [...mentions].sort((a, b) => b.displayName.length - a.displayName.length);
-	const usedRanges: Array<{ start: number; end: number }> = [];
-	const matchedRanges: Array<{ start: number; end: number; mention: MentionCandidate }> = [];
+const isSelectedMentionIntact = (text: string, mention: SelectedMention) =>
+	mention.start >= 0 &&
+	mention.end > mention.start &&
+	mention.end <= text.length &&
+	text.slice(mention.start, mention.end) === getMentionDisplayText(mention);
 
-	for (const mention of remainingMentions) {
-		const token = `@${mention.displayName}`;
-		let searchIndex = text.indexOf(token);
+const reconcileSelectedMentions = (
+	previousText: string,
+	nextText: string,
+	mentions: SelectedMention[],
+) => {
+	if (!mentions.length) return mentions;
+	if (previousText === nextText) return mentions.filter((mention) => isSelectedMentionIntact(nextText, mention));
 
-		while (searchIndex !== -1) {
-			const tokenEnd = searchIndex + token.length;
-			const overlaps = usedRanges.some((range) => !(tokenEnd <= range.start || searchIndex >= range.end));
+	let prefixLength = 0;
+	const minLength = Math.min(previousText.length, nextText.length);
+	while (prefixLength < minLength && previousText[prefixLength] === nextText[prefixLength]) {
+		prefixLength += 1;
+	}
 
-			if (!overlaps) {
-				usedRanges.push({ start: searchIndex, end: tokenEnd });
-				matchedRanges.push({ start: searchIndex, end: tokenEnd, mention });
-				break;
+	let previousSuffixStart = previousText.length;
+	let nextSuffixStart = nextText.length;
+	while (
+		previousSuffixStart > prefixLength &&
+		nextSuffixStart > prefixLength &&
+		previousText[previousSuffixStart - 1] === nextText[nextSuffixStart - 1]
+	) {
+		previousSuffixStart -= 1;
+		nextSuffixStart -= 1;
+	}
+
+	const replacedStart = prefixLength;
+	const replacedEnd = previousSuffixStart;
+	const delta = (nextSuffixStart - prefixLength) - (previousSuffixStart - prefixLength);
+
+	return mentions
+		.map((mention) => {
+			if (mention.end <= replacedStart) {
+				return mention;
 			}
 
-			searchIndex = text.indexOf(token, searchIndex + 1);
-		}
-	}
+			if (mention.start >= replacedEnd) {
+				return {
+					...mention,
+					start: mention.start + delta,
+					end: mention.end + delta,
+				};
+			}
+
+			return null;
+		})
+		.filter((mention): mention is SelectedMention => Boolean(mention))
+		.filter((mention) => isSelectedMentionIntact(nextText, mention));
+};
+
+const buildMentionsFromText = (text: string, mentions: SelectedMention[]): { content: string; mentions: Mention[] } => {
+	const matchedRanges = mentions
+		.filter((mention) => isSelectedMentionIntact(text, mention))
+		.sort((a, b) => a.start - b.start);
 
 	if (!matchedRanges.length) {
 		return { content: text, mentions: [] };
 	}
 
-	matchedRanges.sort((a, b) => a.start - b.start);
-
 	let cursor = 0;
 	let tokenizedContent = "";
 	const result: Mention[] = [];
 
-	for (const range of matchedRanges) {
-		if (range.start < cursor) {
+	for (const mention of matchedRanges) {
+		if (mention.start < cursor) {
 			continue;
 		}
 
-		tokenizedContent += text.slice(cursor, range.start);
-		const mentionToken = `@[USER:${range.mention.userId}]`;
+		tokenizedContent += text.slice(cursor, mention.start);
+		const mentionToken = `@[USER:${mention.userId}]`;
 		const offset = tokenizedContent.length;
 		tokenizedContent += mentionToken;
 
 		result.push({
-			userId: range.mention.userId,
-			displayName: range.mention.canonicalDisplayName || range.mention.displayName,
+			userId: mention.userId,
+			displayName: mention.canonicalDisplayName || mention.displayName,
 			offset,
 			length: mentionToken.length,
 		});
 
-		cursor = range.end;
+		cursor = mention.end;
 	}
 
 	tokenizedContent += text.slice(cursor);
@@ -178,7 +228,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const [mentionRange, setMentionRange] = useState<MentionTokenRange | null>(null);
 	const [mentionOpen, setMentionOpen] = useState(false);
 	const [activeMentionIndex, setActiveMentionIndex] = useState(0);
-	const [selectedMentions, setSelectedMentions] = useState<MentionCandidate[]>([]);
+	const [selectedMentions, setSelectedMentions] = useState<SelectedMention[]>([]);
 	const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const valueRef = useRef(value);
 	const attachmentsRef = useRef<Attachment[]>([]);
@@ -286,7 +336,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const participants = selectedConvo.participants;
 	const attachment = attachments[0] ?? null;
 	const mentionCandidates = useMemo(() => {
-		const keyword = mentionQuery.trim().toLowerCase();
+		const keyword = normalizeMentionSearch(mentionQuery);
 
 		return participants
 			.filter((participant) => participant.userId?._id?.toString() !== currentUserId)
@@ -299,7 +349,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			}))
 			.filter((participant) => {
 				if (!keyword) return true;
-				return participant.displayName.toLowerCase().includes(keyword);
+				return (
+					normalizeMentionSearch(participant.displayName).includes(keyword) ||
+					normalizeMentionSearch(participant.canonicalDisplayName).includes(keyword)
+				);
 			});
 	}, [currentUserId, mentionQuery, participants]);
 
@@ -342,12 +395,13 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			detail: { conversationId: selectedConvo._id },
 		}));
 
-		const currValue = trimmed;
+		const currValue = value;
 		const prevAttachments = currentAttachments;
 		const prevMentions = selectedMentions;
 		const shouldRestoreFocus = shouldRestoreTextInputAfterSend();
 		const tokenized = buildMentionsFromText(currValue, prevMentions);
-		if (type === "text" && tokenized.content.length > MAX_TEXT_MESSAGE_LENGTH) {
+		const tokenizedContent = tokenized.content.trim();
+		if (type === "text" && tokenizedContent.length > MAX_TEXT_MESSAGE_LENGTH) {
 			toast.error(`Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
 			return;
 		}
@@ -390,7 +444,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					const payload = withTarget({ type: item.type, file: item.file });
 
 					if (index === 0 || isImageBatch) {
-						if (tokenized.content) payload.content = tokenized.content;
+						if (tokenizedContent) payload.content = tokenizedContent;
 						if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
 					}
 					if (replyingTo?._id && isImageBatch) {
@@ -425,7 +479,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				}
 			} else {
 				const payload = withTarget({ type });
-				if (tokenized.content) payload.content = tokenized.content;
+				if (tokenizedContent) payload.content = tokenizedContent;
 				if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
 
 				await sendMessage(payload, (_pct) => {
@@ -529,15 +583,24 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const insertMention = useCallback((candidate: MentionCandidate) => {
 		const range = mentionRange ?? { start: value.length, end: value.length };
-		const mentionText = `@${candidate.displayName}`;
+		const mentionText = getMentionDisplayText(candidate);
 		const nextValue = `${value.slice(0, range.start)}${mentionText} ${value.slice(range.end)}`;
 		const nextCursor = range.start + mentionText.length + 1;
+		const selectedMention: SelectedMention = {
+			...candidate,
+			avatarUrl: candidate.avatarUrl ?? null,
+			start: range.start,
+			end: range.start + mentionText.length,
+		};
 
 		valueRef.current = nextValue;
 		setValue(nextValue);
 		setSelectedMentions((current) => {
-			const filtered = current.filter((item) => item.userId !== candidate.userId);
-			return [...filtered, candidate];
+			const reconciled = reconcileSelectedMentions(value, nextValue, current);
+			return [
+				...reconciled.filter((item) => item.end <= selectedMention.start || item.start >= selectedMention.end),
+				selectedMention,
+			].sort((a, b) => a.start - b.start);
 		});
 		setMentionOpen(false);
 		setMentionQuery("");
@@ -558,9 +621,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		captureMessageScrollPosition();
+		const previousValue = valueRef.current;
 		const nextValue = e.target.value;
 		valueRef.current = nextValue;
 		setValue(nextValue);
+		setSelectedMentions((current) => reconcileSelectedMentions(previousValue, nextValue, current));
 		e.target.style.height = "auto";
 		e.target.style.height = `${e.target.scrollHeight}px`;
 
@@ -615,7 +680,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						type: persistedAttachment.type,
 						file: persistedAttachment.file,
 						preview: persistedAttachment.preview
-					} : null
+					} : null,
+					mentions: selectedMentions.filter((mention) => isSelectedMentionIntact(value, mention)),
 				});
 				if (persistedAttachment) {
 					draftStorage.save(selectedConvo._id, persistedAttachment.file, persistedAttachment.type);
@@ -631,7 +697,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		return () => {
 			if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
 		};
-	}, [value, attachments, selectedConvo._id, setDraft, clearDraft, user]);
+	}, [value, attachments, selectedMentions, selectedConvo._id, setDraft, clearDraft, user]);
 
 	useEffect(() => {
 		valueRef.current = value;
@@ -651,6 +717,24 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const rawDraft = useChatStore.getState().drafts[selectedConvo._id];
 		const existingDraft = typeof rawDraft === "string" ? rawDraft : (rawDraft?.content || "");
 		const draftAttachment = (rawDraft && typeof rawDraft === 'object') ? rawDraft.attachment : null;
+		const draftMentions = (rawDraft && typeof rawDraft === 'object' && Array.isArray(rawDraft.mentions))
+			? rawDraft.mentions
+				.map((mention) => ({
+					userId: String(mention.userId || ""),
+					displayName: String(mention.displayName || ""),
+					canonicalDisplayName: String(mention.canonicalDisplayName || mention.displayName || ""),
+					avatarUrl: mention.avatarUrl ?? null,
+					start: Number(mention.start),
+					end: Number(mention.end),
+				}))
+				.filter((mention): mention is SelectedMention => Boolean(
+					mention.userId &&
+					mention.displayName &&
+					Number.isFinite(mention.start) &&
+					Number.isFinite(mention.end) &&
+					isSelectedMentionIntact(existingDraft, mention)
+				))
+			: [];
 
 		setAttachments((current) => {
 			revokeAttachmentPreviews(current);
@@ -692,7 +776,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			});
 		}
 
-		setSelectedMentions([]);
+		setSelectedMentions(draftMentions);
 		setMentionOpen(false);
 		setMentionQuery("");
 		setMentionRange(null);
@@ -739,8 +823,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			const available = MAX_TEXT_MESSAGE_LENGTH - (value.length - (end - start));
 			const insertedText = pastedText.slice(0, Math.max(0, available));
 			const truncatedValue = `${value.slice(0, start)}${insertedText}${value.slice(end)}`;
+			const previousValue = valueRef.current;
 			valueRef.current = truncatedValue;
 			setValue(truncatedValue);
+			setSelectedMentions((current) => reconcileSelectedMentions(previousValue, truncatedValue, current));
 			requestAnimationFrame(() => {
 				const nextCursor = start + insertedText.length;
 				textarea.style.height = "auto";
@@ -1163,24 +1249,28 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-hidden bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none"
 						/>
 						{mentionOpen && (
-							<div className="absolute left-0 bottom-full mb-2 z-40 w-60 max-w-full border border-border/60 bg-popover shadow-lg overflow-hidden rounded-sm">
+							<div className="absolute bottom-full left-0 z-40 mb-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/70 bg-popover shadow-xl">
 								{mentionCandidates.length > 0 ? (
-									<ul className="max-h-56 overflow-y-auto beautiful-scrollbar py-1">
+									<ul className="beautiful-scrollbar max-h-64 overflow-y-auto p-1.5">
 										{mentionCandidates.map((candidate, index) => {
 											const isActive = index === activeMentionIndex;
+											const hasNickname = candidate.displayName !== candidate.canonicalDisplayName;
 											return (
 												<li key={candidate.userId}>
 													<button
 														type="button"
 														onMouseDown={(event) => event.preventDefault()}
 														onClick={() => handleMentionSelect(candidate)}
-														className={`w-full px-3 py-2 text-left flex items-center gap-2.5 transition-colors rounded-sm ${isActive ? "bg-primary/10" : "hover:bg-muted/70"}`}
+														className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${isActive ? "bg-primary/10 text-primary" : "hover:bg-muted/70"}`}
 													>
-														<span className="size-6 rounded-sm overflow-hidden shrink-0 bg-muted flex items-center justify-center text-[11px] font-semibold text-muted-foreground">
-															<img src={getAvatarSrc(candidate.avatarUrl)} alt={candidate.displayName} className="w-full h-full object-cover" />
+														<span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-[11px] font-semibold text-muted-foreground ring-1 ring-border/70">
+															<img src={getAvatarSrc(candidate.avatarUrl)} alt={candidate.displayName} className="h-full w-full object-cover" />
 														</span>
-														<div className="min-w-0">
-															<span className="text-sm font-medium text-foreground truncate">{candidate.displayName}</span>
+														<div className="min-w-0 flex-1">
+															<span className="block truncate text-sm font-semibold text-foreground">{candidate.displayName}</span>
+															{hasNickname && (
+																<span className="block truncate text-xs text-muted-foreground">{candidate.canonicalDisplayName}</span>
+															)}
 														</div>
 													</button>
 												</li>

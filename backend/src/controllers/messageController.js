@@ -34,6 +34,7 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
 const SEARCH_MAX_SCANNED_MESSAGES = 500;
+const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
 const moderationCategoryLabels = {
     abusive: 'Ngôn từ xúc phạm',
     harassment: 'Quấy rối hoặc công kích cá nhân',
@@ -211,27 +212,39 @@ const normalizeMentionEntry = (mention) => {
     };
 };
 
-const buildValidMentions = (conversation, rawMentions) => {
+const buildValidMentions = (conversation, rawMentions, content = '') => {
     const participants = new Set(
         (conversation?.participants || []).map((participant) => participant.userId.toString())
     );
-    const seen = new Set();
-    const mentions = [];
-
+    const mentionMetaByUserId = new Map();
     for (const mention of rawMentions) {
         const normalized = normalizeMentionEntry(mention);
-        if (!normalized) {
+        if (normalized && !mentionMetaByUserId.has(normalized.userId)) {
+            mentionMetaByUserId.set(normalized.userId, normalized);
+        }
+    }
+
+    const seen = new Set();
+    const mentions = [];
+    const safeContent = String(content || '');
+    let match;
+
+    MENTION_TOKEN_REGEX.lastIndex = 0;
+    while ((match = MENTION_TOKEN_REGEX.exec(safeContent)) !== null) {
+        const mentionToken = match[0];
+        const userId = String(match[1] || '').trim();
+
+        if (!mongoose.Types.ObjectId.isValid(userId) || !participants.has(userId) || seen.has(userId)) {
             continue;
         }
 
-        if (!participants.has(normalized.userId) || seen.has(normalized.userId)) {
-            continue;
-        }
-
-        seen.add(normalized.userId);
+        const normalized = mentionMetaByUserId.get(userId);
+        seen.add(userId);
         mentions.push({
-            ...normalized,
-            userId: new mongoose.Types.ObjectId(normalized.userId),
+            userId: new mongoose.Types.ObjectId(userId),
+            displayName: normalized?.displayName || '',
+            offset: match.index,
+            length: mentionToken.length,
         });
     }
 
@@ -384,8 +397,6 @@ export async function sendMessage(req, res) {
             return res.status(404).json({ message: 'Conversation not found.' });
         }
 
-        const mentions = buildValidMentions(conversation, rawMentions);
-
         const messageData = {
             conversationId: conversation._id,
             senderId,
@@ -394,7 +405,7 @@ export async function sendMessage(req, res) {
                 avatarUrl: req.user.avatarUrl
             },
             type,
-            mentions,
+            mentions: [],
         };
 
         if (Object.keys(metadata).length > 0) {
@@ -576,6 +587,9 @@ export async function sendMessage(req, res) {
             default:
                 return res.status(400).json({ message: `Unsupported message type: ${type}` });
         }
+
+        const mentions = buildValidMentions(conversation, rawMentions, messageData.content || '');
+        messageData.mentions = mentions;
 
         if (replyTo) {
             const repliedMessage = await Message.findById(replyTo);
