@@ -59,19 +59,9 @@ export function getPresenceForUser(
   if (!userId) return null;
   const id = String(userId);
   if (presences[id]) return presences[id];
-  if (fallbackPresence) return fallbackPresence;
 
-  if (onlineUsers.includes(id)) {
-    return {
-      userId: id,
-      status: "online",
-      status_mode: "auto",
-      manual_status: "online",
-      is_online: true,
-      last_seen_at: null,
-      last_seen_relative: null,
-    };
-  }
+  const hasPresenceSnapshot = Object.keys(presences).length > 0 || onlineUsers.length > 0;
+  if (!hasPresenceSnapshot && fallbackPresence) return fallbackPresence;
 
   return null;
 }

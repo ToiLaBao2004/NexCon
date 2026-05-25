@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    canViewerSeePresence,
     formatRelativeTimeVi,
     normalizeManualStatus,
     normalizeStatusMode,
@@ -18,6 +19,13 @@ test('normalizeStatusMode only accepts auto and manual', () => {
     assert.equal(normalizeStatusMode('auto'), 'auto');
     assert.equal(normalizeStatusMode('manual'), 'manual');
     assert.equal(normalizeStatusMode('hidden'), null);
+});
+
+test('canViewerSeePresence only allows self and friends', () => {
+    assert.equal(canViewerSeePresence('user-1', 'user-1', []), true);
+    assert.equal(canViewerSeePresence('user-1', 'user-2', ['user-2']), true);
+    assert.equal(canViewerSeePresence('user-1', 'user-3', ['user-2']), false);
+    assert.equal(canViewerSeePresence(null, 'user-2', ['user-2']), false);
 });
 
 test('formatRelativeTimeVi formats recent activity in Vietnamese', () => {

@@ -3,7 +3,6 @@ import UserStatus, {
     USER_STATUS_MODES,
 } from '../models/userStatusModel.js';
 import Friend from '../models/friendModel.js';
-import Conversation from '../models/conversationModel.js';
 import BlockUser from '../models/blockUserModel.js';
 
 export const DISPLAY_STATUSES = [
@@ -49,6 +48,37 @@ function normalizeId(value) {
 
 function uniqueIds(values = []) {
     return [...new Set(values.map(normalizeId).filter(Boolean))];
+}
+
+async function getFriendIdsForUser(userId) {
+    const viewerId = normalizeId(userId);
+    if (!viewerId) return [];
+
+    const friendships = await Friend.find({
+        $or: [
+            { userA: viewerId },
+            { userB: viewerId },
+        ],
+    }).select('userA userB').lean();
+
+    return uniqueIds(friendships.map((friendship) => {
+        const userA = normalizeId(friendship.userA);
+        const userB = normalizeId(friendship.userB);
+        return userA === viewerId ? userB : userA;
+    }));
+}
+
+export function canViewerSeePresence(viewerId, targetUserId, friendIds = []) {
+    const viewerIdString = normalizeId(viewerId);
+    const targetUserIdString = normalizeId(targetUserId);
+    if (!viewerIdString || !targetUserIdString) return false;
+
+    const friendIdSet = new Set(uniqueIds(friendIds));
+    return targetUserIdString === viewerIdString || friendIdSet.has(targetUserIdString);
+}
+
+function filterPresenceIdsForViewer(userIds = [], viewerId, friendIds = []) {
+    return uniqueIds(userIds).filter((userId) => canViewerSeePresence(viewerId, userId, friendIds));
 }
 
 export function normalizeStatusMode(value) {
@@ -225,17 +255,24 @@ export async function getSelfPresence(userId, { socketOnline = false } = {}) {
 export async function getVisiblePresencesForUsers(userIds = [], {
     socketOnlineUserIds = [],
     viewerId = null,
+    viewerFriendIds = null,
 } = {}) {
     const ids = uniqueIds(userIds);
     if (!ids.length) return [];
 
+    const friendIds = Array.isArray(viewerFriendIds)
+        ? viewerFriendIds
+        : await getFriendIdsForUser(viewerId);
+    const visibleIds = filterPresenceIdsForViewer(ids, viewerId, friendIds);
+    if (!visibleIds.length) return [];
+
     const socketOnlineSet = new Set(uniqueIds(socketOnlineUserIds));
-    const docs = await UserStatus.find({ userId: { $in: ids } }).lean();
+    const docs = await UserStatus.find({ userId: { $in: visibleIds } }).lean();
     const docByUserId = new Map(docs.map((doc) => [normalizeId(doc.userId), doc]));
     const now = Date.now();
     const viewerIdString = normalizeId(viewerId);
 
-    return ids.map((userId) => serializePresence(
+    return visibleIds.map((userId) => serializePresence(
         docByUserId.get(userId) || getDefaultStatusDoc(userId),
         {
             socketOnline: socketOnlineSet.has(userId),
@@ -245,32 +282,14 @@ export async function getVisiblePresencesForUsers(userIds = [], {
     ));
 }
 
-async function getRelatedPresenceUserIds(viewerId, socketOnlineUserIds = []) {
+async function getRelatedPresenceUserIds(viewerId) {
     const viewerIdString = normalizeId(viewerId);
-    const [friends, conversations] = await Promise.all([
-        Friend.find({
-            $or: [
-                { userA: viewerId },
-                { userB: viewerId },
-            ],
-        }).select('userA userB').lean(),
-        Conversation.find({
-            'participants.userId': viewerId,
-            disbanded: { $ne: true },
-        }).select('participants.userId').lean(),
-    ]);
+    const friendIds = await getFriendIdsForUser(viewerIdString);
 
-    const friendIds = friends.map((friendship) => {
-        const userA = normalizeId(friendship.userA);
-        const userB = normalizeId(friendship.userB);
-        return userA === viewerIdString ? userB : userA;
-    });
-
-    const participantIds = conversations.flatMap((conversation) =>
-        (conversation.participants || []).map((participant) => normalizeId(participant.userId))
-    );
-
-    return uniqueIds([viewerIdString, ...socketOnlineUserIds, ...friendIds, ...participantIds]);
+    return {
+        friendIds,
+        relatedIds: uniqueIds([viewerIdString, ...friendIds]),
+    };
 }
 
 export async function buildPresencePayloadForViewer(viewerId, {
@@ -278,8 +297,8 @@ export async function buildPresencePayloadForViewer(viewerId, {
     includeUserIds = [],
 } = {}) {
     const viewerIdString = normalizeId(viewerId);
-    const [relatedIds, blocks] = await Promise.all([
-        getRelatedPresenceUserIds(viewerId, socketOnlineUserIds),
+    const [{ friendIds, relatedIds }, blocks] = await Promise.all([
+        getRelatedPresenceUserIds(viewerId),
         BlockUser.find({
             $or: [
                 { from: viewerId },
@@ -299,6 +318,7 @@ export async function buildPresencePayloadForViewer(viewerId, {
     const presences = await getVisiblePresencesForUsers(visibleIds, {
         socketOnlineUserIds,
         viewerId,
+        viewerFriendIds: friendIds,
     });
 
     return {
