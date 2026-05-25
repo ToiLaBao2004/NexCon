@@ -33,6 +33,7 @@ export const useAuthStore = create<AuthState>()(
     },
 
     clearState: () => {
+      void unregisterNativeFcmOnLogout({ removeBackend: false });
       set({ accessToken: null, user: null, loading: false });
       useSocketStore.getState().disconnectSocket();
       useChatStore.getState().reset();

@@ -24,6 +24,10 @@ let lastSavedToken: string | null = null;
 let firebaseMessagingModulePromise: Promise<FirebaseMessagingModule> | null = null;
 let lastHandledOpenUrl: string | null = null;
 
+type UnregisterNativeFcmOptions = {
+  removeBackend?: boolean;
+};
+
 function isNativeFcmAvailable() {
   return Capacitor.isNativePlatform();
 }
@@ -228,7 +232,8 @@ export async function listenForNativeFcmOpen(onOpen: NativeFcmOpenHandler) {
   });
 }
 
-export async function unregisterNativeFcmOnLogout() {
+export async function unregisterNativeFcmOnLogout(options: UnregisterNativeFcmOptions = {}) {
+  const { removeBackend = true } = options;
   const messagingModule = await loadNativeFirebaseMessaging();
   if (!messagingModule) {
     return;
@@ -237,13 +242,22 @@ export async function unregisterNativeFcmOnLogout() {
   const { FirebaseMessaging } = messagingModule;
   try {
     const { token } = await FirebaseMessaging.getToken();
-    if (token) {
+    if (token && removeBackend) {
       await api.delete('/push/fcm-token', {
         data: { token },
       });
     }
   } catch (error) {
-    console.warn('[native-fcm] Failed to remove FCM token from backend:', error);
+    if (removeBackend) {
+      console.warn('[native-fcm] Failed to remove FCM token from backend:', error);
+    }
+  }
+
+  try {
+    await tokenRefreshListener?.remove();
+    tokenRefreshListener = null;
+  } catch (error) {
+    console.warn('[native-fcm] Failed to remove token refresh listener:', error);
   }
 
   try {
