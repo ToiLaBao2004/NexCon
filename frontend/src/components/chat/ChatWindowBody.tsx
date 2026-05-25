@@ -5,7 +5,7 @@ import ChatWelcomeScreen from "./ChatWelcomeScreen";
 import MessageItem from "./MessageItem";
 import CallMessageItem from "./CallMessageItem";
 import { PinnedMessagesBanner } from "@/components/chat/PinnedMessagesBanner";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useSocketStore } from "@/stores/useSocketStore";
@@ -30,6 +30,7 @@ const getImageBatchIndex = (message: Message) => {
 
 const SCROLL_TO_BOTTOM_BUTTON_THRESHOLD = 800;
 const NEAR_BOTTOM_THRESHOLD = 96;
+const STICKY_BOTTOM_THRESHOLD = 160;
 
 const getMessageSenderId = (message?: Message | null) => {
   if (!message?.senderId) return "";
@@ -170,6 +171,8 @@ const ChatWindowBody: React.FC = () => {
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [pendingNewMessageIds, setPendingNewMessageIds] = useState<string[]>([]);
   const distanceFromBottomRef = useRef(0);
+  const followBottomUntilRef = useRef(0);
+  const followBottomTimersRef = useRef<ReturnType<typeof window.setTimeout>[]>([]);
   const scrollToBottom = useCallback((instant: boolean = false, force: boolean = false) => {
     if (!force && Date.now() < suppressAutoScrollUntilRef.current) return;
     if (scrollRef.current) {
@@ -179,6 +182,21 @@ const ChatWindowBody: React.FC = () => {
       });
     }
   }, []);
+
+  const scheduleFollowBottom = useCallback((durationMs: number = 500) => {
+    followBottomUntilRef.current = Math.max(followBottomUntilRef.current, Date.now() + durationMs);
+
+    const run = () => scrollToBottom(true, true);
+    requestAnimationFrame(run);
+
+    for (const delay of [60, 140, 260, 420]) {
+      const timer = window.setTimeout(() => {
+        run();
+        followBottomTimersRef.current = followBottomTimersRef.current.filter((item) => item !== timer);
+      }, delay);
+      followBottomTimersRef.current.push(timer);
+    }
+  }, [scrollToBottom]);
 
   const syncScrollState = useCallback(() => {
     const container = scrollRef.current;
@@ -249,14 +267,12 @@ const ChatWindowBody: React.FC = () => {
       if (detail?.conversationId && detail.conversationId !== convoId) return;
 
       suppressAutoScrollUntilRef.current = 0;
-      requestAnimationFrame(() => scrollToBottom(true, true));
-      setTimeout(() => scrollToBottom(true, true), 80);
-      setTimeout(() => scrollToBottom(true, true), 180);
+      scheduleFollowBottom(700);
     };
 
     window.addEventListener("nexcon:message-send", handleMessageSend as EventListener);
     return () => window.removeEventListener("nexcon:message-send", handleMessageSend as EventListener);
-  }, [convoId, scrollToBottom]);
+  }, [convoId, scheduleFollowBottom]);
 
 
   // IntersectionObserver for top sentinel (load older)
@@ -383,20 +399,26 @@ const ChatWindowBody: React.FC = () => {
 
       if (isOwnLastMessage) {
         pendingImageScrollRef.current = shouldFollowImage;
-        scrollToBottom(true, true);
+        scheduleFollowBottom(700);
         return;
       }
 
       if (wasNearBottom) {
         pendingImageScrollRef.current = shouldFollowImage;
-        scrollToBottom();
+        scheduleFollowBottom(500);
       }
     }
-  }, [lastItemKey, messages.length, convoId, isJumpMode, user?._id, exitJumpMode, scrollToBottom, messages]);
+  }, [lastItemKey, messages.length, convoId, isJumpMode, user?._id, exitJumpMode, scrollToBottom, scheduleFollowBottom, messages]);
 
   useEffect(() => {
     requestAnimationFrame(syncScrollState);
   }, [lastItemKey, syncScrollState]);
+
+  useLayoutEffect(() => {
+    if (!convoId || isJumpMode || activeTypingUserIds.length === 0) return;
+    if (distanceFromBottomRef.current > STICKY_BOTTOM_THRESHOLD) return;
+    scheduleFollowBottom(450);
+  }, [activeTypingUserIds.length, convoId, isJumpMode, scheduleFollowBottom]);
 
   useEffect(() => {
     if (!convoId || messages.length === 0) return;
@@ -530,11 +552,12 @@ const ChatWindowBody: React.FC = () => {
       const nextScrollHeight = container.scrollHeight;
       const heightDelta = nextScrollHeight - previousScrollHeight;
       lastScrollHeight = nextScrollHeight;
+      const shouldFollowBottom = Date.now() < followBottomUntilRef.current;
 
       if (Math.abs(heightDelta) < 1) return;
       if (loadingMoreRef.current || isJumpMode) return;
-      if (Date.now() < suppressAutoScrollUntilRef.current) return;
-      if (previousDistanceFromBottom > NEAR_BOTTOM_THRESHOLD) return;
+      if (!shouldFollowBottom && Date.now() < suppressAutoScrollUntilRef.current) return;
+      if (!shouldFollowBottom && previousDistanceFromBottom > STICKY_BOTTOM_THRESHOLD) return;
 
       window.cancelAnimationFrame(frameId);
       frameId = window.requestAnimationFrame(() => {
@@ -560,9 +583,19 @@ const ChatWindowBody: React.FC = () => {
     loadingMoreRef.current = false;
     prevScrollHeightRef.current = 0;
     distanceFromBottomRef.current = 0;
+    followBottomUntilRef.current = 0;
+    followBottomTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    followBottomTimersRef.current = [];
     setIsNearBottom(true);
     setPendingNewMessageIds([]);
   }, [convoId]);
+
+  useEffect(() => {
+    return () => {
+      followBottomTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      followBottomTimersRef.current = [];
+    };
+  }, []);
 
 
   useEffect(() => {
