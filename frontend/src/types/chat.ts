@@ -73,6 +73,7 @@ export interface LastMessage {
     displayName: string;
     avatarUrl?: string | null;
   } | string;
+  mentions?: Mention[];
   deliveredTo?: string[];
 }
 
@@ -109,6 +110,7 @@ export interface ReplyToMessage {
   filePublicId?: string | null;
   isRecalled?: boolean | null;
   reportStatus?: boolean | null;
+  mentions?: Mention[];
 }
 
 export interface LinkPreview {

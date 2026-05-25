@@ -19,6 +19,7 @@ import { flashTabTitle } from "@/utils/tabTitle";
 import { useAppStatusStore } from "./useAppStatusStore";
 import { consumePendingNativeCallAction } from "@/lib/nativeCallAction";
 import type { UserPresence } from "@/types/user";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
 const TYPING_INDICATOR_TIMEOUT_MS = 3500;
@@ -101,6 +102,27 @@ const isAppVisible = () => {
   return typeof document !== "undefined" && document.visibilityState === "visible" && document.hasFocus();
 };
 
+const navigateToAppPath = (targetPath: string) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    const targetUrl = new URL(targetPath || "/notification", window.location.origin);
+    if (targetUrl.origin !== window.location.origin) {
+      window.location.href = targetUrl.href;
+      return;
+    }
+
+    window.history.pushState(
+      {},
+      "",
+      `${targetUrl.pathname}${targetUrl.search}${targetUrl.hash}`,
+    );
+    window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
+  } catch {
+    window.location.href = targetPath || "/notification";
+  }
+};
+
 const getMessageTabTitle = (message: any, conversation: any) => {
   const senderId = message.senderId || message.sender?._id;
   const senderParticipant = conversation?.participants?.find(
@@ -143,11 +165,9 @@ const showBrowserNotification = (payload: {
     notification.close();
     const targetUrl = payload.url || "/notification";
     window.focus();
-    window.location.href = targetUrl;
+    navigateToAppPath(targetUrl);
   };
 };
-
-const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
 
 const decodeMentionPreview = (
   preview: string,
@@ -157,21 +177,7 @@ const decodeMentionPreview = (
     return "Bạn được nhắc đến";
   }
 
-  return preview.replace(MENTION_TOKEN_REGEX, (_full, rawUserId) => {
-    const mentionUserId = String(rawUserId || "").trim();
-    if (!mentionUserId) {
-      return "@Người dùng";
-    }
-
-    const participant = conversation?.participants?.find(
-      (item: any) => String(item.userId?._id || item.userId) === mentionUserId
-    );
-
-    const displayName =
-      participant?.userId?.nickname?.trim() || participant?.userId?.displayName || "Người dùng";
-
-    return `@${displayName}`;
-  });
+  return decodeMentionTokens(preview, conversation);
 };
 
 const localizeNotificationTitle = (title?: string) => {
@@ -587,20 +593,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             const convo = chatState.conversations.find(
               (c) => String(c._id) === String(message.conversationId)
             );
-            body = rawContent.replace(
-              /@\[USER:([^\]]+)\]/g,
-              (_full: string, uid: string) => {
-                const p = convo?.participants?.find(
-                  (item: any) =>
-                    String(item.userId?._id || item.userId) === uid.trim()
-                );
-                const name =
-                  p?.userId?.nickname?.trim() ||
-                  p?.userId?.displayName?.trim() ||
-                  'Thành viên';
-                return `@${name}`;
-              }
-            );
+            body = decodeMentionTokens(rawContent, convo);
           }
 
           const { activeConversationId } = useChatStore.getState();
@@ -854,13 +847,21 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
       toast.info(mentionTitle, {
         duration: 7000,
-        className: "border border-primary/25 bg-gradient-to-br from-background to-primary/5 shadow-lg",
-        descriptionClassName: "text-[12px] text-muted-foreground",
+        className: "rounded-xl border border-border/70 bg-card text-card-foreground shadow-xl",
+        descriptionClassName: "mt-1 text-[13px] leading-snug text-muted-foreground",
         action: {
-          label: 'Mở chat',
+          label: 'Xem tin',
           onClick: () => {
-            window.location.href = targetUrl;
+            navigateToAppPath(targetUrl);
           },
+        },
+        actionButtonStyle: {
+          height: "32px",
+          borderRadius: "9999px",
+          background: "hsl(var(--primary))",
+          color: "hsl(var(--primary-foreground))",
+          fontWeight: "600",
+          padding: "0 12px",
         },
         description: mentionDescription,
       });

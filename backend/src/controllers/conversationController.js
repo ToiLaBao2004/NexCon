@@ -387,6 +387,7 @@ export async function getConversations(req, res) {
 					type: safeFallback.type,
 					systemType: safeFallback.systemType || null,
 					metadata: fallbackMetadata,
+					mentions: safeFallback.mentions || [],
 					deliveredTo: safeFallback.deliveredTo || [],
 					createdAt: safeFallback.createdAt,
 					senderId: safeFallback.senderId,
@@ -527,6 +528,63 @@ export async function getConversations(req, res) {
 	} catch (error) {
 		console.error("Error occurred while fetching conversations", error);
 		return res.status(500).json({ message: "Internal server error" });
+	}
+}
+
+export async function getConversationById(req, res) {
+	try {
+		const { conversationId } = req.params;
+		const myId = req.user._id.toString();
+		const mongoose = await import('mongoose');
+
+		if (!mongoose.default.Types.ObjectId.isValid(conversationId)) {
+			return res.status(400).json({ message: 'Invalid conversationId.' });
+		}
+
+		const conversation = await Conversation.findOne({
+			_id: conversationId,
+			participants: { $elemMatch: { userId: myId } },
+		})
+			.populate("participants.userId", PARTICIPANT_SELECT)
+			.populate("lastMessage.senderId", MESSAGE_SENDER_SELECT);
+
+		if (!conversation) {
+			return res.status(404).json({ message: 'Conversation not found.' });
+		}
+
+		const formatted = sanitizePopulatedConversation(conversation);
+		const myParticipant = formatted.participants?.find((p) => {
+			const participantId = p?.userId?._id?.toString?.() || p?.userId?.toString?.();
+			return participantId === myId;
+		});
+		const pinnedAt = myParticipant?.pinnedAt
+			? new Date(myParticipant.pinnedAt).toISOString()
+			: null;
+
+		const [conversationWithPresence] = await attachPresenceToConversationParticipants([{
+			...formatted,
+			isPinned: Boolean(pinnedAt),
+			pinnedAt,
+			participants: (formatted.participants || []).map((participant) => {
+				let userObj = participant.userId;
+				if (!userObj && participant.userInfo) {
+					userObj = {
+						_id: null,
+						displayName: participant.userInfo.displayName || 'Người dùng đã xóa',
+						avatarUrl: participant.userInfo.avatarUrl || null,
+					};
+				} else if (!userObj) {
+					userObj = { _id: null, displayName: 'Người dùng đã xóa', avatarUrl: null };
+				}
+				return { ...participant, userId: sanitizeParticipantUser(userObj) };
+			}),
+			unreadCounts: formatted.unreadCounts || {},
+		}], myId);
+
+		return res.status(200).json({ conversation: conversationWithPresence });
+	} catch (error) {
+		console.error('Error fetching conversation:', error);
+		return res.status(500).json({ message: 'Internal server error' });
 	}
 }
 
@@ -725,7 +783,7 @@ export async function getMessages(req, res) {
 					.populate('senderId', MESSAGE_SENDER_SELECT)
 					.populate({
 						path: 'replyTo',
-						select: '_id senderId type content fileName isRecalled reportStatus',
+						select: '_id senderId type content fileName isRecalled reportStatus mentions',
 						populate: { path: 'senderId', select: 'displayName' },
 					})
 					.lean(),
@@ -735,7 +793,7 @@ export async function getMessages(req, res) {
 					.populate('senderId', MESSAGE_SENDER_SELECT)
 					.populate({
 						path: 'replyTo',
-						select: '_id senderId type content fileName isRecalled reportStatus',
+						select: '_id senderId type content fileName isRecalled reportStatus mentions',
 						populate: { path: 'senderId', select: 'displayName' },
 					})
 					.lean(),
@@ -774,7 +832,7 @@ export async function getMessages(req, res) {
 			.populate('senderId', MESSAGE_SENDER_SELECT)
 			.populate({
 				path: 'replyTo',
-				select: '_id senderId type content fileName isRecalled reportStatus',
+				select: '_id senderId type content fileName isRecalled reportStatus mentions',
 				populate: { path: 'senderId', select: 'displayName' },
 			})
 			.lean();
@@ -808,7 +866,7 @@ export async function getMessages(req, res) {
 				.populate('senderId', MESSAGE_SENDER_SELECT)
 				.populate({
 					path: 'replyTo',
-					select: '_id senderId type content fileName isRecalled reportStatus',
+					select: '_id senderId type content fileName isRecalled reportStatus mentions',
 					populate: { path: 'senderId', select: 'displayName' },
 				})
 				.lean();

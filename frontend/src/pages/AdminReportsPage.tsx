@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { adminService, type AdminReport } from "@/services/adminService";
 import type { ReportStatus, ReportTargetType } from "@/services/reportService";
 import { getApiErrorMessage } from "@/lib/apiMessage";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 const statusOptions: Array<ReportStatus | "all"> = ["pending", "reviewing", "resolved", "dismissed", "all"];
 
@@ -51,11 +52,17 @@ function getReportTitle(report: AdminReport) {
 
 function getPreview(report: AdminReport) {
   if (report.targetType === "user") return report.description || "Không có mô tả thêm";
-  if (report.messageEvidence?.preview) return report.messageEvidence.preview;
+  if (report.messageEvidence?.preview) {
+    return decodeMentionTokens(report.messageEvidence.preview);
+  }
   if (report.messageSnapshot?.type === "image") return "[Hình ảnh]";
   if (report.messageSnapshot?.type === "file") return report.messageSnapshot.fileName || "[File]";
   if (report.messageSnapshot?.type === "audio") return "[Tin nhắn thoại]";
-  return report.messageSnapshot?.content || report.description || "[Tin nhắn]";
+  return decodeMentionTokens(
+    report.messageSnapshot?.content || report.description || "[Tin nhắn]",
+    null,
+    report.messageSnapshot?.mentions
+  );
 }
 
 function userName(snapshot?: { displayName?: string; email?: string }) {

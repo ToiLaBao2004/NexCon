@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import { getApiErrorMessage } from "@/lib/apiMessage";
+import type { Mention } from "@/types/chat";
 
 export type ReportReasonCategory =
   | "spam"
@@ -42,6 +43,7 @@ export interface MyReport {
     content?: string;
     fileName?: string;
     mimeType?: string;
+    mentions?: Mention[];
     createdAt?: string;
     senderInfo?: {
       displayName?: string;

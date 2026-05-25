@@ -31,26 +31,7 @@ import { ConfirmationModal } from "../shared/ConfirmationModal";
 import { getSystemMessageText } from "@/utils/chatUtils";
 import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { toast } from "sonner";
-
-const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
-
-const decodeMentionTokens = (text: string, convo: Conversation) => {
-	if (!text) return text;
-
-	return text.replace(MENTION_TOKEN_REGEX, (_raw, userId) => {
-		const mentionUserId = String(userId || "").trim();
-		if (!mentionUserId) return "@Người dùng";
-
-		const participant = convo.participants.find(
-			(item) => String(item.userId?._id || item.userId) === mentionUserId
-		);
-
-		const displayName =
-			participant?.userId?.nickname?.trim() || participant?.userId?.displayName || "Người dùng";
-
-		return `@${displayName}`;
-	});
-};
+import { decodeMentionTokens } from "@/utils/mentions";
 
 const GroupChatCard = ({
 	convo,
@@ -324,6 +305,10 @@ const GroupChatCard = ({
 	);
 
 	const lastMessageObj = convo.lastMessage as any;
+	const loadedLastMessageObj = messages[convo._id]?.items?.find(
+		(item: any) => item?._id?.toString() === lastMessageObj?._id?.toString()
+	) as any;
+	const previewMessageObj = loadedLastMessageObj || lastMessageObj;
 	const lastMessageSenderId = lastMessageObj?.sender?._id || lastMessageObj?.senderId?._id || lastMessageObj?.senderId;
 	const isMyLastMessage = lastMessageSenderId?.toString() === user._id.toString();
 
@@ -423,7 +408,7 @@ const GroupChatCard = ({
 						}
 
 						if (!convo.lastMessage) return <span className="truncate">{convo.participants.length} Thành Viên</span>;
-						const msgObj = convo.lastMessage as any;
+						const msgObj = previewMessageObj;
 						const type = msgObj.type ?? "text";
 						const content = msgObj.content ?? "";
 
@@ -433,7 +418,7 @@ const GroupChatCard = ({
 
 						const prefix = isMyLastMessage ? "Bạn: " : `${senderName}: `;
 						let cleanMsg = content;
-						cleanMsg = decodeMentionTokens(cleanMsg, convo);
+						cleanMsg = decodeMentionTokens(cleanMsg, convo, msgObj.mentions);
 
 						let Icon = null;
 						if (type === "audio") {

@@ -133,6 +133,8 @@ messageSchema.pre('save', function (next) {
 messageSchema.index({ conversationId: 1, createdAt: -1 });
 // Compound index to optimize searching within a conversation
 messageSchema.index({ conversationId: 1, searchContent: 1 });
+// Mention inbox queries filter by mentioned user and newest messages first.
+messageSchema.index({ 'mentions.userId': 1, createdAt: -1 });
 
 export const MESSAGE_TYPE_LIST = MESSAGE_TYPES;
 const MessageModel = mongoose.models.Message || mongoose.model('Message', messageSchema);

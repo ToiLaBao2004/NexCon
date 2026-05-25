@@ -37,26 +37,7 @@ import { FIELD_LIMITS, checkFieldFormat } from '@/lib/fieldFormat';
 import { toast } from "sonner";
 import { ReportDialog } from "../shared/ReportDialog";
 import { getPresenceBadgeStatus, getPresenceForUser } from '@/utils/userPresence';
-
-const MENTION_TOKEN_REGEX = /@\[USER:([^\]]+)\]/g;
-
-const decodeMentionTokens = (text: string, convo: Conversation) => {
-  if (!text) return text;
-
-  return text.replace(MENTION_TOKEN_REGEX, (_raw, userId) => {
-    const mentionUserId = String(userId || "").trim();
-    if (!mentionUserId) return "@Người dùng";
-
-    const participant = convo.participants.find(
-      (item) => String(item.userId?._id || item.userId) === mentionUserId
-    );
-
-    const displayName =
-      participant?.userId?.nickname?.trim() || participant?.userId?.displayName || "Người dùng";
-
-    return `@${displayName}`;
-  });
-};
+import { decodeMentionTokens } from '@/utils/mentions';
 
 const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation; density?: "default" | "people" }) => {
   const { user } = useAuthStore();
@@ -348,6 +329,10 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
   );
 
   const lastMessageObj = convo.lastMessage as any;
+  const loadedLastMessageObj = messages[convo._id]?.items?.find(
+    (item: any) => item?._id?.toString() === lastMessageObj?._id?.toString()
+  ) as any;
+  const previewMessageObj = loadedLastMessageObj || lastMessageObj;
   const lastMessageSenderId = lastMessageObj?.sender?._id || lastMessageObj?.senderId?._id || lastMessageObj?.senderId;
   const isMyLastMessage = lastMessageSenderId?.toString() === user._id.toString();
 
@@ -442,7 +427,7 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
             }
 
             if (!convo.lastMessage) return "";
-            const msgObj = convo.lastMessage as any;
+            const msgObj = previewMessageObj;
             const content = msgObj.content ?? "";
             const type = msgObj.type ?? "text";
 
@@ -456,7 +441,7 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
             if (cleanMsg.startsWith("📎 ")) cleanMsg = cleanMsg.replace("📎 ", "");
             else if (cleanMsg.startsWith("📷 ")) cleanMsg = cleanMsg.replace("📷 ", "");
             else if (cleanMsg.startsWith("🔗 ")) cleanMsg = cleanMsg.replace("🔗 ", "");
-            cleanMsg = decodeMentionTokens(cleanMsg, convo);
+            cleanMsg = decodeMentionTokens(cleanMsg, convo, msgObj.mentions);
 
             let Icon = null;
             if (type === "audio") {

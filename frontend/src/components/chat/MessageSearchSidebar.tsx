@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useMaxWidth } from "@/hooks/use-max-width";
 import { TABLET_OVERLAY_MAX_WIDTH } from "@/constants/layout";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 interface MessageSearchSidebarProps {
   onClose: () => void;
@@ -418,7 +419,8 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
               const senderParticipant = participants.find((p) => p.userId?._id?.toString?.() === senderId?.toString?.());
               const senderName: string = getUserDisplayName(senderParticipant?.userId || sender, 'Người dùng');
               const senderAvatar: string | undefined = senderParticipant?.userId?.avatarUrl ?? sender?.avatarUrl ?? undefined;
-              const contentText: string = msg.content ?? (msg as any).fileName ?? '';
+              const rawContentText: string = msg.content ?? (msg as any).fileName ?? '';
+              const contentText = decodeMentionTokens(rawContentText, participants, msg.mentions);
 
               return (
                 <button

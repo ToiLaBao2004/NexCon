@@ -125,6 +125,7 @@ export interface ChatState {
   setReplyingTo: (message: Message | null) => void;
   clearConversationCache: (keepConversationIds: string[]) => void;
   fetchConversations: (force?: boolean) => Promise<void>;
+  ensureConversation: (conversationId: string) => Promise<Conversation | null>;
   fetchMoreConversations: () => Promise<void>;
   fetchGroups: (force?: boolean) => Promise<void>;
   fetchMoreGroups: () => Promise<void>;

@@ -1,5 +1,6 @@
 import api from "@/lib/axios";
 import type { ReportReasonCategory, ReportStatus, ReportTargetType } from "@/services/reportService";
+import type { Mention } from "@/types/chat";
 import type { User } from "@/types/user";
 
 export interface Pagination {
@@ -128,6 +129,7 @@ export interface AdminMessage {
   fileSize?: number;
   signedUrl?: string | null;
   preview?: string;
+  mentions?: Mention[];
   reportStatus?: boolean;
   createdAt: string;
 }
@@ -149,6 +151,7 @@ export interface AdminReport {
     content?: string;
     fileName?: string;
     mimeType?: string;
+    mentions?: Mention[];
     createdAt?: string;
     senderInfo?: { displayName?: string; avatarUrl?: string } | null;
   } | null;

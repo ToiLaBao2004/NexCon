@@ -1,5 +1,5 @@
 import express from 'express';
-import { createConversation, getConversations, getGroups, getMessages, getMediaByType, markAsSeen, markAsUnread, toggleConversationPin, updateConversationMute, updateGroupName, updateGroupAvatar, disbandGroupByAdmin, clearConversation, addMembers, updateSettings, handleApproval, getApprovalQueue, transferAdminRole, removeMember, leaveGroup } from '../controllers/conversationController.js';
+import { createConversation, getConversationById, getConversations, getGroups, getMessages, getMediaByType, markAsSeen, markAsUnread, toggleConversationPin, updateConversationMute, updateGroupName, updateGroupAvatar, disbandGroupByAdmin, clearConversation, addMembers, updateSettings, handleApproval, getApprovalQueue, transferAdminRole, removeMember, leaveGroup } from '../controllers/conversationController.js';
 import { checkFriendship } from '../middlewares/friendMiddleware.js';
 import { handleUploadError, upload } from '../middlewares/uploadMiddleware.js';
 
@@ -8,6 +8,7 @@ const conversationRouter = express.Router();
 conversationRouter.post('/create-conversation', checkFriendship, createConversation);
 conversationRouter.get('/get-conversations', getConversations);
 conversationRouter.get('/get-groups', getGroups);
+conversationRouter.get('/:conversationId', getConversationById);
 conversationRouter.get('/:conversationId/messages', getMessages);
 conversationRouter.get('/:conversationId/media', getMediaByType);
 conversationRouter.patch('/:conversationId/mark-seen', markAsSeen);

@@ -82,6 +82,17 @@ const toInternalAppPath = (rawUrl?: string) => {
     return null;
 };
 
+const getQueryParamFromInternalPath = (internalPath: string | null, key: string) => {
+    if (!internalPath) return null;
+
+    const queryString = internalPath.includes('?') ? internalPath.split('?')[1] : '';
+    if (!queryString) return null;
+
+    const params = new URLSearchParams(queryString);
+    const value = params.get(key);
+    return value && value.trim() ? value.trim() : null;
+};
+
 const getConversationIdFromNotification = (notification: Notification) => {
     const metaConversationId = notification.metadata?.conversationId;
     if (typeof metaConversationId === 'string' && metaConversationId.trim()) {
@@ -89,20 +100,36 @@ const getConversationIdFromNotification = (notification: Notification) => {
     }
 
     const internalPath = toInternalAppPath(notification.linkUrl);
-    if (!internalPath) return null;
+    return getQueryParamFromInternalPath(internalPath, 'conversationId');
+};
 
-    const queryString = internalPath.includes('?') ? internalPath.split('?')[1] : '';
-    if (!queryString) return null;
+const getMessageIdFromNotification = (notification: Notification) => {
+    const metaMessageId = notification.metadata?.messageId;
+    if (typeof metaMessageId === 'string' && metaMessageId.trim()) {
+        return metaMessageId.trim();
+    }
 
-    const params = new URLSearchParams(queryString);
-    const conversationId = params.get('conversationId');
-    return conversationId && conversationId.trim() ? conversationId.trim() : null;
+    if (typeof notification.targetId === 'string' && notification.targetId.trim()) {
+        return notification.targetId.trim();
+    }
+
+    const internalPath = toInternalAppPath(notification.linkUrl);
+    return getQueryParamFromInternalPath(internalPath, 'messageId');
 };
 
 const resolveNotificationPath = (notification: Notification) => {
     const type = (notification.type || '').toLowerCase();
     if (type === 'account-unlock') return '/notification';
     if (type === 'lock-appeal-result' && notification.metadata?.action === 'approve') return '/notification';
+
+    if (isMentionNotification(notification)) {
+        const conversationId = getConversationIdFromNotification(notification);
+        const messageId = getMessageIdFromNotification(notification);
+
+        if (conversationId && messageId) {
+            return `/chat?conversationId=${encodeURIComponent(conversationId)}&messageId=${encodeURIComponent(messageId)}`;
+        }
+    }
 
     const internalPath = toInternalAppPath(notification.linkUrl);
     if (internalPath) return internalPath;

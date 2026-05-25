@@ -35,6 +35,7 @@ import {
   type AdminUser,
 } from "@/services/adminService";
 import AdminEvidencePreview from "@/components/admin/AdminEvidencePreview";
+import { decodeMentionTokens } from "@/utils/mentions";
 
 type DrawerTab = "profile" | "groups" | "reports" | "audit";
 
@@ -404,7 +405,11 @@ function ReportsTab({ reports }: { reports: AdminReport[] }) {
             {report.targetType === "message" && (
               <AdminEvidencePreview
                 message={report.messageEvidence}
-                fallbackText={report.messageSnapshot?.content || report.messageSnapshot?.fileName || "Không có snapshot tin nhắn."}
+                fallbackText={decodeMentionTokens(
+                  report.messageSnapshot?.content || report.messageSnapshot?.fileName || "Không có snapshot tin nhắn.",
+                  null,
+                  report.messageSnapshot?.mentions
+                )}
               />
             )}
           </div>
