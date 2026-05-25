@@ -72,7 +72,7 @@ export function getPresenceBadgeStatus(presence?: UserPresence | null): UserPres
 }
 
 export function getPresenceText(presence?: UserPresence | null): string {
-  if (!presence) return PRESENCE_LABELS.offline;
+  if (!presence) return "";
   const status = normalizePresenceStatus(presence.status);
 
   if (status === "online") return "Đang hoạt động";
