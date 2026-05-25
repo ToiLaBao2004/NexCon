@@ -149,6 +149,13 @@ const NewGroupModal = ({ isOpen, onClose, initialSelected }: NewGroupModalProps)
                 </Button>
               </div>
             </div>
+            <div
+              className={`text-right text-xs ${
+                groupName.length >= FIELD_LIMITS.groupName ? 'text-destructive' : 'text-muted-foreground'
+              }`}
+            >
+              {groupName.length}/{FIELD_LIMITS.groupName}
+            </div>
           </div>
 
           <div className="space-y-2">

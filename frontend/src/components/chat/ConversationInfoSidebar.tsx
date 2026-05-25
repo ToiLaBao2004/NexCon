@@ -444,23 +444,21 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           </div>
 
           <div className="relative w-full mt-0 mb-3">
-            <div className="w-full flex justify-center">
-              <div className="relative inline-block">
-                  <span ref={nameRefGroup} className="block text-center text-xl font-bold leading-tight text-foreground">
+            <div className="flex w-full items-start justify-center gap-2 px-1">
+              <span ref={nameRefGroup} className="min-w-0 max-w-[calc(100%-2.5rem)] break-words text-center text-xl font-bold leading-tight text-foreground">
                   {groupDisplayName}
-                </span>
-                <button
-                  onClick={() => { if (canUpdateGroupInfo) setOpenGroupRename(true); }}
-                  title={isDisbanded ? "Nhóm đã giải tán" : (!canUpdateGroupInfo ? "Chỉ quản trị viên mới có thể đổi tên nhóm lúc này" : "Đổi tên nhóm")}
-                  disabled={!canUpdateGroupInfo}
-                  className={cn(
-                    "absolute left-full top-1/2 ml-3 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-colors",
-                    !canUpdateGroupInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
-                  )}
-                >
-                  <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
-                </button>
-              </div>
+              </span>
+              <button
+                onClick={() => { if (canUpdateGroupInfo) setOpenGroupRename(true); }}
+                title={isDisbanded ? "Nhóm đã giải tán" : (!canUpdateGroupInfo ? "Chỉ quản trị viên mới có thể đổi tên nhóm lúc này" : "Đổi tên nhóm")}
+                disabled={!canUpdateGroupInfo}
+                className={cn(
+                  "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground transition-colors",
+                  !canUpdateGroupInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
+                )}
+              >
+                <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
+              </button>
             </div>
           </div>
 
@@ -521,6 +519,14 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
               if (e.key === "Enter" && !groupRenameLoading) handleSubmitGroupName();
             }}
           />
+          <div
+            className={cn(
+              "text-right text-xs",
+              groupNameDraft.length >= FIELD_LIMITS.groupName ? "text-destructive" : "text-muted-foreground"
+            )}
+          >
+            {groupNameDraft.length}/{FIELD_LIMITS.groupName}
+          </div>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"

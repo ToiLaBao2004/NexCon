@@ -277,6 +277,13 @@ const GroupChatCard = ({
 							if (e.key === "Enter") onSubmitGroupName();
 						}}
 					/>
+					<div
+						className={`text-right text-xs ${
+							groupNameDraft.length >= FIELD_LIMITS.groupName ? "text-destructive" : "text-muted-foreground"
+						}`}
+					>
+						{groupNameDraft.length}/{FIELD_LIMITS.groupName}
+					</div>
 
 					<DialogFooter className="gap-2">
 						<Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>
