@@ -10,6 +10,8 @@ import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+const getMemberDisplayName = (member: any) => member?.nickname?.trim() || member?.displayName || "Người dùng";
+
 interface TransferAdminModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,7 +41,7 @@ export function TransferAdminModal({
       .map(p => p.userId || p)
       .filter(u => u._id !== currentUser?._id)
       .filter(u => {
-        const name = (u.displayName || "Người dùng").toLowerCase();
+        const name = getMemberDisplayName(u).toLowerCase();
         return name.includes(searchQuery.toLowerCase());
       });
   }, [participants, currentUser?._id, searchQuery]);
@@ -88,40 +90,42 @@ export function TransferAdminModal({
           <div className="flex-1 overflow-y-auto px-2 py-2 min-h-[300px] beautiful-scrollbar">
             {filteredMembers.length > 0 ? (
               <div className="space-y-0.5">
-                {filteredMembers.map((member) => (
-                  <label
-                    key={member._id}
-                    className={cn(
-                      "flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 hover:bg-muted/30 group relative",
-                      selectedMemberId === member._id && "bg-primary/5 hover:bg-primary/10"
-                    )}
-                  >
-                    <div className="relative flex items-center justify-center">
-                      <input
-                        type="radio"
-                        name="new-admin"
-                        checked={selectedMemberId === member._id}
-                        onChange={() => setSelectedMemberId(member._id)}
-                        className="peer h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-muted-foreground/30 transition-all checked:border-primary checked:bg-primary"
+                {filteredMembers.map((member) => {
+                  const memberName = getMemberDisplayName(member);
+                  return (
+                    <label
+                      key={member._id}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 hover:bg-muted/30 group relative",
+                        selectedMemberId === member._id && "bg-primary/5 hover:bg-primary/10"
+                      )}
+                    >
+                      <div className="relative flex items-center justify-center">
+                        <input
+                          type="radio"
+                          name="new-admin"
+                          checked={selectedMemberId === member._id}
+                          onChange={() => setSelectedMemberId(member._id)}
+                          className="peer h-5 w-5 cursor-pointer appearance-none rounded-full border-2 border-muted-foreground/30 transition-all checked:border-primary checked:bg-primary"
+                        />
+                        <div className="absolute h-2.5 w-2.5 scale-0 rounded-full bg-white transition-transform duration-200 peer-checked:scale-100" />
+                      </div>
+
+                      <UserAvatar
+                        type="sidebar"
+                        name={memberName}
+                        avatarUrl={member.avatarUrl}
+                        className="h-10 w-10 border border-border/10 ml-1"
                       />
-                      <div className="absolute h-2.5 w-2.5 scale-0 rounded-full bg-white transition-transform duration-200 peer-checked:scale-100" />
-                    </div>
 
-                    <UserAvatar
-                      type="sidebar"
-                      name={member.displayName || "Người dùng"}
-                      avatarUrl={member.avatarUrl}
-                      className="h-10 w-10 border border-border/10 ml-1"
-                    />
-
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[15px] font-medium text-foreground truncate">
-                        {member.displayName || "Người dùng"}
-                      </p>
-                    </div>
-                  </label>
-                ))}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[15px] font-medium text-foreground truncate">
+                          {memberName}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-10">
@@ -154,7 +158,7 @@ export function TransferAdminModal({
         onClose={() => setShowConfirm(false)}
         onConfirm={handleTransfer}
         title="Xác nhận chuyển quyền trưởng nhóm"
-        description={`Bạn có chắc muốn chuyển quyền trưởng nhóm cho ${selectedMember?.displayName || 'thành viên này'}? Bạn sẽ mất quyền quản lý nhóm sau khi xác nhận.`}
+        description={`Bạn có chắc muốn chuyển quyền trưởng nhóm cho ${selectedMember ? getMemberDisplayName(selectedMember) : 'thành viên này'}? Bạn sẽ mất quyền quản lý nhóm sau khi xác nhận.`}
 
         confirmText="Xác nhận chuyển"
         variant="destructive"

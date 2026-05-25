@@ -134,6 +134,7 @@ export interface ChatState {
   sendMessage: (payload: SendMessagePayload, onProgress?: (pct: number) => void) => Promise<void>;
   addMessage: (message: Message) => Promise<void>;
   createReminderSystemMessage: (conversationId: string, reminder: Reminder) => Promise<void>;
+  updateParticipantNickname: (friendId: string, nickname?: string | null) => void;
   updateConversation: (conversation: Conversation) => void;
   markAsSeen: (conversationId?: string) => Promise<void>;
   markAsUnread: (conversationId: string) => Promise<void>;

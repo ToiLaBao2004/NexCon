@@ -683,7 +683,7 @@ const ChatWindowBody: React.FC = () => {
   }
 
   const typingDisplayName = activeTypingParticipants.length === 1
-    ? activeTypingParticipants[0]?.userId?.nickname || activeTypingParticipants[0]?.userId?.displayName || "Ai đó"
+    ? activeTypingParticipants[0]?.userId?.nickname?.trim() || activeTypingParticipants[0]?.userId?.displayName || "Ai đó"
     : `${activeTypingParticipants.length} người`;
   const showInlineTyping = activeTypingParticipants.length > 0 && isNearBottom;
   const showFloatingTyping = activeTypingParticipants.length > 0 && !isNearBottom;

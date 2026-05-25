@@ -4,6 +4,7 @@ import { friendService } from '@/services/friendService';
 import type { FriendState } from '@/types/store';
 import { checkFieldFormat } from '@/lib/fieldFormat';
 import { getApiErrorMessage, getApiSuccessMessage } from '@/lib/apiMessage';
+import { useChatStore } from './useChatStore';
 
 const MAX_FRIENDS = 500;
 const FRIEND_LIMIT_MESSAGE = `Mỗi người chỉ có thể có tối đa ${MAX_FRIENDS} bạn bè.`;
@@ -121,7 +122,20 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 
 		try {
 			set({ loading: true });
-			await friendService.setNickName(friendId, nickName);
+			const data = await friendService.setNickName(friendId, nickName);
+			const normalizedFriendId = String(data?.friendId || friendId);
+			const nextNickname = typeof data?.nickname === 'string' && data.nickname.trim()
+				? data.nickname.trim()
+				: undefined;
+
+			set((state) => ({
+				friends: state.friends.map((friend) =>
+					String(friend.friendId) === normalizedFriendId
+						? { ...friend, nickname: nextNickname }
+						: friend
+				),
+			}));
+			useChatStore.getState().updateParticipantNickname(normalizedFriendId, nextNickname ?? null);
 			toast.success('Biệt danh đã được cập nhật.');
 		} catch (error: any) {
 			console.error('Lỗi khi đặt biệt danh:', error);

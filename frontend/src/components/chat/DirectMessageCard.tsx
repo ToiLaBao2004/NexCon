@@ -365,7 +365,7 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
     statusIcon = (
       <UserAvatar
         type="seen"
-        name={seenByOther.userId.displayName ?? ""}
+        name={seenByOther.userId.nickname?.trim() || seenByOther.userId.displayName || ""}
         avatarUrl={seenByOther.userId.avatarUrl ?? undefined}
       />
     );

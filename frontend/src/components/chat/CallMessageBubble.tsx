@@ -1,4 +1,4 @@
-import type { Message } from "@/types/chat";
+import type { Conversation, Message } from "@/types/chat";
 import { cn, formatDuration } from "@/lib/utils";
 import { Phone, Video, Ban, AlertCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -10,9 +10,10 @@ interface CallMessageBubbleProps {
   message: Message;
   currentUserId: string;
   isOwn: boolean;
+  selectedConvo?: Conversation;
 }
 
-const CallMessageBubble = ({ message, currentUserId, isOwn }: CallMessageBubbleProps) => {
+const CallMessageBubble = ({ message, currentUserId, isOwn, selectedConvo }: CallMessageBubbleProps) => {
   const { startCall, status: callStatus } = useCallStore();
   const { startGroupCall, status: groupCallStatus } = useGroupCallStore();
   const snapshot = parseCallSnapshot(message);
@@ -114,10 +115,13 @@ const CallMessageBubble = ({ message, currentUserId, isOwn }: CallMessageBubbleP
     }
 
     if (!otherParticipant) return;
+    const otherConversationParticipant = selectedConvo?.participants.find(
+      (participant) => participant.userId?._id?.toString?.() === otherParticipant.userId._id
+    )?.userId;
     startCall(
       {
         _id: otherParticipant.userId._id,
-        displayName: otherParticipant.userId.displayName,
+        displayName: otherConversationParticipant?.nickname?.trim() || otherParticipant.userId.displayName,
         avatarUrl: otherParticipant.userId.avatarUrl ?? null,
       },
       snapshot.callType

@@ -346,7 +346,7 @@ const GroupChatCard = ({
 						<UserAvatar
 							key={pid}
 							type="seen"
-							name={p.userId.displayName ?? ""}
+							name={p.userId.nickname?.trim() || p.userId.displayName || ""}
 							avatarUrl={p.userId.avatarUrl ?? undefined}
 							className="border-[1px] border-background"
 						/>
@@ -357,7 +357,7 @@ const GroupChatCard = ({
 	}
 
 	const senderParticipant = convo.participants.find(p => p.userId?._id?.toString() === lastMessageSenderId?.toString());
-	const senderName = lastMessageObj?.sender?.displayName || lastMessageObj?.senderId?.displayName || senderParticipant?.userId?.displayName || senderParticipant?.userId?.nickname || "Ai đó";
+	const senderName = senderParticipant?.userId?.nickname?.trim() || senderParticipant?.userId?.displayName || lastMessageObj?.sender?.displayName || lastMessageObj?.senderId?.displayName || "Ai đó";
 
 	return (
 		<ChatCard

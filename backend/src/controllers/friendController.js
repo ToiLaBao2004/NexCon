@@ -1014,22 +1014,41 @@ export async function setFriendNickname(req, res) {
         if (!friendship) {
             return res.status(404).json({ message: 'Friendship not found.' });
         }
-        if (nickname === undefined || nickname.trim() === "") {
+        const normalizedNickname = typeof nickname === 'string' ? nickname.trim() : '';
+        const nicknamePayload = normalizedNickname || null;
+
+        if (!normalizedNickname) {
             if (friendship.userA.toString() === user._id.toString()) {
                 friendship.nicknameB = undefined;
             } else {
                 friendship.nicknameA = undefined;
             }
             await friendship.save();
-            return res.status(200).json({ message: `Nickname for ${friend.displayName} has been removed.` });
+            await emitToUser(user._id.toString(), "friend-nickname-updated", {
+                friendId: friend._id.toString(),
+                nickname: null,
+            });
+            return res.status(200).json({
+                message: `Nickname for ${friend.displayName} has been removed.`,
+                friendId: friend._id,
+                nickname: null,
+            });
         }
         if (friendship.userA.toString() === user._id.toString()) {
-            friendship.nicknameB = nickname ? nickname.trim() : undefined;
+            friendship.nicknameB = normalizedNickname;
         } else {
-            friendship.nicknameA = nickname ? nickname.trim() : undefined;
+            friendship.nicknameA = normalizedNickname;
         }
         await friendship.save();
-        return res.status(200).json({ message: `Nickname for ${friend.displayName} has been updated.` });
+        await emitToUser(user._id.toString(), "friend-nickname-updated", {
+            friendId: friend._id.toString(),
+            nickname: nicknamePayload,
+        });
+        return res.status(200).json({
+            message: `Nickname for ${friend.displayName} has been updated.`,
+            friendId: friend._id,
+            nickname: nicknamePayload,
+        });
     } catch (error) {
         console.error('Set friend nickname error:', error);
         return res.status(500).json({ message: 'Server error' });

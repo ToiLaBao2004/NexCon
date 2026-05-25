@@ -569,7 +569,13 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           if (!Capacitor.isNativePlatform()) return;
 
           const { showMessageNotification } = await import('@/lib/localNotification');
-          const senderName = message.senderInfo?.displayName || 'Tin nhắn mới';
+          const senderParticipant = conversationForTitle?.participants?.find(
+            (participant: any) => String(participant?.userId?._id || participant?.userId) === String(senderId)
+          );
+          const senderName =
+            senderParticipant?.userId?.nickname?.trim() ||
+            message.senderInfo?.displayName ||
+            'Tin nhắn mới';
           let body = '';
 
           if (message.type === 'image') body = '📷 Hình ảnh';
@@ -726,6 +732,24 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useFriendStore.getState().fetchSentRequests(true);
     });
 
+    socket.on("friend-nickname-updated", ({ friendId, nickname }) => {
+      const normalizedFriendId = friendId?.toString?.() || friendId;
+      if (!normalizedFriendId) return;
+
+      const nextNickname = typeof nickname === "string" && nickname.trim()
+        ? nickname.trim()
+        : undefined;
+
+      useFriendStore.setState((state) => ({
+        friends: state.friends.map((friend) =>
+          String(friend.friendId) === String(normalizedFriendId)
+            ? { ...friend, nickname: nextNickname }
+            : friend
+        ),
+      }));
+      useChatStore.getState().updateParticipantNickname(normalizedFriendId, nextNickname ?? null);
+    });
+
     socket.on("unfriended", ({ friendId }) => {
       const normalizedFriendId = friendId?.toString?.() || friendId;
       if (normalizedFriendId) {
@@ -782,10 +806,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       const currentUserId = useAuthStore.getState().user?._id?.toString() ?? "";
       const targetConversationId = conversationId?.toString?.() || conversationId;
       const isFocused = chatState.focusedConversationId === targetConversationId;
-      const senderName = mentionedBy?.displayName || "Ai đó";
       const targetConversation = chatState.conversations.find(
         (item) => String(item._id) === String(targetConversationId)
       );
+      const mentionedById = mentionedBy?._id?.toString?.() || mentionedBy?.toString?.() || "";
+      const mentionedByParticipant = targetConversation?.participants?.find(
+        (participant: any) => String(participant?.userId?._id || participant?.userId) === String(mentionedById)
+      );
+      const senderName = mentionedByParticipant?.userId?.nickname?.trim() || mentionedBy?.displayName || "Ai đó";
       const previewText = decodeMentionPreview(
         typeof preview === "string" ? preview.trim() : "",
         targetConversation

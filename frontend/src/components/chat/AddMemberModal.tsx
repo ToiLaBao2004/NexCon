@@ -157,7 +157,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                                 </Avatar>
                                                 <div>
                                                     <p className="text-sm font-semibold text-foreground">
-                                                        {friend.nickname || friend.displayName}
+                                                        {friend.nickname?.trim() || friend.displayName}
                                                     </p>
                                                     {friend.nickname && (
                                                         <p className="text-xs text-muted-foreground">{friend.displayName}</p>

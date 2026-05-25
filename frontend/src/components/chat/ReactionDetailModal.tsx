@@ -38,7 +38,7 @@ export default function ReactionDetailModal({
         const p = participants.find((part) => part.userId._id === r.userId);
         grouped[r.userId] = {
           userId: r.userId,
-          displayName: p?.userId.displayName || "Người dùng",
+          displayName: p?.userId.nickname?.trim() || p?.userId.displayName || "Người dùng",
           avatarUrl: p?.userId.avatarUrl || undefined,
           emojis: [],
         };
