@@ -12,7 +12,6 @@ import SuggestionsTab from "@/components/people/SuggestionsTab";
 import UserSearch from "@/components/shared/UserSearch";
 import ChatWindowLayout from "@/components/chat/ChatWindowLayout";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { MOBILE_BOTTOM_NAV_HEIGHT_REM } from "@/constants/layout";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import type { FriendSuggestion } from "@/types/user";
 
@@ -197,7 +196,7 @@ const PeoplePage = () => {
 							</div>
 						)}
 
-						<div className={`flex-1 min-h-0 overflow-x-hidden overscroll-contain ${tab === "requests" ? "overflow-hidden" : "overflow-y-auto beautiful-scrollbar"} ${isMobile ? "pb-28" : ""}`}>
+						<div className={`flex-1 min-h-0 overflow-x-hidden overscroll-contain ${tab === "requests" ? "overflow-hidden" : "overflow-y-auto beautiful-scrollbar"}`}>
 							<div className={tab === "requests" ? "h-full min-h-0 p-4 md:p-5" : tab === "groups" ? "h-full min-h-0" : "h-full min-h-0 p-5"}>
 								{tab === 'friends' && (
 									<FriendsTab
@@ -240,36 +239,33 @@ const PeoplePage = () => {
 								{tab === 'blocked' && <BlockedTab />}
 							</div>
 						</div>
+
+						{isMobile && (
+							<div className="shrink-0 border-t border-border/40 bg-card/95 backdrop-blur-md">
+								<div className="grid grid-cols-5 gap-1.5 p-2">
+									{PEOPLE_TABS.map((item) => {
+										const Icon = item.icon;
+										const badge = getTabBadge(item.key);
+										const isActive = tab === item.key;
+
+										return (
+											<button
+												key={item.key}
+												onClick={() => handleTabChange(item.key)}
+												className={`relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[10.5px] transition-colors ${isActive ? "bg-primary/15 text-primary font-semibold" : "text-foreground/75 hover:bg-muted/50 hover:text-foreground"}`}
+											>
+												<Icon className="h-5 w-5" strokeWidth={isActive ? 1.85 : 1.65} />
+												<span>{item.shortLabel}</span>
+												{badge > 0 && <span className="absolute top-1 right-3 text-[10px] font-bold text-primary bg-primary/15 px-1.5 py-0.5 rounded-full">{badge}</span>}
+											</button>
+										);
+									})}
+								</div>
+							</div>
+						)}
 					</div>
 				)}
 			</main>
-
-			{isMobile && !showChat && (
-				<div
-					className="fixed left-0 right-0 z-40 border-t border-border/40 bg-card/95 backdrop-blur-md"
-					style={{ bottom: `calc(${MOBILE_BOTTOM_NAV_HEIGHT_REM}rem + env(safe-area-inset-bottom, 0px))` }}
-				>
-					<div className="grid grid-cols-5 gap-1.5 p-2">
-						{PEOPLE_TABS.map((item) => {
-							const Icon = item.icon;
-							const badge = getTabBadge(item.key);
-							const isActive = tab === item.key;
-
-							return (
-								<button
-									key={item.key}
-									onClick={() => handleTabChange(item.key)}
-									className={`relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[10.5px] transition-colors ${isActive ? "bg-primary/15 text-primary font-semibold" : "text-foreground/75 hover:bg-muted/50 hover:text-foreground"}`}
-								>
-									<Icon className="h-5 w-5" strokeWidth={isActive ? 1.85 : 1.65} />
-									<span>{item.shortLabel}</span>
-									{badge > 0 && <span className="absolute top-1 right-3 text-[10px] font-bold text-primary bg-primary/15 px-1.5 py-0.5 rounded-full">{badge}</span>}
-								</button>
-							);
-						})}
-					</div>
-				</div>
-			)}
 		</SidebarProvider>
 	);
 };
