@@ -25,6 +25,7 @@ import { reloadPendingGroupCleanups, startGroupCleanupWorker } from './workers/g
 import { reloadPendingConversationClearCleanups, startConversationClearCleanupWorker } from './workers/conversationClearCleanupWorker.js';
 import { startRealtimeTimeoutWorker } from './workers/realtimeTimeoutWorker.js';
 import { apiLimiter } from './middlewares/rateLimiters.js';
+import { requireProxySecret } from './middlewares/proxySecretMiddleware.js';
 import { auditLogMiddleware } from './middlewares/auditLogMiddleware.js';
 import { requireUser } from './middlewares/roleMiddleware.js';
 import { startSystemMetricsSampler } from './services/systemMetricsService.js';
@@ -46,6 +47,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+app.use('/api', requireProxySecret);
 app.use('/api', apiLimiter);
 
 cloudinary.config({

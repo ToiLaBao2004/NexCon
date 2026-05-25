@@ -384,13 +384,16 @@ frontend/.env
 Ví dụ:
 
 ```env
-VITE_API_URL=http://localhost:5001/api
+VITE_WEB_API_URL=/api
+VITE_DEV_BACKEND_ORIGIN=http://localhost:5001
+VITE_NATIVE_API_URL=http://localhost:5001/api
 VITE_SOCKET_URL=http://localhost:5001
 VITE_LIVEKIT_URL=ws://localhost:7880
 VITE_VAPID_PUBLIC_KEY=
-VITE_CONNECTIVITY_CHECK_URL=http://localhost:5001/api/auth/health
 VITE_STICKER_ASSET_VERSION=2026-05-18
 ```
+
+Web frontend mặc định gọi API qua `/api`; `VITE_DEV_BACKEND_ORIGIN` chỉ dùng cho Vite dev proxy. `VITE_NATIVE_API_URL` chỉ dùng cho bản mobile/native.
 
 ### 4. Cài dependencies
 
@@ -576,11 +579,15 @@ Thiết lập Vercel:
 Environment variables cần cấu hình trên Vercel:
 
 ```env
-VITE_API_URL=https://<railway-backend-domain>/api
+VITE_WEB_API_URL=/api
+BACKEND_ORIGIN=https://<railway-backend-domain>
+BACKEND_PROXY_SECRET=<same-random-secret-as-railway>
 VITE_SOCKET_URL=https://<railway-backend-domain>
 VITE_LIVEKIT_URL=wss://<livekit-domain>
 VITE_VAPID_PUBLIC_KEY=
 ```
+
+`BACKEND_ORIGIN` và `BACKEND_PROXY_SECRET` là biến server-side của Vercel API proxy, không có prefix `VITE_` nên không bị nhúng vào bundle frontend. Browser chỉ thấy request tới `/api/...` trên domain Vercel.
 
 ### Backend - Railway
 
@@ -598,7 +605,8 @@ Environment variables cần cấu hình trên Railway:
 PORT=5001
 CLIENT_URL=https://<vercel-frontend-domain>
 FRONTEND_URL=https://<vercel-frontend-domain>
-BACKEND_URL=https://<railway-backend-domain>
+BACKEND_URL=https://<vercel-frontend-domain>
+BACKEND_PROXY_SECRET=<same-random-secret-as-vercel>
 MONGODB_CONNECTION_STRING=
 ACCESS_TOKEN_SECRET=
 REDIS_URL=
@@ -608,6 +616,8 @@ CLOUDINARY_API_SECRET=
 LIVEKIT_API_KEY=
 LIVEKIT_API_SECRET=
 ```
+
+Khi bật proxy secret, Google OAuth redirect URI nên trỏ về `https://<vercel-frontend-domain>/api/auth/google/callback` để callback đi qua Vercel proxy thay vì gọi thẳng Railway.
 
 ---
 
