@@ -2156,6 +2156,10 @@ const MessageItem = ({
 	const visibleSeenUsers = seenUsersForThisMessage.slice(0, MAX_VISIBLE_SEEN_AVATARS);
 	const hiddenSeenUsers = seenUsersForThisMessage.slice(MAX_VISIBLE_SEEN_AVATARS);
 	const shouldAlignSeenReceiptsRight = isOwn || selectedConvo.type === "group";
+	const seenReceiptClassName = cn(
+		"mt-0.5 flex h-5 items-center",
+		shouldAlignSeenReceiptsRight ? "ml-auto mr-3 justify-end" : "ml-[60px] mr-3 justify-start"
+	);
 
 	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage } = useChatStore();
 	const { isDark } = useThemeStore();
@@ -2843,14 +2847,11 @@ const MessageItem = ({
 					</div>
 				) : seenUsersForThisMessage.length > 0 ? (
 					isCoarsePointer ? (
-						<div className={cn(
-							"mt-0.5 flex",
-							shouldAlignSeenReceiptsRight ? "mx-3 justify-end" : "ml-[60px] mr-3 justify-start"
-						)}>
+						<div className={seenReceiptClassName}>
 							<button
 								type="button"
 								className={cn(
-									"flex min-h-7 items-center -space-x-1 rounded-full py-1 active:bg-muted/70",
+									"flex h-5 items-center -space-x-1 rounded-full active:bg-muted/70",
 									shouldAlignSeenReceiptsRight ? "justify-end px-1.5" : "justify-start pl-0 pr-1.5"
 								)}
 								aria-label={`Xem ${seenUsersForThisMessage.length} người đã xem tin nhắn`}
@@ -2874,10 +2875,7 @@ const MessageItem = ({
 						</div>
 					) : (
 						<TooltipProvider delayDuration={120}>
-							<div className={cn(
-								"flex items-center -space-x-1 mt-0.5",
-								shouldAlignSeenReceiptsRight ? "mx-3 justify-end" : "ml-[60px] mr-3 justify-start"
-							)}>
+							<div className={cn(seenReceiptClassName, "-space-x-1")}>
 								{visibleSeenUsers.map((seenUser) => (
 									<Tooltip key={seenUser._id}>
 										<TooltipTrigger asChild>
