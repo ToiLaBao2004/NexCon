@@ -99,8 +99,9 @@ const ChatWindowBody: React.FC = () => {
   const prevScrollHeightRef = useRef<number>(0);
   const prevMessageCount = useRef(0);
   const isFirstLoad = useRef(true);
-  const lastItemId = messages[messages.length - 1]?._id;
-  const lastItemKey = getMessageStableKey(messages[messages.length - 1]);
+  const lastMessage = messages[messages.length - 1] ?? null;
+  const lastItemId = lastMessage?._id;
+  const lastItemKey = getMessageStableKey(lastMessage);
 
   const activeTypingUserIds = convoId
     ? (typingUsers[convoId]?.filter(id => id !== user?._id) || [])
@@ -109,6 +110,27 @@ const ChatWindowBody: React.FC = () => {
   const activeTypingParticipants = activeTypingUserIds.map((id: string) =>
     selectedConvo?.participants.find(p => p.userId?._id?.toString() === id)
   );
+  const lastMessageSenderId = getMessageSenderId(lastMessage);
+  const isOwnLastMessage = Boolean(
+    lastMessage &&
+    lastMessageSenderId &&
+    user?._id &&
+    lastMessageSenderId.toString() === user._id.toString()
+  );
+  const lastMessageReadState = selectedConvo?.participants
+    .map((participant) => {
+      const participantId = participant.userId?._id?.toString?.() || "";
+      return `${participantId}:${participant.lastReadMessageId || ""}`;
+    })
+    .join("|") ?? "";
+  const lastMessageVisualKey = [
+    lastItemKey,
+    lastMessage?._id || "",
+    lastMessage?.status || "",
+    lastMessage?.isDelivered ? "delivered" : "",
+    lastMessage?.deliveredTo?.length ?? 0,
+    lastMessageReadState,
+  ].join(":");
 
   const lastMyMessageId = useMemo(() => {
     if (!user?._id || messages.length === 0) return null;
@@ -338,6 +360,13 @@ const ChatWindowBody: React.FC = () => {
 
 
   const prevLastItemKeyRef = useRef<string | undefined>(undefined);
+  const prevLastMessageVisualRef = useRef<{
+    key: string;
+    status?: string;
+    delivered?: boolean;
+    readState: string;
+    isOwn: boolean;
+  } | null>(null);
   const lastImageScrollIdRef = useRef<string | undefined>(undefined);
   const pendingImageScrollRef = useRef(false);
 
@@ -413,6 +442,44 @@ const ChatWindowBody: React.FC = () => {
   useEffect(() => {
     requestAnimationFrame(syncScrollState);
   }, [lastItemKey, syncScrollState]);
+
+  useLayoutEffect(() => {
+    const previous = prevLastMessageVisualRef.current;
+    const current = {
+      key: lastItemKey,
+      status: lastMessage?.status,
+      delivered: lastMessage?.isDelivered === true,
+      readState: lastMessageReadState,
+      isOwn: isOwnLastMessage,
+    };
+    prevLastMessageVisualRef.current = current;
+
+    if (!convoId || isJumpMode || !lastMessage || !isOwnLastMessage) return;
+
+    const isSameVisualMessage = previous?.key === current.key;
+    const completedPendingMessage =
+      isSameVisualMessage &&
+      previous?.status === "sending" &&
+      current.status === "sent";
+    const deliveryOrReadChanged =
+      isSameVisualMessage &&
+      (previous?.delivered !== current.delivered || previous?.readState !== current.readState);
+    const isAlreadyFollowingBottom = Date.now() < followBottomUntilRef.current;
+    const isCloseEnoughToBottom = distanceFromBottomRef.current <= 360;
+
+    if (completedPendingMessage || deliveryOrReadChanged || isAlreadyFollowingBottom || isCloseEnoughToBottom) {
+      scheduleFollowBottom(900);
+    }
+  }, [
+    convoId,
+    isJumpMode,
+    isOwnLastMessage,
+    lastItemKey,
+    lastMessage,
+    lastMessageReadState,
+    lastMessageVisualKey,
+    scheduleFollowBottom,
+  ]);
 
   useLayoutEffect(() => {
     if (!convoId || isJumpMode || activeTypingUserIds.length === 0) return;
@@ -579,6 +646,7 @@ const ChatWindowBody: React.FC = () => {
   useEffect(() => {
     isFirstLoad.current = true;
     prevLastItemKeyRef.current = undefined;
+    prevLastMessageVisualRef.current = null;
     prevMessageCount.current = 0;
     loadingMoreRef.current = false;
     prevScrollHeightRef.current = 0;
@@ -627,7 +695,7 @@ const ChatWindowBody: React.FC = () => {
       <div
         ref={scrollRef}
         data-chat-scroll-container={convoId}
-        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4 pb-8"
+        className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden beautiful-scrollbar px-2 md:px-4 pb-16"
       >
         <div ref={contentRef} className="flex min-h-full flex-col">
           <div ref={topSentinelRef} className="h-1 shrink-0" />
