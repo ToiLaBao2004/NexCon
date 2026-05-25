@@ -132,30 +132,30 @@ Khi backend được scale thành nhiều replica, Socket.IO không thể chỉ 
 
 ```mermaid
 flowchart TB
-    ClientA[Client A] --> LB[Load Balancer / Railway Routing]
-    ClientB[Client B] --> LB
-    ClientC[Client C] --> LB
+    ClientA["Client A"] --> LB["Load Balancer / Railway Routing"]
+    ClientB["Client B"] --> LB
+    ClientC["Client C"] --> LB
 
-    LB --> API1[Backend Replica 1<br/>Express + Socket.IO]
-    LB --> API2[Backend Replica 2<br/>Express + Socket.IO]
-    LB --> API3[Backend Replica 3<br/>Express + Socket.IO]
+    LB --> API1["Backend Replica 1<br/>Express + Socket.IO"]
+    LB --> API2["Backend Replica 2<br/>Express + Socket.IO"]
+    LB --> API3["Backend Replica 3<br/>Express + Socket.IO"]
 
-    API1 <-->|pub/sub| RA[(Redis<br/>Socket.IO Adapter)]
-    API2 <-->|pub/sub| RA
-    API3 <-->|pub/sub| RA
+    API1 <-->|Redis pub sub| RA[("Redis<br/>Socket.IO Adapter")]
+    API2 <-->|Redis pub sub| RA
+    API3 <-->|Redis pub sub| RA
 
-    API1 --> PR[(Redis Presence Store)]
+    API1 --> PR[("Redis Presence Store")]
     API2 --> PR
     API3 --> PR
 
-    API1 --> DB[(MongoDB Atlas)]
+    API1 --> DB[("MongoDB Atlas")]
     API2 --> DB
     API3 --> DB
 
-    API1 --> Q[(Redis Queues / BullMQ)]
+    API1 --> Q[("Redis Queues / BullMQ")]
     API2 --> Q
     API3 --> Q
-    Q --> WK[Worker Replica(s)]
+    Q --> WK["Worker Replicas"]
     WK --> DB
 ```
 
