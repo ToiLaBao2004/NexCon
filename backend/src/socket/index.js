@@ -120,6 +120,96 @@ async function emitToUser(userId, event, data) {
     return online;
 }
 
+async function emitMessageDeliveredUpdate({ messageId, conversationId, deliveredUserId, senderId }) {
+    const payload = {
+        messageId: messageId.toString(),
+        conversationId: conversationId.toString(),
+        deliveredUserId: deliveredUserId.toString(),
+    };
+
+    await emitToUser(deliveredUserId, "message-delivered-sync", payload);
+
+    if (senderId) {
+        await emitToUser(senderId, "message-delivered-ack", payload);
+    }
+}
+
+async function markDeliveredForMessage({ messageId, conversationId, deliveredUserId }) {
+    const msg = await Message.findOneAndUpdate(
+        {
+            _id: messageId,
+            conversationId,
+            senderId: { $ne: deliveredUserId },
+            deliveredTo: { $ne: deliveredUserId },
+        },
+        { $addToSet: { deliveredTo: deliveredUserId } },
+        { new: true, select: 'senderId conversationId' }
+    );
+
+    if (!msg) return null;
+
+    await Conversation.updateOne(
+        {
+            _id: msg.conversationId,
+            'lastMessage._id': msg._id,
+        },
+        { $addToSet: { 'lastMessage.deliveredTo': deliveredUserId } }
+    );
+
+    return msg;
+}
+
+async function syncPendingDirectMessageDeliveries(userId) {
+    const batchSize = 200;
+    const maxBatches = 10;
+
+    try {
+        const directConversations = await Conversation.find({
+            type: 'direct',
+            'participants.userId': userId,
+        }).select('_id').lean();
+
+        const conversationIds = directConversations.map((conversation) => conversation._id);
+        if (conversationIds.length === 0) return;
+
+        for (let batch = 0; batch < maxBatches; batch += 1) {
+            const pendingMessages = await Message.find({
+                conversationId: { $in: conversationIds },
+                senderId: { $ne: userId },
+                deliveredTo: { $ne: userId },
+            })
+                .select('_id conversationId senderId')
+                .sort({ createdAt: 1 })
+                .limit(batchSize)
+                .lean();
+
+            if (pendingMessages.length === 0) return;
+
+            const messageIds = pendingMessages.map((message) => message._id);
+
+            await Message.updateMany(
+                { _id: { $in: messageIds }, deliveredTo: { $ne: userId } },
+                { $addToSet: { deliveredTo: userId } }
+            );
+            await Conversation.updateMany(
+                { 'lastMessage._id': { $in: messageIds } },
+                { $addToSet: { 'lastMessage.deliveredTo': userId } }
+            );
+
+            await Promise.all(pendingMessages.map((message) => emitMessageDeliveredUpdate({
+                messageId: message._id,
+                conversationId: message.conversationId,
+                deliveredUserId: userId,
+                senderId: message.senderId,
+            })));
+
+            if (pendingMessages.length < batchSize) return;
+        }
+    } catch (error) {
+        console.error("Error syncing pending message deliveries:", error);
+    }
+}
+
 function joinUserSocketsToRoom(userId, roomName) {
     io.in(getUserRoom(userId)).socketsJoin(roomName.toString());
     return true;
@@ -295,31 +385,18 @@ io.on("connection", async (socket) => {
                 return;
             }
 
-            const msg = await Message.findOneAndUpdate(
-                {
-                    _id: messageId,
-                    conversationId: conversation._id,
-                    senderId: { $ne: userId },
-                    deliveredTo: { $ne: userId },
-                },
-                { $addToSet: { deliveredTo: userId } },
-                { new: true, select: 'senderId' }
-            );
+            const msg = await markDeliveredForMessage({
+                messageId,
+                conversationId: conversation._id,
+                deliveredUserId: userId,
+            });
             if (msg) {
-                await emitToUser(userId, "message-delivered-sync", {
+                await emitMessageDeliveredUpdate({
                     messageId,
-                    conversationId,
+                    conversationId: conversation._id,
                     deliveredUserId: userId,
+                    senderId: msg.senderId,
                 });
-
-                const senderSocketId = getReceiverSocketId(msg.senderId.toString());
-                if (senderSocketId) {
-                    io.to(senderSocketId).emit("message-delivered-ack", {
-                        messageId,
-                        conversationId,
-                        deliveredUserId: userId,
-                    });
-                }
             }
         } catch (err) {
             console.error("Error handling message-delivered:", err);
@@ -332,6 +409,7 @@ io.on("connection", async (socket) => {
     // Group call handlers
     registerGroupCallHandlers(socket, user, io, getReceiverSocketId);
 
+    await syncPendingDirectMessageDeliveries(userId);
     await emitPendingDirectCallsForUser(socket, userId, io, getReceiverSocketId);
     await emitPendingGroupCallsForUser(socket, userId);
 

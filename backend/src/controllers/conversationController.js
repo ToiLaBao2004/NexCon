@@ -387,11 +387,41 @@ export async function getConversations(req, res) {
 					type: safeFallback.type,
 					systemType: safeFallback.systemType || null,
 					metadata: fallbackMetadata,
+					deliveredTo: safeFallback.deliveredTo || [],
 					createdAt: safeFallback.createdAt,
 					senderId: safeFallback.senderId,
 				},
 			};
 		}));
+
+		const lastMessageIds = conversations
+			.map((conversation) => conversation.lastMessage?._id)
+			.filter(Boolean);
+
+		if (lastMessageIds.length > 0) {
+			const lastMessageDeliveryRows = await Message.find({ _id: { $in: lastMessageIds } })
+				.select('_id deliveredTo')
+				.lean();
+			const deliveredToByMessageId = new Map(
+				lastMessageDeliveryRows.map((message) => [
+					message._id.toString(),
+					(message.deliveredTo || []).map((id) => id.toString()),
+				])
+			);
+
+			conversations = conversations.map((conversation) => {
+				const lastMessageId = conversation.lastMessage?._id?.toString?.();
+				if (!lastMessageId) return conversation;
+
+				return {
+					...conversation,
+					lastMessage: {
+						...conversation.lastMessage,
+						deliveredTo: deliveredToByMessageId.get(lastMessageId) || conversation.lastMessage.deliveredTo || [],
+					},
+				};
+			});
+		}
 
 		conversations = conversations.filter(c => {
 			const me = c.participants?.find(p => p.userId?._id?.toString() === myId);

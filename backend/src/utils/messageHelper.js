@@ -105,6 +105,7 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
             systemType: safeMessage.systemType || null,
             metadata: metadata,
             senderId: senderId,
+            deliveredTo: safeMessage.deliveredTo || [],
             createdAt: safeMessage.createdAt,
         },
     });
