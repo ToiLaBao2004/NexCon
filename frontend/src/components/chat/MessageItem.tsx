@@ -2016,6 +2016,7 @@ const MessageItem = ({
 	}
 
 	const prev = messages[index - 1];
+	const prevIsSystemBreak = prev?.type === "system" && prev.systemType !== "call";
 
 	// Handle populated senderId (from fallback or normally populated)
 	const senderObj = typeof message.senderId === "object" ? message.senderId as any : null;
@@ -2023,6 +2024,7 @@ const MessageItem = ({
 
 	const isGroupBreak =
 		index === 0 ||
+		prevIsSystemBreak ||
 		actualSenderId !== (typeof prev?.senderId === "object" ? (prev?.senderId as any)._id : prev?.senderId) ||
 		new Date(message.createdAt).getTime() - new Date(prev?.createdAt || 0).getTime() > 300000;
 	const hasTimeGapFromPrev = prev
