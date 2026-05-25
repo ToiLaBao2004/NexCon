@@ -183,7 +183,7 @@ export async function getLivekitToken(req, res) {
             $addToSet: { waitingRoom: userId },
         });
 
-        scheduleWaitingTimeout(normalizedRoomName, userId, meeting._id);
+        await scheduleWaitingTimeout(normalizedRoomName, userId, meeting._id);
         await emitWaitingRoomUpdate(normalizedRoomName, meeting.hostId.toString());
 
         return res.json({

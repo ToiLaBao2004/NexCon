@@ -70,7 +70,7 @@ async function processReminder(reminder) {
     }
 
     // 1. Gửi qua Socket (Real-time)
-    const delivered = emitToUser(updated.userId.toString(), 'reminder-triggered', { reminder: reminderPayload });
+    const delivered = await emitToUser(updated.userId.toString(), 'reminder-triggered', { reminder: reminderPayload });
 
     // 2. Kiểm tra Mute (Chỉ gửi Push/In-app nếu không bị tắt thông báo)
     let muted = false;

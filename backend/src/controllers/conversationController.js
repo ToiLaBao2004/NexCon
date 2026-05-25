@@ -94,8 +94,12 @@ async function attachPresenceToConversationParticipants(conversations = [], view
 
 	if (!participantIds.length) return conversations;
 
+	const socketOnlineFlags = await Promise.all(participantIds.map(async (id) => ({
+		id,
+		online: await isUserOnline(id),
+	})));
 	const presences = await getVisiblePresencesForUsers(participantIds, {
-		socketOnlineUserIds: participantIds.filter((id) => isUserOnline(id)),
+		socketOnlineUserIds: socketOnlineFlags.filter((item) => item.online).map((item) => item.id),
 		viewerId,
 	});
 	const presenceByUserId = new Map(presences.map((presence) => [presence.userId, presence]));

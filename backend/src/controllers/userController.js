@@ -24,7 +24,7 @@ export async function getCurrentUser(req, res) {
             return res.status(404).json({ message: "User not found" });
         }
 
-        const presence = await getSelfPresence(userId, { socketOnline: isUserOnline(userId) });
+        const presence = await getSelfPresence(userId, { socketOnline: await isUserOnline(userId) });
 
         return res.status(200).json({ user: { ...user, presence } });
     } catch (error) {
@@ -36,7 +36,7 @@ export async function getCurrentUser(req, res) {
 export async function getMyUserStatus(req, res) {
     try {
         const userId = req.user._id || req.user.id;
-        const presence = await getSelfPresence(userId, { socketOnline: isUserOnline(userId) });
+        const presence = await getSelfPresence(userId, { socketOnline: await isUserOnline(userId) });
 
         return res.status(200).json({ presence });
     } catch (error) {
@@ -67,8 +67,8 @@ export async function updateMyUserStatus(req, res) {
         }
 
         await updateUserStatusPreference(userId, updates);
-        const presence = await getSelfPresence(userId, { socketOnline: isUserOnline(userId) });
-        await emitOnlineUsers();
+        const presence = await getSelfPresence(userId, { socketOnline: await isUserOnline(userId) });
+        await emitOnlineUsers({ broadcast: true });
 
         return res.status(200).json({ presence });
     } catch (error) {
@@ -378,7 +378,7 @@ export async function getUserById(req, res) {
         }
 
         const [presence] = await getVisiblePresencesForUsers([id], {
-            socketOnlineUserIds: isUserOnline(id) ? [id] : [],
+            socketOnlineUserIds: await isUserOnline(id) ? [id] : [],
             viewerId: currentUserId,
         });
         const visibleUser = currentUserId && id === currentUserId ? user : maskLockedUser(user);

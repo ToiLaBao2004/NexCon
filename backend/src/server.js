@@ -18,11 +18,12 @@ import pushRouter from './routes/pushRoute.js';
 import reportRouter from './routes/reportRoute.js';
 import adminRouter from './routes/adminRoute.js';
 import globalSearchRouter from './routes/globalSearchRoute.js';
-import { app, server } from './socket/index.js';
+import { app, server, socketRedisAdapterReady } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { startReminderWorker, reloadPendingReminders } from './workers/reminderWorker.js';
 import { reloadPendingGroupCleanups, startGroupCleanupWorker } from './workers/groupCleanupWorker.js';
 import { reloadPendingConversationClearCleanups, startConversationClearCleanupWorker } from './workers/conversationClearCleanupWorker.js';
+import { startRealtimeTimeoutWorker } from './workers/realtimeTimeoutWorker.js';
 import { apiLimiter } from './middlewares/rateLimiters.js';
 import { auditLogMiddleware } from './middlewares/auditLogMiddleware.js';
 import { requireUser } from './middlewares/roleMiddleware.js';
@@ -77,6 +78,7 @@ connectDB().then(() => {
     try {
         startSystemMetricsSampler();
         startReminderWorker();
+        startRealtimeTimeoutWorker();
         if (process.env.ENABLE_INLINE_GROUP_CLEANUP_WORKER !== 'false') {
             startGroupCleanupWorker();
         }
@@ -89,8 +91,7 @@ connectDB().then(() => {
     } catch (err) {
         console.error('[Server] Không thể khởi tạo Reminder Worker (Redis có thể chưa sẵn sàng):', err.message);
     }
-    server.listen(PORT, () => {
+    socketRedisAdapterReady.finally(() => server.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
-    });
+    }));
 });
-

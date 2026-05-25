@@ -19,7 +19,7 @@ export async function createNotification(userId, title, content, linkUrl, option
 
     await notification.populate('actorId', 'displayName avatarUrl');
 
-    const delivered = emitToUser(userId.toString(), 'new-notification', { notification });
+    const delivered = await emitToUser(userId.toString(), 'new-notification', { notification });
 
     if (!delivered) {
         await sendFCMToUser(userId, {

@@ -7,23 +7,30 @@ import { LOCKED_USER_DISPLAY_NAME } from '../utils/lockedUser.js';
 import { sendFCMToUser } from '../services/fcmService.js';
 import { isMuted } from '../utils/isMuted.js';
 import { createCallActionToken, getCallActionUrl } from '../utils/callActionToken.js';
+import { hasUserDirectCall as hasUserDirectCallState } from '../services/directCallStateService.js';
+import {
+    acquireGroupCallFinalizeLock,
+    deleteGroupCall,
+    getGroupCall,
+    hasGroupCall,
+    hasUserActiveGroupCall as hasUserActiveGroupCallState,
+    listGroupCalls,
+    listPendingGroupCallsForUser,
+    releaseGroupCallStart as releaseGroupCallStartState,
+    reserveGroupCallStart as reserveGroupCallStartState,
+    saveGroupCall,
+} from '../services/groupCallStateService.js';
+import { removeGroupCallRingTimeout, scheduleGroupCallRingTimeout } from '../config/realtimeTimeoutQueue.js';
 import {
     clearWaitingTimeout,
     emitWaitingRoomUpdate,
     generateParticipantToken,
     MAX_MEETING_PARTICIPANTS,
     normalizeRoomName,
-    waitingTimeouts,
 } from '../controllers/meetingController.js';
 
 const API_KEY = process.env.LIVEKIT_API_KEY;
 const API_SECRET = process.env.LIVEKIT_API_SECRET;
-const GROUP_CALL_START_RATE_LIMIT_MS = 1_000;
-
-// conversationId -> GroupCallInfo
-const activeGroupCalls = new Map();
-const groupCallStartLocks = new Set();
-const lastGroupCallStartAt = new Map();
 
 function buildSessionId(prefix = 'group-call') {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -47,7 +54,7 @@ async function generateToken(roomName, identity, displayName, metadata) {
 }
 
 function participantsArray(groupCall) {
-    return Array.from(groupCall.participants.values());
+    return Object.values(groupCall.participants || {});
 }
 
 function groupCallDevicePayload(groupCall) {
@@ -82,7 +89,7 @@ async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupNa
         if (!participantId) return;
         if (participantId === groupCallInfo.initiatorId) return;
 
-        const callParticipant = groupCallInfo.participants.get(participantId);
+        const callParticipant = groupCallInfo.participants?.[participantId];
         if (!callParticipant || callParticipant.isLocked || callParticipant.status !== 'ringing') return;
         if (isMuted(participant.mute, 'meetings')) return;
 
@@ -113,7 +120,7 @@ async function sendOfflineGroupCallPushes({ conversation, groupCallInfo, groupNa
 
 function countJoined(groupCall) {
     let n = 0;
-    for (const participant of groupCall.participants.values()) {
+    for (const participant of participantsArray(groupCall)) {
         if (participant.status === 'joined') n++;
     }
     return n;
@@ -123,47 +130,20 @@ function normalizeUserId(value) {
     return value?.toString?.() || String(value);
 }
 
-function hasUserDirectCall(activeCalls, userId) {
-    const normalizedUserId = normalizeUserId(userId);
-    for (const session of activeCalls?.values?.() || []) {
-        if (session.callerId === normalizedUserId || session.receiverId === normalizedUserId) {
-            return true;
-        }
-    }
-    return false;
+function hasUserDirectCall(userId) {
+    return hasUserDirectCallState(userId);
 }
 
 function reserveGroupCallStart(userId) {
-    const normalizedUserId = normalizeUserId(userId);
-    if (groupCallStartLocks.has(normalizedUserId)) {
-        return 'already-in-call';
-    }
-
-    const now = Date.now();
-    const lastStartedAt = lastGroupCallStartAt.get(normalizedUserId) || 0;
-    if (now - lastStartedAt < GROUP_CALL_START_RATE_LIMIT_MS) {
-        return 'rate-limited';
-    }
-
-    groupCallStartLocks.add(normalizedUserId);
-    lastGroupCallStartAt.set(normalizedUserId, now);
-    return null;
+    return reserveGroupCallStartState(userId);
 }
 
 function releaseGroupCallStart(userId) {
-    groupCallStartLocks.delete(normalizeUserId(userId));
+    return releaseGroupCallStartState(userId);
 }
 
 function hasUserActiveGroupCall(userId) {
-    const normalizedUserId = normalizeUserId(userId);
-    for (const groupCall of activeGroupCalls.values()) {
-        const participant = groupCall.participants?.get(normalizedUserId);
-        if (!participant) continue;
-        if (participant.status === 'joined') {
-            return true;
-        }
-    }
-    return false;
+    return hasUserActiveGroupCallState(userId);
 }
 
 function toFinalParticipantStatus(participant, endedAtIso) {
@@ -180,14 +160,15 @@ function toFinalParticipantStatus(participant, endedAtIso) {
     return participant;
 }
 
-async function endGroupCall(conversationId, io) {
-    const groupCall = activeGroupCalls.get(conversationId);
+async function endGroupCall(conversationId, io, { removeRingTimeout = true } = {}) {
+    const groupCall = await getGroupCall(conversationId);
     if (!groupCall) return;
 
     const now = new Date();
     const endedAtIso = now.toISOString();
-    const durationSec = groupCall.startedAt
-        ? Math.max(0, Math.round((now.getTime() - groupCall.startedAt.getTime()) / 1000))
+    const startedAtDate = groupCall.startedAt ? new Date(groupCall.startedAt) : null;
+    const durationSec = startedAtDate && Number.isFinite(startedAtDate.getTime())
+        ? Math.max(0, Math.round((now.getTime() - startedAtDate.getTime()) / 1000))
         : 0;
 
     try {
@@ -204,18 +185,20 @@ async function endGroupCall(conversationId, io) {
                 leftAt: participant.leftAt,
             }));
 
-        await persistCallSystemMessage(io, {
-            conversationId,
-            callId: groupCall.callId,
-            mode: 'group',
-            callType: groupCall.callType,
-            overallStatus: 'ended',
-            duration: durationSec,
-            startedAt: groupCall.startedAt,
-            endedAt: now,
-            initiator: groupCall.initiator,
-            participants: finalizedParticipants,
-        });
+        if (await acquireGroupCallFinalizeLock(conversationId, groupCall.callId)) {
+            await persistCallSystemMessage(io, {
+                conversationId,
+                callId: groupCall.callId,
+                mode: 'group',
+                callType: groupCall.callType,
+                overallStatus: 'ended',
+                duration: durationSec,
+                startedAt: startedAtDate,
+                endedAt: now,
+                initiator: groupCall.initiator,
+                participants: finalizedParticipants,
+            });
+        }
     } catch (error) {
         console.error('[GroupCall] endGroupCall DB error:', error);
     }
@@ -227,39 +210,65 @@ async function endGroupCall(conversationId, io) {
         endedAt: endedAtIso,
     });
 
-    if (groupCall.ringTimeout) clearTimeout(groupCall.ringTimeout);
-    activeGroupCalls.delete(conversationId);
+    if (removeRingTimeout) {
+        await removeGroupCallRingTimeout(conversationId, groupCall.callId);
+    }
+    await deleteGroupCall(conversationId);
 }
 
-async function checkAutoEnd(conversationId, io) {
-    const groupCall = activeGroupCalls.get(conversationId);
+async function checkAutoEnd(conversationId, io, options = {}) {
+    const groupCall = await getGroupCall(conversationId);
     if (!groupCall) return;
 
     const joined = countJoined(groupCall);
 
     // Không còn ai trong call
     if (joined === 0) {
-        await endGroupCall(conversationId, io);
+        await endGroupCall(conversationId, io, options);
         return;
     }
 
     // Chỉ còn 1 người joined và không còn ai đang ringing
     let ringing = 0;
-    for (const participant of groupCall.participants.values()) {
+    for (const participant of participantsArray(groupCall)) {
         if (participant.status === 'ringing') ringing++;
     }
 
     if (joined < 2 && ringing === 0) {
-        await endGroupCall(conversationId, io);
+        await endGroupCall(conversationId, io, options);
     }
 }
 
-function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, activeCalls = new Map()) {
+async function processGroupCallRingTimeout(io, conversationId, callId) {
+    const session = await getGroupCall(conversationId);
+    if (!session || (callId && session.callId !== callId)) return false;
+
+    let changed = false;
+    for (const participant of participantsArray(session)) {
+        if (participant.status === 'ringing') {
+            participant.status = 'no-answer';
+            changed = true;
+        }
+    }
+
+    if (!changed) return false;
+
+    await saveGroupCall(session);
+    io.to(conversationId).emit('group-call:user-declined', {
+        conversationId,
+        userId: null,
+        participants: participantsArray(session),
+    });
+    await checkAutoEnd(conversationId, io, { removeRingTimeout: false });
+    return true;
+}
+
+function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
     const userId = user._id.toString();
 
     // START
     socket.on('group-call:start', async ({ conversationId, callType }) => {
-        const reservationError = reserveGroupCallStart(userId);
+        const reservationError = await reserveGroupCallStart(userId);
         if (reservationError) {
             return socket.emit('group-call:error', { reason: reservationError });
         }
@@ -282,22 +291,21 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
             }
 
             // Already active?
-            if (activeGroupCalls.has(conversationId)) {
+            if (await hasGroupCall(conversationId)) {
                 return socket.emit('group-call:error', { reason: 'already-active' });
             }
 
-            if (hasUserDirectCall(activeCalls, userId) || hasUserActiveGroupCall(userId)) {
+            if (await hasUserDirectCall(userId) || await hasUserActiveGroupCall(userId)) {
                 return socket.emit('group-call:error', { reason: 'already-in-call' });
             }
 
             const callId = buildSessionId('group-call');
 
-            // Build in-memory participants map
-            const participantsMap = new Map();
+            const participantsMap = {};
             for (const participant of conversation.participants) {
                 const pid = participant.userId._id.toString();
                 const isLocked = Boolean(participant.userId.lock?.isLocked);
-                participantsMap.set(pid, {
+                participantsMap[pid] = {
                     userId: pid,
                     displayName: isLocked ? LOCKED_USER_DISPLAY_NAME : participant.userId.displayName,
                     avatarUrl: isLocked ? null : (participant.userId.avatarUrl || null),
@@ -305,31 +313,8 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                     status: isLocked ? 'locked' : (pid === userId ? 'joined' : 'ringing'),
                     joinedAt: pid === userId ? new Date().toISOString() : null,
                     leftAt: null,
-                });
+                };
             }
-
-            // Ring timeout (30s)
-            const ringTimeout = setTimeout(async () => {
-                const session = activeGroupCalls.get(conversationId);
-                if (!session) return;
-
-                let changed = false;
-                for (const participant of session.participants.values()) {
-                    if (participant.status === 'ringing') {
-                        participant.status = 'no-answer';
-                        changed = true;
-                    }
-                }
-
-                if (changed) {
-                    io.to(conversationId).emit('group-call:user-declined', {
-                        conversationId,
-                        userId: null,
-                        participants: participantsArray(session),
-                    });
-                    await checkAutoEnd(conversationId, io);
-                }
-            }, 30_000);
 
             const initiatorInfo = {
                 _id: userId,
@@ -347,10 +332,10 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 callType,
                 startedAt: null,
                 participants: participantsMap,
-                participantSockets: new Map([[userId, socket.id]]),
-                ringTimeout,
+                participantSockets: { [userId]: socket.id },
             };
-            activeGroupCalls.set(conversationId, groupCallInfo);
+            await saveGroupCall(groupCallInfo);
+            await scheduleGroupCallRingTimeout(conversationId, callId, 30_000);
 
             // Generate token for initiator
             const metadata = JSON.stringify({
@@ -387,32 +372,32 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
             console.error('[GroupCall] start error:', error);
             socket.emit('group-call:error', { reason: 'server-error' });
         } finally {
-            releaseGroupCallStart(userId);
+            await releaseGroupCallStart(userId);
         }
     });
 
     // JOIN
     socket.on('group-call:join', async ({ conversationId }) => {
         try {
-            const groupCall = activeGroupCalls.get(conversationId);
+            const groupCall = await getGroupCall(conversationId);
             if (!groupCall) {
                 return socket.emit('group-call:error', { reason: 'call-not-found' });
             }
 
             // Check if user is in the participant map (member of group)
-            if (!groupCall.participants.has(userId)) {
+            if (!groupCall.participants?.[userId]) {
                 return socket.emit('group-call:error', { reason: 'not-a-member' });
             }
 
-            const participant = groupCall.participants.get(userId);
-            const activeSocketId = groupCall.participantSockets?.get(userId);
+            const participant = groupCall.participants[userId];
+            const activeSocketId = groupCall.participantSockets?.[userId];
             if (participant.status === 'joined' && activeSocketId && activeSocketId !== socket.id) {
                 socket.emit('group-call:answered-on-other-device', groupCallDevicePayload(groupCall));
                 return;
             }
 
             if (!groupCall.participantSockets) {
-                groupCall.participantSockets = new Map();
+                groupCall.participantSockets = {};
             }
 
             const previousState = {
@@ -428,10 +413,10 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 ? previousState.joinedAt
                 : new Date().toISOString();
             participant.leftAt = null;
-            groupCall.participantSockets.set(userId, socket.id);
+            groupCall.participantSockets[userId] = socket.id;
 
             if (!groupCall.startedAt && userId !== groupCall.initiatorId) {
-                groupCall.startedAt = new Date();
+                groupCall.startedAt = new Date().toISOString();
             }
 
             let token;
@@ -442,18 +427,20 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 });
                 token = await generateToken(conversationId, userId, user.displayName, metadata);
             } catch (error) {
-                if (groupCall.participantSockets?.get(userId) === socket.id) {
+                if (groupCall.participantSockets?.[userId] === socket.id) {
                     participant.status = previousState.status;
                     participant.joinedAt = previousState.joinedAt;
                     participant.leftAt = previousState.leftAt;
                     if (previousState.socketId) {
-                        groupCall.participantSockets.set(userId, previousState.socketId);
+                        groupCall.participantSockets[userId] = previousState.socketId;
                     } else {
-                        groupCall.participantSockets.delete(userId);
+                        delete groupCall.participantSockets[userId];
                     }
                 }
                 throw error;
             }
+
+            await saveGroupCall(groupCall);
 
             // Send token to this user
             socket.emit('group-call:token', { conversationId, token });
@@ -487,13 +474,13 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
     // DECLINE
     socket.on('group-call:decline', async ({ conversationId }) => {
         try {
-            const groupCall = activeGroupCalls.get(conversationId);
+            const groupCall = await getGroupCall(conversationId);
             if (!groupCall) return;
 
-            const participant = groupCall.participants.get(userId);
+            const participant = groupCall.participants?.[userId];
             if (!participant) return;
 
-            const activeSocketId = groupCall.participantSockets?.get(userId);
+            const activeSocketId = groupCall.participantSockets?.[userId];
             if (participant.status === 'joined' && activeSocketId && activeSocketId !== socket.id) {
                 socket.emit('group-call:answered-on-other-device', groupCallDevicePayload(groupCall));
                 return;
@@ -505,7 +492,8 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
             }
 
             participant.status = 'declined';
-            groupCall.participantSockets?.delete(userId);
+            if (groupCall.participantSockets) delete groupCall.participantSockets[userId];
+            await saveGroupCall(groupCall);
 
             emitToOtherUserDevices(
                 socket,
@@ -529,13 +517,13 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
     // LEAVE
     socket.on('group-call:leave', async ({ conversationId }) => {
         try {
-            const groupCall = activeGroupCalls.get(conversationId);
+            const groupCall = await getGroupCall(conversationId);
             if (!groupCall) return;
 
-            const participant = groupCall.participants.get(userId);
+            const participant = groupCall.participants?.[userId];
             if (!participant) return;
 
-            const activeSocketId = groupCall.participantSockets?.get(userId);
+            const activeSocketId = groupCall.participantSockets?.[userId];
             if (participant.status === 'joined' && activeSocketId && activeSocketId !== socket.id) {
                 socket.emit('group-call:answered-on-other-device', groupCallDevicePayload(groupCall));
                 return;
@@ -543,7 +531,8 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
 
             participant.status = 'left';
             participant.leftAt = new Date().toISOString();
-            groupCall.participantSockets?.delete(userId);
+            if (groupCall.participantSockets) delete groupCall.participantSockets[userId];
+            await saveGroupCall(groupCall);
 
             io.to(conversationId).emit('group-call:user-left', {
                 conversationId,
@@ -560,11 +549,11 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
     });
 
     // STATUS
-    socket.on('group-call:status', ({ conversationId }) => {
-        const groupCall = activeGroupCalls.get(conversationId);
+    socket.on('group-call:status', async ({ conversationId }) => {
+        const groupCall = await getGroupCall(conversationId);
         if (groupCall) {
-            const participant = groupCall.participants.get(userId);
-            const activeSocketId = groupCall.participantSockets?.get(userId) || null;
+            const participant = groupCall.participants?.[userId];
+            const activeSocketId = groupCall.participantSockets?.[userId] || null;
             socket.emit('group-call:status-response', {
                 conversationId,
                 active: true,
@@ -572,7 +561,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 callType: groupCall.callType,
                 initiatorId: groupCall.initiatorId,
                 participants: participantsArray(groupCall),
-                startedAt: groupCall.startedAt?.toISOString() ?? null,
+                startedAt: groupCall.startedAt ?? null,
                 myStatus: participant?.status ?? null,
                 joinedByCurrentUser: participant?.status === 'joined',
                 joinedByCurrentDevice: Boolean(activeSocketId && activeSocketId === socket.id),
@@ -598,10 +587,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 return;
             }
 
-            const key = `${normalizedRoomName}:${waiterUserId}`;
-            if (waitingTimeouts.has(key)) {
-                clearWaitingTimeout(normalizedRoomName, waiterUserId);
-            }
+            await clearWaitingTimeout(normalizedRoomName, waiterUserId);
 
             const alreadyParticipant = meeting.participants.some(
                 (participant) => participant.userId.toString() === waiterUserId
@@ -670,10 +656,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 return;
             }
 
-            const key = `${normalizedRoomName}:${waiterUserId}`;
-            if (waitingTimeouts.has(key)) {
-                clearWaitingTimeout(normalizedRoomName, waiterUserId);
-            }
+            await clearWaitingTimeout(normalizedRoomName, waiterUserId);
 
             await Meeting.findByIdAndUpdate(meeting._id, {
                 $pull: { waitingRoom: waiterUserId },
@@ -712,10 +695,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
             const userMap = new Map(users.map((item) => [item._id.toString(), item]));
 
             for (const waiterUserId of toAdmit) {
-                const key = `${normalizedRoomName}:${waiterUserId}`;
-                if (waitingTimeouts.has(key)) {
-                    clearWaitingTimeout(normalizedRoomName, waiterUserId);
-                }
+                await clearWaitingTimeout(normalizedRoomName, waiterUserId);
             }
 
             const existingParticipantSet = new Set(
@@ -784,10 +764,7 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
                 return;
             }
 
-            const key = `${normalizedRoomName}:${userId}`;
-            if (waitingTimeouts.has(key)) {
-                clearWaitingTimeout(normalizedRoomName, userId);
-            }
+            await clearWaitingTimeout(normalizedRoomName, userId);
 
             const meeting = await Meeting.findOneAndUpdate(
                 { roomName: normalizedRoomName },
@@ -808,15 +785,17 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId, active
 
 // Disconnect handler
 async function handleGroupCallDisconnect(userId, socketId, io) {
-    for (const [conversationId, groupCall] of activeGroupCalls) {
-        const participant = groupCall.participants.get(userId);
-        const participantSocketId = groupCall.participantSockets?.get(userId);
+    for (const groupCall of await listGroupCalls()) {
+        const conversationId = groupCall.conversationId;
+        const participant = groupCall.participants?.[userId];
+        const participantSocketId = groupCall.participantSockets?.[userId];
         const isActiveCallSocket = participantSocketId ? participantSocketId === socketId : true;
 
         if (participant && participant.status === 'joined' && isActiveCallSocket) {
             participant.status = 'left';
             participant.leftAt = new Date().toISOString();
-            groupCall.participantSockets?.delete(userId);
+            if (groupCall.participantSockets) delete groupCall.participantSockets[userId];
+            await saveGroupCall(groupCall);
 
             io.to(conversationId).emit('group-call:user-left', {
                 conversationId,
@@ -829,15 +808,10 @@ async function handleGroupCallDisconnect(userId, socketId, io) {
     }
 }
 
-function emitPendingGroupCallsForUser(socket, userId) {
+async function emitPendingGroupCallsForUser(socket, userId) {
     const normalizedUserId = normalizeUserId(userId);
 
-    for (const groupCall of activeGroupCalls.values()) {
-        const participant = groupCall.participants?.get(normalizedUserId);
-        if (!participant || participant.status !== 'ringing' || participant.isLocked) {
-            continue;
-        }
-
+    for (const groupCall of await listPendingGroupCallsForUser(normalizedUserId)) {
         socket.emit('group-call:incoming', buildGroupIncomingPayload(groupCall));
     }
 }
@@ -847,18 +821,19 @@ async function declineGroupCallFromPush(io, payload = {}) {
     const conversationId = payload.conversationId?.toString();
     if (!userId || !conversationId) return false;
 
-    const groupCall = activeGroupCalls.get(conversationId);
+    const groupCall = await getGroupCall(conversationId);
     if (!groupCall || (payload.callId && groupCall.callId !== payload.callId)) {
         return false;
     }
 
-    const participant = groupCall.participants.get(userId);
+    const participant = groupCall.participants?.[userId];
     if (!participant || participant.status !== 'ringing') {
         return false;
     }
 
     participant.status = 'declined';
-    groupCall.participantSockets?.delete(userId);
+    if (groupCall.participantSockets) delete groupCall.participantSockets[userId];
+    await saveGroupCall(groupCall);
 
     io.to(`user:${userId}`).emit('group-call:declined-on-other-device', groupCallDevicePayload(groupCall));
     io.to(conversationId).emit('group-call:user-declined', {
@@ -877,4 +852,5 @@ export {
     hasUserActiveGroupCall,
     emitPendingGroupCallsForUser,
     declineGroupCallFromPush,
+    processGroupCallRingTimeout,
 };
