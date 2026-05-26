@@ -586,6 +586,8 @@ export async function listAdminUsers(req, res) {
     try {
         const { page, limit, skip } = parsePagination(req.query, 20, 50);
         const search = String(req.query.search || '').trim();
+        const sortBy = String(req.query.sortBy || 'createdAt');
+        const sortDir = String(req.query.sortDir || 'desc').toLowerCase() === 'asc' ? 1 : -1;
         const filter = userRoleFilter();
 
         if (search) {
@@ -599,39 +601,74 @@ export async function listAdminUsers(req, res) {
             }];
         }
 
+        const statusCollectionName = UserStatus.collection.name;
+        const reportCollectionName = Report.collection.name;
+        const lastSeenFallback = sortDir === 1 ? new Date('9999-12-31T23:59:59.999Z') : new Date(0);
+        const sortMap = {
+            user: { displayName: sortDir, email: sortDir, _id: 1 },
+            openReports: { openReportCount: sortDir, createdAt: -1, _id: 1 },
+            createdAt: { createdAt: sortDir, _id: 1 },
+            lastSeenAt: { lastSeenAtSort: sortDir, createdAt: -1, _id: 1 },
+        };
+        const sortStage = sortMap[sortBy] || sortMap.createdAt;
+
         const [users, total] = await Promise.all([
-            User.find(filter)
-                .select('-password')
-                .sort({ createdAt: -1 })
-                .skip(skip)
-                .limit(limit)
-                .lean(),
+            User.aggregate([
+                { $match: filter },
+                {
+                    $lookup: {
+                        from: reportCollectionName,
+                        let: { userId: '$_id' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ['$targetUserId', '$$userId'] },
+                                            { $in: ['$status', ['pending', 'reviewing']] },
+                                        ],
+                                    },
+                                },
+                            },
+                            { $count: 'count' },
+                        ],
+                        as: 'openReportRows',
+                    },
+                },
+                {
+                    $lookup: {
+                        from: statusCollectionName,
+                        localField: '_id',
+                        foreignField: 'userId',
+                        as: 'statusRows',
+                    },
+                },
+                {
+                    $addFields: {
+                        openReportCount: { $ifNull: [{ $arrayElemAt: ['$openReportRows.count', 0] }, 0] },
+                        lastSeenAt: { $arrayElemAt: ['$statusRows.last_seen_at', 0] },
+                    },
+                },
+                {
+                    $addFields: {
+                        lastSeenAtSort: { $ifNull: ['$lastSeenAt', lastSeenFallback] },
+                    },
+                },
+                { $sort: sortStage },
+                { $skip: skip },
+                { $limit: limit },
+                { $project: { password: 0, openReportRows: 0, statusRows: 0, lastSeenAtSort: 0 } },
+            ]),
             User.countDocuments(filter),
         ]);
 
-        const userIds = users.map((user) => user._id);
-        const [reportCounts, statuses] = await Promise.all([
-            Report.aggregate([
-                { $match: { targetUserId: { $in: userIds }, status: { $in: ['pending', 'reviewing'] } } },
-                { $group: { _id: '$targetUserId', count: { $sum: 1 } } },
-            ]),
-            UserStatus.find({ userId: { $in: userIds } })
-                .select('userId last_seen_at')
-                .lean(),
-        ]);
-
-        const reportCountMap = new Map(reportCounts.map((item) => [item._id.toString(), item.count]));
-        const lastSeenMap = new Map(statuses.map((status) => [
-            status.userId.toString(),
-            status.last_seen_at ? new Date(status.last_seen_at).toISOString() : null,
-        ]));
         const enrichedUsers = await Promise.all(users.map(async (user) => {
             const violationSummary = await getViolationSummary(user._id);
             return toUserSummary(user, {
                 online: await isUserOnline(user._id),
-                lastSeenAt: lastSeenMap.get(user._id.toString()) || null,
+                lastSeenAt: user.lastSeenAt || null,
                 violationSummary,
-                openReportCount: reportCountMap.get(user._id.toString()) || 0,
+                openReportCount: user.openReportCount || 0,
             });
         }));
 
