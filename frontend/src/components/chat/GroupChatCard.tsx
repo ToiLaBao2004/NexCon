@@ -5,7 +5,7 @@ import ChatCard from "./ChatCard";
 import UnreadCountBadge from "./UnreadCountBadge";
 import MentionCountBadge from "./MentionCountBadge";
 import GroupChatAvatar from "./GroupChatAvatar";
-import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, Mail, MailOpen, Mic, BellOff } from "lucide-react";
+import { MoreHorizontal, Paperclip, Image as ImageIcon, Link2, Trash2, PencilLine, Pin, PinOff, Mail, MailOpen, Mic, BellOff } from "lucide-react";
 import { StickerIcon as Sticker } from "@/components/shared/StickerIcon";
 import { isMuted } from '@/utils/isMuted';
 import { MuteSubMenu } from './MuteSubMenu';
@@ -222,7 +222,7 @@ const GroupChatCard = ({
 									void handleToggleConversationPin();
 								}}
 							>
-								<Pin className="size-4 mr-2" />
+								{isConversationPinned ? <PinOff className="size-4 mr-2" /> : <Pin className="size-4 mr-2" />}
 								{isConversationPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại"}
 							</DropdownMenuItem>
 							<DropdownMenuItem
@@ -277,6 +277,13 @@ const GroupChatCard = ({
 							if (e.key === "Enter") onSubmitGroupName();
 						}}
 					/>
+					<div
+						className={`text-right text-xs ${
+							groupNameDraft.length >= FIELD_LIMITS.groupName ? "text-destructive" : "text-muted-foreground"
+						}`}
+					>
+						{groupNameDraft.length}/{FIELD_LIMITS.groupName}
+					</div>
 
 					<DialogFooter className="gap-2">
 						<Button variant="outline" onClick={() => setOpenRename(false)} disabled={loading}>

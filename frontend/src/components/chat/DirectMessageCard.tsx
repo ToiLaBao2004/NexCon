@@ -8,7 +8,7 @@ import UserAvatar from './UserAvatar';
 import UnreadCountBadge from './UnreadCountBadge';
 import MentionCountBadge from './MentionCountBadge';
 import { useSocketStore } from '@/stores/useSocketStore';
-import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, Mail, MailOpen, Mic, BellOff, Flag } from "lucide-react";
+import { MoreHorizontal, PencilLine, UserX, Paperclip, Image as ImageIcon, Link2, Trash2, Pin, PinOff, Mail, MailOpen, Mic, BellOff, Flag } from "lucide-react";
 import { StickerIcon as Sticker } from "@/components/shared/StickerIcon";
 import { isUrl } from '@/lib/utils';
 import { isMuted } from '@/utils/isMuted';
@@ -212,7 +212,7 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
                   void handleToggleConversationPin();
                 }}
               >
-                <Pin className="h-4 w-4 mr-2" />
+                {isConversationPinned ? <PinOff className="h-4 w-4 mr-2" /> : <Pin className="h-4 w-4 mr-2" />}
                 {isConversationPinned ? "Bỏ ghim hội thoại" : "Ghim hội thoại"}
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -286,15 +286,20 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
 
           <Input
             value={nickname}
-            onChange={(e) => setNicknameValue(e.target.value)}
+            onChange={(e) => setNicknameValue(e.target.value.slice(0, FIELD_LIMITS.nickname))}
+            maxLength={FIELD_LIMITS.nickname}
             placeholder="Nhập nickname mới"
             autoFocus
             onKeyDown={(e) => {
               if (e.key === "Enter" && !loading) onSubmitNickname()
             }}
           />
-          <div className="text-right text-xs text-muted-foreground">
-            {nickname.trim().length}/{FIELD_LIMITS.nickname}
+          <div
+            className={`text-right text-xs ${
+              nickname.length >= FIELD_LIMITS.nickname ? "text-destructive" : "text-muted-foreground"
+            }`}
+          >
+            {nickname.length}/{FIELD_LIMITS.nickname}
           </div>
 
           <DialogFooter className="gap-2">

@@ -27,7 +27,7 @@ const ActionBtnLocal = forwardRef<HTMLButtonElement, {
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex min-w-0 flex-col items-center gap-2 rounded-xl px-1.5 py-2 transition-colors bg-transparent",
+        "flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 py-2 transition-colors bg-transparent",
         disabled ? "opacity-100 cursor-default" : "hover:bg-muted/60 cursor-pointer"
       )}
       {...props}
@@ -35,12 +35,12 @@ const ActionBtnLocal = forwardRef<HTMLButtonElement, {
       <div className="flex h-11 w-11 items-center justify-center rounded-full bg-muted/40 text-foreground">
         <Icon className="h-5 w-5" strokeWidth={1.55} />
       </div>
-      <span className="w-full max-w-[76px] text-center text-[13px] font-normal leading-4 text-foreground sm:text-[15px] sm:leading-5">{label}</span>
+      <span className="w-full max-w-[72px] text-center text-[12.5px] font-normal leading-[1.25] text-foreground sm:text-[13px]">{label}</span>
     </button>
   );
 });
 ActionBtnLocal.displayName = "ActionBtnLocal";
-import { Bell, BellOff, Pin, UserPlus, Pencil, Camera, Loader2 } from "lucide-react";
+import { Bell, BellOff, Pin, PinOff, UserPlus, Pencil, Camera, Loader2 } from "lucide-react";
 import { isMuted } from "@/utils/isMuted";
 import { MuteDropdown } from "./MuteDropdown";
 import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
@@ -276,22 +276,20 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             </div>
 
             <div className="relative w-full mt-0 mb-3">
-              <div className="w-full flex justify-center">
-                <div className="relative inline-block">
-                  <span ref={nameRefDirect} className="block text-center text-xl font-bold leading-tight text-foreground">
+              <div className="grid w-full grid-cols-[2rem_minmax(0,1fr)_2rem] items-center px-1">
+                  <span ref={nameRefDirect} className="col-start-2 min-w-0 break-words text-center text-xl font-bold leading-tight text-foreground">
                     {directDisplayName}
                   </span>
-                  <span className="mt-1 block text-center text-xs text-muted-foreground">
+                  <span className="col-span-3 mt-1 block text-center text-xs text-muted-foreground">
                     {directPresenceText}
                   </span>
                   <button
                     onClick={() => setOpenNickname(true)}
                     title="Đổi nickname"
-                    className="absolute left-full top-1/2 ml-3 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted/60"
+                    className="col-start-3 row-start-1 ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground transition-colors hover:bg-muted/60"
                   >
                     <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
                   </button>
-                </div>
               </div>
             </div>
 
@@ -300,7 +298,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
                 <ActionBtnLocal icon={isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "messages") || isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "meetings") ? BellOff : Bell} label="Thông báo" />
               </MuteDropdown>
               <ActionBtnLocal
-                icon={Pin}
+                icon={isConversationPinned ? PinOff : Pin}
                 label={isConversationPinned ? "Bỏ ghim" : "Ghim hội thoại"}
                 onClick={handleToggleConversationPin}
                 disabled={pinLoading}
@@ -362,15 +360,21 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
             </DialogHeader>
             <Input
               value={nicknameValue}
-              onChange={(e) => setNicknameValue(e.target.value)}
+              onChange={(e) => setNicknameValue(e.target.value.slice(0, FIELD_LIMITS.nickname))}
+              maxLength={FIELD_LIMITS.nickname}
               placeholder="Nhập nickname mới"
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !nicknameLoading) handleSubmitNickname();
               }}
             />
-            <div className="text-right text-xs text-muted-foreground">
-              {nicknameValue.trim().length}/{FIELD_LIMITS.nickname}
+            <div
+              className={cn(
+                "text-right text-xs",
+                nicknameValue.length >= FIELD_LIMITS.nickname ? "text-destructive" : "text-muted-foreground"
+              )}
+            >
+              {nicknameValue.length}/{FIELD_LIMITS.nickname}
             </div>
             <DialogFooter className="gap-2">
               <Button
@@ -444,32 +448,30 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           </div>
 
           <div className="relative w-full mt-0 mb-3">
-            <div className="w-full flex justify-center">
-              <div className="relative inline-block">
-                  <span ref={nameRefGroup} className="block text-center text-xl font-bold leading-tight text-foreground">
+            <div className="grid w-full grid-cols-[2rem_minmax(0,1fr)_2rem] items-center px-1">
+              <span ref={nameRefGroup} className="col-start-2 min-w-0 break-words text-center text-xl font-bold leading-tight text-foreground">
                   {groupDisplayName}
-                </span>
-                <button
-                  onClick={() => { if (canUpdateGroupInfo) setOpenGroupRename(true); }}
-                  title={isDisbanded ? "Nhóm đã giải tán" : (!canUpdateGroupInfo ? "Chỉ quản trị viên mới có thể đổi tên nhóm lúc này" : "Đổi tên nhóm")}
-                  disabled={!canUpdateGroupInfo}
-                  className={cn(
-                    "absolute left-full top-1/2 ml-3 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-foreground transition-colors",
-                    !canUpdateGroupInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
-                  )}
-                >
-                  <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
-                </button>
-              </div>
+              </span>
+              <button
+                onClick={() => { if (canUpdateGroupInfo) setOpenGroupRename(true); }}
+                title={isDisbanded ? "Nhóm đã giải tán" : (!canUpdateGroupInfo ? "Chỉ quản trị viên mới có thể đổi tên nhóm lúc này" : "Đổi tên nhóm")}
+                disabled={!canUpdateGroupInfo}
+                className={cn(
+                  "col-start-3 ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-foreground transition-colors",
+                  !canUpdateGroupInfo ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
+                )}
+              >
+                <Pencil className="h-[13px] w-[13px]" strokeWidth={1.5} />
+              </button>
             </div>
           </div>
 
-          <div className="mt-2 grid w-full grid-cols-4 gap-1 px-0 sm:gap-2 sm:px-1">
+          <div className="mt-2 grid w-full grid-cols-4 gap-1 px-0 sm:gap-1.5 sm:px-1">
             <MuteDropdown conversationId={conversation._id} disabled={isDisbanded}>
               <ActionBtnLocal icon={isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "messages") || isMuted(conversation.participants.find(p => (p.userId?._id || p.userId)?.toString() === user?._id?.toString())?.mute, "meetings") ? BellOff : Bell} label="Thông báo" disabled={isDisbanded} />
             </MuteDropdown>
             <ActionBtnLocal
-              icon={Pin}
+              icon={isConversationPinned ? PinOff : Pin}
               label={isConversationPinned ? "Bỏ ghim" : "Ghim hội thoại"}
               onClick={handleToggleConversationPin}
               disabled={isDisbanded || pinLoading}
@@ -521,6 +523,14 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
               if (e.key === "Enter" && !groupRenameLoading) handleSubmitGroupName();
             }}
           />
+          <div
+            className={cn(
+              "text-right text-xs",
+              groupNameDraft.length >= FIELD_LIMITS.groupName ? "text-destructive" : "text-muted-foreground"
+            )}
+          >
+            {groupNameDraft.length}/{FIELD_LIMITS.groupName}
+          </div>
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
