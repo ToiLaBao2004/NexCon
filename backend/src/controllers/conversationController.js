@@ -190,6 +190,20 @@ function getClearCleanupCutoff(conversation) {
 	return new Date(Math.min(...clearTimes.map((date) => date.getTime())));
 }
 
+function ensureUnreadCounts(conversation) {
+	if (!conversation.unreadCounts || typeof conversation.unreadCounts.get !== 'function') {
+		conversation.unreadCounts = new Map();
+	}
+	return conversation.unreadCounts;
+}
+
+function ensureApprovalQueue(conversation) {
+	if (!Array.isArray(conversation.group?.approvalQueue)) {
+		conversation.group.approvalQueue = [];
+	}
+	return conversation.group.approvalQueue;
+}
+
 export async function createConversation(req, res) {
 	try {
 		const { type, name, memberIds } = req.body;
@@ -1644,10 +1658,11 @@ export async function addMembers(req, res) {
 
 		if (conversation.group.isApprovalRequired && !conversation.group.admins.some(adminId => adminId.toString() === currentUserId)) {
 			let addedCount = 0;
+			const approvalQueue = ensureApprovalQueue(conversation);
 			filteredUserIds.forEach(id => {
-				const alreadyInQueue = conversation.group.approvalQueue.some(q => q.userId.toString() === id.toString());
+				const alreadyInQueue = approvalQueue.some(q => q.userId.toString() === id.toString());
 				if (!alreadyInQueue) {
-					conversation.group.approvalQueue.push({
+					approvalQueue.push({
 						userId: id,
 						addedBy: currentUserId,
 						createdAt: new Date()
@@ -1779,7 +1794,7 @@ export async function updateSettings(req, res) {
 		if (isApprovalRequired !== undefined) {
 			conversation.group.isApprovalRequired = isApprovalRequired;
 			if (!isApprovalRequired) {
-				conversation.group.approvalQueue = [];
+				conversation.group.approvalQueue = undefined;
 			}
 		}
 		if (allowMembersChangeAvatar !== undefined) {
@@ -1927,15 +1942,16 @@ export async function handleApproval(req, res) {
 		}
 		if (conversation.disbanded) return res.status(403).json({ message: 'Nhóm này đã bị giải tán.' });
 
-		const queueIndex = conversation.group.approvalQueue.findIndex(q => q.userId.toString() === userId.toString());
+		const approvalQueue = ensureApprovalQueue(conversation);
+		const queueIndex = approvalQueue.findIndex(q => q.userId.toString() === userId.toString());
 		if (queueIndex === -1) {
 			return res.status(400).json({ message: 'User is not in the approval queue.' });
 		}
 
-		const queueItem = conversation.group.approvalQueue[queueIndex];
+		const queueItem = approvalQueue[queueIndex];
 		const originalAddedById = queueItem.addedBy;
 
-		conversation.group.approvalQueue.splice(queueIndex, 1);
+		approvalQueue.splice(queueIndex, 1);
 
 		if (action === 'approve') {
 			if (!conversation.participants.some(p => p.userId.toString() === userId.toString())) {
@@ -1951,7 +1967,7 @@ export async function handleApproval(req, res) {
 						joinedAt: new Date()
 					});
 
-					conversation.unreadCounts.set(memberToAdd._id.toString(), 0);
+					ensureUnreadCounts(conversation).set(memberToAdd._id.toString(), 0);
 
 					// Save to assign _ids if needed
 					await conversation.save();
@@ -2027,7 +2043,7 @@ export async function getApprovalQueue(req, res) {
 			return res.status(403).json({ message: 'Only admins can view the queue.' });
 		}
 
-		const queue = conversation.group.approvalQueue.map((item) => {
+		const queue = (conversation.group.approvalQueue || []).map((item) => {
 			const raw = item.toObject?.() || item;
 			return {
 				...raw,
@@ -2080,7 +2096,7 @@ export async function removeMember(req, res) {
 		const kickedUser = sanitizeParticipantUser(await User.findById(memberId).select('displayName avatarUrl lock'));
 		// Remove from participants and unread counts
 		conversation.participants.splice(memberIndex, 1);
-		conversation.unreadCounts.delete(memberId);
+		ensureUnreadCounts(conversation).delete(memberId);
 		// Record removal in a system message
 		const systemMessage = new Message({
 			conversationId,
@@ -2288,7 +2304,7 @@ export async function leaveGroup(req, res) {
 		}
 
 		conversation.participants.splice(memberIndex, 1);
-		conversation.unreadCounts.delete(userId);
+		ensureUnreadCounts(conversation).delete(userId);
 
 		if (!silent) {
 			const leaveMessage = new Message({

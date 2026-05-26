@@ -9,7 +9,6 @@ const auditLogSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        default: 'user',
         index: true,
     },
     method: {
@@ -27,19 +26,15 @@ const auditLogSchema = new mongoose.Schema({
     },
     durationMs: {
         type: Number,
-        default: 0,
     },
     ip: {
         type: String,
-        default: '',
     },
     userAgent: {
         type: String,
-        default: '',
     },
     query: {
         type: mongoose.Schema.Types.Mixed,
-        default: {},
     },
 }, { timestamps: true });
 

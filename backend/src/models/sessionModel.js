@@ -20,11 +20,14 @@ const sessionSchema = new mongoose.Schema({
         ip: { type: String },
         deviceName: { type: String }
     },
-    fcmTokens: [{
-        type: String,
-        trim: true,
-        maxlength: 4096,
-    }]
+    fcmTokens: {
+        type: [{
+            type: String,
+            trim: true,
+            maxlength: 4096,
+        }],
+        default: undefined,
+    }
 }, { timestamps: true });
 
 // Auto delete expired sessions

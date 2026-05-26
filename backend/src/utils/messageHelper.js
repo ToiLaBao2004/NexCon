@@ -92,6 +92,13 @@ const resolveLastMessagePreview = (rawMessage) => {
     }
 };
 
+function ensureUnreadCounts(conversation) {
+    if (!conversation.unreadCounts || typeof conversation.unreadCounts.get !== 'function') {
+        conversation.unreadCounts = new Map();
+    }
+    return conversation.unreadCounts;
+}
+
 export const updateConversationLastMessage = (conversation, message, senderId) => {
     const safeMessage = decryptMessagePayload(message);
     const metadata = safeMessage.metadata instanceof Map ? Object.fromEntries(safeMessage.metadata) : (safeMessage.metadata || null);
@@ -99,21 +106,22 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
         ? metadata.visibleToUserIds.map((id) => id.toString())
         : [];
     const hasVisibilityFilter = visibleToUserIds.length > 0;
+    const lastMessage = {
+        _id: safeMessage._id,
+        content: resolveLastMessagePreview(safeMessage),
+        type: safeMessage.type ?? 'text',
+        senderId: senderId,
+        createdAt: safeMessage.createdAt,
+    };
 
-    conversation.set({
-        lastMessage: {
-            _id: safeMessage._id,
-            content: resolveLastMessagePreview(safeMessage),
-            type: safeMessage.type ?? 'text',
-            systemType: safeMessage.systemType || null,
-            metadata: metadata,
-            senderId: senderId,
-            mentions: safeMessage.mentions || [],
-            deliveredTo: safeMessage.deliveredTo || [],
-            createdAt: safeMessage.createdAt,
-        },
-    });
+    if (safeMessage.systemType) lastMessage.systemType = safeMessage.systemType;
+    if (metadata) lastMessage.metadata = metadata;
+    if (safeMessage.mentions?.length) lastMessage.mentions = safeMessage.mentions;
+    if (safeMessage.deliveredTo?.length) lastMessage.deliveredTo = safeMessage.deliveredTo;
 
+    conversation.set({ lastMessage });
+
+    const unreadCounts = ensureUnreadCounts(conversation);
     conversation.participants.forEach((participant) => {
         const userIdObj = participant.userId;
         const memberId = (userIdObj._id || userIdObj).toString();
@@ -123,8 +131,8 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
         }
 
         const isSender = memberId === senderId.toString();
-        const prevCount = conversation.unreadCounts?.get(memberId) || 0;
-        conversation.unreadCounts.set(memberId, isSender ? 0 : prevCount + 1);
+        const prevCount = unreadCounts.get(memberId) || 0;
+        unreadCounts.set(memberId, isSender ? 0 : prevCount + 1);
     });
 
     const senderIdStr = senderId.toString();

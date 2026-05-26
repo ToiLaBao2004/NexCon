@@ -16,20 +16,22 @@ export const REPORT_STATUSES = ['pending', 'reviewing', 'resolved', 'dismissed']
 export const REPORT_DECISIONS = ['violation', 'no_violation'];
 
 const messageSnapshotSchema = new mongoose.Schema({
-    type: { type: String, default: '' },
-    content: { type: String, default: '' },
-    fileName: { type: String, default: '' },
-    mimeType: { type: String, default: '' },
-    mentions: [{
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        displayName: { type: String, default: '' },
-        offset: { type: Number, default: 0 },
-        length: { type: Number, default: 0 },
-    }],
-    createdAt: { type: Date, default: null },
+    type: { type: String },
+    content: { type: String },
+    fileName: { type: String },
+    mimeType: { type: String },
+    mentions: {
+        type: [{
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            displayName: { type: String },
+            offset: { type: Number },
+            length: { type: Number },
+        }],
+        default: undefined,
+    },
+    createdAt: { type: Date },
     senderInfo: {
         type: mongoose.Schema.Types.Mixed,
-        default: null,
     },
 }, { _id: false });
 
@@ -55,13 +57,11 @@ const reportSchema = new mongoose.Schema({
     targetMessageId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Message',
-        default: null,
         index: true,
     },
     conversationId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Conversation',
-        default: null,
         index: true,
     },
     reasonCategory: {
@@ -73,7 +73,6 @@ const reportSchema = new mongoose.Schema({
         type: String,
         trim: true,
         maxlength: 1000,
-        default: '',
     },
     status: {
         type: String,
@@ -93,32 +92,30 @@ const reportSchema = new mongoose.Schema({
     },
     messageSnapshot: {
         type: messageSnapshotSchema,
-        default: null,
     },
     review: {
-        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-        reviewedAt: { type: Date, default: null },
-        note: { type: String, trim: true, maxlength: 1000, default: '' },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
+        note: { type: String, trim: true, maxlength: 1000 },
     },
     resolution: {
-        decision: { type: String, enum: [...REPORT_DECISIONS, null], default: null },
-        actionTaken: { type: String, trim: true, maxlength: 1000, default: '' },
-        targetViolationCount: { type: Number, default: null },
-        targetLocked: { type: Boolean, default: false },
-        reporterMessage: { type: String, trim: true, maxlength: 1000, default: '' },
-        targetMessage: { type: String, trim: true, maxlength: 1000, default: '' },
+        decision: { type: String, enum: [...REPORT_DECISIONS, null] },
+        actionTaken: { type: String, trim: true, maxlength: 1000 },
+        targetViolationCount: { type: Number },
+        targetLocked: { type: Boolean },
+        reporterMessage: { type: String, trim: true, maxlength: 1000 },
+        targetMessage: { type: String, trim: true, maxlength: 1000 },
         aiModeration: {
-            reviewedAt: { type: Date, default: null },
-            blocked: { type: Boolean, default: null },
-            category: { type: String, trim: true, maxlength: 80, default: '' },
-            confidence: { type: Number, default: null },
-            reason: { type: String, trim: true, maxlength: 1000, default: '' },
-            source: { type: String, trim: true, maxlength: 80, default: '' },
+            reviewedAt: { type: Date },
+            blocked: { type: Boolean },
+            category: { type: String, trim: true, maxlength: 80 },
+            confidence: { type: Number },
+            reason: { type: String, trim: true, maxlength: 1000 },
+            source: { type: String, trim: true, maxlength: 80 },
         },
     },
     expiresAt: {
         type: Date,
-        default: null,
     },
 }, { timestamps: true });
 

@@ -31,7 +31,6 @@ const meetingSchema = new mongoose.Schema({
     conversationId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Conversation',
-        default: null,
         index: true,
     },
     status: {
@@ -42,16 +41,13 @@ const meetingSchema = new mongoose.Schema({
     },
     scheduledAt: {
         type: Date,
-        default: null,
         index: true,
     },
     startedAt: {
         type: Date,
-        default: null,
     },
     endedAt: {
         type: Date,
-        default: null,
     },
     participants: {
         type: [participantSchema],

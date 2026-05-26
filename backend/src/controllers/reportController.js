@@ -30,18 +30,21 @@ const normalizeReportPayload = (body) => {
 const buildUserSnapshot = (user) => ({
     displayName: user?.displayName || '',
     email: user?.email || '',
-    avatarUrl: user?.avatarUrl || '',
+    ...(user?.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
 });
 
-const buildMessageSnapshot = (message) => ({
-    type: message?.type || '',
-    content: replaceMentionTags(message?.content || '', message?.mentions),
-    fileName: message?.fileName || '',
-    mimeType: message?.mimeType || '',
-    mentions: [],
-    createdAt: message?.createdAt || null,
-    senderInfo: message?.senderInfo || null,
-});
+const buildMessageSnapshot = (message) => {
+    const content = replaceMentionTags(message?.content || '', message?.mentions);
+
+    return {
+        ...(message?.type ? { type: message.type } : {}),
+        ...(content ? { content } : {}),
+        ...(message?.fileName ? { fileName: message.fileName } : {}),
+        ...(message?.mimeType ? { mimeType: message.mimeType } : {}),
+        ...(message?.createdAt ? { createdAt: message.createdAt } : {}),
+        ...(message?.senderInfo ? { senderInfo: message.senderInfo } : {}),
+    };
+};
 
 const ensureObjectId = (value, fieldName) => {
     if (!mongoose.Types.ObjectId.isValid(value)) {
@@ -113,7 +116,7 @@ export async function createMessageReport(req, res) {
             targetMessageId: message._id,
             conversationId: conversation._id,
             reasonCategory,
-            description,
+            ...(description ? { description } : {}),
             reporterSnapshot: buildUserSnapshot(reporter),
             targetUserSnapshot: buildUserSnapshot(targetUser),
             messageSnapshot: buildMessageSnapshot(message),
@@ -179,9 +182,9 @@ export async function createUserReport(req, res) {
             reporterId: reporter._id,
             targetType: 'user',
             targetUserId: targetUser._id,
-            conversationId: conversation?._id || null,
             reasonCategory,
-            description,
+            ...(conversation ? { conversationId: conversation._id } : {}),
+            ...(description ? { description } : {}),
             reporterSnapshot: buildUserSnapshot(reporter),
             targetUserSnapshot: buildUserSnapshot(targetUser),
         });

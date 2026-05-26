@@ -373,7 +373,7 @@ export async function signOutAll(req, res) {
     try {
         const userId = req.user._id;
         await Session.deleteMany({ userId });
-        await User.updateOne({ _id: userId }, { $set: { fcmTokens: [] } });
+        await User.updateOne({ _id: userId }, { $unset: { fcmTokens: 1 } });
         disconnectUserSockets(userId, 'signed-out-all');
         res.clearCookie('refreshToken', { httpOnly: true, secure: true, sameSite: 'none' });
         return res.status(200).json({ message: 'Logged out from all devices successfully.' });
