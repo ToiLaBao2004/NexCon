@@ -10,6 +10,9 @@ export interface Pagination {
   totalPages: number;
 }
 
+export type AdminUserSortBy = "user" | "openReports" | "createdAt" | "lastSeenAt";
+export type AdminSortDir = "asc" | "desc";
+
 export interface ViolationSummary {
   count: number;
   threshold: number;
@@ -227,11 +230,13 @@ export const adminService = {
     return res.data as AdminObservabilityData;
   },
 
-  async listUsers(params: { search?: string; page?: number; limit?: number } = {}) {
+  async listUsers(params: { search?: string; page?: number; limit?: number; sortBy?: AdminUserSortBy; sortDir?: AdminSortDir } = {}) {
     const query = new URLSearchParams();
     if (params.search) query.set("search", params.search);
     if (params.page) query.set("page", String(params.page));
     if (params.limit) query.set("limit", String(params.limit));
+    if (params.sortBy) query.set("sortBy", params.sortBy);
+    if (params.sortDir) query.set("sortDir", params.sortDir);
     const res = await api.get(`/admin/users?${query.toString()}`);
     return res.data as { users: AdminUser[]; pagination: Pagination };
   },
