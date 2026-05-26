@@ -255,6 +255,11 @@
     height: 4px;
 }
 
+.stable-y-scroll {
+    scrollbar-gutter: stable;
+    overflow-anchor: none;
+}
+
 .beautiful-scrollbar::-webkit-scrollbar-track {
     background: transparent;
 }

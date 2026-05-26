@@ -3,8 +3,6 @@ type ApiPayload = {
   code?: unknown;
   error?: unknown;
   title?: unknown;
-  "mật khẩu mới không được trùng với mật khẩu hiện tại": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
-  "mật khẩu mới không được trùng với mật khẩu hiện tại.": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
 };
 
 type ApiErrorLike = {
@@ -33,6 +31,10 @@ const EXACT_MESSAGES: Record<string, string> = {
   "all fields are required.": "Vui lòng nhập đầy đủ thông tin.",
   "passwords do not match": "Mật khẩu không khớp.",
   "passwords do not match.": "Mật khẩu không khớp.",
+  "mật khẩu hiện tại không chính xác": "Mật khẩu hiện tại không đúng.",
+  "mật khẩu hiện tại không chính xác.": "Mật khẩu hiện tại không đúng.",
+  "mật khẩu mới không được trùng với mật khẩu hiện tại": "Mật khẩu mới không được trùng với mật khẩu hiện tại.",
+  "mật khẩu mới không được trùng với mật khẩu hiện tại.": "Mật khẩu mới không được trùng với mật khẩu hiện tại.",
   "email already in use": "Email này đã được sử dụng.",
   "email already in use.": "Email này đã được sử dụng.",
   "invalid email format": "Địa chỉ email không hợp lệ.",
