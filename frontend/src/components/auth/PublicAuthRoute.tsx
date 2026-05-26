@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate, Outlet } from "react-router";
 
 export default function PublicAuthRoute() {
-  const { accessToken, loading, refreshToken, fetchMe } = useAuthStore();
+  const { accessToken, refreshToken, fetchMe } = useAuthStore();
   const [checkingSession, setCheckingSession] = useState(!accessToken);
   const ranRef = useRef(false);
 
@@ -34,7 +34,7 @@ export default function PublicAuthRoute() {
     void restoreExistingSession();
   }, [accessToken, fetchMe, refreshToken]);
 
-  if (checkingSession || (loading && !accessToken)) {
+  if (checkingSession) {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />

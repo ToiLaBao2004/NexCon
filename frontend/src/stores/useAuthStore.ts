@@ -84,7 +84,14 @@ export const useAuthStore = create<AuthState>()(
         useNotificationStore.getState().reset();
         useFriendStore.getState().reset();
         // API Call
-        const { accessToken, refreshToken, user } = await authService.signIn(email, password);
+        const signInResponse = await authService.signIn(email, password);
+        if (signInResponse?.locked || signInResponse?.restriction?.locked) {
+          const lockedError: any = new Error(signInResponse.message || 'Tài khoản đang bị hạn chế.');
+          lockedError.lockedPayload = signInResponse;
+          throw lockedError;
+        }
+
+        const { accessToken, refreshToken, user } = signInResponse;
         get().setAccessToken(accessToken);
         if (user) {
           set({ user });
@@ -99,7 +106,9 @@ export const useAuthStore = create<AuthState>()(
           useNotificationStore.getState().fetchNotifications();
         }
       } catch (error: any) {
-        if (error.response?.status === 423 || error.response?.data?.locked) {
+        const lockedPayload = error.response?.data || error.data || null;
+        if (error.response?.status === 423 || lockedPayload?.locked || lockedPayload?.restriction?.locked) {
+          error.lockedPayload = lockedPayload;
           throw error;
         }
         console.error('Lỗi khi đăng nhập:', error);
