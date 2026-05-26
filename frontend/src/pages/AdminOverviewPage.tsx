@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type UIEvent } from "react";
-import { Loader2, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode, type UIEvent } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
 import { toast } from "sonner";
 import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getAvatarSrc } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import { adminService, type AdminStats, type AdminUser, type Pagination } from "@/services/adminService";
+import { adminService, type AdminSortDir, type AdminStats, type AdminUser, type AdminUserSortBy, type Pagination } from "@/services/adminService";
 import { getApiErrorMessage } from "@/lib/apiMessage";
 
 function formatDate(value?: string | null) {
@@ -19,12 +19,27 @@ function formatDate(value?: string | null) {
   });
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return "Chưa có";
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function locked(user?: AdminUser | null) {
   return Boolean(user?.lock?.isLocked);
 }
 
 function userLabel(user: AdminUser) {
   return user.displayName || user.email;
+}
+
+function getDefaultSortDir(sortBy: AdminUserSortBy): AdminSortDir {
+  return sortBy === "user" ? "asc" : "desc";
 }
 
 export default function AdminOverviewPage() {
@@ -36,6 +51,8 @@ export default function AdminOverviewPage() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [drawerUserId, setDrawerUserId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<AdminUserSortBy>("createdAt");
+  const [sortDir, setSortDir] = useState<AdminSortDir>("desc");
 
   const drawerUser = useMemo(
     () => users.find((user) => user._id === drawerUserId) || null,
@@ -54,7 +71,7 @@ export default function AdminOverviewPage() {
       if (append) setLoadingMore(true);
       else setLoadingUsers(true);
 
-      const result = await adminService.listUsers({ search: query, page, limit: 20 });
+      const result = await adminService.listUsers({ search: query, page, limit: 20, sortBy, sortDir });
       setUsers((current) => (append ? [...current, ...result.users] : result.users));
       setPagination(result.pagination);
     } catch (error: any) {
@@ -82,7 +99,19 @@ export default function AdminOverviewPage() {
 
   useEffect(() => {
     void loadUsers({ page: 1, append: false, query: appliedSearch });
-  }, [appliedSearch]);
+  }, [appliedSearch, sortBy, sortDir]);
+
+  const handleSort = (nextSortBy: AdminUserSortBy) => {
+    setSortBy((currentSortBy) => {
+      if (currentSortBy !== nextSortBy) {
+        setSortDir(getDefaultSortDir(nextSortBy));
+        return nextSortBy;
+      }
+
+      setSortDir((currentDir) => (currentDir === "asc" ? "desc" : "asc"));
+      return currentSortBy;
+    });
+  };
 
   const loadMore = async () => {
     if (!pagination || loadingMore || loadingUsers || !hasMore) return;
@@ -150,16 +179,25 @@ export default function AdminOverviewPage() {
             </div>
           ) : (
             <div className="mx-auto w-full max-w-7xl overflow-hidden rounded-md border border-border/70">
-              <div className="hidden grid-cols-[minmax(260px,1.4fr)_170px_140px_92px] gap-4 border-b border-border/70 bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid">
-                <span>Người dùng</span>
-                <span>Report mở</span>
-                <span>Tham gia</span>
+              <div className="hidden grid-cols-[minmax(260px,1.4fr)_170px_140px_170px_92px] gap-4 border-b border-border/70 bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid">
+                <SortHeader active={sortBy === "user"} dir={sortDir} onClick={() => handleSort("user")}>
+                  Người dùng
+                </SortHeader>
+                <SortHeader active={sortBy === "openReports"} dir={sortDir} onClick={() => handleSort("openReports")}>
+                  Report mở
+                </SortHeader>
+                <SortHeader active={sortBy === "createdAt"} dir={sortDir} onClick={() => handleSort("createdAt")}>
+                  Tham gia
+                </SortHeader>
+                <SortHeader active={sortBy === "lastSeenAt"} dir={sortDir} onClick={() => handleSort("lastSeenAt")}>
+                  Lần cuối truy cập
+                </SortHeader>
                 <span />
               </div>
               {users.map((user) => (
                   <div
                     key={user._id}
-                    className="grid gap-3 border-b border-border/60 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(260px,1.4fr)_170px_140px_92px] lg:items-center"
+                    className="grid gap-3 border-b border-border/60 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(260px,1.4fr)_170px_140px_170px_92px] lg:items-center"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="relative shrink-0">
@@ -191,7 +229,15 @@ export default function AdminOverviewPage() {
                       </Badge>
                     </div>
 
-                    <div className="text-sm text-muted-foreground">{formatDate(user.createdAt)}</div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="mr-1 font-medium text-foreground lg:hidden">Tham gia:</span>
+                      {formatDate(user.createdAt)}
+                    </div>
+
+                    <div className="text-sm text-muted-foreground">
+                      <span className="mr-1 font-medium text-foreground lg:hidden">Lần cuối truy cập:</span>
+                      {formatDateTime(user.lastSeenAt)}
+                    </div>
 
                     <Button className="w-fit rounded-md" size="sm" onClick={() => setDrawerUserId(user._id)}>
                       Xem
@@ -235,5 +281,33 @@ function Metric({ label, value }: { label: string; value: number }) {
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="text-lg font-semibold">{value}</div>
     </div>
+  );
+}
+
+function SortHeader({
+  active,
+  dir,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  dir: AdminSortDir;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  const Icon = active ? (dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex min-w-0 items-center gap-1 text-left transition-colors hover:text-foreground",
+        active && "text-foreground"
+      )}
+    >
+      <span className="truncate">{children}</span>
+      <Icon className={cn("size-3.5 shrink-0", !active && "opacity-50")} />
+    </button>
   );
 }
