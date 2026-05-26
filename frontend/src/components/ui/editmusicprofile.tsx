@@ -3,6 +3,8 @@ import { useUserStore } from '@/stores/useUserStore';
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
+const MUSIC_SEARCH_QUERY_LIMIT = 100;
+
 export default function EditMusicProfile() {
     const [query, setQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
@@ -52,6 +54,10 @@ export default function EditMusicProfile() {
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
+        if (value.length > MUSIC_SEARCH_QUERY_LIMIT) {
+            return;
+        }
+
         setQuery(value);
         debouncedSearch(value);
     };
@@ -75,6 +81,7 @@ export default function EditMusicProfile() {
                     type="text"
                     value={query}
                     onChange={handleInputChange}
+                    maxLength={MUSIC_SEARCH_QUERY_LIMIT}
                     placeholder="Tìm bài hát, nghệ sĩ trên Spotify..."
                     className="w-full rounded-xl border border-gray-300 dark:border-gray-600
                                bg-white dark:bg-gray-800

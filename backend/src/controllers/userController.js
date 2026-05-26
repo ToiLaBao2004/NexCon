@@ -15,6 +15,7 @@ import {
 import { emitOnlineUsers, emitToUser, isUserOnline } from '../socket/index.js';
 import { applyProfileVisibility, areFriends, normalizeProfileVisibility, PROFILE_VISIBILITY } from '../utils/profilePrivacy.js';
 
+const MUSIC_SEARCH_QUERY_LIMIT = 100;
 const SPOTIFY_TRACK_ID_PATTERN = /^[A-Za-z0-9]{22}$/;
 
 export async function getCurrentUser(req, res) {
@@ -298,7 +299,12 @@ export async function searchMusic(req, res) {
             return res.status(200).json({ tracks: [] });
         }
 
-        const tracks = await searchSpotifyTracks(q.trim());
+        const query = q.trim();
+        if (query.length > MUSIC_SEARCH_QUERY_LIMIT) {
+            return res.status(400).json({ message: `Search query must not exceed ${MUSIC_SEARCH_QUERY_LIMIT} characters.` });
+        }
+
+        const tracks = await searchSpotifyTracks(query);
 
         return res.status(200).json({ tracks });
     } catch (error) {

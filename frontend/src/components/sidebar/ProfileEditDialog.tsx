@@ -53,6 +53,18 @@ const getUploadErrorMessage = (error: unknown, fallback: string) => {
     return getApiErrorMessage(error, fallback);
 };
 
+const normalizeProfileData = (data: {
+    displayName?: string | null;
+    bio?: string | null;
+    phone?: string | null;
+    profileVisibility?: ProfileVisibility | null;
+}) => ({
+    displayName: (data.displayName || "").trim(),
+    bio: data.bio || "",
+    phone: (data.phone || "").trim(),
+    profileVisibility: data.profileVisibility || "public",
+});
+
 export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps) {
     const { user, updateProfile, updateAvatar } = useAuthStore();
 
@@ -102,7 +114,9 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
 
         if (id === "phone") {
             const numericValue = value.replace(/\D/g, "");
-            setFormData((prev) => ({ ...prev, [id]: numericValue }));
+            if (numericValue.length <= FIELD_LIMITS.phone) {
+                setFormData((prev) => ({ ...prev, [id]: numericValue }));
+            }
             return;
         }
 
@@ -110,6 +124,10 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
             if (value.length <= 150) {
                 setFormData((prev) => ({ ...prev, [id]: value }));
             }
+            return;
+        }
+
+        if (id === "displayName" && value.trim().length > FIELD_LIMITS.displayName) {
             return;
         }
 
@@ -122,6 +140,21 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
         if (displayNameError || phoneError) {
             toast.error(displayNameError || phoneError);
             return;
+        }
+
+        if (user) {
+            const currentProfile = normalizeProfileData(user);
+            const nextProfile = normalizeProfileData(formData);
+
+            if (
+                currentProfile.displayName === nextProfile.displayName &&
+                currentProfile.bio === nextProfile.bio &&
+                currentProfile.phone === nextProfile.phone &&
+                currentProfile.profileVisibility === nextProfile.profileVisibility
+            ) {
+                onOpenChange(false);
+                return;
+            }
         }
 
         try {
@@ -226,6 +259,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                                 onChange={handleInputChange}
                                 placeholder="Nhập tên hiển thị"
                                 className="h-10"
+                                maxLength={FIELD_LIMITS.displayName}
                             />
                         </div>
 
@@ -244,6 +278,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
                                 onChange={handleInputChange}
                                 placeholder="Nhập số điện thoại"
                                 className="h-10"
+                                maxLength={FIELD_LIMITS.phone}
                             />
                         </div>
 
