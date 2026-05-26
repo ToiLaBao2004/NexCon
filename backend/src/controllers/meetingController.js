@@ -225,11 +225,11 @@ export async function createMeeting(req, res) {
         const meeting = await Meeting.create({
             roomName,
             hostId: userId,
-            conversationId: conversationId || null,
+            ...(conversationId ? { conversationId } : {}),
             requireApproval: Boolean(requireApproval),
             status: 'active',
-            startedAt: isImmediate ? now : null,
-            scheduledAt: parsedSchedule,
+            ...(isImmediate ? { startedAt: now } : {}),
+            ...(parsedSchedule ? { scheduledAt: parsedSchedule } : {}),
             participants: isImmediate ? [{ userId, joinedAt: now }] : [],
         });
 

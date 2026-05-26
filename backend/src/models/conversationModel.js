@@ -22,21 +22,18 @@ const participantSchema = new mongoose.Schema({
         type: Date,
     },
     mute: {
-        messages: { type: Date, default: null },
-        meetings: { type: Date, default: null },
+        messages: { type: Date },
+        meetings: { type: Date },
     },
     unreadMentionCount: {
         type: Number,
-        default: 0,
     },
     lastReadMessageId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Message',
-        default: null,
     },
     lastReadAt: {
         type: Date,
-        default: null,
     }
 }, { _id: false });
 
@@ -59,21 +56,21 @@ const groupSchema = new mongoose.Schema({
     admins: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     isApprovalRequired: {
         type: Boolean,
-        default: false
     },
     allowMembersChangeAvatar: {
         type: Boolean,
-        default: true
     },
     allowMembersCreateSharedReminder: {
         type: Boolean,
-        default: true
     },
-    approvalQueue: [{
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-        addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-        createdAt: { type: Date, default: Date.now }
-    }]
+    approvalQueue: {
+        type: [{
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+            addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+            createdAt: { type: Date, default: Date.now }
+        }],
+        default: undefined,
+    }
 }, { _id: false });
 
 const lastMessageSchema = new mongoose.Schema({
@@ -105,13 +102,19 @@ const lastMessageSchema = new mongoose.Schema({
         displayName: { type: String },
         avatarUrl: { type: String }
     },
-    mentions: [{
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        displayName: { type: String },
-        offset: { type: Number },
-        length: { type: Number },
-    }],
-    deliveredTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    mentions: {
+        type: [{
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+            displayName: { type: String },
+            offset: { type: Number },
+            length: { type: Number },
+        }],
+        default: undefined,
+    },
+    deliveredTo: {
+        type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+        default: undefined,
+    },
     createdAt: {
         type: Date
     }
@@ -140,9 +143,8 @@ const conversationSchema = new mongoose.Schema({
     unreadCounts: {
         type: Map,
         of: Number,
-        default: () => new Map(),
     },
-    disbanded: { type: Boolean, default: false },
+    disbanded: { type: Boolean },
     disbandedAt: {
         type: Date,
     },
@@ -154,7 +156,6 @@ const conversationSchema = new mongoose.Schema({
         status: {
             type: String,
             enum: ['idle', 'queued', 'processing', 'completed', 'failed'],
-            default: 'idle',
             index: true,
         },
         jobId: {

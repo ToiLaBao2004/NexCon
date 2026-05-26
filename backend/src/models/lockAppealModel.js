@@ -6,7 +6,6 @@ const lockAppealSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        default: null,
         index: true,
     },
     email: {
@@ -31,21 +30,17 @@ const lockAppealSchema = new mongoose.Schema({
     reviewedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        default: null,
     },
     reviewedAt: {
         type: Date,
-        default: null,
     },
     adminNote: {
         type: String,
         trim: true,
         maxlength: 1000,
-        default: '',
     },
     expiresAt: {
         type: Date,
-        default: null,
     },
 }, { timestamps: true });
 

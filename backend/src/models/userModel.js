@@ -3,9 +3,9 @@ import mongoose from 'mongoose';
 const moderationViolationSchema = new mongoose.Schema({
     recordedAt: { type: Date, default: Date.now },
     source: { type: String, trim: true, maxlength: 120, default: 'unknown' },
-    reason: { type: String, trim: true, maxlength: 1000, default: '' },
-    category: { type: String, trim: true, maxlength: 80, default: '' },
-    confidence: { type: Number, default: null },
+    reason: { type: String, trim: true, maxlength: 1000 },
+    category: { type: String, trim: true, maxlength: 80 },
+    confidence: { type: Number },
     status: {
         type: String,
         enum: ['recorded', 'warning_sent', 'account_locked', 'cleared'],
@@ -14,12 +14,12 @@ const moderationViolationSchema = new mongoose.Schema({
     action: { type: String, trim: true, maxlength: 120, default: 'warning' },
     countAfter: { type: Number, default: 0 },
     threshold: { type: Number, default: 0 },
-    messageType: { type: String, trim: true, maxlength: 40, default: '' },
-    conversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation', default: null },
-    messageId: { type: mongoose.Schema.Types.ObjectId, ref: 'Message', default: null },
-    reportId: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null },
-    actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-    metadata: { type: mongoose.Schema.Types.Mixed, default: null },
+    messageType: { type: String, trim: true, maxlength: 40 },
+    conversationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Conversation' },
+    messageId: { type: mongoose.Schema.Types.ObjectId, ref: 'Message' },
+    reportId: { type: mongoose.Schema.Types.ObjectId, ref: 'Report' },
+    actorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    metadata: { type: mongoose.Schema.Types.Mixed },
 }, { _id: true });
 
 const userSchema = new mongoose.Schema({
@@ -57,7 +57,6 @@ const userSchema = new mongoose.Schema({
     profileVisibility: {
         type: String,
         enum: ['public', 'friends', 'private'],
-        default: 'public',
     },
     googleId: {
         type: String,
@@ -74,29 +73,31 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         enum: ['user', 'admin'],
-        default: 'user',
         index: true
     },
     lock: {
-        isLocked: { type: Boolean, default: false, index: true },
-        lockedAt: { type: Date, default: null },
-        expiresAt: { type: Date, default: null },
-        lockedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-        reason: { type: String, trim: true, maxlength: 1000, default: '' },
-        unlockedAt: { type: Date, default: null },
-        unlockedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        isLocked: { type: Boolean, index: true },
+        lockedAt: { type: Date },
+        expiresAt: { type: Date },
+        lockedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reason: { type: String, trim: true, maxlength: 1000 },
+        unlockedAt: { type: Date },
+        unlockedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     },
     moderation: {
-        violationCountCache: { type: Number, default: 0 },
-        lastViolationAt: { type: Date, default: null },
-        nextViolationDecayAt: { type: Date, default: null },
-        violationHistory: { type: [moderationViolationSchema], default: [] },
+        violationCountCache: { type: Number },
+        lastViolationAt: { type: Date },
+        nextViolationDecayAt: { type: Date },
+        violationHistory: { type: [moderationViolationSchema], default: undefined },
     },
-    fcmTokens: [{
-        type: String,
-        trim: true,
-        maxlength: 4096,
-    }],
+    fcmTokens: {
+        type: [{
+            type: String,
+            trim: true,
+            maxlength: 4096,
+        }],
+        default: undefined,
+    },
 }, { timestamps: true });
 
 const UserModel = mongoose.models.User || mongoose.model('User', userSchema);

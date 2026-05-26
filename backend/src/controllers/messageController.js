@@ -329,7 +329,6 @@ export async function sendMessage(req, res) {
                 avatarUrl: req.user.avatarUrl
             },
             type,
-            mentions: [],
         };
 
         if (Object.keys(metadata).length > 0) {
@@ -520,7 +519,9 @@ export async function sendMessage(req, res) {
                 UserModel: User,
             });
             messageData.content = mentionResult.content;
-            messageData.mentions = mentionResult.mentions;
+            if (mentionResult.mentions.length > 0) {
+                messageData.mentions = mentionResult.mentions;
+            }
         }
 
         const mentions = messageData.mentions || [];
@@ -1217,6 +1218,10 @@ export async function reactToMessage(req, res) {
             }
         }
 
+        if (!Array.isArray(message.reactions)) {
+            message.reactions = [];
+        }
+
         const existingReactionIndex = message.reactions.findIndex(
             (r) => r.userId.toString() === userId.toString()
         );
@@ -1232,6 +1237,11 @@ export async function reactToMessage(req, res) {
             message.reactions.push({ userId, emoji });
         }
 
+        const reactionsForClient = [...message.reactions];
+        if (reactionsForClient.length === 0) {
+            message.reactions = undefined;
+        }
+
         await message.save();
         conversation.participants.forEach((p) => {
             const socketId = getReceiverSocketId(p.userId._id?.toString() ?? p.userId.toString());
@@ -1239,12 +1249,12 @@ export async function reactToMessage(req, res) {
                 io.to(socketId).emit('message-reaction', {
                     conversationId: conversation._id.toString(),
                     messageId: message._id.toString(),
-                    reactions: message.reactions,
+                    reactions: reactionsForClient,
                 });
             }
         });
 
-        return res.status(200).json({ reactions: message.reactions });
+        return res.status(200).json({ reactions: reactionsForClient });
     } catch (error) {
         console.error('Error reacting to message:', error);
         return res.status(500).json({ message: 'Internal server error.' });
@@ -1419,9 +1429,9 @@ export async function forwardMessage(req, res) {
                         UserModel: User,
                     });
                     msgData.content = mentionResult.content;
-                    msgData.mentions = mentionResult.mentions;
-                } else {
-                    msgData.mentions = [];
+                    if (mentionResult.mentions.length > 0) {
+                        msgData.mentions = mentionResult.mentions;
+                    }
                 }
 
                 const newMsg = await Message.create(msgData);
@@ -1430,7 +1440,7 @@ export async function forwardMessage(req, res) {
                     conversationId: targetConvo._id,
                     message: newMsg,
                     senderId,
-                    mentions: msgData.mentions,
+                    mentions: msgData.mentions || [],
                 });
 
                 const signedUrl = generateSignedUrl(newMsg.filePublicId, newMsg.type);

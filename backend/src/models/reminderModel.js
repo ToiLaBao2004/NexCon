@@ -52,12 +52,10 @@ const reminderSchema = new mongoose.Schema({
     meetingId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Meeting',
-        default: null,
         index: true,
     },
     meetingRoomName: {
         type: String,
-        default: null,
         trim: true,
     },
     createdBy: {
@@ -97,7 +95,6 @@ const reminderSchema = new mongoose.Schema({
     },
     snoozeCount: {
         type: Number,
-        default: 0,
         min: 0,
     },
     repeatRule: {
@@ -113,7 +110,6 @@ const reminderSchema = new mongoose.Schema({
     },
     dismissedAt: {
         type: Date,
-        default: null,
     },
     source: reminderSourceSchema,
     notifyChannels: {

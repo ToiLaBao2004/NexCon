@@ -19,12 +19,15 @@ const messageSchema = new mongoose.Schema({
         displayName: { type: String },
         avatarUrl: { type: String }
     },
-    mentions: [{
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-        displayName: { type: String },
-        offset: { type: Number },
-        length: { type: Number },
-    }],
+    mentions: {
+        type: [{
+            userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+            displayName: { type: String },
+            offset: { type: Number },
+            length: { type: Number },
+        }],
+        default: undefined,
+    },
     type: {
         type: String,
         enum: MESSAGE_TYPES,
@@ -72,37 +75,38 @@ const messageSchema = new mongoose.Schema({
     },
     isPinned: {
         type: Boolean,
-        default: false,
     },
     pinnedAt: {
         type: Date
     },
     isRecalled: {
         type: Boolean,
-        default: false,
     },
     reportStatus: {
         type: Boolean,
-        default: false,
         index: true,
     },
     reportReview: {
-        reportId: { type: mongoose.Schema.Types.ObjectId, ref: 'Report', default: null },
-        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-        reviewedAt: { type: Date, default: null },
-        note: { type: String, trim: true, maxlength: 1000, default: '' },
+        reportId: { type: mongoose.Schema.Types.ObjectId, ref: 'Report' },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reviewedAt: { type: Date },
+        note: { type: String, trim: true, maxlength: 1000 },
     },
     replyTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Message',
     },
-    reactions: [
-        {
+    reactions: {
+        type: [{
             userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
             emoji: { type: String, required: true }
-        }
-    ],
-    deliveredTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+        }],
+        default: undefined,
+    },
+    deliveredTo: {
+        type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+        default: undefined,
+    },
 }, {
     timestamps: true,
     toJSON: { getters: true },
