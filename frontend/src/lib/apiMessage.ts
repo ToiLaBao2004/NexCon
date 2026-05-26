@@ -3,6 +3,8 @@ type ApiPayload = {
   code?: unknown;
   error?: unknown;
   title?: unknown;
+  "mật khẩu mới không được trùng với mật khẩu hiện tại": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
+  "mật khẩu mới không được trùng với mật khẩu hiện tại.": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
 };
 
 type ApiErrorLike = {
