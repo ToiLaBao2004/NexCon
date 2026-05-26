@@ -19,6 +19,17 @@ function formatDate(value?: string | null) {
   });
 }
 
+function formatDateTime(value?: string | null) {
+  if (!value) return "Chưa có";
+  return new Date(value).toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function locked(user?: AdminUser | null) {
   return Boolean(user?.lock?.isLocked);
 }
@@ -150,16 +161,17 @@ export default function AdminOverviewPage() {
             </div>
           ) : (
             <div className="mx-auto w-full max-w-7xl overflow-hidden rounded-md border border-border/70">
-              <div className="hidden grid-cols-[minmax(260px,1.4fr)_170px_140px_92px] gap-4 border-b border-border/70 bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid">
+              <div className="hidden grid-cols-[minmax(260px,1.4fr)_170px_140px_170px_92px] gap-4 border-b border-border/70 bg-muted/40 px-4 py-2 text-xs font-medium text-muted-foreground lg:grid">
                 <span>Người dùng</span>
                 <span>Report mở</span>
                 <span>Tham gia</span>
+                <span>Lần cuối truy cập</span>
                 <span />
               </div>
               {users.map((user) => (
                   <div
                     key={user._id}
-                    className="grid gap-3 border-b border-border/60 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(260px,1.4fr)_170px_140px_92px] lg:items-center"
+                    className="grid gap-3 border-b border-border/60 px-4 py-4 last:border-b-0 lg:grid-cols-[minmax(260px,1.4fr)_170px_140px_170px_92px] lg:items-center"
                   >
                     <div className="flex min-w-0 items-center gap-3">
                       <div className="relative shrink-0">
@@ -191,7 +203,15 @@ export default function AdminOverviewPage() {
                       </Badge>
                     </div>
 
-                    <div className="text-sm text-muted-foreground">{formatDate(user.createdAt)}</div>
+                    <div className="text-sm text-muted-foreground">
+                      <span className="mr-1 font-medium text-foreground lg:hidden">Tham gia:</span>
+                      {formatDate(user.createdAt)}
+                    </div>
+
+                    <div className="text-sm text-muted-foreground">
+                      <span className="mr-1 font-medium text-foreground lg:hidden">Lần cuối truy cập:</span>
+                      {formatDateTime(user.lastSeenAt)}
+                    </div>
 
                     <Button className="w-fit rounded-md" size="sm" onClick={() => setDrawerUserId(user._id)}>
                       Xem
