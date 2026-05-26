@@ -74,11 +74,12 @@ export const socketAuthMiddleware = async (socket, next) => {
         next();
 
     } catch (error) {
-        console.error("An error occurred while verifying JWT in socketMiddleware", error);
-
         if (error.name === 'TokenExpiredError') {
+            console.info("[SocketAuth] Access token expired; client should refresh and reconnect.");
             return next(new Error("jwt expired")); // ← client nhận biết được
         }
+
+        console.error("An error occurred while verifying JWT in socketMiddleware", error);
 
         next(new Error("Unauthorized"));
     };
