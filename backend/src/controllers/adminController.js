@@ -5,6 +5,7 @@ import Conversation from '../models/conversationModel.js';
 import Report, { REPORT_DECISIONS, REPORT_STATUSES, REPORT_TARGET_TYPES } from '../models/reportModel.js';
 import AuditLog from '../models/auditLogModel.js';
 import LockAppeal, { LOCK_APPEAL_STATUSES } from '../models/lockAppealModel.js';
+import UserStatus from '../models/userStatusModel.js';
 import { createNotification } from '../services/notificationServices.js';
 import { generateSignedUrl } from '../utils/messageHelper.js';
 import {
@@ -609,18 +610,26 @@ export async function listAdminUsers(req, res) {
         ]);
 
         const userIds = users.map((user) => user._id);
-        const [reportCounts] = await Promise.all([
+        const [reportCounts, statuses] = await Promise.all([
             Report.aggregate([
                 { $match: { targetUserId: { $in: userIds }, status: { $in: ['pending', 'reviewing'] } } },
                 { $group: { _id: '$targetUserId', count: { $sum: 1 } } },
             ]),
+            UserStatus.find({ userId: { $in: userIds } })
+                .select('userId last_seen_at')
+                .lean(),
         ]);
 
         const reportCountMap = new Map(reportCounts.map((item) => [item._id.toString(), item.count]));
+        const lastSeenMap = new Map(statuses.map((status) => [
+            status.userId.toString(),
+            status.last_seen_at ? new Date(status.last_seen_at).toISOString() : null,
+        ]));
         const enrichedUsers = await Promise.all(users.map(async (user) => {
             const violationSummary = await getViolationSummary(user._id);
             return toUserSummary(user, {
                 online: await isUserOnline(user._id),
+                lastSeenAt: lastSeenMap.get(user._id.toString()) || null,
                 violationSummary,
                 openReportCount: reportCountMap.get(user._id.toString()) || 0,
             });

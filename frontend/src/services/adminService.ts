@@ -20,6 +20,7 @@ export interface ViolationSummary {
 
 export interface AdminUser extends User {
   online?: boolean;
+  lastSeenAt?: string | null;
   violationSummary?: ViolationSummary;
   openReportCount?: number;
   counters?: {
