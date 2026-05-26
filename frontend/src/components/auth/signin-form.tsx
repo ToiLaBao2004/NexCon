@@ -29,9 +29,37 @@ const signInSchema = z.object({
 const APPEAL_REASON_MIN_LENGTH = 20
 
 type SignInFormValues = z.infer<typeof signInSchema>
+type LockedSignInPayload = {
+  locked?: boolean;
+  message?: string;
+  restriction?: ModerationStatusResponse["restriction"];
+  violationSummary?: ModerationStatusResponse["summary"];
+  violationHistory?: ModerationStatusResponse["history"];
+  appeal?: ModerationStatusResponse["appeal"];
+}
 
 const legalLinkClass =
   "font-normal text-primary underline underline-offset-4 decoration-primary/40 transition-colors hover:text-primary/80 hover:decoration-primary"
+
+const getLockedSignInPayload = (error: any): LockedSignInPayload | null => {
+  const payload = error?.lockedPayload || error?.response?.data || error?.data || error;
+  if (payload?.locked || payload?.restriction?.locked) {
+    return payload;
+  }
+
+  return null;
+}
+
+const hasPendingLockAppeal = (appeal?: ModerationStatusResponse["appeal"]) => {
+  return !appeal?.canSubmit && appeal?.status === "pending";
+}
+
+const canSubmitLockAppeal = (payload: LockedSignInPayload | null) => {
+  if (!payload) return false;
+  if (hasPendingLockAppeal(payload.appeal)) return false;
+  if (payload.appeal?.canSubmit === true) return true;
+  return payload.restriction?.canAppeal === true;
+}
 
 export function SigninForm({
   className,
@@ -65,15 +93,16 @@ export function SigninForm({
     } catch (error: any) {
       console.error("Sign in failed:", error);
       const message = getApiErrorMessage(error, "Đăng nhập thất bại.");
-      if (error.response?.status === 423 || error.response?.data?.locked) {
-        setLockedMessage(message);
+      const lockedPayload = getLockedSignInPayload(error);
+      if (lockedPayload) {
+        setLockedMessage(lockedPayload.message || message);
         setLockedDetails({
-          summary: error.response?.data?.violationSummary,
-          restriction: error.response?.data?.restriction,
-          history: error.response?.data?.violationHistory || [],
-          appeal: error.response?.data?.appeal,
+          summary: lockedPayload.violationSummary,
+          restriction: lockedPayload.restriction,
+          history: lockedPayload.violationHistory || [],
+          appeal: lockedPayload.appeal,
         });
-        setHasPendingAppeal(!error.response?.data?.appeal?.canSubmit && error.response?.data?.appeal?.status === "pending");
+        setHasPendingAppeal(hasPendingLockAppeal(lockedPayload.appeal));
         clearErrors("root");
         return;
       }
@@ -162,6 +191,12 @@ export function SigninForm({
       setAppealSubmitting(false);
     }
   }
+
+  const canAppealLockedAccount = canSubmitLockAppeal({
+    locked: Boolean(lockedMessage),
+    restriction: lockedDetails?.restriction,
+    appeal: lockedDetails?.appeal,
+  });
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -267,6 +302,7 @@ export function SigninForm({
                     placeholder="Mô tả lý do bạn muốn kháng cáo khóa tài khoản"
                     className="min-h-24 resize-none bg-background"
                     maxLength={2000}
+                    disabled={!canAppealLockedAccount || hasPendingAppeal || appealSubmitting}
                   />
                   <div className="flex justify-end">
                     <span
@@ -282,7 +318,7 @@ export function SigninForm({
                     type="button"
                     variant="outline"
                     className="w-full cursor-pointer"
-                    disabled={hasPendingAppeal || appealSubmitting || isAppealReasonTooShort}
+                    disabled={!canAppealLockedAccount || hasPendingAppeal || appealSubmitting || isAppealReasonTooShort}
                     onClick={handleSubmitAppeal}
                   >
                     {hasPendingAppeal ? "Đang chờ xem xét" : "Gửi kháng cáo"}

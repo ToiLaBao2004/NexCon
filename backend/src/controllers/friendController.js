@@ -4,7 +4,7 @@ import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
 import Conversation from "../models/conversationModel.js";
-import { io, getReceiverSocketId, emitToUser, emitOnlineUsers, isUserOnline } from "../socket/index.js";
+import { io, getReceiverSocketId, emitToUser, emitOnlineUsers, getOnlineUserIdsForUsers } from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
 import { checkFieldFormat } from "../utils/fieldFormat.js";
 import { maskLockedUserDoc } from "../utils/lockedUser.js";
@@ -665,12 +665,9 @@ export async function getAllFriends(req, res) {
             };
         });
         const friendIds = listedFriends.map((friend) => friend.friendId?.toString()).filter(Boolean);
-        const socketOnlineFlags = await Promise.all(friendIds.map(async (id) => ({
-            id,
-            online: await isUserOnline(id),
-        })));
+        const socketOnlineUserIds = await getOnlineUserIdsForUsers(friendIds);
         const presences = await getVisiblePresencesForUsers(friendIds, {
-            socketOnlineUserIds: socketOnlineFlags.filter((item) => item.online).map((item) => item.id),
+            socketOnlineUserIds,
             viewerId: user._id,
         });
         const presenceByUserId = new Map(presences.map((presence) => [presence.userId, presence]));

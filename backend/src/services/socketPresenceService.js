@@ -30,6 +30,10 @@ function normalizeId(value) {
     return value?.toString?.() || String(value || '');
 }
 
+function uniqueIds(values = []) {
+    return [...new Set(values.map(normalizeId).filter(Boolean))];
+}
+
 async function safeRedis(action, fn, fallback) {
     if (!canUseRedis(action)) return fallback;
 
@@ -142,11 +146,86 @@ export async function isUserOnlineInRedis(userId) {
 export async function getOnlineUserIdsFromRedis() {
     return safeRedis('list online users', async () => {
         const userIds = await redisIOClient.smembers(onlineUsersKey());
-        const onlineUserIds = [];
+        return getOnlineUserIdsForUsersFromRedis(userIds);
+    }, []);
+}
 
-        for (const userId of userIds) {
-            const socketIds = await pruneUserSockets(userId);
-            if (socketIds.length > 0) onlineUserIds.push(userId);
+export async function getOnlineUserIdsForUsersFromRedis(userIds = []) {
+    const safeUserIds = uniqueIds(userIds);
+    if (safeUserIds.length === 0) return [];
+
+    return safeRedis('list selected online users', async () => {
+        const socketSetResults = await redisIOClient
+            .pipeline(safeUserIds.map((id) => ['smembers', userSocketsKey(id)]))
+            .exec();
+
+        const socketIdsByUserId = new Map();
+        const socketToUserId = new Map();
+        const allSocketIds = [];
+
+        socketSetResults.forEach(([error, socketIds], index) => {
+            if (error || !Array.isArray(socketIds) || socketIds.length === 0) {
+                socketIdsByUserId.set(safeUserIds[index], []);
+                return;
+            }
+
+            const uniqueSocketIds = uniqueIds(socketIds);
+            socketIdsByUserId.set(safeUserIds[index], uniqueSocketIds);
+            uniqueSocketIds.forEach((socketId) => {
+                socketToUserId.set(socketId, safeUserIds[index]);
+                allSocketIds.push(socketId);
+            });
+        });
+
+        if (allSocketIds.length === 0) {
+            await redisIOClient.srem(onlineUsersKey(), ...safeUserIds);
+            return [];
+        }
+
+        const existsResults = await redisIOClient
+            .pipeline(allSocketIds.map((id) => ['exists', socketKey(id)]))
+            .exec();
+
+        const liveSocketIdsByUserId = new Map();
+        const staleSocketIdsByUserId = new Map();
+
+        existsResults.forEach(([error, exists], index) => {
+            const socketId = allSocketIds[index];
+            const userId = socketToUserId.get(socketId);
+            if (!userId) return;
+
+            const targetMap = !error && exists === 1
+                ? liveSocketIdsByUserId
+                : staleSocketIdsByUserId;
+            if (!targetMap.has(userId)) targetMap.set(userId, []);
+            targetMap.get(userId).push(socketId);
+        });
+
+        const cleanupPipeline = redisIOClient.pipeline();
+        const onlineUserIds = [];
+        let hasCleanup = false;
+
+        safeUserIds.forEach((userId) => {
+            const liveSocketIds = liveSocketIdsByUserId.get(userId) || [];
+            const staleSocketIds = staleSocketIdsByUserId.get(userId) || [];
+
+            if (staleSocketIds.length > 0) {
+                cleanupPipeline.srem(userSocketsKey(userId), ...staleSocketIds);
+                hasCleanup = true;
+            }
+
+            if (liveSocketIds.length > 0) {
+                onlineUserIds.push(userId);
+                return;
+            }
+
+            cleanupPipeline.del(userSocketsKey(userId));
+            cleanupPipeline.srem(onlineUsersKey(), userId);
+            hasCleanup = true;
+        });
+
+        if (hasCleanup) {
+            await cleanupPipeline.exec();
         }
 
         return onlineUserIds;

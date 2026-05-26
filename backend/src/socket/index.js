@@ -14,6 +14,7 @@ import { buildPresencePayloadForViewer, touchUserActivity } from "../services/us
 import { configureSocketIoRedisAdapter } from "../config/socketIoRedisAdapter.js";
 import {
     getOnlineUserIdsFromRedis,
+    getOnlineUserIdsForUsersFromRedis,
     isUserOnlineInRedis,
     refreshSocketPresence,
     registerSocketPresence,
@@ -40,6 +41,12 @@ io.use(socketAuthMiddleware);
 
 const USER_ROOM_PREFIX = "user:";
 const SESSION_ROOM_PREFIX = "session:";
+const PRESENCE_FLUSH_DELAY_MS = Number(process.env.PRESENCE_FLUSH_DELAY_MS || 2000);
+
+let presenceFlushTimer = null;
+let presenceFlushInProgress = false;
+let pendingPresenceBroadcast = false;
+let pendingPresenceFlush = false;
 
 function getUserRoom(userId) {
     return `${USER_ROOM_PREFIX}${userId.toString()}`;
@@ -53,11 +60,15 @@ async function getOnlineUserIds() {
     return getOnlineUserIdsFromRedis();
 }
 
+async function getOnlineUserIdsForUsers(userIds = []) {
+    return getOnlineUserIdsForUsersFromRedis(userIds);
+}
+
 async function isUserOnline(userId) {
     return isUserOnlineInRedis(userId);
 }
 
-async function emitOnlineUsers({ broadcast = false } = {}) {
+async function emitOnlineUsersNow({ broadcast = false } = {}) {
     try {
         const allOnlineIds = await getOnlineUserIds();
         const sockets = Array.from(io.sockets.sockets.values());
@@ -93,6 +104,44 @@ async function emitOnlineUsers({ broadcast = false } = {}) {
     } catch (err) {
         console.error("Critical error in emitOnlineUsers:", err);
     }
+}
+
+function schedulePresenceFlush() {
+    if (presenceFlushTimer || presenceFlushInProgress) {
+        pendingPresenceFlush = true;
+        return;
+    }
+
+    presenceFlushTimer = setTimeout(async () => {
+        presenceFlushTimer = null;
+        presenceFlushInProgress = true;
+
+        const shouldBroadcast = pendingPresenceBroadcast;
+        pendingPresenceBroadcast = false;
+        pendingPresenceFlush = false;
+
+        try {
+            await emitOnlineUsersNow({ broadcast: shouldBroadcast });
+        } finally {
+            presenceFlushInProgress = false;
+            if (pendingPresenceFlush || pendingPresenceBroadcast) {
+                schedulePresenceFlush();
+            }
+        }
+    }, PRESENCE_FLUSH_DELAY_MS);
+
+    presenceFlushTimer.unref?.();
+}
+
+async function emitOnlineUsers({ broadcast = false, immediate = false } = {}) {
+    if (immediate) {
+        return emitOnlineUsersNow({ broadcast });
+    }
+
+    pendingPresenceBroadcast = pendingPresenceBroadcast || broadcast;
+    pendingPresenceFlush = true;
+    schedulePresenceFlush();
+    return true;
 }
 
 function getReceiverSocketId(userId) {
@@ -249,6 +298,7 @@ configureSocketGateway({
     getReceiverSocketId,
     emitToUser,
     isUserOnline,
+    getOnlineUserIdsForUsers,
     joinUserSocketsToRoom,
     leaveUserSocketsFromRoom,
 });
@@ -270,14 +320,26 @@ io.on("connection", async (socket) => {
     if (sessionId) {
         socket.join(getSessionRoom(sessionId));
     }
-    await registerSocketPresence({ socketId: socket.id, userId, sessionId });
+    registerSocketPresence({ socketId: socket.id, userId, sessionId })
+        .then(async () => {
+            if (!socket.connected) {
+                await removeSocketPresence(socket.id, userId);
+                return false;
+            }
+            return emitOnlineUsers({ broadcast: true });
+        })
+        .catch((error) => {
+            console.error("Error registering socket presence:", error);
+        });
     socket.data.presenceInterval = setInterval(() => {
         refreshSocketPresence(socket.id, userId).catch((error) => {
             console.error("Error refreshing socket presence:", error);
         });
     }, 45_000);
-    await touchUserActivity(userId);
-    await emitOnlineUsers({ broadcast: true });
+    socket.data.presenceInterval.unref?.();
+    void touchUserActivity(userId).catch((error) => {
+        console.error("Error touching user activity:", error);
+    });
 
     let lastActivityTouchAt = Date.now();
     socket.use(async (_packet, next) => {
@@ -306,11 +368,17 @@ io.on("connection", async (socket) => {
         }
     });
 
-    // Join tất cả conversation rooms
-    const conversationIds = await getUserConversationsForSocketIO(user._id);
-    conversationIds.forEach((id) => {
-        if (!socket.rooms.has(id)) {
-            socket.join(id);
+    // Join conversation rooms in the background so Socket.IO connect can finish fast.
+    setImmediate(async () => {
+        try {
+            const conversationIds = await getUserConversationsForSocketIO(user._id);
+            conversationIds.forEach((id) => {
+                if (!socket.rooms.has(id)) {
+                    socket.join(id);
+                }
+            });
+        } catch (error) {
+            console.error("Error joining conversation rooms on connect:", error);
         }
     });
 
@@ -409,9 +477,13 @@ io.on("connection", async (socket) => {
     // Group call handlers
     registerGroupCallHandlers(socket, user, io, getReceiverSocketId);
 
-    await syncPendingDirectMessageDeliveries(userId);
-    await emitPendingDirectCallsForUser(socket, userId, io, getReceiverSocketId);
-    await emitPendingGroupCallsForUser(socket, userId);
+    setImmediate(async () => {
+        await Promise.allSettled([
+            syncPendingDirectMessageDeliveries(userId),
+            emitPendingDirectCallsForUser(socket, userId, io, getReceiverSocketId),
+            emitPendingGroupCallsForUser(socket, userId),
+        ]);
+    });
 
     socket.on("disconnecting", () => {
         const conversationRooms = Array.from(socket.rooms)
@@ -436,8 +508,10 @@ io.on("connection", async (socket) => {
         }
 
         await removeSocketPresence(socket.id, userId);
-        await touchUserActivity(userId);
-        await emitOnlineUsers({ broadcast: true });
+        void touchUserActivity(userId).catch((error) => {
+            console.error("Error touching user activity on disconnect:", error);
+        });
+        void emitOnlineUsers({ broadcast: true });
 
         // Xử lý cuộc gọi đang active (lưu DB + thông báo đối phương)
         await handleCallDisconnect(userId, socket.id, io, getReceiverSocketId);
@@ -457,6 +531,7 @@ export {
     getReceiverSocketId,
     emitToUser,
     isUserOnline,
+    getOnlineUserIdsForUsers,
     joinUserSocketsToRoom,
     leaveUserSocketsFromRoom,
     disconnectSessionSockets,

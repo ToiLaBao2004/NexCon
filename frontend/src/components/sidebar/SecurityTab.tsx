@@ -18,6 +18,9 @@ const changePasswordSchema = z.object({
 }).refine((data) => data.newPassword === data.confirmNewPassword, {
     message: "Mật khẩu xác nhận không khớp",
     path: ["confirmNewPassword"],
+}).refine((data) => data.currentPassword !== data.newPassword, {
+    message: "Mật khẩu mới không được trùng với mật khẩu hiện tại",
+    path: ["newPassword"],
 });
 
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;

@@ -3,6 +3,8 @@ import { userService } from '@/services/userService';
 import type { UserMusic } from '@/types/user';
 import type { User } from '@/types/user';
 
+let fetchMePromise: Promise<void> | null = null;
+
 interface UserStore {
     user: User | null;
     musicResults: UserMusic[];
@@ -21,8 +23,18 @@ export const useUserStore = create<UserStore>((set) => ({
     musicLoading: false,
 
     fetchMe: async () => {
-        const user = await userService.fetchMe();
-        set({ user });
+        if (fetchMePromise) return fetchMePromise;
+
+        fetchMePromise = (async () => {
+            try {
+                const user = await userService.fetchMe();
+                set({ user });
+            } finally {
+                fetchMePromise = null;
+            }
+        })();
+
+        return fetchMePromise;
     },
 
     searchMusic: async (q) => {

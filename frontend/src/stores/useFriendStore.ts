@@ -13,6 +13,12 @@ const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX
 const MAX_FRIEND_REQUEST_MESSAGE_LENGTH = 300;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+let fetchFriendsPromise: Promise<void> | null = null;
+let fetchFriendSuggestionsPromise: Promise<void> | null = null;
+let fetchIncomingRequestsPromise: Promise<void> | null = null;
+let fetchSentRequestsPromise: Promise<void> | null = null;
+let fetchBlockedListPromise: Promise<void> | null = null;
+
 export const useFriendStore = create<FriendState>((set, get) => ({
 	loading: false,
 	sendingRequest: false,
@@ -53,6 +59,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	fetchFriends: async (force = false) => {
+		if (!force && get().friendsFetched) return;
+		if (fetchFriendsPromise) return fetchFriendsPromise;
+
+		fetchFriendsPromise = (async () => {
 		try {
 			if (!force && get().friendsFetched) {
 				return;
@@ -62,10 +72,19 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			set({ friends: data.listedFriends || [], friendsFetched: true });
 		} catch (error) {
 			console.error('Lỗi khi tải danh sách bạn bè:', error);
+		} finally {
+			fetchFriendsPromise = null;
 		}
+		})();
+
+		return fetchFriendsPromise;
 	},
 
 	fetchFriendSuggestions: async (force = false) => {
+		if (!force && get().friendSuggestionsFetched) return;
+		if (fetchFriendSuggestionsPromise) return fetchFriendSuggestionsPromise;
+
+		fetchFriendSuggestionsPromise = (async () => {
 		try {
 			if (!force && (get().friendSuggestionsFetched || get().fetchingFriendSuggestions)) {
 				return;
@@ -78,10 +97,18 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			console.error('Lỗi khi tải gợi ý kết bạn:', error);
 		} finally {
 			set({ fetchingFriendSuggestions: false });
+			fetchFriendSuggestionsPromise = null;
 		}
+		})();
+
+		return fetchFriendSuggestionsPromise;
 	},
 
 	fetchIncomingRequests: async (force = false) => {
+		if (!force && get().incomingRequestsFetched) return;
+		if (fetchIncomingRequestsPromise) return fetchIncomingRequestsPromise;
+
+		fetchIncomingRequestsPromise = (async () => {
 		try {
 			if (!force && (get().incomingRequestsFetched || get().fetchingIncomingRequests)) {
 				return;
@@ -94,10 +121,18 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			console.error('Lỗi khi tải lời mời kết bạn đến:', error);
 		} finally {
 			set({ fetchingIncomingRequests: false });
+			fetchIncomingRequestsPromise = null;
 		}
+		})();
+
+		return fetchIncomingRequestsPromise;
 	},
 
 	fetchSentRequests: async (force = false) => {
+		if (!force && get().sentRequestsFetched) return;
+		if (fetchSentRequestsPromise) return fetchSentRequestsPromise;
+
+		fetchSentRequestsPromise = (async () => {
 		try {
 			if (!force && (get().sentRequestsFetched || get().fetchingSentRequests)) {
 				return;
@@ -110,7 +145,11 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			console.error('Lỗi khi tải lời mời kết bạn đi:', error);
 		} finally {
 			set({ fetchingSentRequests: false });
+			fetchSentRequestsPromise = null;
 		}
+		})();
+
+		return fetchSentRequestsPromise;
 	},
 
 	setNickName: async (friendId: string, nickName: string) => {
@@ -337,6 +376,10 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 	},
 
 	fetchBlockedList: async (force = false) => {
+		if (!force && get().blockedUsersFetched) return;
+		if (fetchBlockedListPromise) return fetchBlockedListPromise;
+
+		fetchBlockedListPromise = (async () => {
 		try {
 			if (!force && (get().blockedUsersFetched || get().fetchingBlockedUsers)) {
 				return;
@@ -353,7 +396,11 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 			console.error('Lỗi khi tải danh sách chặn:', error);
 		} finally {
 			set({ fetchingBlockedUsers: false });
+			fetchBlockedListPromise = null;
 		}
+		})();
+
+		return fetchBlockedListPromise;
 	},
 
 	blockUser: async (userId) => {

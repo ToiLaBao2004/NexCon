@@ -28,6 +28,28 @@ const DEFAULT_STATUS = {
     status_mode: 'auto',
     last_seen_at: null,
 };
+const PRESENCE_RELATION_CACHE_TTL_MS = Number(process.env.PRESENCE_RELATION_CACHE_TTL_MS || 10000);
+
+const friendIdsCache = new Map();
+const blockedIdsCache = new Map();
+
+function getCachedList(cache, key) {
+    const cached = cache.get(key);
+    if (!cached || cached.expiresAt <= Date.now()) {
+        cache.delete(key);
+        return null;
+    }
+
+    return cached.value;
+}
+
+function setCachedList(cache, key, value) {
+    cache.set(key, {
+        value,
+        expiresAt: Date.now() + PRESENCE_RELATION_CACHE_TTL_MS,
+    });
+    return value;
+}
 
 const STATUS_ALIASES = {
     available: 'online',
@@ -54,6 +76,9 @@ async function getFriendIdsForUser(userId) {
     const viewerId = normalizeId(userId);
     if (!viewerId) return [];
 
+    const cached = getCachedList(friendIdsCache, viewerId);
+    if (cached) return cached;
+
     const friendships = await Friend.find({
         $or: [
             { userA: viewerId },
@@ -61,11 +86,32 @@ async function getFriendIdsForUser(userId) {
         ],
     }).select('userA userB').lean();
 
-    return uniqueIds(friendships.map((friendship) => {
+    return setCachedList(friendIdsCache, viewerId, uniqueIds(friendships.map((friendship) => {
         const userA = normalizeId(friendship.userA);
         const userB = normalizeId(friendship.userB);
         return userA === viewerId ? userB : userA;
-    }));
+    })));
+}
+
+async function getBlockedIdsForUser(userId) {
+    const viewerId = normalizeId(userId);
+    if (!viewerId) return [];
+
+    const cached = getCachedList(blockedIdsCache, viewerId);
+    if (cached) return cached;
+
+    const blocks = await BlockUser.find({
+        $or: [
+            { from: viewerId },
+            { to: viewerId },
+        ],
+    }).select('from to').lean();
+
+    return setCachedList(blockedIdsCache, viewerId, uniqueIds(blocks.map((block) => {
+        const from = normalizeId(block.from);
+        const to = normalizeId(block.to);
+        return from === viewerId ? to : from;
+    })));
 }
 
 export function canViewerSeePresence(viewerId, targetUserId, friendIds = []) {
@@ -297,24 +343,15 @@ export async function buildPresencePayloadForViewer(viewerId, {
     includeUserIds = [],
 } = {}) {
     const viewerIdString = normalizeId(viewerId);
-    const [{ friendIds, relatedIds }, blocks] = await Promise.all([
+    const [{ friendIds, relatedIds }, blockedIds] = await Promise.all([
         getRelatedPresenceUserIds(viewerId),
-        BlockUser.find({
-            $or: [
-                { from: viewerId },
-                { to: viewerId },
-            ],
-        }).select('from to').lean(),
+        getBlockedIdsForUser(viewerId),
     ]);
 
-    const blockedIds = new Set(blocks.map((block) => {
-        const from = normalizeId(block.from);
-        const to = normalizeId(block.to);
-        return from === viewerIdString ? to : from;
-    }));
+    const blockedIdSet = new Set(blockedIds);
 
     const candidateIds = uniqueIds([...relatedIds, ...includeUserIds]);
-    const visibleIds = candidateIds.filter((id) => id === viewerIdString || !blockedIds.has(id));
+    const visibleIds = candidateIds.filter((id) => id === viewerIdString || !blockedIdSet.has(id));
     const presences = await getVisiblePresencesForUsers(visibleIds, {
         socketOnlineUserIds,
         viewerId,

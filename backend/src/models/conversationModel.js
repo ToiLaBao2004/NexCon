@@ -197,6 +197,8 @@ conversationSchema.pre('save', function (next) {
 });
 
 conversationSchema.index({ 'participants.userId': 1, 'lastMessage.createdAt': -1 });
+conversationSchema.index({ 'participants.userId': 1, updatedAt: -1 });
+conversationSchema.index({ 'participants.userId': 1, 'participants.pinnedAt': 1, updatedAt: -1 });
 
 const ConversationModel = mongoose.models.Conversation || mongoose.model('Conversation', conversationSchema);
 

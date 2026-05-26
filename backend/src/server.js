@@ -28,6 +28,7 @@ import { apiLimiter } from './middlewares/rateLimiters.js';
 import { auditLogMiddleware } from './middlewares/auditLogMiddleware.js';
 import { requireUser } from './middlewares/roleMiddleware.js';
 import { startSystemMetricsSampler } from './services/systemMetricsService.js';
+import { slowRequestLogger } from './middlewares/slowRequestLogger.js';
 
 const PORT = process.env.PORT;
 
@@ -39,12 +40,18 @@ if (trustProxy) {
     }
 }
 
+app.set('etag', false);
 
 // middlewares
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+app.use('/api', (_req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    next();
+});
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use(slowRequestLogger);
 
 app.use('/api', apiLimiter);
 

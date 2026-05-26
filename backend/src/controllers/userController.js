@@ -12,7 +12,7 @@ import {
     getVisiblePresencesForUsers,
     updateUserStatus as updateUserStatusPreference,
 } from '../services/userStatusService.js';
-import { emitOnlineUsers, emitToUser, isUserOnline } from '../socket/index.js';
+import { emitOnlineUsers, emitToUser, getOnlineUserIdsForUsers, isUserOnline } from '../socket/index.js';
 import { applyProfileVisibility, areFriends, normalizeProfileVisibility, PROFILE_VISIBILITY } from '../utils/profilePrivacy.js';
 
 const MUSIC_SEARCH_QUERY_LIMIT = 100;
@@ -21,8 +21,7 @@ const SPOTIFY_TRACK_ID_PATTERN = /^[A-Za-z0-9]{22}$/;
 export async function getCurrentUser(req, res) {
     try {
         const userId = req.user._id || req.user.id;
-
-        const user = await User.findById(userId).select("-password").lean();
+        const user = req.user?.toObject?.() || req.user;
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
@@ -432,7 +431,7 @@ export async function getUserById(req, res) {
         }
 
         const [presence] = await getVisiblePresencesForUsers([id], {
-            socketOnlineUserIds: await isUserOnline(id) ? [id] : [],
+            socketOnlineUserIds: await getOnlineUserIdsForUsers([id]),
             viewerId: currentUserId,
         });
         const isSelf = currentUserId && id === currentUserId;

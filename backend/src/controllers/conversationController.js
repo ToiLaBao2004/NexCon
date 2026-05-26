@@ -13,7 +13,7 @@ import {
 	getReceiverSocketId,
 	joinUserSocketsToRoom,
 	leaveUserSocketsFromRoom,
-	isUserOnline,
+	getOnlineUserIdsForUsers,
 } from '../socket/index.js';
 import { updateConversationLastMessage, emitNewMessage } from '../utils/messageHelper.js';
 import {
@@ -94,12 +94,9 @@ async function attachPresenceToConversationParticipants(conversations = [], view
 
 	if (!participantIds.length) return conversations;
 
-	const socketOnlineFlags = await Promise.all(participantIds.map(async (id) => ({
-		id,
-		online: await isUserOnline(id),
-	})));
+	const socketOnlineUserIds = await getOnlineUserIdsForUsers(participantIds);
 	const presences = await getVisiblePresencesForUsers(participantIds, {
-		socketOnlineUserIds: socketOnlineFlags.filter((item) => item.online).map((item) => item.id),
+		socketOnlineUserIds,
 		viewerId,
 	});
 	const presenceByUserId = new Map(presences.map((presence) => [presence.userId, presence]));
@@ -891,7 +888,7 @@ export async function getUserConversationsForSocketIO(userId) {
 	try {
 		const conversations = await Conversation.find({ "participants.userId": userId },
 			{ _id: 1 }
-		);
+		).lean();
 		return conversations.map((c) => c._id.toString());
 	} catch (error) {
 		console.error("An error occurred while fetching conversations: ", error);
