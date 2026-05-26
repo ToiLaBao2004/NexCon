@@ -131,6 +131,8 @@ messageSchema.pre('save', function (next) {
 
 // Compound index to optimize queries fetching messages by conversation and sorting by creation time
 messageSchema.index({ conversationId: 1, createdAt: -1 });
+messageSchema.index({ conversationId: 1, type: 1, createdAt: -1 });
+messageSchema.index({ conversationId: 1, isPinned: 1, pinnedAt: -1 });
 // Compound index to optimize searching within a conversation
 messageSchema.index({ conversationId: 1, searchContent: 1 });
 // Mention inbox queries filter by mentioned user and newest messages first.

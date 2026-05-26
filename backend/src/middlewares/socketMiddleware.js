@@ -2,6 +2,8 @@ import jwt from "jsonwebtoken";
 import User from "../models/userModel.js";
 import Session from "../models/sessionModel.js";
 
+const SOCKET_SESSION_REVALIDATE_MS = Number(process.env.SOCKET_SESSION_REVALIDATE_MS || 60000);
+
 async function findValidSession(userId, sessionId) {
     if (!userId || !sessionId) {
         return null;
@@ -10,7 +12,7 @@ async function findValidSession(userId, sessionId) {
     const session = await Session.findOne({
         _id: sessionId,
         userId,
-    }).select('_id userId expiresAt');
+    }).select('_id userId expiresAt').lean();
 
     if (!session || session.expiresAt < Date.now()) {
         return null;
@@ -22,8 +24,21 @@ async function findValidSession(userId, sessionId) {
 export async function validateSocketSession(socket) {
     const userId = socket.user?._id?.toString();
     const sessionId = socket.sessionId?.toString();
+    const now = Date.now();
 
-    return Boolean(await findValidSession(userId, sessionId));
+    if (
+        socket.data?.lastSessionValidationAt
+        && now - socket.data.lastSessionValidationAt < SOCKET_SESSION_REVALIDATE_MS
+    ) {
+        return true;
+    }
+
+    const isValid = Boolean(await findValidSession(userId, sessionId));
+    if (isValid) {
+        socket.data.lastSessionValidationAt = now;
+    }
+
+    return isValid;
 }
 
 export const socketAuthMiddleware = async (socket, next) => {
@@ -44,7 +59,7 @@ export const socketAuthMiddleware = async (socket, next) => {
             return next(new Error("Unauthorized - Session expired or revoked"));
         }
 
-        const user = await User.findById(decoded.userId).select("-password");
+        const user = await User.findById(decoded.userId).select("-password").lean();
 
         if (!user) {
             return next(new Error("User does not exist"));

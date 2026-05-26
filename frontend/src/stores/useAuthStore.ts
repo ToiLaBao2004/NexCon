@@ -20,6 +20,8 @@ const clearAuthStorage = () => {
   localStorage.removeItem('auth-storage');
 };
 
+let fetchMePromise: Promise<void> | null = null;
+
 export const useAuthStore = create<AuthState>()(
   persist((set, get) => ({
     accessToken: null,
@@ -251,6 +253,9 @@ export const useAuthStore = create<AuthState>()(
     },
 
     fetchMe: async (silent = false) => {
+      if (fetchMePromise) return fetchMePromise;
+
+      fetchMePromise = (async () => {
       try {
         if (!silent) set({ loading: true });
         const user = await authService.fetchMe();
@@ -262,7 +267,11 @@ export const useAuthStore = create<AuthState>()(
         throw error;
       } finally {
         if (!silent) set({ loading: false });
+        fetchMePromise = null;
       }
+      })();
+
+      return fetchMePromise;
     },
 
     refreshToken: async () => {
