@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { decryptText, encryptText, isEncryptedText } from '../utils/messageCrypto.js';
+import { getDirectConversationKey } from '../utils/directConversation.js';
 
 const participantSchema = new mongoose.Schema({
     userId: {
@@ -130,6 +131,10 @@ const conversationSchema = new mongoose.Schema({
         enum: ['direct', 'group'],
         required: true
     },
+    directKey: {
+        type: String,
+        trim: true,
+    },
     participants: {
         type: [participantSchema],
         required: true
@@ -190,6 +195,18 @@ const conversationSchema = new mongoose.Schema({
 });
 
 conversationSchema.pre('save', function (next) {
+    if (this.type === 'direct') {
+        const participantIds = (this.participants || [])
+            .map((participant) => participant.userId)
+            .filter(Boolean);
+
+        if (participantIds.length === 2 && (this.isNew || this.directKey)) {
+            this.directKey = getDirectConversationKey(participantIds[0], participantIds[1]);
+        }
+    } else if (this.directKey) {
+        this.directKey = undefined;
+    }
+
     const rawLastMessageContent = this.get('lastMessage.content', null, { getters: false });
     if (rawLastMessageContent && !isEncryptedText(rawLastMessageContent)) {
         this.set('lastMessage.content', rawLastMessageContent);
@@ -200,6 +217,16 @@ conversationSchema.pre('save', function (next) {
 conversationSchema.index({ 'participants.userId': 1, 'lastMessage.createdAt': -1 });
 conversationSchema.index({ 'participants.userId': 1, updatedAt: -1 });
 conversationSchema.index({ 'participants.userId': 1, 'participants.pinnedAt': 1, updatedAt: -1 });
+conversationSchema.index(
+    { directKey: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            type: 'direct',
+            directKey: { $type: 'string' },
+        },
+    }
+);
 
 const ConversationModel = mongoose.models.Conversation || mongoose.model('Conversation', conversationSchema);
 

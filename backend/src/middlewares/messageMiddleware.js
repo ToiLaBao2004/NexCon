@@ -2,6 +2,7 @@ import Conversation from '../models/conversationModel.js';
 import Friend from '../models/friendModel.js';
 import Message from '../models/messageModel.js';
 import User from '../models/userModel.js';
+import { buildDirectConversationLookup } from '../utils/directConversation.js';
 
 const pair = (a, b) => (a < b ? [a, b] : [b, a]);
 
@@ -25,10 +26,7 @@ export async function checkMessagePermission(req, res, next) {
                 return res.status(403).json({ message: 'You are not friends with this user.' });
             }
 
-            const conversation = await Conversation.findOne({
-                type: 'direct',
-                'participants.userId': { $all: [senderId, recipientId] },
-            });
+            const conversation = await Conversation.findOne(buildDirectConversationLookup(senderId, recipientId));
             req.conversation = conversation ?? null;
             req.messageTarget = 'direct';
             return next();

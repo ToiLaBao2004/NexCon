@@ -28,6 +28,11 @@ import { maskLockedUserDoc } from '../utils/lockedUser.js';
 import { isMuted } from '../utils/isMuted.js';
 import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
 import { buildMentionsForContent, parseMentionPayload } from '../utils/mentions.js';
+import {
+    buildDirectConversationLookup,
+    getDirectConversationKey,
+    isDuplicateDirectConversationError,
+} from '../utils/directConversation.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
 const MAX_REMINDER_SYSTEM_CONTENT_LENGTH = 1200;
@@ -307,14 +312,26 @@ export async function sendMessage(req, res) {
             if (!recipientId) {
                 return res.status(400).json({ message: 'recipientId is required for direct messages.' });
             }
-            conversation = await Conversation.create({
-                type: 'direct',
-                participants: [
-                    { userId: senderId, joinedAt: new Date() },
-                    { userId: recipientId, joinedAt: new Date() },
-                ],
-            });
-            createdDirectConversation = true;
+            try {
+                conversation = await Conversation.create({
+                    type: 'direct',
+                    directKey: getDirectConversationKey(senderId, recipientId),
+                    participants: [
+                        { userId: senderId, joinedAt: new Date() },
+                        { userId: recipientId, joinedAt: new Date() },
+                    ],
+                });
+                createdDirectConversation = true;
+            } catch (error) {
+                if (!isDuplicateDirectConversationError(error)) {
+                    throw error;
+                }
+
+                conversation = await Conversation.findOne(buildDirectConversationLookup(senderId, recipientId));
+                if (!conversation) {
+                    throw error;
+                }
+            }
         }
 
         if (!conversation) {

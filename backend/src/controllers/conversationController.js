@@ -27,6 +27,11 @@ import { checkFieldFormat } from '../utils/fieldFormat.js';
 import { GROUP_CLEANUP_RETENTION_DAYS, enqueueGroupCleanup, getGroupCleanupDeleteAfter } from '../config/groupCleanupQueue.js';
 import { enqueueConversationClearCleanup } from '../config/conversationClearCleanupQueue.js';
 import { getVisiblePresencesForUsers } from '../services/userStatusService.js';
+import {
+	buildDirectConversationLookup,
+	getDirectConversationKey,
+	isDuplicateDirectConversationError,
+} from '../utils/directConversation.js';
 
 const MUTE_DURATION_MS = {
 	'1h': 60 * 60 * 1000,
@@ -220,22 +225,40 @@ export async function createConversation(req, res) {
 			}
 		}
 		let conversation;
+		let createdConversation = false;
 		if (type === 'direct') {
 			const participantId = memberIds[0];
-			conversation = await Conversation.findOne({ type: 'direct', 'participants.userId': { $all: [userId, participantId] } });
+			if (memberIds.length !== 1) {
+				return res.status(400).json({ message: 'Cuộc trò chuyện 1-1 chỉ được có đúng một người nhận.' });
+			}
+
+			const directKey = getDirectConversationKey(userId, participantId);
+			conversation = await Conversation.findOne(buildDirectConversationLookup(userId, participantId));
 			const partner = await User.findById(participantId).select('displayName avatarUrl lock');
 			if (partner?.lock?.isLocked) {
 				return res.status(423).json({ message: 'Không thể tạo cuộc trò chuyện với tài khoản đã bị khóa.' });
 			}
 			if (!conversation) {
-				conversation = new Conversation({
-					type: 'direct',
-					participants: [
-						{ userId: userId, userInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl }, joinedAt: new Date() },
-						{ userId: participantId, userInfo: { displayName: partner?.displayName || 'User', avatarUrl: partner?.avatarUrl }, joinedAt: new Date() }
-					]
-				});
-				conversation = await Conversation.create(conversation);
+				try {
+					conversation = await Conversation.create({
+						type: 'direct',
+						directKey,
+						participants: [
+							{ userId: userId, userInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl }, joinedAt: new Date() },
+							{ userId: participantId, userInfo: { displayName: partner?.displayName || 'User', avatarUrl: partner?.avatarUrl }, joinedAt: new Date() }
+						]
+					});
+					createdConversation = true;
+				} catch (error) {
+					if (!isDuplicateDirectConversationError(error)) {
+						throw error;
+					}
+
+					conversation = await Conversation.findOne(buildDirectConversationLookup(userId, participantId));
+					if (!conversation) {
+						throw error;
+					}
+				}
 			}
 		}
 		if (type === 'group') {
@@ -267,6 +290,7 @@ export async function createConversation(req, res) {
 				participants: participants
 			});
 			conversation = await Conversation.create(conversation);
+			createdConversation = true;
 		}
 		if (!conversation) {
 			return res.status(400).json({ message: 'Failed to create conversation.' });
@@ -277,14 +301,16 @@ export async function createConversation(req, res) {
 		]);
 		conversation = sanitizePopulatedConversation(conversation);
 
-		conversation.participants.forEach(p => {
-			const receiverSocketId = getReceiverSocketId(p.userId._id.toString());
-			if (receiverSocketId) {
-				io.to(receiverSocketId).emit("new-conversation", { conversation });
-			}
-		});
+		if (createdConversation) {
+			conversation.participants.forEach(p => {
+				const receiverSocketId = getReceiverSocketId(p.userId._id.toString());
+				if (receiverSocketId) {
+					io.to(receiverSocketId).emit("new-conversation", { conversation });
+				}
+			});
+		}
 
-		res.status(201).json({ conversation });
+		res.status(createdConversation ? 201 : 200).json({ conversation });
 	} catch (error) {
 		console.error('Error creating conversation:', error);
 		res.status(500).json({ message: 'Internal server error' });

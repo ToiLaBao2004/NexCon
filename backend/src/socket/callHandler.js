@@ -21,6 +21,11 @@ import {
 } from '../services/directCallStateService.js';
 import { hasUserActiveGroupCall } from '../services/groupCallStateService.js';
 import { removeDirectCallTimeout, scheduleDirectCallTimeout as enqueueDirectCallTimeout } from '../config/realtimeTimeoutQueue.js';
+import {
+    buildDirectConversationLookup,
+    getDirectConversationKey,
+    isDuplicateDirectConversationError,
+} from '../utils/directConversation.js';
 
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
@@ -85,10 +90,7 @@ async function areFriends(userId1, userId2) {
 }
 
 async function hasDirectConversation(userId1, userId2) {
-    const conversation = await Conversation.findOne({
-        type: 'direct',
-        'participants.userId': { $all: [userId1, userId2] }
-    }).select('_id').lean();
+    const conversation = await Conversation.findOne(buildDirectConversationLookup(userId1, userId2)).select('_id').lean();
     return !!conversation;
 }
 
@@ -107,21 +109,31 @@ async function findCallableUser(userId) {
 }
 
 async function findOrCreateDirectConversation(userId1, userId2) {
-    let conversation = await Conversation.findOne({
-        type: 'direct',
-        'participants.userId': { $all: [userId1, userId2] }
-    }).populate('participants.userId', 'displayName avatarUrl');
+    let conversation = await Conversation.findOne(buildDirectConversationLookup(userId1, userId2))
+        .populate('participants.userId', 'displayName avatarUrl');
 
     if (!conversation) {
-        conversation = await Conversation.create({
-            type: 'direct',
-            participants: [
-                { userId: userId1, joinedAt: new Date() },
-                { userId: userId2, joinedAt: new Date() }
-            ]
-        });
-        conversation = await Conversation.findById(conversation._id)
+        try {
+            conversation = await Conversation.create({
+                type: 'direct',
+                directKey: getDirectConversationKey(userId1, userId2),
+                participants: [
+                    { userId: userId1, joinedAt: new Date() },
+                    { userId: userId2, joinedAt: new Date() }
+                ]
+            });
+        } catch (error) {
+            if (!isDuplicateDirectConversationError(error)) {
+                throw error;
+            }
+        }
+
+        conversation = await Conversation.findOne(buildDirectConversationLookup(userId1, userId2))
             .populate('participants.userId', 'displayName avatarUrl');
+
+        if (!conversation) {
+            throw new Error('Could not create or resolve direct conversation.');
+        }
     }
 
     return conversation;
