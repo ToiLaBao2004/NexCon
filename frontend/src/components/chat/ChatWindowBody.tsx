@@ -31,6 +31,7 @@ const getImageBatchIndex = (message: Message) => {
 const SCROLL_TO_BOTTOM_BUTTON_THRESHOLD = 800;
 const NEAR_BOTTOM_THRESHOLD = 96;
 const STICKY_BOTTOM_THRESHOLD = 160;
+const JUMP_PAGINATION_INTENT_MS = 1200;
 
 const getMessageSenderId = (message?: Message | null) => {
   if (!message?.senderId) return "";
@@ -189,6 +190,8 @@ const ChatWindowBody: React.FC = () => {
 
   const loadingMoreRef = useRef(false);
   const suppressAutoScrollUntilRef = useRef(0);
+  const jumpPaginationIntentRef = useRef<{ direction: "up" | "down" | null; at: number }>({ direction: null, at: 0 });
+  const touchStartYRef = useRef<number | null>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [isNearBottom, setIsNearBottom] = useState(true);
   const [pendingNewMessageIds, setPendingNewMessageIds] = useState<string[]>([]);
@@ -296,15 +299,74 @@ const ChatWindowBody: React.FC = () => {
     return () => window.removeEventListener("nexcon:message-send", handleMessageSend as EventListener);
   }, [convoId, scheduleFollowBottom]);
 
+  const consumeJumpPaginationIntent = useCallback((direction: "up" | "down") => {
+    const intent = jumpPaginationIntentRef.current;
+    const isRecent = Date.now() - intent.at <= JUMP_PAGINATION_INTENT_MS;
+    if (intent.direction !== direction || !isRecent) return false;
+
+    jumpPaginationIntentRef.current = { direction: null, at: 0 };
+    return true;
+  }, []);
+
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const recordIntent = (direction: "up" | "down" | null) => {
+      if (!direction) return;
+      jumpPaginationIntentRef.current = { direction, at: Date.now() };
+    };
+
+    const handleWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) < 4) return;
+      recordIntent(event.deltaY > 0 ? "down" : "up");
+    };
+
+    const handleTouchStart = (event: TouchEvent) => {
+      touchStartYRef.current = event.touches[0]?.clientY ?? null;
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
+      const startY = touchStartYRef.current;
+      const currentY = event.touches[0]?.clientY;
+      if (startY == null || currentY == null) return;
+
+      const delta = startY - currentY;
+      if (Math.abs(delta) < 8) return;
+      recordIntent(delta > 0 ? "down" : "up");
+      touchStartYRef.current = currentY;
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!isJumpMode) return;
+      if (["ArrowDown", "PageDown", "End", " "].includes(event.key)) recordIntent("down");
+      if (["ArrowUp", "PageUp", "Home"].includes(event.key)) recordIntent("up");
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: true });
+    container.addEventListener("touchstart", handleTouchStart, { passive: true });
+    container.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+      container.removeEventListener("touchstart", handleTouchStart);
+      container.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isJumpMode]);
+
 
   // IntersectionObserver for top sentinel (load older)
   useEffect(() => {
-    if (!topSentinelRef.current || !convoId) return;
+    const container = scrollRef.current;
+    if (!topSentinelRef.current || !container || !convoId) return;
     if (!hasMoreOlder || messageLoading) return;
 
     const observer = new IntersectionObserver((entries: any) => {
       const [entry] = entries;
       if (entry.isIntersecting && !loadingMoreRef.current) {
+        if (isJumpMode && !consumeJumpPaginationIntent("up")) return;
         loadingMoreRef.current = true;
         prevScrollHeightRef.current = scrollRef.current?.scrollHeight ?? 0;
 
@@ -314,28 +376,30 @@ const ChatWindowBody: React.FC = () => {
           fetchMessages(convoId);
         }
       }
-    }, { threshold: 0.1 });
+    }, { root: container, threshold: 0.1 });
 
     observer.observe(topSentinelRef.current);
     return () => observer.disconnect();
-  }, [convoId, hasMoreOlder, messageLoading, isJumpMode, fetchMessages, loadOlderInJumpMode]);
+  }, [convoId, hasMoreOlder, messageLoading, isJumpMode, fetchMessages, loadOlderInJumpMode, consumeJumpPaginationIntent]);
 
   // IntersectionObserver for bottom sentinel (load newer)
   useEffect(() => {
-    if (!bottomSentinelRef.current || !convoId) return;
+    const container = scrollRef.current;
+    if (!bottomSentinelRef.current || !container || !convoId) return;
     if (!isJumpMode || !hasMoreNewer || messageLoading) return;
 
     const observer = new IntersectionObserver((entries: any) => {
       const [entry] = entries;
       if (entry.isIntersecting && !loadingMoreRef.current) {
+        if (!consumeJumpPaginationIntent("down")) return;
         loadingMoreRef.current = true;
         loadNewerInJumpMode(convoId);
       }
-    }, { threshold: 0.1 });
+    }, { root: container, threshold: 0.1 });
 
     observer.observe(bottomSentinelRef.current);
     return () => observer.disconnect();
-  }, [convoId, isJumpMode, hasMoreNewer, messageLoading, loadNewerInJumpMode]);
+  }, [convoId, isJumpMode, hasMoreNewer, messageLoading, loadNewerInJumpMode, consumeJumpPaginationIntent]);
 
   // Restore scroll position after loading older messages
   useEffect(() => {
@@ -546,6 +610,9 @@ const ChatWindowBody: React.FC = () => {
   const anchorId = jumpContext?.anchorId;
   useEffect(() => {
     if (!anchorId || !isJumpMode) return;
+
+    isFirstLoad.current = false;
+    jumpPaginationIntentRef.current = { direction: null, at: 0 };
 
     requestAnimationFrame(() => {
       const el = document.getElementById(`message-${anchorId}`);
