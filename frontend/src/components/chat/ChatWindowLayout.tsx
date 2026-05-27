@@ -71,6 +71,9 @@ const ChatWindowLayout = () => {
   const selectedConvo = conversations.find((c) => c._id === activeConversationId && c.disbanded !== true) ?? null;
   const conversationIdParam = searchParams.get('conversationId')?.trim() || '';
   const messageIdParam = searchParams.get('messageId')?.trim() || '';
+  const isDeepLinkingToActiveMessage = Boolean(
+    messageIdParam && (!conversationIdParam || conversationIdParam === activeConversationId)
+  );
 
   const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
   const { joinConversation } = useSocketStore();
@@ -108,7 +111,7 @@ const ChatWindowLayout = () => {
       joinConversation(activeConversationId);
 
       // Chỉ gọi fetch nếu ONLINE và chưa có tin nhắn, hoặc nếu bắt buộc phải load
-      if (!allMessages[activeConversationId] && !messageLoading && !isOffline) {
+      if (!isDeepLinkingToActiveMessage && !allMessages[activeConversationId] && !messageLoading && !isOffline) {
         fetchMessages(activeConversationId);
       }
     }

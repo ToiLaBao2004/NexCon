@@ -3,6 +3,7 @@ import Message from '../models/messageModel.js';
 import Friend from '../models/friendModel.js';
 import BlockUser from '../models/blockUserModel.js';
 import User from '../models/userModel.js';
+import mongoose from 'mongoose';
 import {
 	uploadImageFromBuffer,
 	deleteCloudinaryResource,
@@ -796,8 +797,7 @@ export async function getMessages(req, res) {
 		};
 
 		if (aroundId) {
-			const mongoose = await import('mongoose');
-			if (!mongoose.default.Types.ObjectId.isValid(aroundId)) {
+			if (!mongoose.Types.ObjectId.isValid(aroundId)) {
 				return res.status(400).json({ message: "Invalid aroundId" });
 			}
 
@@ -855,11 +855,35 @@ export async function getMessages(req, res) {
 		let sortDirection = -1; // Default: newest first
 
 		const activeCursor = before || cursor; // 'cursor' is legacy for 'before'
+		const resolveCursorDate = async (rawCursor) => {
+			const raw = String(rawCursor || '').trim();
+			if (!raw) return null;
+
+			const parsedDate = new Date(raw);
+			if (!Number.isNaN(parsedDate.getTime())) return parsedDate;
+
+			if (mongoose.Types.ObjectId.isValid(raw)) {
+				const cursorMessage = await Message.findOne({ _id: raw, conversationId })
+					.select('createdAt')
+					.lean();
+				return cursorMessage?.createdAt ? new Date(cursorMessage.createdAt) : null;
+			}
+
+			return null;
+		};
 
 		if (activeCursor) {
-			query.createdAt = { ...query.createdAt, $lt: new Date(activeCursor) };
+			const cursorDate = await resolveCursorDate(activeCursor);
+			if (!cursorDate) {
+				return res.status(400).json({ message: "Invalid cursor" });
+			}
+			query.createdAt = { ...query.createdAt, $lt: cursorDate };
 		} else if (after) {
-			query.createdAt = { ...query.createdAt, $gt: new Date(after) };
+			const afterDate = await resolveCursorDate(after);
+			if (!afterDate) {
+				return res.status(400).json({ message: "Invalid cursor" });
+			}
+			query.createdAt = { ...query.createdAt, $gt: afterDate };
 			sortDirection = 1; // forward: oldest to newest
 		}
 
