@@ -459,15 +459,6 @@ const ChatWindowBody: React.FC = () => {
 
     if (loadingMoreRef.current) return;
 
-    if (isJumpMode && convoId && isNewMessageAtBottom && isOwnLastMessage) {
-      pendingImageScrollRef.current = shouldFollowImage;
-      void exitJumpMode(convoId).then(() => {
-        requestAnimationFrame(() => scrollToBottom(true, true));
-        setTimeout(() => scrollToBottom(true, true), 120);
-      });
-      return;
-    }
-
     if (isJumpMode) return;
 
     if (isFirstLoad.current) {
@@ -501,7 +492,7 @@ const ChatWindowBody: React.FC = () => {
         scheduleFollowBottom(500);
       }
     }
-  }, [lastItemKey, messages.length, convoId, isJumpMode, user?._id, exitJumpMode, scrollToBottom, scheduleFollowBottom, messages]);
+  }, [lastItemKey, messages.length, convoId, isJumpMode, user?._id, scrollToBottom, scheduleFollowBottom, messages]);
 
   useEffect(() => {
     requestAnimationFrame(syncScrollState);
