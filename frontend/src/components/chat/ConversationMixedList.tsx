@@ -219,12 +219,38 @@ const getMessagePreview = (message: MessagePreviewLike, currentUserId?: string, 
 };
 
 const rememberConversation = (conversation: Conversation) => {
-  useChatStore.setState((state) => ({
-    conversations: [
-      conversation,
+  useChatStore.setState((state) => {
+    const existing = state.conversations.find((item) => item._id === conversation._id);
+    const mergedConversation = existing
+      ? {
+          ...existing,
+          ...conversation,
+          isPinned: existing.isPinned,
+          pinnedAt: existing.pinnedAt,
+        }
+      : conversation;
+
+    const nextConversations = [
+      mergedConversation,
       ...state.conversations.filter((item) => item._id !== conversation._id),
-    ],
-  }));
+    ].sort((a, b) => {
+      const aPinned = a.isPinned === true;
+      const bPinned = b.isPinned === true;
+      if (aPinned !== bPinned) return aPinned ? -1 : 1;
+
+      if (aPinned && bPinned) {
+        const aPinnedAt = new Date(a.pinnedAt || 0).getTime();
+        const bPinnedAt = new Date(b.pinnedAt || 0).getTime();
+        if (aPinnedAt !== bPinnedAt) return bPinnedAt - aPinnedAt;
+      }
+
+      const aTime = new Date(a.lastMessage?.createdAt || a.updatedAt || a.createdAt || 0).getTime();
+      const bTime = new Date(b.lastMessage?.createdAt || b.updatedAt || b.createdAt || 0).getTime();
+      return bTime - aTime;
+    });
+
+    return { conversations: nextConversations };
+  });
 };
 
 const appendUniqueById = <T extends { _id: string }>(current: T[], incoming: T[]) => {
