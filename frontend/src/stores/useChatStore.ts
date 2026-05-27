@@ -76,6 +76,24 @@ const getMessageSenderId = (message: any) => {
     return String(sender?._id || sender || "");
 };
 
+const isValidDateCursor = (value?: string | null) => {
+    if (!value) return false;
+    return !Number.isNaN(new Date(value).getTime());
+};
+
+const getMessageCreatedAtCursor = (message: any) => {
+    const createdAt = message?.createdAt?.toISOString?.() || message?.createdAt;
+    return isValidDateCursor(createdAt) ? String(createdAt) : null;
+};
+
+const resolveMessagePaginationCursor = (cursor: string | null | undefined, items: any[]) => {
+    if (!cursor) return cursor ?? null;
+    if (isValidDateCursor(cursor)) return cursor;
+
+    const cursorMessage = items.find((message) => String(message?._id || "") === String(cursor));
+    return getMessageCreatedAtCursor(cursorMessage);
+};
+
 const canUseOptimisticSlot = (optimistic: any, incoming: any) => {
     if (optimistic?.status !== 'sending') return false;
     if (!incoming?._id) return false;
@@ -532,8 +550,23 @@ export const useChatStore = create<ChatState>()(
                 }
 
                 const current = messages?.[convoId];
-                const nextCursor = current?.nextCursor === undefined ? "" : current?.nextCursor;
-                if (nextCursor === null) return;
+                const rawNextCursor = current?.nextCursor === undefined ? "" : current?.nextCursor;
+                if (rawNextCursor === null) return;
+
+                const nextCursor = resolveMessagePaginationCursor(rawNextCursor, current?.items ?? []);
+                if (rawNextCursor && !nextCursor) {
+                    set((state) => ({
+                        messages: {
+                            ...state.messages,
+                            [convoId]: {
+                                ...(state.messages[convoId] ?? { items: [], pinnedMessages: [] }),
+                                hasMore: false,
+                                nextCursor: null,
+                            },
+                        },
+                    }));
+                    return;
+                }
 
                 set({ messageLoading: true });
 
@@ -665,12 +698,11 @@ export const useChatStore = create<ChatState>()(
                 const context = get().jumpContexts[conversationId];
                 if (!context || !context.isJumpMode || !context.hasMoreOlder) return;
 
-                set({ messageLoading: true });
-
-
                 const { user } = useAuthStore.getState();
                 const messages = get().messages[conversationId]?.items ?? [];
                 if (messages.length === 0) return;
+
+                set({ messageLoading: true });
 
                 const firstMessage = messages[0];
 
@@ -725,12 +757,11 @@ export const useChatStore = create<ChatState>()(
                 const context = get().jumpContexts[conversationId];
                 if (!context || !context.isJumpMode || !context.hasMoreNewer) return;
 
-                set({ messageLoading: true });
-
-
                 const { user } = useAuthStore.getState();
                 const messages = get().messages[conversationId]?.items ?? [];
                 if (messages.length === 0) return;
+
+                set({ messageLoading: true });
 
                 const lastMessage = messages[messages.length - 1];
 
@@ -758,6 +789,7 @@ export const useChatStore = create<ChatState>()(
                         uniqueMerged.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
                         const isTransitioning = !hasMoreNewer;
                         const oldestMessage = uniqueMerged[0];
+                        const oldestMessageCursor = getMessageCreatedAtCursor(oldestMessage);
 
                         return {
                             messages: {
@@ -767,8 +799,8 @@ export const useChatStore = create<ChatState>()(
                                     items: uniqueMerged,
                                     // If transitioning to normal mode, update nextCursor to support upward scrolling
                                     ...(isTransitioning ? {
-                                        nextCursor: oldestMessage ? oldestMessage._id : prevState.nextCursor,
-                                        hasMore: true
+                                        nextCursor: oldestMessageCursor ?? null,
+                                        hasMore: Boolean(oldestMessageCursor)
                                     } : {})
                                 },
                             },
