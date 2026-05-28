@@ -7,6 +7,46 @@ import type { MediaKind } from "@/types/store";
 import SecureImage from "../SecureImage";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
 
+const getLocalDateKey = (value?: string | null) => {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+};
+
+const formatDateGroupLabel = (value?: string | null) => {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) return "Không rõ ngày";
+
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return `Ngày ${date.getDate()} Tháng ${date.getMonth() + 1}${sameYear ? "" : `, ${date.getFullYear()}`}`;
+};
+
+const groupMessagesByDay = (items: Message[]) => {
+  const groups: Array<{ key: string; label: string; items: Message[] }> = [];
+
+  items.forEach((item) => {
+    const key = getLocalDateKey(item.createdAt);
+    const current = groups[groups.length - 1];
+    if (current?.key === key) {
+      current.items.push(item);
+      return;
+    }
+
+    groups.push({
+      key,
+      label: formatDateGroupLabel(item.createdAt),
+      items: [item],
+    });
+  });
+
+  return groups;
+};
+
 const VIEWER_TITLES: Record<MediaKind, string> = {
   image: "Tất cả ảnh/video",
   file: "Tất cả file",
@@ -23,6 +63,7 @@ interface SidebarMediaViewerModalProps {
   onScroll: (event: UIEvent<HTMLDivElement>) => void;
   renderFileRow: (msg: Message) => ReactNode;
   renderLinkRow: (msg: Message) => ReactNode;
+  filtersNode?: ReactNode;
 }
 
 export function SidebarMediaViewerModal({
@@ -35,6 +76,7 @@ export function SidebarMediaViewerModal({
   onScroll,
   renderFileRow,
   renderLinkRow,
+  filtersNode,
 }: SidebarMediaViewerModalProps) {
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
     const container = event.currentTarget;
@@ -47,43 +89,51 @@ export function SidebarMediaViewerModal({
 
     if (type === "image") {
       return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-      {items.map((msg, i) => (
-         msg.filePublicId ? (
-            <button
-              key={`all-img-${msg._id || i}`}
-              type="button"
-              className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30 cursor-zoom-in hover:ring-2 hover:ring-primary/30 transition-all"
-              onClick={() =>
-                useImageViewerStore.getState().openViewer({
-                  messageId: msg._id,
-                  conversationId: msg.conversationId,
-                  message: msg,
-                  alt: msg.fileName ?? "image",
-                })
-              }
-            >
-              <SecureImage messageId={msg._id} alt="media" className="h-full w-full object-cover" />
-            </button>
-         ) : (
-            <button
-              key={`all-img-${msg._id || i}`}
-              type="button"
-              className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30 cursor-zoom-in hover:ring-2 hover:ring-primary/30 transition-all"
-              onClick={() =>
-                useImageViewerStore.getState().openViewer({
-                  messageId: msg._id,
-                  conversationId: msg.conversationId,
-                  message: msg,
-                  src: msg.fileUrl ?? undefined,
-                  alt: msg.fileName ?? "image",
-                })
-              }
-            >
-              <img src={msg.fileUrl || undefined} alt="media" className="h-full w-full object-cover" />
-            </button>
-         )
-      ))}
+        <div className="space-y-5">
+          {groupMessagesByDay(items).map((group, groupIndex) => (
+            <section key={group.key}>
+              {groupIndex > 0 && <div className="-mx-3 mb-5 h-2 bg-muted/50" />}
+              <h4 className="mb-3 text-[15px] font-semibold text-foreground">{group.label}</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {group.items.map((msg, i) => (
+                  msg.filePublicId ? (
+                    <button
+                      key={`all-img-${msg._id || i}`}
+                      type="button"
+                      className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30 cursor-zoom-in hover:ring-2 hover:ring-primary/30 transition-all"
+                      onClick={() =>
+                        useImageViewerStore.getState().openViewer({
+                          messageId: msg._id,
+                          conversationId: msg.conversationId,
+                          message: msg,
+                          alt: msg.fileName ?? "image",
+                        })
+                      }
+                    >
+                      <SecureImage messageId={msg._id} alt="media" className="h-full w-full object-cover" />
+                    </button>
+                  ) : (
+                    <button
+                      key={`all-img-${msg._id || i}`}
+                      type="button"
+                      className="aspect-square rounded-[6px] bg-muted/10 flex items-center justify-center overflow-hidden border border-border/30 cursor-zoom-in hover:ring-2 hover:ring-primary/30 transition-all"
+                      onClick={() =>
+                        useImageViewerStore.getState().openViewer({
+                          messageId: msg._id,
+                          conversationId: msg.conversationId,
+                          message: msg,
+                          src: msg.fileUrl ?? undefined,
+                          alt: msg.fileName ?? "image",
+                        })
+                      }
+                    >
+                      <img src={msg.fileUrl || undefined} alt="media" className="h-full w-full object-cover" />
+                    </button>
+                  )
+                ))}
+              </div>
+            </section>
+          ))}
         </div>
       );
     }
@@ -114,6 +164,12 @@ export function SidebarMediaViewerModal({
               </DialogTitle>
             </DialogHeader>
           </div>
+
+          {filtersNode && (
+            <div className="shrink-0 border-b border-border/30 bg-card px-3 py-2.5">
+              {filtersNode}
+            </div>
+          )}
 
           <div
             className="p-3 overflow-y-auto overflow-x-hidden flex-1 min-h-0 bg-card beautiful-scrollbar"

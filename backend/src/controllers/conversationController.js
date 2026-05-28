@@ -1212,7 +1212,7 @@ export async function updateConversationMute(req, res) {
 export async function getMediaByType(req, res) {
 	try {
 		const { conversationId } = req.params;
-		const { type, limit = 8, cursor } = req.query;
+		const { type, limit = 8, cursor, senderId, fromDate, toDate } = req.query;
 		const userId = req.user._id.toString();
 
 		const allowedTypes = ['image', 'file', 'link'];
@@ -1254,6 +1254,39 @@ export async function getMediaByType(req, res) {
 
 		if (me.clearedAt) {
 			query.createdAt = { $gt: new Date(me.clearedAt) };
+		}
+
+		if (senderId) {
+			const normalizedSenderId = senderId.toString();
+			const isConversationSender = conversation.participants?.some((p) => p.userId.toString() === normalizedSenderId);
+			if (!mongoose.Types.ObjectId.isValid(normalizedSenderId) || !isConversationSender) {
+				return res.status(400).json({ message: 'Invalid senderId' });
+			}
+			query.senderId = normalizedSenderId;
+		}
+
+		if (fromDate || toDate) {
+			const createdAtFilter = { ...(query.createdAt || {}) };
+
+			if (fromDate) {
+				const from = new Date(fromDate);
+				if (Number.isNaN(from.getTime())) {
+					return res.status(400).json({ message: 'Invalid fromDate' });
+				}
+				from.setHours(0, 0, 0, 0);
+				createdAtFilter.$gte = from;
+			}
+
+			if (toDate) {
+				const to = new Date(toDate);
+				if (Number.isNaN(to.getTime())) {
+					return res.status(400).json({ message: 'Invalid toDate' });
+				}
+				to.setHours(23, 59, 59, 999);
+				createdAtFilter.$lte = to;
+			}
+
+			query.createdAt = createdAtFilter;
 		}
 
 		if (cursor) {

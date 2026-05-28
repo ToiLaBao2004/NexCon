@@ -69,6 +69,12 @@ export interface MediaCacheState {
 
 export type MediaKind = 'image' | 'file' | 'link';
 
+export interface MediaFilters {
+  senderId?: string;
+  fromDate?: string;
+  toDate?: string;
+}
+
 export interface MediaPageState {
   items: Message[];
   page: number;
@@ -160,7 +166,7 @@ export interface ChatState {
   clearConversation: (conversationId: string) => Promise<void>;
   fetchMedia: (conversationId: string) => Promise<void>;
   removeMember: (conversationId: string, memberId: string) => Promise<void>;
-  fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number, force?: boolean) => Promise<void>;
+  fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number, force?: boolean, filters?: MediaFilters) => Promise<void>;
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
   updateMessageReaction: (messageId: string, reactions: { userId: string; emoji: string }[]) => void;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;

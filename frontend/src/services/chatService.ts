@@ -188,9 +188,18 @@ export const chatService = {
 		};
 	},
 
-	async fetchMedia(conversationId: string, type: 'image' | 'file' | 'link', limit = 8, cursor?: string) {
+	async fetchMedia(
+		conversationId: string,
+		type: 'image' | 'file' | 'link',
+		limit = 8,
+		cursor?: string,
+		filters?: { senderId?: string; fromDate?: string; toDate?: string }
+	) {
 		const params = new URLSearchParams({ type, limit: String(limit) });
 		if (cursor) params.append('cursor', cursor);
+		if (filters?.senderId) params.append('senderId', filters.senderId);
+		if (filters?.fromDate) params.append('fromDate', filters.fromDate);
+		if (filters?.toDate) params.append('toDate', filters.toDate);
 		const res = await api.get(`/conversations/${conversationId}/media?${params}`);
 		return res.data as { messages: Message[]; nextCursor: string | null };
 	},
