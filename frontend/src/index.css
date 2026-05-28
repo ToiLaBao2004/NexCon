@@ -304,6 +304,17 @@
         font-size: 1.25rem;
         line-height: 1.75rem;
     }
+
+    .mobile-hide-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    .mobile-hide-scrollbar::-webkit-scrollbar {
+        width: 0;
+        height: 0;
+        display: none;
+    }
 }
 
 [data-sonner-toaster] {
