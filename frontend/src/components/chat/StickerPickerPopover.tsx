@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { StickerIcon } from "@/components/shared/StickerIcon";
@@ -13,6 +13,11 @@ interface StickerPickerPopoverProps {
 export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverProps) {
   const [activeTab, setActiveTab] = useState(STICKER_SETS[0].id);
   const [isOpen, setIsOpen] = useState(false);
+  const [isDraggingTabs, setIsDraggingTabs] = useState(false);
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
+  const dragStartXRef = useRef(0);
+  const dragStartScrollLeftRef = useRef(0);
+  const didDragTabsRef = useRef(false);
   const currentSet = STICKER_SETS.find((set) => set.id === activeTab) ?? STICKER_SETS[0];
 
   useEffect(() => {
@@ -24,6 +29,43 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
   const handleSelect = (url: string) => {
     onSelect(url);
     setIsOpen(false);
+  };
+
+  const handleTabsPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = tabsScrollRef.current;
+    if (!target) return;
+
+    setIsDraggingTabs(true);
+    didDragTabsRef.current = false;
+    dragStartXRef.current = event.clientX;
+    dragStartScrollLeftRef.current = target.scrollLeft;
+    target.setPointerCapture(event.pointerId);
+  };
+
+  const handleTabsPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = tabsScrollRef.current;
+    if (!target || !isDraggingTabs) return;
+
+    const deltaX = event.clientX - dragStartXRef.current;
+    if (Math.abs(deltaX) > 4) didDragTabsRef.current = true;
+    target.scrollLeft = dragStartScrollLeftRef.current - deltaX;
+  };
+
+  const stopTabsDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = tabsScrollRef.current;
+    if (target?.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
+    setIsDraggingTabs(false);
+  };
+
+  const handleTabsClickCapture = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!didDragTabsRef.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.setTimeout(() => {
+      didDragTabsRef.current = false;
+    }, 0);
   };
 
   return (
@@ -71,10 +113,22 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
           </div>
 
           <div className="p-2 bg-muted/30 border-t border-border/40">
-            <div className="flex gap-2 overflow-x-auto beautiful-scrollbar py-1 px-1">
+            <div
+              ref={tabsScrollRef}
+              onPointerDown={handleTabsPointerDown}
+              onPointerMove={handleTabsPointerMove}
+              onPointerUp={stopTabsDrag}
+              onPointerCancel={stopTabsDrag}
+              onClickCapture={handleTabsClickCapture}
+              className={cn(
+                "flex gap-2 overflow-x-auto beautiful-scrollbar py-1 px-1 select-none touch-pan-y",
+                isDraggingTabs ? "cursor-grabbing" : "cursor-grab"
+              )}
+            >
               {STICKER_SETS.map((set) => (
                 <button
                   key={set.id}
+                  draggable={false}
                   onClick={() => setActiveTab(set.id)}
                   className={cn(
                     "h-10 w-10 shrink-0 rounded-xl transition-all duration-200 flex items-center justify-center border-2",
@@ -87,7 +141,9 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
                   <CachedStickerImage
                     src={set.iconUrl}
                     alt={set.name}
-                    className="size-7 object-contain"
+                    draggable={false}
+                    onDragStart={(event) => event.preventDefault()}
+                    className="size-7 object-contain pointer-events-none select-none"
                   />
                 </button>
               ))}

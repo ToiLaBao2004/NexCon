@@ -1,13 +1,14 @@
-import { CheckCircle2, Link2, FileText, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2, Copy } from "lucide-react";
-import { useState, useEffect } from "react";
+import { CheckCircle2, Link2, FileText, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2, Copy, Check, CalendarDays, UserRound, X } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import type { ReactNode, UIEvent } from "react";
 import type { Conversation, Message } from "@/types/chat";
 import { useChatStore } from "@/stores/useChatStore";
-import { formatBytes, formatMessageTime } from "@/lib/utils";
+import { cn, formatBytes, formatMessageTime } from "@/lib/utils";
 import type { MediaKind } from "@/types/store";
 import { SidebarMediaViewerModal } from "./SidebarMediaViewerModal";
 import SecureImage from "../SecureImage";
 import { useImageViewerStore } from "@/stores/useImageViewerStore";
+import UserAvatar from "./UserAvatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,114 @@ const PREVIEW_LIMIT: Record<MediaKind, number> = {
   file: 3,
   link: 3,
 };
+
+type ViewerDateOption = "all" | "today" | "7days" | "30days" | "custom";
+
+const DATE_OPTIONS: { value: ViewerDateOption; label: string }[] = [
+  { value: "all", label: "Tất cả" },
+  { value: "today", label: "Hôm nay" },
+  { value: "7days", label: "7 ngày qua" },
+  { value: "30days", label: "30 ngày qua" },
+  { value: "custom", label: "Tùy chỉnh" },
+];
+
+const toDateInputValue = (date: Date) => date.toISOString().split("T")[0];
+
+const computeDateRange = (option: ViewerDateOption, customFrom: string, customTo: string) => {
+  const now = new Date();
+
+  if (option === "today") {
+    const today = toDateInputValue(now);
+    return { fromDate: today, toDate: today };
+  }
+
+  if (option === "7days" || option === "30days") {
+    const from = new Date(now);
+    from.setDate(now.getDate() - (option === "7days" ? 6 : 29));
+    return { fromDate: toDateInputValue(from), toDate: toDateInputValue(now) };
+  }
+
+  if (option === "custom") {
+    return {
+      fromDate: customFrom || undefined,
+      toDate: customTo || undefined,
+    };
+  }
+
+  return {};
+};
+
+const getParticipantDisplayName = (participant?: Conversation["participants"][number]) =>
+  participant?.userId?.nickname?.trim() || participant?.userId?.displayName || "Người dùng";
+
+function FilterDropdown({
+  label,
+  icon,
+  active,
+  open,
+  onToggle,
+  onClose,
+  children,
+  className,
+  align = "start",
+  contentClassName,
+}: {
+  label: string;
+  icon: ReactNode;
+  active?: boolean;
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+  align?: "start" | "end";
+  contentClassName?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open, onClose]);
+
+  return (
+    <div ref={ref} className={cn("relative min-w-0", className)}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          "flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-full border px-3 text-[13px] transition-colors",
+          active || open
+            ? "border-primary/30 bg-primary/5 text-primary"
+            : "border-border/50 bg-muted/40 text-foreground hover:bg-muted/60"
+        )}
+      >
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="shrink-0">{icon}</span>
+          <span className="truncate">{label}</span>
+        </span>
+        <ChevronDown className={cn("h-3.5 w-3.5 shrink-0 opacity-70 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div
+          className={cn(
+            "absolute top-full z-[230] mt-1 w-[240px] overflow-hidden rounded-lg border border-border/50 bg-popover py-1 shadow-xl",
+            align === "end" ? "right-0" : "left-0",
+            contentClassName
+          )}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ThickDivider() {
   return <div className="h-2 w-full shrink-0 bg-muted/40 pointer-events-none" />;
@@ -79,6 +188,15 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   const [forwardTarget, setForwardTarget] = useState<Message | null>(null);
   const [recallTarget, setRecallTarget] = useState<Message | null>(null);
   const [isRecalling, setIsRecalling] = useState(false);
+  const [selectedSenderId, setSelectedSenderId] = useState("");
+  const [dateOption, setDateOption] = useState<ViewerDateOption>("all");
+  const [datePickerOption, setDatePickerOption] = useState<ViewerDateOption>("all");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [customDraftFrom, setCustomDraftFrom] = useState("");
+  const [customDraftTo, setCustomDraftTo] = useState("");
+  const [senderFilterOpen, setSenderFilterOpen] = useState(false);
+  const [dateFilterOpen, setDateFilterOpen] = useState(false);
 
   const mediaPage = useChatStore((s) =>
     activeViewer ? s.mediaPagination[conversation._id]?.[activeViewer] : undefined
@@ -99,8 +217,13 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   useEffect(() => {
     if (!isViewerOpen || !activeViewer) return;
     // force=true: tự reset state + fetch, bỏ qua mọi guard trong store
-    fetchMediaPage(conversation._id, activeViewer, VIEW_ALL_LIMIT[activeViewer], true);
-  }, [isViewerOpen, activeViewer, viewerKey, conversation._id, fetchMediaPage]);
+    const { fromDate, toDate } = computeDateRange(dateOption, customFrom, customTo);
+    fetchMediaPage(conversation._id, activeViewer, VIEW_ALL_LIMIT[activeViewer], true, {
+      senderId: selectedSenderId || undefined,
+      fromDate,
+      toDate,
+    });
+  }, [isViewerOpen, activeViewer, viewerKey, conversation._id, fetchMediaPage, selectedSenderId, dateOption, customFrom, customTo]);
 
   const imageMessages = mediaState?.images ?? [];
   const fileMessages = mediaState?.files ?? [];
@@ -205,6 +328,15 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
 
   const openViewer = (type: MediaKind) => {
     setActiveViewer(type);
+    setSelectedSenderId("");
+    setDateOption("all");
+    setDatePickerOption("all");
+    setCustomFrom("");
+    setCustomTo("");
+    setCustomDraftFrom("");
+    setCustomDraftTo("");
+    setSenderFilterOpen(false);
+    setDateFilterOpen(false);
     setIsViewerOpen(true);
     setViewerKey((k) => k + 1);
   };
@@ -213,6 +345,8 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     if (activeViewer) {
       resetMediaPagination(conversation._id, activeViewer);
     }
+    setSenderFilterOpen(false);
+    setDateFilterOpen(false);
     setIsViewerOpen(false);
     setActiveViewer(null);
   };
@@ -222,13 +356,217 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     const target = event.currentTarget;
     const distanceToBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
     if (distanceToBottom <= 180) {
-      fetchMediaPage(conversation._id, activeViewer, VIEW_ALL_LIMIT[activeViewer]);
+      const { fromDate, toDate } = computeDateRange(dateOption, customFrom, customTo);
+      fetchMediaPage(conversation._id, activeViewer, VIEW_ALL_LIMIT[activeViewer], false, {
+        senderId: selectedSenderId || undefined,
+        fromDate,
+        toDate,
+      });
     }
   };
 
   const viewerItems = mediaPage?.items ?? [];
   const viewerLoading = mediaPage?.isFetching ?? false;
   const viewerHasMore = mediaPage?.hasMore ?? true;
+  const selectedSender = conversation.participants.find((participant) => participant.userId?._id === selectedSenderId);
+  const senderLabel = selectedSender ? getParticipantDisplayName(selectedSender) : "Người gửi";
+  const dateLabel = dateOption === "custom"
+    ? (customFrom || customTo ? [customFrom, customTo].filter(Boolean).join(" - ") : "Tùy chỉnh")
+    : DATE_OPTIONS.find((option) => option.value === dateOption)?.label ?? "Ngày gửi";
+  const hasViewerFilters = Boolean(selectedSenderId || dateOption !== "all" || customFrom || customTo);
+  const canApplyCustomDate = Boolean(customDraftFrom || customDraftTo);
+
+  const closeDateFilter = () => {
+    setDateFilterOpen(false);
+    setDatePickerOption(dateOption);
+    setCustomDraftFrom(customFrom);
+    setCustomDraftTo(customTo);
+  };
+
+  const clearViewerFilters = () => {
+    setSelectedSenderId("");
+    setDateOption("all");
+    setDatePickerOption("all");
+    setCustomFrom("");
+    setCustomTo("");
+    setCustomDraftFrom("");
+    setCustomDraftTo("");
+    setSenderFilterOpen(false);
+    setDateFilterOpen(false);
+  };
+
+  const viewerFiltersNode = (
+    <div className="flex w-full items-center gap-2">
+      <FilterDropdown
+        label={senderLabel}
+        icon={<UserRound className="h-3.5 w-3.5" strokeWidth={1.8} />}
+        active={Boolean(selectedSenderId)}
+        open={senderFilterOpen}
+        onToggle={() => {
+          setSenderFilterOpen((open) => !open);
+          setDateFilterOpen(false);
+        }}
+        onClose={() => setSenderFilterOpen(false)}
+        className="flex-1"
+      >
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedSenderId("");
+            setSenderFilterOpen(false);
+          }}
+          className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40"
+        >
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <UserRound className="h-3.5 w-3.5" strokeWidth={1.8} />
+          </div>
+          <span className="min-w-0 flex-1 truncate">Tất cả người gửi</span>
+          {!selectedSenderId && <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2} />}
+        </button>
+
+        <div className="max-h-[260px] overflow-y-auto py-1 beautiful-scrollbar">
+          {conversation.participants.map((participant) => {
+            const displayName = getParticipantDisplayName(participant);
+            const isSelected = participant.userId._id === selectedSenderId;
+
+            return (
+              <button
+                key={participant.userId._id}
+                type="button"
+                onClick={() => {
+                  setSelectedSenderId(isSelected ? "" : participant.userId._id);
+                  setSenderFilterOpen(false);
+                }}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-muted/40"
+              >
+                <UserAvatar
+                  type="profile"
+                  name={displayName}
+                  avatarUrl={participant.userId.avatarUrl ?? undefined}
+                  className="!h-7 !w-7 !text-xs shrink-0"
+                />
+                <span className="min-w-0 flex-1 truncate text-sm">{displayName}</span>
+                {isSelected && <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2} />}
+              </button>
+            );
+          })}
+        </div>
+      </FilterDropdown>
+
+      <FilterDropdown
+        label={dateOption === "all" ? "Ngày gửi" : dateLabel}
+        icon={<CalendarDays className="h-3.5 w-3.5" strokeWidth={1.8} />}
+        active={dateOption !== "all" || Boolean(customFrom || customTo)}
+        open={dateFilterOpen}
+        onToggle={() => {
+          const nextOpen = !dateFilterOpen;
+          if (nextOpen) {
+            setDatePickerOption(dateOption);
+            setCustomDraftFrom(customFrom);
+            setCustomDraftTo(customTo);
+          }
+          setDateFilterOpen(nextOpen);
+          setSenderFilterOpen(false);
+        }}
+        onClose={closeDateFilter}
+        className="flex-1"
+        align="end"
+        contentClassName="w-[min(300px,calc(100vw-24px))]"
+      >
+        {DATE_OPTIONS.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => {
+              setDatePickerOption(option.value);
+              if (option.value === "custom") {
+                setCustomDraftFrom(customFrom);
+                setCustomDraftTo(customTo);
+                return;
+              }
+
+              setDateOption(option.value);
+              setCustomFrom("");
+              setCustomTo("");
+              setCustomDraftFrom("");
+              setCustomDraftTo("");
+              setDateFilterOpen(false);
+            }}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40"
+          >
+            <span className="min-w-0 flex-1 truncate">{option.label}</span>
+            {datePickerOption === option.value && <Check className="h-4 w-4 shrink-0 text-primary" strokeWidth={2} />}
+          </button>
+        ))}
+
+        {datePickerOption === "custom" && (
+          <div className="mt-1 space-y-2 border-t border-border/40 px-3 py-3">
+            <label className="block space-y-1">
+              <span className="text-[11px] text-muted-foreground">Từ ngày</span>
+              <input
+                type="date"
+                value={customDraftFrom}
+                onChange={(event) => setCustomDraftFrom(event.target.value)}
+                className="h-8 w-full rounded-md border border-border/60 bg-background px-2 text-sm outline-none focus:border-primary/50"
+              />
+            </label>
+            <label className="block space-y-1">
+              <span className="text-[11px] text-muted-foreground">Đến ngày</span>
+              <input
+                type="date"
+                value={customDraftTo}
+                min={customDraftFrom || undefined}
+                onChange={(event) => setCustomDraftTo(event.target.value)}
+                className="h-8 w-full rounded-md border border-border/60 bg-background px-2 text-sm outline-none focus:border-primary/50"
+              />
+            </label>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setDateOption("all");
+                  setDatePickerOption("all");
+                  setCustomFrom("");
+                  setCustomTo("");
+                  setCustomDraftFrom("");
+                  setCustomDraftTo("");
+                  setDateFilterOpen(false);
+                }}
+                className="rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              >
+                Xóa ngày
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!canApplyCustomDate) return;
+                  setDateOption("custom");
+                  setCustomFrom(customDraftFrom);
+                  setCustomTo(customDraftTo);
+                  setDateFilterOpen(false);
+                }}
+                disabled={!canApplyCustomDate}
+                className="rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-45"
+              >
+                Áp dụng
+              </button>
+            </div>
+          </div>
+        )}
+      </FilterDropdown>
+
+      {hasViewerFilters && (
+        <button
+          type="button"
+          onClick={clearViewerFilters}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border/50 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          aria-label="Xóa bộ lọc"
+        >
+          <X className="h-4 w-4" strokeWidth={1.8} />
+        </button>
+      )}
+    </div>
+  );
 
   const getSenderId = (msg: Message) => {
     const sender = msg.senderId as any;
@@ -564,6 +902,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         onScroll={onViewerScroll}
         renderFileRow={renderFileRow}
         renderLinkRow={renderLinkRow}
+        filtersNode={viewerFiltersNode}
       />
 
       {forwardTarget && (

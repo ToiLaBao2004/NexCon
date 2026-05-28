@@ -1838,7 +1838,7 @@ export const useChatStore = create<ChatState>()(
                     console.error('Failed to fetch media:', error);
                 }
             },
-            fetchMediaPage: async (conversationId, type, limit, force) => {
+            fetchMediaPage: async (conversationId, type, limit, force, filters) => {
                 const defaultLimit = type === 'image' ? 24 : 20;
                 const resolvedLimit = limit ?? defaultLimit;
 
@@ -1866,7 +1866,7 @@ export const useChatStore = create<ChatState>()(
                         };
                     });
                     try {
-                        const res = await chatService.fetchMedia(conversationId, type, resolvedLimit, undefined);
+                        const res = await chatService.fetchMedia(conversationId, type, resolvedLimit, undefined, filters);
                         const fetched = res.messages ?? [];
                         const noMoreData = fetched.length === 0 || fetched.length < resolvedLimit || !res.nextCursor;
                         set((state) => {
@@ -2005,6 +2005,7 @@ export const useChatStore = create<ChatState>()(
                         type,
                         active.limit,
                         active.nextCursor || undefined,
+                        filters,
                     );
 
                     const fetched = res.messages ?? [];
