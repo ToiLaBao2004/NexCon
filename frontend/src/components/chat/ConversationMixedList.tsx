@@ -40,6 +40,7 @@ const DEFAULT_TAB_LIMITS: Record<ResultTab, number> = {
   conversations: 8,
   messages: 10,
 };
+const GLOBAL_SEARCH_DEBOUNCE_MS = 1000;
 
 const createEmptyPage = <T,>(limit = 0): GlobalSearchPage<T> => ({
   items: [],
@@ -518,7 +519,7 @@ const ConversationMixedList = ({
   const fetchedTabsRef = useRef(createFetchedMap(false));
   const conversationItems = useMemo(() => conversations ?? [], [conversations]);
   const currentUserId = user?._id?.toString();
-  const debouncedQuery = useDebounce(searchQuery, 300);
+  const debouncedQuery = useDebounce(searchQuery, GLOBAL_SEARCH_DEBOUNCE_MS);
   const trimmedQuery = searchQuery.trim();
   const trimmedDebouncedQuery = debouncedQuery.trim();
   const hasQuery = trimmedQuery.length > 0;
