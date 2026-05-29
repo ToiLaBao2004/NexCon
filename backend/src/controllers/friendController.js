@@ -10,6 +10,14 @@ import { checkFieldFormat } from "../utils/fieldFormat.js";
 import { maskLockedUserDoc } from "../utils/lockedUser.js";
 import { applyProfileVisibility } from "../utils/profilePrivacy.js";
 import { getVisiblePresencesForUsers } from "../services/userStatusService.js";
+import {
+    buildReadCacheKey,
+    createPendingJson,
+    getCachedJson,
+    getPendingJson,
+    getPositiveIntEnv,
+    setCachedJson,
+} from "../utils/readCache.js";
 import validator from "validator";
 
 const toFriendItem = (friendship, user) => {
@@ -30,6 +38,8 @@ const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX
 const MAX_FRIEND_REQUEST_MESSAGE_LENGTH = 300;
 const DEFAULT_SUGGESTION_LIMIT = 20;
 const MAX_SUGGESTION_LIMIT = 50;
+const FRIENDS_LIST_CACHE_TTL_MS = getPositiveIntEnv('FRIENDS_LIST_CACHE_TTL_MS', 2000);
+const FRIEND_SUGGESTIONS_CACHE_TTL_MS = getPositiveIntEnv('FRIEND_SUGGESTIONS_CACHE_TTL_MS', 5000);
 const GENERIC_EMAIL_DOMAINS = new Set([
     'gmail.com',
     'googlemail.com',
@@ -40,6 +50,10 @@ const GENERIC_EMAIL_DOMAINS = new Set([
     'icloud.com',
     'proton.me',
     'protonmail.com',
+    'yopmail.com',
+    'mailinator.com',
+    'tempmail.com',
+    '10minutemail.com',
 ]);
 
 const NON_ADMIN_USER_FILTER = { role: { $ne: 'admin' } };
@@ -637,8 +651,20 @@ export async function unblockUser(req, res) {
 }
 
 export async function getAllFriends(req, res) {
+    let pendingCache = null;
     try {
         const user = req.user;
+        const cacheKey = buildReadCacheKey('friends:list', [user._id]);
+        const cachedPayload = getCachedJson(cacheKey);
+        if (cachedPayload) {
+            return res.status(200).json(cachedPayload);
+        }
+        const pendingPayload = getPendingJson(cacheKey);
+        if (pendingPayload) {
+            return res.status(200).json(await pendingPayload);
+        }
+        pendingCache = createPendingJson(cacheKey);
+
         const friends = await Friend.find({
             $or: [
                 { userA: user._id },
@@ -675,14 +701,21 @@ export async function getAllFriends(req, res) {
             ...friend,
             presence: presenceByUserId.get(friend.friendId?.toString()) || null,
         }));
-        return res.status(200).json({ listedFriends });
+        const payload = { listedFriends };
+        setCachedJson(cacheKey, payload, FRIENDS_LIST_CACHE_TTL_MS);
+        pendingCache.resolve(payload);
+        return res.status(200).json(payload);
     } catch (error) {
+        pendingCache?.reject(error);
         console.error('Get all friends error:', error);
         return res.status(500).json({ message: 'Server error' });
+    } finally {
+        pendingCache?.clear();
     }
 }
 
 export async function getFriendSuggestions(req, res) {
+    let pendingCache = null;
     try {
         const user = req.user;
         const userId = user._id;
@@ -691,6 +724,16 @@ export async function getFriendSuggestions(req, res) {
             Math.max(Number.parseInt(req.query.limit, 10) || DEFAULT_SUGGESTION_LIMIT, 1),
             MAX_SUGGESTION_LIMIT
         );
+        const cacheKey = buildReadCacheKey('friends:suggestions', [currentUserId, limit]);
+        const cachedPayload = getCachedJson(cacheKey);
+        if (cachedPayload) {
+            return res.status(200).json(cachedPayload);
+        }
+        const pendingPayload = getPendingJson(cacheKey);
+        if (pendingPayload) {
+            return res.status(200).json(await pendingPayload);
+        }
+        pendingCache = createPendingJson(cacheKey);
 
         const [friendships, relatedRequests, blockEntries, myGroups] = await Promise.all([
             Friend.find({
@@ -833,7 +876,10 @@ export async function getFriendSuggestions(req, res) {
 
         const candidateIds = Array.from(candidateStats.keys());
         if (candidateIds.length === 0) {
-            return res.status(200).json({ suggestions: [] });
+            const payload = { suggestions: [] };
+            setCachedJson(cacheKey, payload, FRIEND_SUGGESTIONS_CACHE_TTL_MS);
+            pendingCache.resolve(payload);
+            return res.status(200).json(payload);
         }
 
         const candidateUsers = await User.find({
@@ -931,10 +977,16 @@ export async function getFriendSuggestions(req, res) {
             };
         });
 
-        return res.status(200).json({ suggestions });
+        const payload = { suggestions };
+        setCachedJson(cacheKey, payload, FRIEND_SUGGESTIONS_CACHE_TTL_MS);
+        pendingCache.resolve(payload);
+        return res.status(200).json(payload);
     } catch (error) {
+        pendingCache?.reject(error);
         console.error('Get friend suggestions error:', error);
         return res.status(500).json({ message: 'Server error' });
+    } finally {
+        pendingCache?.clear();
     }
 }
 
