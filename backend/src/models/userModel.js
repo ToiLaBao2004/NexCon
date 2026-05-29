@@ -73,6 +73,7 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         enum: ['user', 'admin'],
+        default: 'user',
         index: true
     },
     lock: {
@@ -99,6 +100,11 @@ const userSchema = new mongoose.Schema({
         default: undefined,
     },
 }, { timestamps: true });
+
+userSchema.index({ createdAt: -1 });
+userSchema.index({ role: 1, createdAt: -1 });
+userSchema.index({ 'lock.isLocked': 1, createdAt: -1 });
+userSchema.index({ role: 1, 'lock.isLocked': 1, createdAt: -1 });
 
 const UserModel = mongoose.models.User || mongoose.model('User', userSchema);
 

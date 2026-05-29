@@ -33,6 +33,14 @@ import {
 	getDirectConversationKey,
 	isDuplicateDirectConversationError,
 } from '../utils/directConversation.js';
+import {
+	buildReadCacheKey,
+	createPendingJson,
+	getCachedJson,
+	getPendingJson,
+	getPositiveIntEnv,
+	setCachedJson,
+} from '../utils/readCache.js';
 
 const MUTE_DURATION_MS = {
 	'1h': 60 * 60 * 1000,
@@ -46,6 +54,8 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const PARTICIPANT_SELECT = 'displayName avatarUrl profileVisibility lock';
 const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
 const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname profileVisibility status lastSeen about lock';
+const CONVERSATION_LIST_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_LIST_CACHE_TTL_MS', 2000);
+const CONVERSATION_MESSAGES_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_MESSAGES_CACHE_TTL_MS', 1000);
 
 function clampPageLimit(value, defaultLimit = 50, maxLimit = 100) {
 	const parsed = Number.parseInt(value, 10);
@@ -319,10 +329,21 @@ export async function createConversation(req, res) {
 }
 
 export async function getConversations(req, res) {
+	let pendingCache = null;
 	try {
 		const myId = req.user._id.toString();
 		const limit = clampPageLimit(req.query.limit, 50, 100);
 		const cursor = req.query.cursor;
+		const cacheKey = buildReadCacheKey('conversations:list', [myId, limit, cursor || '']);
+		const cachedPayload = getCachedJson(cacheKey);
+		if (cachedPayload) {
+			return res.status(200).json(cachedPayload);
+		}
+		const pendingPayload = getPendingJson(cacheKey);
+		if (pendingPayload) {
+			return res.status(200).json(await pendingPayload);
+		}
+		pendingCache = createPendingJson(cacheKey);
 
 		const unpinnedQuery = { participants: { $elemMatch: { userId: myId, pinnedAt: null } } };
 		let cursorDate = null;
@@ -562,10 +583,16 @@ export async function getConversations(req, res) {
 
 		const formattedWithPresence = await attachPresenceToConversationParticipants(formatted, myId);
 
-		return res.status(200).json({ conversations: sortConversationsForClient(formattedWithPresence), hasMore, nextCursor });
+		const payload = { conversations: sortConversationsForClient(formattedWithPresence), hasMore, nextCursor };
+		setCachedJson(cacheKey, payload, CONVERSATION_LIST_CACHE_TTL_MS);
+		pendingCache.resolve(payload);
+		return res.status(200).json(payload);
 	} catch (error) {
+		pendingCache?.reject(error);
 		console.error("Error occurred while fetching conversations", error);
 		return res.status(500).json({ message: "Internal server error" });
+	} finally {
+		pendingCache?.clear();
 	}
 }
 
@@ -747,6 +774,7 @@ export async function getGroups(req, res) {
 }
 
 export async function getMessages(req, res) {
+	let pendingCache = null;
 	try {
 		const { conversationId } = req.params;
 		const { limit = 50, cursor, before, after, aroundId } = req.query;
@@ -762,6 +790,20 @@ export async function getMessages(req, res) {
 			return res.status(403).json({ message: "You are not a participant in this conversation." });
 		}
 		const clearedAt = me?.clearedAt ? new Date(me.clearedAt) : null;
+		const cacheKey = buildReadCacheKey('conversations:messages', [
+			userId,
+			conversationId,
+			limit,
+			cursor || '',
+			before || '',
+			after || '',
+			aroundId || '',
+			clearedAt?.toISOString?.() || '',
+		]);
+		const cachedPayload = getCachedJson(cacheKey);
+		if (cachedPayload) {
+			return res.status(200).json(cachedPayload);
+		}
 
 		const baseFilter = {
 			conversationId,
@@ -812,6 +854,11 @@ export async function getMessages(req, res) {
 			const requestedAroundLimit = Number(limit);
 			const limitNumber = Math.max(1, Math.min(100, Number.isFinite(requestedAroundLimit) ? requestedAroundLimit : 50));
 			const half = Math.floor(limitNumber / 2);
+			const pendingPayload = getPendingJson(cacheKey);
+			if (pendingPayload) {
+				return res.status(200).json(await pendingPayload);
+			}
+			pendingCache = createPendingJson(cacheKey);
 
 			const [olderMessages, newerMessages] = await Promise.all([
 				Message.find({ ...baseFilter, createdAt: { $lt: anchor.createdAt } })
@@ -842,12 +889,15 @@ export async function getMessages(req, res) {
 				...newerMessages
 			].map(fallbackSender);
 
-			return res.status(200).json({
+			const payload = {
 				messages: sanitizeMessages(combined),
 				anchorId: aroundId,
 				hasMoreOlder: olderMessages.length === half,
 				hasMoreNewer: newerMessages.length === half,
-			});
+			};
+			setCachedJson(cacheKey, payload, CONVERSATION_MESSAGES_CACHE_TTL_MS);
+			pendingCache.resolve(payload);
+			return res.status(200).json(payload);
 		}
 		const requestedLimit = Number(limit);
 		const limitNumber = Math.max(1, Math.min(100, Number.isFinite(requestedLimit) ? requestedLimit : 50));
@@ -886,6 +936,11 @@ export async function getMessages(req, res) {
 			query.createdAt = { ...query.createdAt, $gt: afterDate };
 			sortDirection = 1; // forward: oldest to newest
 		}
+		const pendingPayload = getPendingJson(cacheKey);
+		if (pendingPayload) {
+			return res.status(200).json(await pendingPayload);
+		}
+		pendingCache = createPendingJson(cacheKey);
 
 		let messages = await Message.find(query)
 			.sort({ createdAt: sortDirection })
@@ -934,16 +989,22 @@ export async function getMessages(req, res) {
 			safePinnedMessages = sanitizeMessages(pinnedMessages.map(fallbackSender));
 		}
 
-		return res.status(200).json({
+		const payload = {
 			messages,
 			hasMore,
 			nextCursor: (sortDirection === -1 && hasMore && messages.length > 0) ? messages[0].createdAt : null,
 			pinnedMessages: safePinnedMessages,
-		});
+		};
+		setCachedJson(cacheKey, payload, CONVERSATION_MESSAGES_CACHE_TTL_MS);
+		pendingCache.resolve(payload);
+		return res.status(200).json(payload);
 
 	} catch (error) {
+		pendingCache?.reject(error);
 		console.error("Error occurred while fetching messages", error);
 		return res.status(500).json({ message: "Internal server error" });
+	} finally {
+		pendingCache?.clear();
 	}
 }
 
