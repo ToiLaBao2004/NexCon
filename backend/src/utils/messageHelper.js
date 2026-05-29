@@ -1,6 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import { decryptConversationPayload, decryptMessagePayload } from './messageCrypto.js';
 import { replaceMentionTags } from './mentions.js';
+import { invalidateConversationReadCache } from './readCache.js';
 
 export { replaceMentionTags };
 
@@ -144,6 +145,7 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
         senderParticipant.lastReadAt = new Date();
     }
     conversation.markModified('participants');
+    invalidateConversationReadCache(conversation);
 };
 
 export const emitNewMessage = (io, conversation, message, signedUrl = null) => {
