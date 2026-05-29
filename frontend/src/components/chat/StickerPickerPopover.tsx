@@ -18,6 +18,7 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
   const dragStartXRef = useRef(0);
   const dragStartScrollLeftRef = useRef(0);
   const didDragTabsRef = useRef(false);
+  const pendingTabIdRef = useRef<string | null>(null);
   const currentSet = STICKER_SETS.find((set) => set.id === activeTab) ?? STICKER_SETS[0];
 
   useEffect(() => {
@@ -35,6 +36,8 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
     const target = tabsScrollRef.current;
     if (!target) return;
 
+    const tabButton = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-sticker-set-id]");
+    pendingTabIdRef.current = tabButton?.dataset.stickerSetId ?? null;
     setIsDraggingTabs(true);
     didDragTabsRef.current = false;
     dragStartXRef.current = event.clientX;
@@ -56,6 +59,10 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
     if (target?.hasPointerCapture(event.pointerId)) {
       target.releasePointerCapture(event.pointerId);
     }
+    if (!didDragTabsRef.current && pendingTabIdRef.current) {
+      setActiveTab(pendingTabIdRef.current);
+    }
+    pendingTabIdRef.current = null;
     setIsDraggingTabs(false);
   };
 
@@ -128,6 +135,7 @@ export default function StickerPickerPopover({ onSelect }: StickerPickerPopoverP
               {STICKER_SETS.map((set) => (
                 <button
                   key={set.id}
+                  data-sticker-set-id={set.id}
                   draggable={false}
                   onClick={() => setActiveTab(set.id)}
                   className={cn(
