@@ -14,7 +14,7 @@ const DEFAULT_USER_LIMIT = 5;
 const DEFAULT_CONVERSATION_LIMIT = 8;
 const DEFAULT_MESSAGE_LIMIT = 10;
 const MAX_GROUP_LIMIT = 20;
-const MAX_SCANNED_MESSAGES = 800;
+const MESSAGE_SEARCH_SCAN_BATCH_SIZE = 100;
 const MAX_SCANNED_CONVERSATIONS = 200;
 const SEARCH_TYPES = new Set(['all', 'users', 'conversations', 'messages']);
 
@@ -121,6 +121,11 @@ function getLimitForType(req, requestedType, type, defaultLimit, queryKey) {
         : req.query[queryKey];
 
     return clampLimit(rawLimit, defaultLimit);
+}
+
+function shouldIncludeMessages(req, requestedType) {
+    if (requestedType === 'messages') return true;
+    return String(req.query.includeMessages ?? 'true').toLowerCase() !== 'false';
 }
 
 function getIdString(value) {
@@ -260,6 +265,20 @@ function getSystemMessageSearchText(message, currentUserId) {
         default:
             return message.content || 'Thong bao he thong';
     }
+}
+
+function getMessageSearchableText(message, currentUserId) {
+    const parts = [
+        message.type === 'system'
+            ? normalizeVietnamese(getSystemMessageSearchText(message, currentUserId))
+            : (message.searchContent || normalizeVietnamese(message.content || '')),
+    ];
+
+    if (message.type === 'file' && message.fileName) {
+        parts.push(normalizeVietnamese(message.fileName));
+    }
+
+    return parts.filter(Boolean).join(' ');
 }
 
 function isVisibleByMetadata(messageLike, userId) {
@@ -552,9 +571,15 @@ async function getNicknameMatchedUserIds(keywordRegex, currentUserId) {
     return [...ids].map((id) => new mongoose.Types.ObjectId(id));
 }
 
-async function searchConversationsForGlobal({ keywordRegex, currentUserId, limit, nickMap, cursor }) {
+async function searchConversationsForGlobal({ keywordRegex, currentUserId, limit, nickMap, cursor, isAborted = () => false }) {
+    if (isAborted()) return emptyPage(limit);
+
     const matchedUserIds = await getConversationMatchedUserIds(keywordRegex, currentUserId);
+    if (isAborted()) return emptyPage(limit);
+
     const nicknameMatchedUserIds = await getNicknameMatchedUserIds(keywordRegex, currentUserId);
+    if (isAborted()) return emptyPage(limit);
+
     const participantMatchedIds = [...matchedUserIds, ...nicknameMatchedUserIds];
 
     const matchClauses = [
@@ -572,7 +597,7 @@ async function searchConversationsForGlobal({ keywordRegex, currentUserId, limit
     let scanCursor = cursor || null;
     let exhausted = false;
 
-    while (matches.length <= limit && scannedCount < MAX_SCANNED_CONVERSATIONS && !exhausted) {
+    while (matches.length <= limit && scannedCount < MAX_SCANNED_CONVERSATIONS && !exhausted && !isAborted()) {
         const cursorFilter = buildDateIdCursorFilter(scanCursor, 'updatedAt');
         const andFilters = [{ $or: matchClauses }];
         if (cursorFilter) andFilters.push(cursorFilter);
@@ -589,6 +614,8 @@ async function searchConversationsForGlobal({ keywordRegex, currentUserId, limit
             .populate('lastMessage.senderId', MESSAGE_SENDER_SELECT)
             .lean();
 
+        if (isAborted()) return emptyPage(limit);
+
         scannedCount += rawConversations.length;
 
         if (!rawConversations.length) {
@@ -599,6 +626,8 @@ async function searchConversationsForGlobal({ keywordRegex, currentUserId, limit
         const formatted = await Promise.all(
             rawConversations.map((conversation) => formatConversationForClient(conversation, currentUserId.toString(), nickMap))
         );
+
+        if (isAborted()) return emptyPage(limit);
 
         for (let index = 0; index < formatted.length; index += 1) {
             if (!formatted[index]) continue;
@@ -625,7 +654,9 @@ async function searchConversationsForGlobal({ keywordRegex, currentUserId, limit
     return toPage(pageMatches.map((match) => match.item), limit, hasMore, nextCursor);
 }
 
-async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit, nickMap, cursor }) {
+async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit, nickMap, cursor, isAborted = () => false }) {
+    if (isAborted()) return emptyPage(limit);
+
     const accessibleConversations = await Conversation.find({
         'participants.userId': currentUserId,
         disbanded: { $ne: true },
@@ -634,6 +665,8 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
         .populate('participants.userId', PARTICIPANT_SELECT)
         .populate('lastMessage.senderId', MESSAGE_SENDER_SELECT)
         .lean();
+
+    if (isAborted()) return emptyPage(limit);
 
     if (!accessibleConversations.length) return emptyPage(limit);
 
@@ -662,32 +695,38 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
     };
 
     const matched = [];
-    let scannedCount = 0;
     let scanCursor = cursor || null;
     let exhausted = false;
+    let hasMore = false;
 
-    while (matched.length <= limit && scannedCount < MAX_SCANNED_MESSAGES && !exhausted) {
+    while (matched.length < limit && !exhausted && !isAborted()) {
         const cursorFilter = buildDateIdCursorFilter(scanCursor, 'createdAt');
         const pageFilter = cursorFilter
             ? { $and: [baseFilter, cursorFilter] }
             : baseFilter;
 
-        const batchSize = Math.min(Math.max(limit * 4, 20), MAX_SCANNED_MESSAGES - scannedCount);
-        const rawMessages = await Message.find(pageFilter)
+        const batchSize = Math.max(limit * 4, MESSAGE_SEARCH_SCAN_BATCH_SIZE);
+        const rawBatch = await Message.find(pageFilter)
             .select('+searchContent')
             .sort({ createdAt: -1, _id: -1 })
-            .limit(batchSize)
-            .populate('senderId', MESSAGE_SENDER_SELECT)
+            .limit(batchSize + 1)
             .lean();
 
-        scannedCount += rawMessages.length;
+        if (isAborted()) return emptyPage(limit);
+
+        const hasExtra = rawBatch.length > batchSize;
+        const rawMessages = hasExtra ? rawBatch.slice(0, batchSize) : rawBatch;
 
         if (!rawMessages.length) {
             exhausted = true;
             break;
         }
 
-        for (const rawMessage of rawMessages) {
+        let reachedLimit = false;
+        for (let index = 0; index < rawMessages.length; index += 1) {
+            if (isAborted()) return emptyPage(limit);
+
+            const rawMessage = rawMessages[index];
             const message = decryptMessagePayload(rawMessage);
             if (message.type === 'sticker') {
                 continue;
@@ -700,34 +739,33 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
                 continue;
             }
 
-            const searchableText = message.type === 'system'
-                ? normalizeVietnamese(getSystemMessageSearchText(message, currentUserId))
-                : (message.searchContent || normalizeVietnamese(message.content || ''));
+            const searchableText = getMessageSearchableText(message, currentUserId);
 
             if (!searchableText.includes(normalizedKeyword)) {
                 continue;
             }
 
-            const { searchContent, ...safeMessage } = message;
-            if (safeMessage.senderId && typeof safeMessage.senderId === 'object') {
-                safeMessage.senderId = sanitizeParticipantUser(safeMessage.senderId);
-            }
-
             matched.push({
-                item: safeMessage,
+                messageId: rawMessage._id,
                 conversationId,
                 cursor: buildDateIdCursor(rawMessage, 'createdAt'),
             });
 
-            if (matched.length > limit) break;
+            if (matched.length >= limit) {
+                reachedLimit = true;
+                hasMore = index < rawMessages.length - 1 || hasExtra;
+                break;
+            }
         }
 
-        if (matched.length > limit) break;
+        if (reachedLimit) break;
 
         const lastScanned = rawMessages[rawMessages.length - 1];
         scanCursor = buildDateIdCursor(lastScanned, 'createdAt');
-        exhausted = rawMessages.length < batchSize;
+        exhausted = !hasExtra;
     }
+
+    if (isAborted()) return emptyPage(limit);
 
     const pageMatches = matched.slice(0, limit);
     if (!pageMatches.length) return emptyPage(limit);
@@ -744,21 +782,45 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
             ];
         })
     );
+
+    if (isAborted()) return emptyPage(limit);
+
     const formattedConversationMap = new Map(formattedConversationEntries);
 
+    const messageIds = pageMatches.map((match) => match.messageId);
+    const populatedMessages = await Message.find({ _id: { $in: messageIds } })
+        .select('+searchContent')
+        .populate('senderId', MESSAGE_SENDER_SELECT)
+        .lean();
+
+    if (isAborted()) return emptyPage(limit);
+
+    const messageMap = new Map(populatedMessages.map((message) => [message._id.toString(), message]));
+
     const items = pageMatches
-        .map((match) => ({
-            ...match.item,
-            conversation: formattedConversationMap.get(match.conversationId) || null,
-        }))
+        .map((match) => {
+            const rawMessage = messageMap.get(match.messageId.toString());
+            if (!rawMessage) return null;
+
+            const message = decryptMessagePayload(rawMessage);
+            const { searchContent, ...safeMessage } = message;
+            if (safeMessage.senderId && typeof safeMessage.senderId === 'object') {
+                safeMessage.senderId = sanitizeParticipantUser(safeMessage.senderId);
+            }
+
+            return {
+                ...safeMessage,
+                conversation: formattedConversationMap.get(match.conversationId) || null,
+            };
+        })
         .filter((message) => Boolean(message.conversation));
 
-    const hasMore = matched.length > limit || (!exhausted && scannedCount >= MAX_SCANNED_MESSAGES && items.length > 0);
-    const nextCursor = hasMore && pageMatches.length > 0
+    const finalHasMore = hasMore && items.length > 0;
+    const nextCursor = finalHasMore && pageMatches.length > 0
         ? pageMatches[pageMatches.length - 1].cursor
         : null;
 
-    return toPage(items, limit, hasMore, nextCursor);
+    return toPage(items, limit, finalHasMore, nextCursor);
 }
 
 export async function globalSearch(req, res) {
@@ -806,6 +868,7 @@ export async function globalSearch(req, res) {
             .lean();
         const nickMap = buildNicknameMap(friends, currentUserId.toString());
         const searchAll = requestedType === 'all';
+        const includeMessages = shouldIncludeMessages(req, requestedType);
 
         let users = emptyPage(userLimit);
         let conversations = emptyPage(conversationLimit);
@@ -839,7 +902,7 @@ export async function globalSearch(req, res) {
             })());
         }
 
-        if (searchAll || requestedType === 'messages') {
+        if ((searchAll && includeMessages) || requestedType === 'messages') {
             tasks.push((async () => {
                 messages = await searchMessagesForGlobal({
                     currentUserId,
@@ -863,5 +926,99 @@ export async function globalSearch(req, res) {
     } catch (error) {
         console.error('Global search error:', error);
         return res.status(500).json({ message: 'Internal server error.' });
+    }
+}
+
+export async function globalSearchStream(req, res) {
+    const sendChunk = (payload) => {
+        if (!res.writableEnded && !res.destroyed) {
+            res.write(`${JSON.stringify(payload)}\n`);
+        }
+    };
+
+    let aborted = false;
+    req.on('close', () => {
+        aborted = true;
+    });
+
+    try {
+        const currentUserId = req.user._id;
+        const keyword = String(req.query.keyword || req.query.q || '').trim();
+        const conversationLimit = getLimitForType(req, 'conversations', 'conversations', DEFAULT_CONVERSATION_LIMIT, 'conversationLimit');
+        const messageLimit = getLimitForType(req, 'messages', 'messages', DEFAULT_MESSAGE_LIMIT, 'messageLimit');
+
+        res.status(200);
+        res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-cache, no-transform');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders?.();
+
+        if (!keyword) {
+            sendChunk({
+                type: 'done',
+                query: '',
+                conversations: emptyPage(conversationLimit),
+                messages: emptyPage(messageLimit),
+            });
+            res.end();
+            return;
+        }
+
+        if (keyword.length > MAX_SEARCH_QUERY_LENGTH) {
+            sendChunk({
+                type: 'error',
+                message: `Search query must not exceed ${MAX_SEARCH_QUERY_LENGTH} characters.`,
+            });
+            res.end();
+            return;
+        }
+
+        const keywordRegex = new RegExp(escapeRegex(keyword), 'i');
+        const normalizedKeyword = normalizeVietnamese(keyword);
+
+        const friends = await Friend.find({
+            $or: [
+                { userA: currentUserId },
+                { userB: currentUserId },
+            ],
+        })
+            .select('userA userB nicknameA nicknameB')
+            .lean();
+
+        if (aborted) return;
+
+        const nickMap = buildNicknameMap(friends, currentUserId.toString());
+
+        const conversations = await searchConversationsForGlobal({
+            keywordRegex,
+            currentUserId,
+            limit: conversationLimit,
+            nickMap,
+            cursor: null,
+            isAborted: () => aborted,
+        });
+        if (aborted) return;
+        sendChunk({ type: 'conversations', query: keyword, conversations });
+
+        const messages = await searchMessagesForGlobal({
+            currentUserId,
+            normalizedKeyword,
+            limit: messageLimit,
+            nickMap,
+            cursor: null,
+            isAborted: () => aborted,
+        });
+        if (aborted) return;
+        sendChunk({ type: 'messages', query: keyword, messages });
+        sendChunk({ type: 'done', query: keyword });
+        res.end();
+    } catch (error) {
+        console.error('Global search stream error:', error);
+        if (!res.headersSent) {
+            return res.status(500).json({ message: 'Internal server error.' });
+        }
+        sendChunk({ type: 'error', message: 'Internal server error.' });
+        res.end();
     }
 }
