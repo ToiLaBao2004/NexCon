@@ -229,106 +229,116 @@ export default function LegalPage({ type }: LegalPageProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { accessToken, user } = useAuthStore();
-  const fromPath = typeof (location.state as { from?: unknown } | null)?.from === "string"
-    ? (location.state as { from: string }).from
-    : null;
+  const fromPath =
+    typeof (location.state as { from?: unknown } | null)?.from === "string"
+      ? (location.state as { from: string }).from
+      : null;
   const isSignedIn = Boolean(accessToken);
   const fallbackPath = isSignedIn ? (user?.role === "admin" ? "/admin" : "/chat") : "/signin";
   const returnPath = fromPath || fallbackPath;
   const linkState = fromPath ? { from: fromPath } : undefined;
 
   const handleBack = () => {
-    if (fromPath) {
-      navigate(fromPath);
-      return;
-    }
-
     navigate(returnPath);
   };
 
   return (
-    <main className="flex h-svh min-h-0 bg-background px-4 py-6 text-foreground md:px-8">
-      <div className="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col">
-        <header className="mb-5 flex shrink-0 items-center justify-between gap-3">
+    <main className="flex h-svh min-h-0 bg-slate-100 px-3 py-5 text-slate-950 dark:bg-background dark:text-foreground sm:px-4 md:px-8 md:py-8">
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[430px] flex-col md:max-w-5xl">
+        <header className="mb-3 flex shrink-0 items-center justify-between gap-3 md:mb-5">
           <Button
             type="button"
             size="sm"
-            className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+            className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground shadow-none hover:bg-primary/90 md:text-sm"
             onClick={handleBack}
           >
             <ArrowLeft className="size-4" />
             Quay lại
           </Button>
-          <Link to={fallbackPath} className="text-sm font-semibold text-primary">
+          <Link to={fallbackPath} className="shrink-0 text-xs font-semibold text-primary md:text-sm">
             NexCon
           </Link>
         </header>
 
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border border-border/70 bg-card shadow-sm">
-          <div className="shrink-0 border-b border-border/70 px-5 py-6 md:px-8 md:py-7">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-border/70 dark:bg-card">
+          <div className="shrink-0 border-b border-slate-200 px-3 py-5 dark:border-border/70 sm:px-4 md:px-8 md:py-7">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-border/70 px-3 py-1 text-xs font-semibold text-foreground">
+              <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 dark:border-border/70 dark:bg-background dark:text-foreground md:text-xs">
                 Cập nhật {content.updatedAt}
               </span>
             </div>
 
-            <h1 className="mt-4 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-foreground md:text-[40px]">
+            <h1 className="mt-4 max-w-3xl text-[24px] font-bold leading-[1.12] text-slate-950 dark:text-foreground md:text-[40px]">
               {content.title}
             </h1>
           </div>
 
-          <nav className="flex shrink-0 flex-wrap gap-4 border-b border-border/70 px-5 md:px-8">
+          <nav className="flex shrink-0 flex-wrap gap-x-4 gap-y-0 border-b border-slate-200 px-3 dark:border-border/70 sm:px-4 md:px-8">
             {legalNav.map((item) => (
               <Link
                 key={item.type}
                 to={item.to}
                 state={linkState}
                 className={cn(
-                  "relative h-12 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity",
+                  "relative h-11 px-0 text-[11px] text-slate-950 transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity dark:text-foreground md:h-12 md:text-sm",
                   item.type === type
                     ? "font-semibold after:opacity-100"
-                    : "font-normal after:opacity-0 hover:text-foreground/80"
+                    : "font-normal after:opacity-0 hover:text-slate-700 dark:hover:text-foreground/80"
                 )}
               >
-                <span className="flex h-full items-center">{item.label}</span>
+                <span className="flex h-full items-center whitespace-nowrap">{item.label}</span>
               </Link>
             ))}
           </nav>
 
-          <div className="grid min-h-0 flex-1 gap-6 px-5 py-6 md:px-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-            <aside className="min-h-0 self-start">
-              <div className="rounded-md border border-border/70 bg-background p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-foreground">Tóm tắt chính</p>
-                <div className="mt-4 grid gap-3">
-                  {content.summary.map((item, index) => (
-                    <div key={item} className="flex gap-3">
-                      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                        {index + 1}
-                      </span>
-                      <p className="text-sm leading-6 text-foreground">{item}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </aside>
-
-            <div className="beautiful-scrollbar min-h-0 overflow-y-auto pr-1">
-              <div className="grid gap-4">
-              {content.sections.map((section) => (
-                <section key={section.title} className="rounded-md border border-border/70 bg-background p-5">
-                  <h2 className="text-lg font-semibold leading-7 text-foreground">{section.title}</h2>
-                  {section.description && (
-                    <p className="mt-2 text-sm leading-6 text-foreground">{section.description}</p>
-                  )}
+          <div className="beautiful-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 md:px-8 md:py-6">
+            <div className="grid gap-3 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-6">
+              <aside className="min-h-0 self-start lg:sticky lg:top-0">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 dark:border-border/70 dark:bg-background">
+                  <p className="text-[11px] font-semibold uppercase text-slate-950 dark:text-foreground">
+                    Tóm tắt chính
+                  </p>
                   <div className="mt-4 grid gap-3">
-                    {section.body.map((item) => (
-                      <p key={item} className="border-l-2 border-primary/70 pl-3 text-sm leading-6 text-foreground">
-                        {item}
-                      </p>
+                    {content.summary.map((item, index) => (
+                      <div key={item} className="flex gap-2.5">
+                        <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground md:size-6 md:text-xs">
+                          {index + 1}
+                        </span>
+                        <p className="text-xs leading-5 text-slate-950 dark:text-foreground md:text-sm md:leading-6">
+                          {item}
+                        </p>
+                      </div>
                     ))}
                   </div>
-                </section>
-              ))}
+                </div>
+              </aside>
+
+              <div className="grid min-w-0 gap-3 md:gap-4">
+                {content.sections.map((section) => (
+                  <section
+                    key={section.title}
+                    className="rounded-lg border border-slate-200 bg-white p-4 dark:border-border/70 dark:bg-background md:p-5"
+                  >
+                    <h2 className="text-base font-semibold leading-6 text-slate-950 dark:text-foreground md:text-lg md:leading-7">
+                      {section.title}
+                    </h2>
+                    {section.description && (
+                      <p className="mt-2 text-xs leading-5 text-slate-950 dark:text-foreground md:text-sm md:leading-6">
+                        {section.description}
+                      </p>
+                    )}
+                    <div className="mt-4 grid gap-3">
+                      {section.body.map((item) => (
+                        <p
+                          key={item}
+                          className="border-l-2 border-primary/70 pl-3 text-xs leading-5 text-slate-950 dark:text-foreground md:text-sm md:leading-6"
+                        >
+                          {item}
+                        </p>
+                      ))}
+                    </div>
+                  </section>
+                ))}
               </div>
             </div>
           </div>
