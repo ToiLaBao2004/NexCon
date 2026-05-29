@@ -27,6 +27,7 @@ import { UserStatusMenuItems } from "./UserStatusMenuItems";
 import { useSocketStore } from "@/stores/useSocketStore";
 import StatusBadge from "@/components/chat/StatusBadge";
 import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
+import { SHOW_CONVERSATION_LIST_EVENT } from "@/constants/chatEvents";
 
 const MobileBottomNav = () => {
     const navigate = useNavigate();
@@ -69,6 +70,14 @@ const MobileBottomNav = () => {
         }
     };
 
+    const handleNavClick = (path: string) => {
+        setFocusedConversation(null);
+        if (path === "/chat") {
+            window.dispatchEvent(new Event(SHOW_CONVERSATION_LIST_EVENT));
+        }
+        navigate(path);
+    };
+
     return (
         <>
             <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-card/95 backdrop-blur-md safe-area-bottom">
@@ -80,8 +89,7 @@ const MobileBottomNav = () => {
                             type="button"
                             key={item.path}
                             onClick={() => {
-                                setFocusedConversation(null);
-                                navigate(item.path);
+                                handleNavClick(item.path);
                             }}
                             aria-label={item.label}
                             className={cn(

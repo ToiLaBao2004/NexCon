@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from "react";
 import { Search, X, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useChatStore } from "@/stores/useChatStore";
@@ -23,6 +23,7 @@ import GroupChatAvatar from "./GroupChatAvatar";
 import UserAvatar from "./UserAvatar";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { decodeMentionTokens } from "@/utils/mentions";
+import { SHOW_CONVERSATION_LIST_EVENT } from "@/constants/chatEvents";
 
 export type ConversationFilter = "all" | "unread";
 
@@ -532,6 +533,22 @@ const ConversationMixedList = ({
     && hasFreshSearchCache
     && !fetchedTabsRef.current[searchTab];
 
+  const resetGlobalSearch = useCallback((focusInput = false) => {
+    setSearchQuery("");
+    setSearchTab("all");
+    setGlobalResults(EMPTY_RESULTS);
+    setTabPages(createEmptyTabPages());
+    setTabLoading(createLoadingMap(false));
+    setTabLoadingMore(createLoadingMap(false));
+    fetchedTabsRef.current = createFetchedMap(false);
+    cacheKeywordRef.current = "";
+    setLoadMoreErrorTab(null);
+    setSearchError("");
+    if (focusInput) {
+      searchInputRef.current?.focus();
+    }
+  }, []);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "k" && (event.ctrlKey || event.metaKey)) {
@@ -543,6 +560,15 @@ const ConversationMixedList = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  useEffect(() => {
+    const handleShowConversationList = () => {
+      resetGlobalSearch(false);
+    };
+
+    window.addEventListener(SHOW_CONVERSATION_LIST_EVENT, handleShowConversationList);
+    return () => window.removeEventListener(SHOW_CONVERSATION_LIST_EVENT, handleShowConversationList);
+  }, [resetGlobalSearch]);
 
   useEffect(() => {
     if (conversationItems.length === 0) {
@@ -714,19 +740,7 @@ const ConversationMixedList = ({
     }
   };
 
-  const clearGlobalSearch = () => {
-    setSearchQuery("");
-    setSearchTab("all");
-    setGlobalResults(EMPTY_RESULTS);
-    setTabPages(createEmptyTabPages());
-    setTabLoading(createLoadingMap(false));
-    setTabLoadingMore(createLoadingMap(false));
-    fetchedTabsRef.current = createFetchedMap(false);
-    cacheKeywordRef.current = "";
-    setLoadMoreErrorTab(null);
-    setSearchError("");
-    searchInputRef.current?.focus();
-  };
+  const clearGlobalSearch = () => resetGlobalSearch(true);
 
   const handleOpenConversation = async (conversation: Conversation) => {
     rememberConversation(conversation);

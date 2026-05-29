@@ -41,6 +41,7 @@ import { UserStatusMenuItems } from "./UserStatusMenuItems";
 import { useSocketStore } from "@/stores/useSocketStore";
 import StatusBadge from "@/components/chat/StatusBadge";
 import { getPresenceBadgeStatus, getPresenceForUser } from "@/utils/userPresence";
+import { SHOW_CONVERSATION_LIST_EVENT } from "@/constants/chatEvents";
 
 const MainSidebar = () => {
     const { user, signOut } = useAuthStore();
@@ -74,6 +75,14 @@ const MainSidebar = () => {
 
     const handleSidebarClick = () => {
         setFocusedConversation(null);
+    };
+
+    const handleNavClick = (path: string) => {
+        setFocusedConversation(null);
+        if (path === "/chat") {
+            window.dispatchEvent(new Event(SHOW_CONVERSATION_LIST_EVENT));
+        }
+        navigate(path);
     };
 
     const topNavItems = [
@@ -188,7 +197,7 @@ const MainSidebar = () => {
                             <Tooltip key={item.id}>
                                 <TooltipTrigger asChild>
                                     <div
-                                        onClick={() => navigate(item.path)}
+                                        onClick={() => handleNavClick(item.path)}
                                         className={navItemClass(active)}
                                     >
                                         <item.icon 
@@ -219,7 +228,7 @@ const MainSidebar = () => {
                             <Tooltip key={item.id}>
                                 <TooltipTrigger asChild>
                                     <div
-                                        onClick={() => navigate(item.path)}
+                                        onClick={() => handleNavClick(item.path)}
                                         className={navItemClass(active)}
                                     >
                                         <item.icon 
