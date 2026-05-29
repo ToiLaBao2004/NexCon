@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from "react";
-import { Search, X, Loader2 } from "lucide-react";
+import { Search, X, Loader2, User, Users, Plus } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useChatStore } from "@/stores/useChatStore";
 import { chatService } from "@/services/chatService";
@@ -33,6 +33,7 @@ type ResultTab = Exclude<SearchTab, "all">;
 interface ConversationMixedListProps {
   conversationFilter: ConversationFilter;
   onChangeFilter: (filter: ConversationFilter) => void;
+  onAddFriend: () => void;
   onCreateGroup: () => void;
 }
 
@@ -487,6 +488,7 @@ function MessageResultRow({
 const ConversationMixedList = ({
   conversationFilter,
   onChangeFilter,
+  onAddFriend,
   onCreateGroup,
 }: ConversationMixedListProps) => {
   const {
@@ -941,8 +943,8 @@ const ConversationMixedList = ({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 pt-3">
-          <div className="flex min-w-0 items-center gap-4 overflow-x-auto beautiful-scrollbar">
+        <div className="-mx-5 flex items-center justify-between gap-3 border-b border-border/50 px-5 pt-3">
+          <div className="flex min-w-0 items-center gap-4 overflow-x-auto overflow-y-hidden">
             {(hasQuery ? SEARCH_TABS : CONVERSATION_TABS).map((item) => {
               const active = hasQuery
                 ? searchTab === item.value
@@ -959,7 +961,7 @@ const ConversationMixedList = ({
                       onChangeFilter(item.value as ConversationFilter);
                     }
                   }}
-                  className={`relative h-8 shrink-0 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${
+                  className={`relative h-8 shrink-0 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:z-10 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${
                     active
                       ? "font-semibold after:opacity-100"
                       : "font-normal after:opacity-0 hover:text-foreground/80"
@@ -972,19 +974,34 @@ const ConversationMixedList = ({
           </div>
 
           {!hasQuery && (
-            <button
-              type="button"
-              onClick={onCreateGroup}
-              className="shrink-0 rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/50"
-            >
-              Tạo nhóm
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onAddFriend}
+                aria-label="Thêm bạn"
+                title="Thêm bạn"
+                className="relative flex size-7 items-center justify-center rounded-md text-slate-950 transition-colors hover:bg-muted/60 dark:text-foreground"
+              >
+                <User className="h-[18px] w-[18px]" strokeWidth={1.55} />
+                <Plus className="absolute right-0 top-0 h-2.5 w-2.5" strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                onClick={onCreateGroup}
+                aria-label="Tạo nhóm"
+                title="Tạo nhóm"
+                className="relative flex size-7 items-center justify-center rounded-md text-slate-950 transition-colors hover:bg-muted/60 dark:text-foreground"
+              >
+                <Users className="h-[18px] w-[18px]" strokeWidth={1.55} />
+                <Plus className="absolute right-0 top-0 h-2.5 w-2.5" strokeWidth={2} />
+              </button>
+            </div>
           )}
         </div>
       </div>
 
       <div
-        className="-mr-5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden beautiful-scrollbar mobile-hide-scrollbar pb-4 pr-2 pt-1.5"
+        className="-mr-5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden beautiful-scrollbar mobile-hide-scrollbar pb-4 pr-2 pt-2"
         onScroll={handleScroll}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) {
