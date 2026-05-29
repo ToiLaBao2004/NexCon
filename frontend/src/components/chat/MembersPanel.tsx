@@ -1,15 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import UserAvatar from "./UserAvatar";
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ConfirmationModal } from "@/components/shared/ConfirmationModal";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { Users, ChevronLeft, MoreHorizontal, UserCircle, UserMinus, Check, X, KeyRound } from "lucide-react";
+import { Users, ChevronLeft, MoreHorizontal, UserCircle, UserMinus, Check, X, KeyRound, Search } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { chatService } from "@/services/chatService";
 import { useChatStore } from "@/stores/useChatStore";
@@ -26,10 +27,20 @@ interface Props {
   adminIds?: string[];
 }
 
+const normalizeSearchText = (value?: string | null) =>
+  (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+
 export default function MembersPanel({ conversationId, participants, memberCount, isGroupAdmin, currentUserId, adminIds = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [memberSearch, setMemberSearch] = useState("");
 
   const [approvalQueue, setApprovalQueue] = useState<any[]>([]);
   const [loadingApproval, setLoadingApproval] = useState(false);
@@ -59,6 +70,29 @@ export default function MembersPanel({ conversationId, participants, memberCount
       };
     }
   }, [isGroupAdmin, conversationId]);
+
+  useEffect(() => {
+    if (!open) {
+      setMemberSearch("");
+    }
+  }, [open]);
+
+  const filteredParticipants = useMemo(() => {
+    const query = normalizeSearchText(memberSearch);
+
+    if (!query) {
+      return participants;
+    }
+
+    return participants.filter((p: any) => {
+      const u = p.userId || p;
+      const searchableText = normalizeSearchText(
+        [u?.nickname, u?.displayName, u?.email, u?.phone].filter(Boolean).join(" ")
+      );
+
+      return searchableText.includes(query);
+    });
+  }, [participants, memberSearch]);
 
   const onHandleApproval = async (userId: string, action: 'approve' | 'reject') => {
     if (!conversationId) return;
@@ -168,9 +202,38 @@ export default function MembersPanel({ conversationId, participants, memberCount
 
                 <div className="px-3 py-2 mt-2 text-[15px] font-bold text-foreground tracking-normal flex items-center justify-between">
                   <span>Danh sách thành viên</span>
-                  <span className="bg-muted/60 px-2 py-0.5 rounded-full text-xs font-semibold text-foreground">{participants.length}</span>
+                  <span className="bg-muted/60 px-2 py-0.5 rounded-full text-xs font-semibold text-foreground">{filteredParticipants.length}</span>
                 </div>
-                {participants.map((p: any) => {
+
+                <div className="px-3 pb-2">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={memberSearch}
+                      onChange={(event) => setMemberSearch(event.target.value)}
+                      placeholder="Tìm kiếm thành viên"
+                      className="h-10 rounded-full bg-muted/50 pl-9 pr-9 text-[14px] shadow-none focus-visible:ring-2"
+                    />
+                    {memberSearch && (
+                      <button
+                        type="button"
+                        aria-label="Xóa tìm kiếm"
+                        onClick={() => setMemberSearch("")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {filteredParticipants.length === 0 && (
+                  <div className="px-3 py-8 text-center text-sm text-muted-foreground">
+                    Không tìm thấy thành viên phù hợp
+                  </div>
+                )}
+
+                {filteredParticipants.map((p: any) => {
                   const u = p.userId || p;
                   const name = u?.nickname?.trim() || u?.displayName || "Người dùng";
                   const isMe = u?._id?.toString() === currentUserId?.toString();
