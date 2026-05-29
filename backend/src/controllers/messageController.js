@@ -1006,6 +1006,7 @@ export async function searchMessages(req, res) {
         // Build base filter. searchContent is encrypted at rest, so keyword matching happens after decrypting.
         const filter = {
             conversationId,
+            type: { $ne: 'sticker' },
             isRecalled: { $ne: true },
             reportStatus: { $ne: true },
             $or: [
@@ -1083,6 +1084,7 @@ export async function searchMessages(req, res) {
                     replyTo: message.replyTo ? maskPopulatedSender(message.replyTo) : message.replyTo,
                 }))
                 .filter((message) => {
+                    if (message.type === 'sticker') return false;
                     const searchableText = message.searchContent || normalizeVietnamese(message.content || '');
                     return searchableText.includes(normalizedKeyword);
                 })

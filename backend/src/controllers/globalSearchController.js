@@ -651,6 +651,7 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
 
     const baseFilter = {
         conversationId: { $in: conversationIds },
+        type: { $ne: 'sticker' },
         isRecalled: { $ne: true },
         reportStatus: { $ne: true },
         $or: [
@@ -688,6 +689,10 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
 
         for (const rawMessage of rawMessages) {
             const message = decryptMessagePayload(rawMessage);
+            if (message.type === 'sticker') {
+                continue;
+            }
+
             const conversationId = getIdString(message.conversationId);
             const clearedAt = clearMap.get(conversationId);
 
