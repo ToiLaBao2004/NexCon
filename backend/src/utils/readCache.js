@@ -34,6 +34,16 @@ export function buildReadCacheKey(namespace, parts = []) {
 	return `${namespace}:${suffix}`;
 }
 
+function normalizeCacheId(value) {
+	if (!value) return '';
+	return String(value._id || value);
+}
+
+function normalizeCacheIds(values = []) {
+	const list = Array.isArray(values) ? values : [values];
+	return [...new Set(list.map(normalizeCacheId).filter(Boolean))];
+}
+
 export function getCachedJson(key) {
 	const entry = cache.get(key);
 	if (!entry) return null;
@@ -101,5 +111,47 @@ export function deleteCachedJsonByPrefix(prefix) {
 		if (key.startsWith(prefix)) {
 			cache.delete(key);
 		}
+	}
+
+	for (const key of pendingPayloads.keys()) {
+		if (key.startsWith(prefix)) {
+			pendingPayloads.delete(key);
+		}
+	}
+}
+
+export function invalidateConversationListReadCache(userIds = []) {
+	for (const userId of normalizeCacheIds(userIds)) {
+		deleteCachedJsonByPrefix(buildReadCacheKey('conversations:list', [userId]));
+	}
+}
+
+export function invalidateConversationMessagesReadCache(conversationId) {
+	const normalizedConversationId = normalizeCacheId(conversationId);
+	if (!normalizedConversationId) return;
+	deleteCachedJsonByPrefix(buildReadCacheKey('conversations:messages', [normalizedConversationId]));
+}
+
+export function invalidateConversationAccessReadCache(conversationId) {
+	const normalizedConversationId = normalizeCacheId(conversationId);
+	if (!normalizedConversationId) return;
+	deleteCachedJsonByPrefix(buildReadCacheKey('conversations:access', [normalizedConversationId]));
+}
+
+export function invalidateConversationReadCache(conversationOrId, participantIds = []) {
+	const conversationId = normalizeCacheId(conversationOrId);
+	const idsFromConversation = Array.isArray(conversationOrId?.participants)
+		? conversationOrId.participants.map((participant) => participant?.userId)
+		: [];
+
+	invalidateConversationAccessReadCache(conversationId);
+	invalidateConversationMessagesReadCache(conversationId);
+	invalidateConversationListReadCache([...idsFromConversation, ...normalizeCacheIds(participantIds)]);
+}
+
+export function invalidateFriendReadCache(userIds = []) {
+	for (const userId of normalizeCacheIds(userIds)) {
+		deleteCachedJsonByPrefix(buildReadCacheKey('friends:list', [userId]));
+		deleteCachedJsonByPrefix(buildReadCacheKey('friends:suggestions', [userId]));
 	}
 }

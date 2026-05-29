@@ -39,6 +39,7 @@ import {
 	getCachedJson,
 	getPendingJson,
 	getPositiveIntEnv,
+	invalidateConversationListReadCache,
 	setCachedJson,
 } from '../utils/readCache.js';
 
@@ -54,8 +55,9 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const PARTICIPANT_SELECT = 'displayName avatarUrl profileVisibility lock';
 const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
 const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname profileVisibility status lastSeen about lock';
-const CONVERSATION_LIST_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_LIST_CACHE_TTL_MS', 2000);
-const CONVERSATION_MESSAGES_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_MESSAGES_CACHE_TTL_MS', 1000);
+const CONVERSATION_LIST_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_LIST_CACHE_TTL_MS', 10000);
+const CONVERSATION_MESSAGES_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_MESSAGES_CACHE_TTL_MS', 10000);
+const CONVERSATION_ACCESS_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_ACCESS_CACHE_TTL_MS', 5000);
 
 function clampPageLimit(value, defaultLimit = 50, maxLimit = 100) {
 	const parsed = Number.parseInt(value, 10);
@@ -91,6 +93,16 @@ function sortConversationsForClient(conversations = []) {
 
 		return getConversationActivityTime(b) - getConversationActivityTime(a);
 	});
+}
+
+function getUnreadCountValue(unreadCounts, userId) {
+	if (!unreadCounts) return 0;
+	const key = userId.toString();
+	const value = typeof unreadCounts.get === 'function'
+		? unreadCounts.get(key)
+		: unreadCounts[key];
+	const parsed = Number(value || 0);
+	return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function sanitizeParticipantUser(userObj) {
@@ -780,7 +792,11 @@ export async function getMessages(req, res) {
 		const { limit = 50, cursor, before, after, aroundId } = req.query;
 		const userId = req.user._id.toString();
 
-		const conversation = await Conversation.findById(conversationId).select('participants').lean();
+		const accessCacheKey = buildReadCacheKey('conversations:access', [conversationId, userId]);
+		let conversation = getCachedJson(accessCacheKey);
+		if (!conversation) {
+			conversation = await Conversation.findById(conversationId).select('participants').lean();
+		}
 		if (!conversation) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
@@ -789,10 +805,11 @@ export async function getMessages(req, res) {
 		if (!me) {
 			return res.status(403).json({ message: "You are not a participant in this conversation." });
 		}
+		setCachedJson(accessCacheKey, conversation, CONVERSATION_ACCESS_CACHE_TTL_MS);
 		const clearedAt = me?.clearedAt ? new Date(me.clearedAt) : null;
 		const cacheKey = buildReadCacheKey('conversations:messages', [
-			userId,
 			conversationId,
+			userId,
 			limit,
 			cursor || '',
 			before || '',
@@ -1026,43 +1043,74 @@ export async function markAsSeen(req, res) {
 		const { conversationId } = req.params;
 		const userId = req.user._id.toString();
 
+		const conversation = await Conversation.findOne({
+			_id: conversationId,
+			'participants.userId': userId,
+		})
+			.select('type participants.userId participants.unreadMentionCount participants.lastReadMessageId lastMessage._id unreadCounts')
+			.lean();
 
-		const latestMessage = await Message.findOne({ conversationId }).sort({ createdAt: -1 }).select('_id').lean();
-		if (!latestMessage) {
+		if (!conversation) {
+			return res.status(404).json({ message: "Conversation not found" });
+		}
+
+		const me = conversation.participants?.find((participant) => participant.userId.toString() === userId);
+		const latestMessage = conversation.lastMessage?._id
+			? { _id: conversation.lastMessage._id }
+			: await Message.findOne({ conversationId }).sort({ createdAt: -1 }).select('_id').lean();
+
+		if (!latestMessage?._id) {
 			return res.status(200).json({ message: "No messages in conversation" });
 		}
 
+		const latestMessageId = latestMessage._id;
+		const latestMessageIdString = latestMessageId.toString();
+		const alreadySeen =
+			getUnreadCountValue(conversation.unreadCounts, userId) === 0
+			&& Number(me?.unreadMentionCount || 0) === 0
+			&& me?.lastReadMessageId?.toString?.() === latestMessageIdString;
+
+		if (alreadySeen) {
+			invalidateConversationListReadCache(userId);
+			return res.status(200).json({
+				message: "Conversation marked as seen",
+				lastReadMessageId: latestMessageId,
+				myunreadCount: 0,
+			});
+		}
+
 		const now = new Date();
-		const updated = await Conversation.findOneAndUpdate(
+		const updated = await Conversation.updateOne(
 			{ _id: conversationId, 'participants.userId': userId },
 			{
 				$set: {
 					[`unreadCounts.${userId}`]: 0,
 					'participants.$.unreadMentionCount': 0,
-					'participants.$.lastReadMessageId': latestMessage._id,
+					'participants.$.lastReadMessageId': latestMessageId,
 					'participants.$.lastReadAt': now,
 				},
-			},
-			{ new: true }
+			}
 		);
 
-		if (!updated) {
+		const matchedCount = updated.matchedCount ?? updated.n ?? 0;
+		if (matchedCount === 0) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
+		invalidateConversationListReadCache(userId);
 
 		const readMessagePayload = {
 			conversationId: conversationId,
 			userId: userId,
-			lastReadMessageId: latestMessage._id,
+			lastReadMessageId: latestMessageId,
 			lastReadAt: now.toISOString(),
 			unreadCount: 0,
 			unreadMentionCount: 0,
 		};
 
-		if (updated.type === 'direct') {
-			const otherParticipant = updated.participants.find(p => p.userId.toString() !== userId);
+		if (conversation.type === 'direct') {
+			const otherParticipant = conversation.participants.find(p => p.userId.toString() !== userId);
 			if (otherParticipant) {
-				const blockExists = await BlockUser.findOne({
+				const blockExists = await BlockUser.exists({
 					$or: [
 						{ from: userId, to: otherParticipant.userId },
 						{ from: otherParticipant.userId, to: userId }
@@ -1073,7 +1121,7 @@ export async function markAsSeen(req, res) {
 					io.to(`user:${userId}`).emit("read-message", readMessagePayload);
 					return res.status(200).json({
 						message: "Conversation marked as seen",
-						lastReadMessageId: latestMessage._id,
+						lastReadMessageId: latestMessageId,
 						myunreadCount: 0,
 					});
 				}
@@ -1084,7 +1132,7 @@ export async function markAsSeen(req, res) {
 
 		return res.status(200).json({
 			message: "Conversation marked as seen",
-			lastReadMessageId: latestMessage._id,
+			lastReadMessageId: latestMessageId,
 			myunreadCount: 0,
 		});
 
@@ -1121,6 +1169,7 @@ export async function markAsUnread(req, res) {
 		if (!updated) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
+		invalidateConversationListReadCache(userId);
 
 		const receiverSocketId = getReceiverSocketId(userId);
 		if (receiverSocketId) {

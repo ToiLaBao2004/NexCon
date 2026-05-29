@@ -16,6 +16,7 @@ import {
     getCachedJson,
     getPendingJson,
     getPositiveIntEnv,
+    invalidateFriendReadCache,
     setCachedJson,
 } from "../utils/readCache.js";
 import validator from "validator";
@@ -38,8 +39,8 @@ const PENDING_REQUEST_LIMIT_MESSAGE = `Bạn chỉ có thể có tối đa ${MAX
 const MAX_FRIEND_REQUEST_MESSAGE_LENGTH = 300;
 const DEFAULT_SUGGESTION_LIMIT = 20;
 const MAX_SUGGESTION_LIMIT = 50;
-const FRIENDS_LIST_CACHE_TTL_MS = getPositiveIntEnv('FRIENDS_LIST_CACHE_TTL_MS', 2000);
-const FRIEND_SUGGESTIONS_CACHE_TTL_MS = getPositiveIntEnv('FRIEND_SUGGESTIONS_CACHE_TTL_MS', 5000);
+const FRIENDS_LIST_CACHE_TTL_MS = getPositiveIntEnv('FRIENDS_LIST_CACHE_TTL_MS', 10000);
+const FRIEND_SUGGESTIONS_CACHE_TTL_MS = getPositiveIntEnv('FRIEND_SUGGESTIONS_CACHE_TTL_MS', 30000);
 const GENERIC_EMAIL_DOMAINS = new Set([
     'gmail.com',
     'googlemail.com',
@@ -167,6 +168,7 @@ export async function sendFriendRequest(req, res) {
         const blockedBySender = await BlockUser.findOne({ from: sender._id, to: receiver._id });
         if (blockedBySender) {
             await BlockUser.deleteOne({ _id: blockedBySender._id });
+            invalidateFriendReadCache([sender._id, receiver._id]);
             // Notify receiver that they are unblocked
             const receiverSocketId = getReceiverSocketId(receiver._id.toString());
             if (receiverSocketId) {
@@ -210,6 +212,7 @@ export async function sendFriendRequest(req, res) {
             rejectedRequest.status = 'pending';
             rejectedRequest.message = normalizedMessage || undefined;
             await rejectedRequest.save();
+            invalidateFriendReadCache([sender._id, receiver._id]);
             await createNotification(receiver._id,
                 "Friend Request Resent",
                 `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${normalizedMessage ? `"${normalizedMessage}"` : ""}`,
@@ -243,6 +246,7 @@ export async function sendFriendRequest(req, res) {
                 userB: sender._id
             });
             await newFriend.save();
+            invalidateFriendReadCache([sender._id, receiver._id]);
             await createNotification(receiver._id,
                 "Friend Request Accepted",
                 `${sender.displayName} đã chấp nhận lời mời kết bạn của bạn.`,
@@ -270,6 +274,7 @@ export async function sendFriendRequest(req, res) {
             status: 'pending'
         });
         await friendRequest.save();
+        invalidateFriendReadCache([sender._id, receiver._id]);
         await createNotification(receiver._id,
             "New Friend Request",
             `${sender.displayName} đã gửi cho bạn một lời mời kết bạn. ${normalizedMessage ? `"${normalizedMessage}"` : ""}`,
@@ -323,6 +328,7 @@ export async function acceptFriendRequest(req, res) {
         await newFriend.save();
         friendRequest.status = 'accepted';
         await friendRequest.save();
+        invalidateFriendReadCache([receiver._id, sender._id]);
         await createNotification(sender._id,
             "Friend Request Accepted",
             `${receiver.displayName} đã chấp nhận lời mời kết bạn của bạn.`,
@@ -389,6 +395,7 @@ export async function rejectFriendRequest(req, res) {
         const sender = await User.findById(friendRequest.from);
         friendRequest.status = 'rejected';
         await friendRequest.save();
+        invalidateFriendReadCache([receiver._id, sender?._id]);
         emitToUser(receiver._id.toString(), "friend-request-resolved", {
             requestId,
             action: "rejected"
@@ -427,6 +434,7 @@ export async function resendFriendRequest(req, res) {
         const receiver = await User.findById(friendRequest.to);
         friendRequest.status = 'pending';
         await friendRequest.save();
+        invalidateFriendReadCache([sender._id, receiver?._id]);
         await emitSentRequestUpdated(sender._id, friendRequest._id);
         await createNotification(receiver._id,
             "Friend Request Resent",
@@ -456,6 +464,7 @@ export async function cancelFriendRequest(req, res) {
         }
         const receiverId = friendRequest.to.toString();
         await FriendRequest.deleteOne({ _id: requestId });
+        invalidateFriendReadCache([sender._id, receiverId]);
         emitToUser(sender._id.toString(), "friend-request-sent-cancelled", {
             requestId
         });
@@ -524,6 +533,7 @@ export async function unfriendUser(req, res) {
             await FriendRequest.deleteOne({ _id: friendRequest._id });
         }
         await Friend.deleteOne({ _id: friendship._id });
+        invalidateFriendReadCache([user._id, friend._id]);
 
         emitToUser(user._id.toString(), "unfriended", {
             friendId
@@ -580,6 +590,7 @@ export async function blockUser(req, res) {
             to: userBlocked._id
         });
         await blockEntry.save();
+        invalidateFriendReadCache([user._id, userBlocked._id]);
 
         emitToUser(user._id.toString(), "user-blocked-self", {
             blockedUser: {
@@ -629,6 +640,7 @@ export async function unblockUser(req, res) {
             return res.status(400).json({ message: `${userUnblocked.displayName} is not blocked by you.` });
         }
         await BlockUser.deleteOne({ _id: blockEntry._id });
+        invalidateFriendReadCache([user._id, userUnblocked._id]);
 
         emitToUser(user._id.toString(), "user-unblocked-self", {
             userId: userIdUnblocked
@@ -1073,6 +1085,7 @@ export async function setFriendNickname(req, res) {
                 friendship.nicknameA = undefined;
             }
             await friendship.save();
+            invalidateFriendReadCache(user._id);
             await emitToUser(user._id.toString(), "friend-nickname-updated", {
                 friendId: friend._id.toString(),
                 nickname: null,
@@ -1089,6 +1102,7 @@ export async function setFriendNickname(req, res) {
             friendship.nicknameA = normalizedNickname;
         }
         await friendship.save();
+        invalidateFriendReadCache(user._id);
         await emitToUser(user._id.toString(), "friend-nickname-updated", {
             friendId: friend._id.toString(),
             nickname: nicknamePayload,
