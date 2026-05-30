@@ -36,6 +36,11 @@ const normalizeSearchText = (value?: string | null) =>
     .toLowerCase()
     .trim();
 
+const getUserId = (value: any) => {
+  const user = value?.userId || value;
+  return String(user?._id || user || "");
+};
+
 export default function MembersPanel({ conversationId, participants, memberCount, isGroupAdmin, currentUserId, adminIds = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -79,20 +84,41 @@ export default function MembersPanel({ conversationId, participants, memberCount
 
   const filteredParticipants = useMemo(() => {
     const query = normalizeSearchText(memberSearch);
+    const orderedAdminIds = adminIds.map(getUserId).filter(Boolean);
 
-    if (!query) {
-      return participants;
-    }
+    const matchingParticipants = query
+      ? participants.filter((p: any) => {
+        const u = p.userId || p;
+        const searchableText = normalizeSearchText(
+          [u?.nickname, u?.displayName, u?.email, u?.phone].filter(Boolean).join(" ")
+        );
 
-    return participants.filter((p: any) => {
-      const u = p.userId || p;
-      const searchableText = normalizeSearchText(
-        [u?.nickname, u?.displayName, u?.email, u?.phone].filter(Boolean).join(" ")
-      );
+        return searchableText.includes(query);
+      })
+      : participants;
 
-      return searchableText.includes(query);
-    });
-  }, [participants, memberSearch]);
+    return matchingParticipants
+      .map((participant: any, index: number) => ({
+        participant,
+        index,
+        adminIndex: orderedAdminIds.indexOf(getUserId(participant)),
+      }))
+      .sort((a, b) => {
+        const aIsAdmin = a.adminIndex !== -1;
+        const bIsAdmin = b.adminIndex !== -1;
+
+        if (aIsAdmin !== bIsAdmin) {
+          return aIsAdmin ? -1 : 1;
+        }
+
+        if (aIsAdmin && bIsAdmin && a.adminIndex !== b.adminIndex) {
+          return a.adminIndex - b.adminIndex;
+        }
+
+        return a.index - b.index;
+      })
+      .map(({ participant }) => participant);
+  }, [participants, memberSearch, adminIds]);
 
   const onHandleApproval = async (userId: string, action: 'approve' | 'reject') => {
     if (!conversationId) return;
@@ -239,7 +265,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
                   const isMe = u?._id?.toString() === currentUserId?.toString();
                   const presence = getPresenceForUser(u?._id?.toString?.() || "", userPresences, u?.presence ?? null, onlineUsers);
                   const badgeStatus = getPresenceBadgeStatus(presence);
-                  const isLeader = adminIds.some((id) => id?.toString?.() === u?._id?.toString?.());
+                  const isLeader = adminIds.some((id) => getUserId(id) === getUserId(u));
 
                   return (
                     <div

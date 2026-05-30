@@ -2523,17 +2523,19 @@ const MessageItem = ({
 		}
 	};
 
-	const handleRecall = async () => {
-		try {
-			for (const item of bubbleMessages.filter((entry) => entry.isRecalled !== true && entry.reportStatus !== true && (!entry.status || entry.status === "sent"))) {
-				await recallMessage(item._id);
+	const handleRecall = () => {
+		const recallTargets = bubbleMessages.filter((entry) => entry.isRecalled !== true && entry.reportStatus !== true && (!entry.status || entry.status === "sent"));
+		setShowConfirmRecall(false);
+		setShowTouchActions(false);
+
+		void (async () => {
+			try {
+				for (const item of recallTargets) {
+					await recallMessage(item._id);
+				}
 			}
-		}
-		catch (e: any) { toast.error(e.message || "Thu hồi thất bại"); }
-		finally {
-			setShowConfirmRecall(false);
-			setShowTouchActions(false);
-		}
+			catch (e: any) { toast.error(e.message || "Thu hồi thất bại"); }
+		})();
 	};
 
 	const canCreateReminder = !isDisbanded && !isRecalled && !isViolationMessage && message.type === "text";

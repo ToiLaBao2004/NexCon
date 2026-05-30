@@ -635,21 +635,25 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
     }
   };
 
-  const handleRecallMedia = async () => {
+  const handleRecallMedia = () => {
     if (!recallTarget || isRecalling) return;
-    try {
-      setIsRecalling(true);
-      await recallMessage(recallTarget._id);
-      recallMessageLocal(recallTarget.conversationId || conversation._id, recallTarget._id, {
-        content: "Tin nhắn này đã được thu hồi",
-        isRecalled: true,
-      });
-      setRecallTarget(null);
-    } catch (error: any) {
-      toast.error(error?.message || "Thu hồi thất bại");
-    } finally {
-      setIsRecalling(false);
-    }
+    const target = recallTarget;
+    setIsRecalling(true);
+    setRecallTarget(null);
+
+    void (async () => {
+      try {
+        await recallMessage(target._id);
+        recallMessageLocal(target.conversationId || conversation._id, target._id, {
+          content: "Tin nhắn này đã được thu hồi",
+          isRecalled: true,
+        });
+      } catch (error: any) {
+        toast.error(error?.message || "Thu hồi thất bại");
+      } finally {
+        setIsRecalling(false);
+      }
+    })();
   };
 
   const renderFileRow = (msg: Message) => {

@@ -176,24 +176,28 @@ export default function ImageViewerModal() {
     }
   };
 
-  const handleRecall = async () => {
+  const handleRecall = () => {
     if (!viewerMessage || isRecalling) return;
-    try {
-      setIsRecalling(true);
-      await recallMessage(viewerMessage._id);
-      if (viewerMessage.conversationId) {
-        recallMessageLocal(viewerMessage.conversationId, viewerMessage._id, {
-          content: "Tin nhắn này đã được thu hồi",
-          isRecalled: true,
-        });
+    const messageToRecall = viewerMessage;
+    setIsRecalling(true);
+    setShowRecallConfirm(false);
+    closeViewer();
+
+    void (async () => {
+      try {
+        await recallMessage(messageToRecall._id);
+        if (messageToRecall.conversationId) {
+          recallMessageLocal(messageToRecall.conversationId, messageToRecall._id, {
+            content: "Tin nhắn này đã được thu hồi",
+            isRecalled: true,
+          });
+        }
+      } catch (error: any) {
+        toast.error(error?.message || "Thu hồi thất bại");
+      } finally {
+        setIsRecalling(false);
       }
-      setShowRecallConfirm(false);
-      closeViewer();
-    } catch (error: any) {
-      toast.error(error?.message || "Thu hồi thất bại");
-    } finally {
-      setIsRecalling(false);
-    }
+    })();
   };
 
   if (!isOpen || !image) return null;
