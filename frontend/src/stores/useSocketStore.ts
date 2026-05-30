@@ -847,21 +847,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
       toast.info(mentionTitle, {
         duration: 7000,
-        className: "rounded-xl border border-border/70 bg-card text-card-foreground shadow-xl",
-        descriptionClassName: "mt-1 text-[13px] leading-snug text-muted-foreground",
         action: {
           label: 'Xem tin',
           onClick: () => {
             navigateToAppPath(targetUrl);
           },
-        },
-        actionButtonStyle: {
-          height: "32px",
-          borderRadius: "9999px",
-          background: "hsl(var(--primary))",
-          color: "hsl(var(--primary-foreground))",
-          fontWeight: "600",
-          padding: "0 12px",
         },
         description: mentionDescription,
       });

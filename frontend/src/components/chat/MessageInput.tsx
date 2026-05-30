@@ -183,10 +183,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				label: "Xem chi tiết",
 				onClick: () => navigate(targetPath),
 			},
-			actionButtonStyle: {
-				backgroundColor: "hsl(var(--primary))",
-				color: "hsl(var(--primary-foreground))",
-			},
 		});
 	}, [navigate]);
 

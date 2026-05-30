@@ -321,6 +321,146 @@
   z-index: 2147483647 !important;
 }
 
+[data-sonner-toaster].nexcon-toaster {
+  --width: 360px;
+  --nexcon-toast-surface: 214 62% 96%;
+  --nexcon-toast-border: 214 42% 82%;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+[data-sonner-toaster].nexcon-toaster[data-sonner-theme="dark"] {
+  --nexcon-toast-surface: 220 34% 17%;
+  --nexcon-toast-border: 217 30% 31%;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast {
+  --nexcon-toast-accent: var(--primary);
+  min-height: 58px;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid hsl(var(--nexcon-toast-border) / 0.92);
+  border-radius: 12px;
+  background: hsl(var(--nexcon-toast-surface) / 0.98);
+  color: hsl(var(--card-foreground));
+  box-shadow:
+    inset 3px 0 0 hsl(var(--nexcon-toast-accent)),
+    0 14px 34px -14px hsl(var(--foreground) / 0.4);
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast][data-type="success"].nexcon-toast {
+  --nexcon-toast-accent: var(--online);
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast][data-type="warning"].nexcon-toast {
+  --nexcon-toast-accent: var(--warning);
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast][data-type="error"].nexcon-toast {
+  --nexcon-toast-accent: var(--destructive);
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-icon] {
+  display: flex;
+  height: 24px;
+  width: 24px;
+  flex: 0 0 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast][data-type="success"].nexcon-toast [data-icon] {
+  background: hsl(var(--online) / 0.14);
+  color: hsl(var(--online));
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast][data-type="warning"].nexcon-toast [data-icon] {
+  background: hsl(var(--warning) / 0.15);
+  color: hsl(var(--warning));
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast][data-type="error"].nexcon-toast [data-icon] {
+  background: hsl(var(--destructive) / 0.14);
+  color: hsl(var(--destructive));
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-icon] svg {
+  height: 15px;
+  width: 15px;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-content] {
+  gap: 3px;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-title] {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-description] {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-button] {
+  height: 30px;
+  border-radius: 6px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  padding-inline: 11px;
+  font-size: 12px;
+  font-weight: 600;
+  transition: opacity 150ms ease;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-button]:hover {
+  opacity: 0.86;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-close-button] {
+  left: auto !important;
+  right: -7px !important;
+  top: -7px !important;
+  height: 22px;
+  width: 22px;
+  border: 1px solid hsl(var(--nexcon-toast-border) / 0.92);
+  background: hsl(var(--nexcon-toast-surface));
+  color: hsl(var(--muted-foreground));
+  opacity: 0.9;
+  transform: none;
+  box-shadow: 0 3px 8px -5px hsl(var(--foreground) / 0.55);
+  transition: background-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast].nexcon-toast [data-close-button]:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  opacity: 1;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast][data-type="custom"].nexcon-toast {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+[data-sonner-toaster].nexcon-toaster [data-sonner-toast][data-type="custom"].nexcon-toast > [data-close-button] {
+  display: none;
+}
+
+@media (max-width: 480px) {
+  [data-sonner-toaster].nexcon-toaster {
+    --width: calc(100vw - 16px);
+  }
+}
+
   /* Animations */
   .transition-bounce {
     transition: var(--transition-bounce);
