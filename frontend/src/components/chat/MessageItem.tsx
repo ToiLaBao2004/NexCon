@@ -2217,17 +2217,6 @@ const MessageItem = ({
 			return (senderObj ? senderObj._id : msg.senderId)?.toString?.() ?? "";
 		};
 
-		const latestSentIndexBySender = new Map<string, number>();
-		messages.forEach((msg, idx) => {
-			if (msg.type === "system" && msg.systemType !== "call") return;
-			if (msg.status && msg.status !== "sent") return;
-
-			const senderId = resolveSenderId(msg);
-			if (senderId) {
-				latestSentIndexBySender.set(senderId, idx);
-			}
-		});
-
 		for (const p of selectedConvo.participants) {
 			const pid = p.userId?._id?.toString();
 			if (!pid || pid === currentUserIdStr) continue;
@@ -2237,7 +2226,6 @@ const MessageItem = ({
 			if (lastReadIndex === undefined) continue;
 
 			let targetMessageId: string | null = null;
-			let targetMessageIndex = -1;
 			for (let i = lastReadIndex; i >= 0; i -= 1) {
 				const msg = messages[i];
 				if (msg.type === "system" && msg.systemType !== "call") continue;
@@ -2245,14 +2233,11 @@ const MessageItem = ({
 
 				if (!msg.status || msg.status === "sent") {
 					targetMessageId = msg._id;
-					targetMessageIndex = i;
 					break;
 				}
 			}
 
 			if (!targetMessageId) continue;
-			const latestSentIndex = latestSentIndexBySender.get(pid);
-			if (latestSentIndex !== undefined && latestSentIndex > targetMessageIndex) continue;
 
 			if (!map[targetMessageId]) map[targetMessageId] = [];
 			map[targetMessageId].push({
