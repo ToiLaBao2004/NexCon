@@ -40,6 +40,8 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
 const SEARCH_SCAN_BATCH_SIZE = 100;
+const IMAGE_MODERATION_STATUS_PENDING = 'pending_review';
+const IMAGE_CLEANUP_RETRY_DELAYS_MS = [0, 500, 2000];
 const moderationCategoryLabels = {
     abusive: 'Ngôn từ xúc phạm',
     harassment: 'Quấy rối hoặc công kích cá nhân',
@@ -262,6 +264,190 @@ async function sendOfflineMessagePushes({ conversation, message, senderId, sende
     }));
 }
 
+async function cleanupRejectedImage(publicId) {
+    if (!publicId) return;
+
+    for (let index = 0; index < IMAGE_CLEANUP_RETRY_DELAYS_MS.length; index += 1) {
+        const delay = IMAGE_CLEANUP_RETRY_DELAYS_MS[index];
+        if (delay > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+
+        try {
+            await deleteCloudinaryResource(publicId, 'image', 'authenticated');
+            return;
+        } catch (error) {
+            const isLastAttempt = index === IMAGE_CLEANUP_RETRY_DELAYS_MS.length - 1;
+            console.error(
+                `[ImageModeration] Cannot delete rejected asset${isLastAttempt ? '' : ', retrying'}:`,
+                publicId,
+                error?.message || error
+            );
+        }
+    }
+}
+
+async function moderateDeliveredImage({
+    messageId,
+    conversationId,
+    publicId,
+    imageBuffer,
+    mimeType,
+    notificationPayload,
+}) {
+    try {
+        const result = await moderateImageMessage(imageBuffer, mimeType);
+        const moderationStatus = result.blocked
+            ? 'rejected'
+            : (result.moderationSkipped ? 'skipped' : 'approved');
+
+        if (!result.blocked) {
+            const updateResult = await Message.updateOne(
+                {
+                    _id: messageId,
+                    isRecalled: { $ne: true },
+                    'metadata.imageModerationStatus': IMAGE_MODERATION_STATUS_PENDING,
+                },
+                {
+                    $set: {
+                        'metadata.imageModerationStatus': moderationStatus,
+                        'metadata.imageModerationCategory': result.category || 'safe',
+                    },
+                }
+            );
+            const matchedCount = updateResult.matchedCount ?? updateResult.n ?? 0;
+            if (matchedCount > 0 && notificationPayload) {
+                schedulePostMessageNotifications(notificationPayload);
+            }
+            return;
+        }
+
+        const moderatedMessage = await Message.findOneAndUpdate(
+            {
+                _id: messageId,
+                isRecalled: { $ne: true },
+            },
+            {
+                $set: {
+                    reportStatus: true,
+                    'metadata.imageModerationStatus': moderationStatus,
+                    'metadata.imageModerationCategory': result.category || 'unknown',
+                    'metadata.imageModerationReason': String(result.reason || '').slice(0, 1000),
+                },
+            },
+            { new: true }
+        ).lean();
+
+        await cleanupRejectedImage(publicId);
+
+        if (!moderatedMessage) return;
+
+        const conversation = await Conversation.findById(conversationId);
+        if (conversation?.lastMessage?._id?.toString?.() === messageId.toString()) {
+            conversation.lastMessage.content = 'Tin nhắn vi phạm tiêu chuẩn cộng đồng';
+            await conversation.save();
+        }
+
+        io.to(conversationId.toString()).emit('message-moderated', {
+            conversationId: conversationId.toString(),
+            messageId: messageId.toString(),
+            reportStatus: true,
+            content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
+        });
+    } catch (error) {
+        console.error('[ImageModeration] Background review failed:', error);
+    }
+}
+
+function scheduleImageModeration(payload) {
+    setImmediate(() => {
+        void moderateDeliveredImage(payload);
+    });
+}
+
+async function sendPostMessageNotifications({ conversation, message, senderId, senderName, senderAvatarUrl }) {
+    const mentionTargetIds = new Set(
+        (message.mentions || [])
+            .map((mention) => mention.userId.toString())
+            .filter((mentionUserId) => mentionUserId !== senderId.toString())
+    );
+
+    try {
+        await sendOfflineMessagePushes({
+            conversation,
+            message,
+            senderId,
+            senderName,
+            skipUserIds: mentionTargetIds,
+        });
+    } catch (error) {
+        console.error('Error sending offline message pushes:', error);
+    }
+
+    if (!Array.isArray(message.mentions) || message.mentions.length === 0) return;
+
+    const cleanContent = replaceMentionTags(message.content, message.mentions);
+    const preview = cleanContent?.substring(0, 100) ?? '';
+    const conversationUrl = `${process.env.FRONTEND_URL}/chat?conversationId=${conversation._id}&messageId=${message._id}`;
+    const mentionTargets = new Set();
+
+    for (const mention of message.mentions) {
+        const mentionUserId = mention.userId.toString();
+        if (mentionUserId === senderId.toString() || mentionTargets.has(mentionUserId)) continue;
+
+        mentionTargets.add(mentionUserId);
+
+        const delivered = await emitToUser(mentionUserId, 'user_mentioned', {
+            messageId: message._id,
+            conversationId: message.conversationId,
+            mentionedBy: {
+                userId: senderId,
+                displayName: senderName,
+                avatarUrl: senderAvatarUrl,
+            },
+            preview,
+            createdAt: message.createdAt,
+        });
+
+        if (delivered) continue;
+
+        await createNotification(
+            mention.userId,
+            'Bạn được nhắc đến',
+            `${senderName}${preview ? `: "${preview}"` : ''}`,
+            conversationUrl,
+            {
+                type: 'mention',
+                targetId: message._id,
+                actorId: senderId,
+                recipientId: mention.userId,
+                metadata: {
+                    conversationId: conversation._id.toString(),
+                    preview,
+                },
+            }
+        );
+
+        try {
+            await sendPushToUser(mentionUserId, {
+                title: 'Bạn được nhắc đến',
+                body: `${senderName}${preview ? `: ${preview}` : ''}`,
+                url: conversationUrl,
+            });
+        } catch (pushError) {
+            console.error('Error sending mention push notification:', pushError);
+        }
+    }
+}
+
+function schedulePostMessageNotifications(payload) {
+    setImmediate(() => {
+        void sendPostMessageNotifications(payload).catch((error) => {
+            console.error('Error sending post-message notifications:', error);
+        });
+    });
+}
+
 const saveConversationForNewMessage = async ({ conversationId, message, senderId, mentions = [] }) => {
     const maxAttempts = 3;
 
@@ -310,6 +496,8 @@ const saveConversationForNewMessage = async ({ conversationId, message, senderId
 };
 
 export async function sendMessage(req, res) {
+    let pendingImageModeration = null;
+
     try {
         const senderId = req.user._id;
         const { type = 'text', recipientId, content, replyTo } = req.body;
@@ -431,17 +619,20 @@ export async function sendMessage(req, res) {
                 const imageBuffer = uploadedFile.buffer;
                 const mimeType = uploadedFile.mimetype;
 
-                const moderationResult = await moderateImageMessage(imageBuffer, mimeType);
-
-                if (moderationResult.blocked) {
-                    return respondWithModerationBlock(req, res, moderationResult, 'Ảnh vi phạm tiêu chuẩn cộng đồng.', 'image');
-                }
-
                 const result = await safeUpload(uploadChatImageFromBuffer, uploadedFile.buffer);
                 messageData.filePublicId = result.public_id;
                 messageData.fileName = uploadedFile.originalname;
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
+                messageData.metadata = {
+                    ...(messageData.metadata || {}),
+                    imageModerationStatus: IMAGE_MODERATION_STATUS_PENDING,
+                };
+                pendingImageModeration = {
+                    publicId: result.public_id,
+                    imageBuffer,
+                    mimeType,
+                };
                 if (content?.trim()) messageData.content = content.trim();
                 break;
             }
@@ -558,6 +749,10 @@ export async function sendMessage(req, res) {
         if (replyTo) {
             const repliedMessage = await Message.findById(replyTo);
             if (!repliedMessage || repliedMessage.conversationId.toString() !== conversation._id.toString()) {
+                if (pendingImageModeration?.publicId) {
+                    void cleanupRejectedImage(pendingImageModeration.publicId);
+                    pendingImageModeration = null;
+                }
                 return res.status(400).json({ message: 'Tin nhắn trả lời không hợp lệ.' });
             }
             messageData.replyTo = replyTo;
@@ -600,79 +795,31 @@ export async function sendMessage(req, res) {
         const signedUrl = generateSignedUrl(message.filePublicId, message.type);
         emitNewMessage(io, conversation, message, signedUrl);
 
-        const mentionTargetIds = new Set(
-            (message.mentions || [])
-                .map((mention) => mention.userId.toString())
-                .filter((mentionUserId) => mentionUserId !== senderId.toString())
-        );
-
-        await sendOfflineMessagePushes({
+        const notificationPayload = {
             conversation,
             message,
             senderId,
             senderName: req.user.displayName,
-            skipUserIds: mentionTargetIds,
-        });
+            senderAvatarUrl: req.user.avatarUrl,
+        };
 
-        if (Array.isArray(message.mentions) && message.mentions.length > 0) {
-            const cleanContent = replaceMentionTags(message.content, message.mentions);
-            const preview = cleanContent?.substring(0, 100) ?? '';
-            const conversationUrl = `${process.env.FRONTEND_URL}/chat?conversationId=${conversation._id}&messageId=${message._id}`;
-            const mentionTargets = new Set();
-
-            for (const mention of message.mentions) {
-                const mentionUserId = mention.userId.toString();
-                if (mentionUserId === senderId.toString() || mentionTargets.has(mentionUserId)) {
-                    continue;
-                }
-
-                mentionTargets.add(mentionUserId);
-
-                const delivered = await emitToUser(mentionUserId, 'user_mentioned', {
-                    messageId: message._id,
-                    conversationId: message.conversationId,
-                    mentionedBy: {
-                        userId: senderId,
-                        displayName: req.user.displayName,
-                        avatarUrl: req.user.avatarUrl,
-                    },
-                    preview,
-                    createdAt: message.createdAt,
-                });
-
-                if (!delivered) {
-                    await createNotification(
-                        mention.userId,
-                        'Bạn được nhắc đến',
-                        `${req.user.displayName}${preview ? `: "${preview}"` : ''}`,
-                        conversationUrl,
-                        {
-                            type: 'mention',
-                            targetId: message._id,
-                            actorId: senderId,
-                            recipientId: mention.userId,
-                            metadata: {
-                                conversationId: conversation._id.toString(),
-                                preview,
-                            },
-                        }
-                    );
-
-                    try {
-                        await sendPushToUser(mentionUserId, {
-                            title: 'Bạn được nhắc đến',
-                            body: `${req.user.displayName}${preview ? `: ${preview}` : ''}`,
-                            url: conversationUrl,
-                        });
-                    } catch (pushError) {
-                        console.error('Error sending mention push notification:', pushError);
-                    }
-                }
-            }
+        if (pendingImageModeration) {
+            scheduleImageModeration({
+                ...pendingImageModeration,
+                messageId: message._id,
+                conversationId: conversation._id,
+                notificationPayload,
+            });
+            pendingImageModeration = null;
+        } else {
+            schedulePostMessageNotifications(notificationPayload);
         }
 
         return res.status(201).json({ message, signedUrl });
     } catch (error) {
+        if (pendingImageModeration?.publicId) {
+            void cleanupRejectedImage(pendingImageModeration.publicId);
+        }
         console.error('Error sending message:', error);
         const statusCode = error.statusCode ?? 500;
         const message = statusCode !== 500 ? error.message : 'Internal server error.';
@@ -1403,6 +1550,9 @@ export async function forwardMessage(req, res) {
         const sourceMetadata = source.metadata instanceof Map
             ? Object.fromEntries(source.metadata)
             : (source.metadata || {});
+        if (source.type === 'image' && sourceMetadata.imageModerationStatus === IMAGE_MODERATION_STATUS_PENDING) {
+            return res.status(409).json({ message: 'Ảnh đang được kiểm duyệt. Vui lòng thử lại sau.' });
+        }
         const forwardedFrom = {
             messageId: source._id.toString(),
             conversationId: source.conversationId.toString(),

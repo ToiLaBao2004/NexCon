@@ -1072,9 +1072,22 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             },
           }
           : state.messages;
+        const currentMedia = state.media[targetConversationId];
+        const nextMedia = currentMedia
+          ? {
+            ...state.media,
+            [targetConversationId]: {
+              ...currentMedia,
+              images: currentMedia.images.filter((message) => String(message._id) !== String(targetMessageId)),
+              files: currentMedia.files.filter((message) => String(message._id) !== String(targetMessageId)),
+              links: currentMedia.links.filter((message) => String(message._id) !== String(targetMessageId)),
+            },
+          }
+          : state.media;
 
         return {
           messages: nextMessages,
+          media: nextMedia,
           conversations: state.conversations.map((conversation) => {
             if (String(conversation._id) !== String(targetConversationId)) return conversation;
             if (String(conversation.lastMessage?._id) !== String(targetMessageId)) return conversation;
