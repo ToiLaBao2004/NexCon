@@ -111,6 +111,31 @@ const canUseOptimisticSlot = (optimistic: any, incoming: any) => {
     return true;
 };
 
+const resolveCompletedOptimisticItems = (
+    items: any[],
+    optimisticIndex: number,
+    existingIndex: number,
+    completedMessage: any
+) => {
+    if (existingIndex !== -1) {
+        return items
+            .filter((_, index) => index !== optimisticIndex)
+            .map((message) => message._id === completedMessage._id ? { ...message, ...completedMessage } : message);
+    }
+
+    if (optimisticIndex === -1) {
+        return [...items, completedMessage];
+    }
+
+    const shouldMoveToCompletionPosition = optimisticIndex < items.length - 1;
+    if (!shouldMoveToCompletionPosition) {
+        return items.map((message, index) => index === optimisticIndex ? { ...message, ...completedMessage } : message);
+    }
+
+    const withoutOptimistic = items.filter((_, index) => index !== optimisticIndex);
+    return [...withoutOptimistic, completedMessage];
+};
+
 const isVisibleConversation = (conversation: any) => {
     return !(conversation?.type === 'group' && conversation?.disbanded === true);
 };
@@ -975,19 +1000,7 @@ export const useChatStore = create<ChatState>()(
                             const sentMessage = { ...realMsg, isOwn: true, clientTempId: tempId, status: 'sent' as const };
                             const tempIndex = prev.items.findIndex((m) => m._id === tempId);
                             const existingIndex = prev.items.findIndex((m) => m._id === realMsg._id);
-                            const items = (() => {
-                                if (existingIndex !== -1) {
-                                    return prev.items
-                                        .filter((_, index) => index !== tempIndex)
-                                        .map((m) => m._id === realMsg._id ? { ...m, ...sentMessage } : m);
-                                }
-
-                                if (tempIndex !== -1) {
-                                    return prev.items.map((m, index) => index === tempIndex ? { ...m, ...sentMessage } : m);
-                                }
-
-                                return [...prev.items, sentMessage];
-                            })();
+                            const items = resolveCompletedOptimisticItems(prev.items, tempIndex, existingIndex, sentMessage);
                             const prevMedia = state.media[convoId];
                             let nextMedia = prevMedia;
                             if (prevMedia) {
@@ -1176,9 +1189,12 @@ export const useChatStore = create<ChatState>()(
                                 ...state.messages,
                                 [convoId]: {
                                     ...prevState,
-                                    items: optimisticIndex >= 0
-                                        ? prevState.items.map((item, index) => index === optimisticIndex ? messageForList : item)
-                                        : [...prevState.items, messageForList],
+                                    items: resolveCompletedOptimisticItems(
+                                        prevState.items,
+                                        optimisticIndex,
+                                        -1,
+                                        messageForList
+                                    ),
                                     pinnedMessages: prevState.pinnedMessages ?? [],
                                 },
                             },
