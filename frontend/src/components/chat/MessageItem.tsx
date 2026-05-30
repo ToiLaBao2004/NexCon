@@ -50,18 +50,31 @@ const MAX_VISIBLE_SEEN_AVATARS = 8;
 const singleImageFrameClass = "relative h-auto w-[280px] max-w-[70vw] aspect-[14/9] overflow-hidden rounded-xl bg-muted";
 const imagePreviewClass = "h-full w-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity";
 
-function MentionChip({ children, isOwn }: { children: React.ReactNode; isOwn: boolean }) {
+function MentionChip({
+	children,
+	isOwn,
+	onClick,
+}: {
+	children: React.ReactNode;
+	isOwn: boolean;
+	onClick?: () => void;
+}) {
 	return (
-		<span
+		<button
+			type="button"
+			onClick={(event) => {
+				event.stopPropagation();
+				onClick?.();
+			}}
 			className={cn(
-				"inline-flex items-center rounded-md px-1.5 py-0.5 font-semibold align-baseline",
+				"inline cursor-pointer border-0 bg-transparent p-0 font-semibold align-baseline transition-opacity hover:opacity-70",
 				isOwn
-					? "bg-white/15 text-white"
-					: "bg-blue-500/10 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300"
+					? "text-white"
+					: "text-blue-700 dark:text-blue-300"
 			)}
 		>
 			{children}
-		</span>
+		</button>
 	);
 }
 
@@ -70,11 +83,16 @@ function renderMentionedText(
 	mentions: Mention[] | undefined,
 	isOwn: boolean,
 	participants: Participant[],
+	onMentionClick?: (userId: string) => void,
 ) {
 	const parts = getMentionTextSegments(text, mentions, participants).map((segment, index) => {
 		if (segment.type === "mention") {
 			return (
-				<MentionChip key={`mention-${segment.userId}-${index}`} isOwn={isOwn}>
+				<MentionChip
+					key={`mention-${segment.userId}-${index}`}
+					isOwn={isOwn}
+					onClick={() => onMentionClick?.(segment.userId)}
+				>
 					{segment.text}
 				</MentionChip>
 			);
@@ -256,11 +274,13 @@ function AudioMessageBubble({
 	isOwn,
 	downloadUrl,
 	participants,
+	onMentionClick,
 }: {
 	message: Message;
 	isOwn: boolean;
 	downloadUrl: string;
 	participants: Participant[];
+	onMentionClick?: (userId: string) => void;
 }) {
 	const [showTranscript, setShowTranscript] = useState(false);
 	const hasTranscript = Boolean(message.content?.trim());
@@ -317,7 +337,8 @@ function AudioMessageBubble({
 						message.content ?? "",
 						message.mentions,
 						isOwn,
-						participants
+						participants,
+						onMentionClick
 					)}
 				</div>
 			)}
@@ -341,11 +362,13 @@ function ImageBatchGrid({
 	isOwn,
 	participants,
 	conversationId,
+	onMentionClick,
 }: {
 	items: Message[];
 	isOwn: boolean;
 	participants: Participant[];
 	conversationId: string;
+	onMentionClick?: (userId: string) => void;
 }) {
 	const visibleItems = items.slice(0, 10);
 	const count = visibleItems.length;
@@ -435,18 +458,18 @@ function ImageBatchGrid({
 			</div>
 			{items[0]?.content && !items[0]?.isRecalled && !items[0]?.reportStatus && (
 				<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
-					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
+					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants, onMentionClick)}
 				</p>
 			)}
 		</div>
 	);
 }
 
-function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchItems }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[]; imageBatchItems?: Message[] }) {
+function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchItems, onMentionClick }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[]; imageBatchItems?: Message[]; onMentionClick?: (userId: string) => void }) {
 	const type: MessageType = message.type ?? "text";
 
 	if (imageBatchItems && imageBatchItems.length > 1) {
-		return <ImageBatchGrid items={imageBatchItems} isOwn={isOwn} participants={participants} conversationId={message.conversationId} />;
+		return <ImageBatchGrid items={imageBatchItems} isOwn={isOwn} participants={participants} conversationId={message.conversationId} onMentionClick={onMentionClick} />;
 	}
 
 	if (message.reportStatus) {
@@ -533,7 +556,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				)}
 				{message.content && (
 					<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
-						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
+						{renderMentionedText(message.content, message.mentions, isOwn, participants, onMentionClick)}
 					</p>
 				)}
 			</div>
@@ -567,6 +590,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				isOwn={isOwn}
 				downloadUrl={downloadUrl}
 				participants={participants}
+				onMentionClick={onMentionClick}
 			/>
 		);
 	}
@@ -615,7 +639,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				</a>
 				{message.content && (
 					<div className="px-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words sm:text-[15px]">
-						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
+						{renderMentionedText(message.content, message.mentions, isOwn, participants, onMentionClick)}
 					</div>
 				)}
 			</div>
@@ -698,7 +722,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 		);
 	}
 
-	return renderMentionedText(message.content ?? "", message.mentions, isOwn, participants);
+	return renderMentionedText(message.content ?? "", message.mentions, isOwn, participants, onMentionClick);
 }
 
 // Reply quote (rendered inside the Card bubble) 
@@ -2250,6 +2274,24 @@ const MessageItem = ({
 		});
 	}, [participant?.userId, selectedConvo.type]);
 
+	const openMentionProfile = useCallback((userId: string) => {
+		const mentionedParticipant = selectedConvo.participants.find(
+			(item) => item.userId?._id?.toString?.() === userId.toString()
+		)?.userId;
+		if (!mentionedParticipant?._id) return;
+
+		setProfileUser({
+			_id: mentionedParticipant._id.toString(),
+			displayName: mentionedParticipant.displayName || mentionedParticipant.nickname?.trim() || "Người dùng",
+			email: mentionedParticipant.email || "",
+			avatarUrl: mentionedParticipant.avatarUrl || undefined,
+			bio: mentionedParticipant.bio,
+			phone: mentionedParticipant.phone,
+			profileVisibility: mentionedParticipant.profileVisibility,
+			profileVisibleToViewer: mentionedParticipant.profileVisibleToViewer,
+		});
+	}, [selectedConvo.participants]);
+
 	const clearLongPressTimer = useCallback(() => {
 		if (longPressTimeoutRef.current !== null) {
 			window.clearTimeout(longPressTimeoutRef.current);
@@ -2547,6 +2589,7 @@ const MessageItem = ({
 										downloadUrl={downloadUrl}
 										participants={selectedConvo.participants}
 										imageBatchItems={imageBatchItems}
+										onMentionClick={openMentionProfile}
 									/>
 								</div>
 
