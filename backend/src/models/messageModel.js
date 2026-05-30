@@ -122,6 +122,12 @@ messageSchema.pre('save', function (next) {
         this.content = rawContent;
     }
 
+    if (this.type === 'sticker') {
+        this.searchContent = undefined;
+        next();
+        return;
+    }
+
     if (rawContent != null) {
         this.searchContent = normalizeVietnamese(plainContent || '');
     } else {

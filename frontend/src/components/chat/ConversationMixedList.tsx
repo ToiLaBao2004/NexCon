@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type UIEvent } from "react";
-import { Search, X, Loader2 } from "lucide-react";
+import { Search, X, Loader2, User, Users, Plus } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useChatStore } from "@/stores/useChatStore";
+import { useFriendStore } from "@/stores/useFriendStore";
 import { chatService } from "@/services/chatService";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import UserAvatar from "./UserAvatar";
 import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { decodeMentionTokens } from "@/utils/mentions";
 import { SHOW_CONVERSATION_LIST_EVENT } from "@/constants/chatEvents";
+import type { FriendItem } from "@/types/user";
 
 export type ConversationFilter = "all" | "unread";
 
@@ -33,6 +35,7 @@ type ResultTab = Exclude<SearchTab, "all">;
 interface ConversationMixedListProps {
   conversationFilter: ConversationFilter;
   onChangeFilter: (filter: ConversationFilter) => void;
+  onAddFriend: () => void;
   onCreateGroup: () => void;
 }
 
@@ -41,7 +44,7 @@ const DEFAULT_TAB_LIMITS: Record<ResultTab, number> = {
   conversations: 8,
   messages: 10,
 };
-const GLOBAL_SEARCH_DEBOUNCE_MS = 1000;
+const GLOBAL_SEARCH_DEBOUNCE_MS = 300;
 
 const createEmptyPage = <T,>(limit = 0): GlobalSearchPage<T> => ({
   items: [],
@@ -268,6 +271,78 @@ const appendUniqueById = <T extends { _id: string }>(current: T[], incoming: T[]
   return next;
 };
 
+const mergeUniqueById = <T extends { _id: string }>(primary: T[], secondary: T[]) => {
+  const seen = new Set(primary.map((item) => item._id));
+  return [
+    ...primary,
+    ...secondary.filter((item) => {
+      if (seen.has(item._id)) return false;
+      seen.add(item._id);
+      return true;
+    }),
+  ];
+};
+
+const buildPage = <T,>(items: T[], limit: number, hasMore = false, nextCursor: string | null = null): GlobalSearchPage<T> => ({
+  items,
+  limit,
+  hasMore,
+  nextCursor: hasMore ? nextCursor : null,
+});
+
+const getFriendSearchText = (friend: FriendItem) => {
+  const raw = friend as FriendItem & { email?: string; phone?: string; bio?: string };
+  return normalizeSearchText([
+    raw.nickname,
+    raw.displayName,
+    raw.email,
+    raw.phone,
+    raw.bio,
+  ].filter(Boolean).join(" "));
+};
+
+const searchFriendsCache = (friends: FriendItem[], keyword: string, limit = DEFAULT_TAB_LIMITS.users) => {
+  const normalizedKeyword = normalizeSearchText(keyword);
+  if (!normalizedKeyword) return buildPage<GlobalSearchUser>([], limit);
+
+  const matches = friends
+    .filter((friend) => getFriendSearchText(friend).includes(normalizedKeyword))
+    .map((friend) => {
+      const raw = friend as FriendItem & { email?: string; phone?: string; bio?: string };
+      return {
+        _id: friend.friendId,
+        displayName: friend.nickname?.trim() || friend.displayName,
+        email: raw.email,
+        avatarUrl: friend.avatarUrl || null,
+        phone: raw.phone,
+        bio: raw.bio,
+      } satisfies GlobalSearchUser;
+    });
+
+  return buildPage(matches.slice(0, limit), limit, matches.length > limit, null);
+};
+
+const searchConversationsCache = (
+  conversations: Conversation[],
+  keyword: string,
+  currentUserId?: string,
+  limit = DEFAULT_TAB_LIMITS.conversations,
+) => {
+  const normalizedKeyword = normalizeSearchText(keyword);
+  if (!normalizedKeyword) return buildPage<Conversation>([], limit);
+
+  const matches = conversations.filter((conversation) => {
+    const searchableText = normalizeSearchText([
+      getConversationTitle(conversation, currentUserId),
+      getConversationSubtitle(conversation, currentUserId),
+      getMatchedGroupMemberLabel(conversation, keyword, currentUserId),
+    ].filter(Boolean).join(" "));
+    return searchableText.includes(normalizedKeyword);
+  });
+
+  return buildPage(matches.slice(0, limit), limit, matches.length > limit, null);
+};
+
 function SearchResultSkeleton() {
   return (
     <div className="space-y-3 px-1 py-2">
@@ -281,6 +356,29 @@ function SearchResultSkeleton() {
         </div>
       ))}
     </div>
+  );
+}
+
+function SearchSectionSkeleton({ title, rows = 2 }: { title: string; rows?: number }) {
+  return (
+    <section className="pb-2">
+      <div className="px-1 pb-1.5 pt-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+      </div>
+      <div className="space-y-3 px-1 py-1">
+        {Array.from({ length: rows }).map((_, index) => (
+          <div key={index} className="flex items-center gap-3 rounded-lg px-1 py-2">
+            <Skeleton className="h-11 w-11 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-3 w-5/6" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -487,6 +585,7 @@ function MessageResultRow({
 const ConversationMixedList = ({
   conversationFilter,
   onChangeFilter,
+  onAddFriend,
   onCreateGroup,
 }: ConversationMixedListProps) => {
   const {
@@ -503,6 +602,7 @@ const ConversationMixedList = ({
     openChat,
   } = useChatStore();
   const { user } = useAuthStore();
+  const { friends } = useFriendStore();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchTab, setSearchTab] = useState<SearchTab>("all");
@@ -511,13 +611,15 @@ const ConversationMixedList = ({
   const [tabLoading, setTabLoading] = useState(createLoadingMap);
   const [tabLoadingMore, setTabLoadingMore] = useState(createLoadingMap);
   const [loadMoreErrorTab, setLoadMoreErrorTab] = useState<ResultTab | null>(null);
-  const [isGlobalSearching, setIsGlobalSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [profileUser, setProfileUser] = useState<GlobalSearchUser | null>(null);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const cacheKeywordRef = useRef("");
   const fetchedTabsRef = useRef(createFetchedMap(false));
+  const scrollPositionsRef = useRef<Record<string, number>>({});
+  const suppressAutoLoadUntilRef = useRef(0);
   const conversationItems = useMemo(() => conversations ?? [], [conversations]);
   const currentUserId = user?._id?.toString();
   const debouncedQuery = useDebounce(searchQuery, GLOBAL_SEARCH_DEBOUNCE_MS);
@@ -532,6 +634,9 @@ const ConversationMixedList = ({
     && !isWaitingForDebounce
     && hasFreshSearchCache
     && !fetchedTabsRef.current[searchTab];
+  const activeScrollKey = hasQuery
+    ? `search:${trimmedQuery}:${searchTab}`
+    : `conversations:${conversationFilter}`;
 
   const resetGlobalSearch = useCallback((focusInput = false) => {
     setSearchQuery("");
@@ -591,10 +696,22 @@ const ConversationMixedList = ({
   }, [trimmedQuery]);
 
   useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    suppressAutoLoadUntilRef.current = Date.now() + 300;
+    const nextTop = scrollPositionsRef.current[activeScrollKey] || 0;
+    const frame = window.requestAnimationFrame(() => {
+      container.scrollTop = nextTop;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeScrollKey]);
+
+  useEffect(() => {
     const keyword = trimmedDebouncedQuery;
 
     if (!keyword) {
-      setIsGlobalSearching(false);
       setTabLoading(createLoadingMap(false));
       setSearchError("");
       return;
@@ -602,6 +719,17 @@ const ConversationMixedList = ({
 
     const type = searchTab;
     const keywordChanged = cacheKeywordRef.current !== keyword;
+    const cachedUsers = searchFriendsCache(
+      friends,
+      keyword,
+      type === "users" ? Math.max(friends.length, DEFAULT_TAB_LIMITS.users) : DEFAULT_TAB_LIMITS.users,
+    );
+    const cachedConversations = searchConversationsCache(
+      conversationItems,
+      keyword,
+      currentUserId,
+      DEFAULT_TAB_LIMITS.conversations,
+    );
 
     if (keywordChanged) {
       cacheKeywordRef.current = keyword;
@@ -611,8 +739,6 @@ const ConversationMixedList = ({
       setTabLoadingMore(createLoadingMap(false));
       setLoadMoreErrorTab(null);
     } else if (fetchedTabsRef.current[type]) {
-      setIsGlobalSearching(false);
-      setTabLoading(createLoadingMap(false));
       setSearchError("");
       return;
     }
@@ -620,49 +746,151 @@ const ConversationMixedList = ({
     const controller = new AbortController();
     let active = true;
 
-    if (type === "all") {
-      setIsGlobalSearching(true);
-      setTabLoading(createLoadingMap(false));
-    } else {
-      setIsGlobalSearching(false);
-      setTabLoading((prev) => ({ ...prev, [type]: true }));
+    if (type === "users") {
+      setTabLoading((prev) => ({ ...prev, users: false }));
+      setTabPages((prev) => ({ ...prev, users: cachedUsers }));
+      fetchedTabsRef.current = { ...fetchedTabsRef.current, users: true };
+      setSearchError("");
+      return;
     }
+
+    if (type === "all") {
+      setGlobalResults({
+        ...EMPTY_RESULTS,
+        query: keyword,
+        type: "all",
+        users: cachedUsers,
+        conversations: cachedConversations,
+      });
+      setTabPages((prev) => ({
+        ...prev,
+        users: cachedUsers,
+        conversations: cachedConversations,
+      }));
+      fetchedTabsRef.current = { ...fetchedTabsRef.current, all: true };
+      setTabLoading({ users: false, conversations: true, messages: true });
+      setSearchError("");
+      let allSearchFinished = false;
+      const isCanceled = (error: { code?: string; name?: string } | null | undefined) => (
+        error?.code === "ERR_CANCELED" || error?.name === "CanceledError" || error?.name === "AbortError"
+      );
+
+      void (async () => {
+        try {
+          await chatService.globalSearchStream(keyword, {
+            signal: controller.signal,
+            conversationLimit: DEFAULT_TAB_LIMITS.conversations,
+            messageLimit: DEFAULT_TAB_LIMITS.messages,
+            onChunk: (chunk) => {
+              if (!active) return;
+
+              if (chunk.type === "conversations") {
+                const mergedConversations = mergeUniqueById(cachedConversations.items, chunk.conversations.items);
+                const conversationsPage = {
+                  ...chunk.conversations,
+                  items: mergedConversations,
+                  hasMore: chunk.conversations.hasMore || cachedConversations.hasMore,
+                };
+                setGlobalResults((prev) => (
+                  prev.query.trim() === keyword
+                    ? { ...prev, conversations: conversationsPage }
+                    : { ...EMPTY_RESULTS, query: keyword, type: "all", conversations: conversationsPage }
+                ));
+                setTabPages((prev) => ({ ...prev, conversations: conversationsPage }));
+                fetchedTabsRef.current = { ...fetchedTabsRef.current, conversations: true };
+                setTabLoading((prev) => ({ ...prev, conversations: false, messages: true }));
+                return;
+              }
+
+              if (chunk.type === "messages") {
+                setGlobalResults((prev) => (
+                  prev.query.trim() === keyword
+                    ? { ...prev, messages: chunk.messages }
+                    : { ...EMPTY_RESULTS, query: keyword, type: "all", messages: chunk.messages }
+                ));
+                setTabPages((prev) => ({ ...prev, messages: chunk.messages }));
+                fetchedTabsRef.current = { ...fetchedTabsRef.current, messages: true };
+                setTabLoading((prev) => ({ ...prev, messages: false }));
+                return;
+              }
+
+              if (chunk.type === "done") {
+                allSearchFinished = true;
+                fetchedTabsRef.current = { ...fetchedTabsRef.current, all: true };
+                setTabLoading(createLoadingMap(false));
+                return;
+              }
+
+              if (chunk.type === "error") {
+                throw new Error(chunk.message);
+              }
+            },
+          });
+        } catch (error: unknown) {
+          if (!active || isCanceled(error as { code?: string; name?: string })) return;
+          fetchedTabsRef.current = {
+            ...fetchedTabsRef.current,
+            all: false,
+            conversations: false,
+            messages: false,
+          };
+          setSearchError("Không thể tìm kiếm lúc này. Vui lòng thử lại.");
+        } finally {
+          if (!active) return;
+          if (!allSearchFinished) {
+            setTabLoading(createLoadingMap(false));
+          }
+        }
+      })();
+
+      return () => {
+        active = false;
+        controller.abort();
+        if (!allSearchFinished) {
+          fetchedTabsRef.current = { ...fetchedTabsRef.current, all: false, messages: false };
+        }
+      };
+    }
+
+    setTabLoading((prev) => ({ ...prev, [type]: true }));
     setSearchError("");
+
+    if (type === "conversations") {
+      setTabPages((prev) => ({ ...prev, conversations: cachedConversations }));
+    }
 
     chatService.globalSearch(keyword, { signal: controller.signal, type })
       .then((response) => {
         if (!active) return;
-        if (type === "all") {
-          setGlobalResults(response);
-          fetchedTabsRef.current = { ...fetchedTabsRef.current, all: true };
-          return;
+        if (type === "conversations") {
+          setTabPages((prev) => ({
+            ...prev,
+            conversations: {
+              ...response.conversations,
+              items: mergeUniqueById(cachedConversations.items, response.conversations.items),
+              hasMore: response.conversations.hasMore || cachedConversations.hasMore,
+            },
+          }));
+        } else {
+          setTabPages((prev) => ({ ...prev, [type]: response[type] }));
         }
-
-        setTabPages((prev) => ({ ...prev, [type]: response[type] }));
         fetchedTabsRef.current = { ...fetchedTabsRef.current, [type]: true };
       })
       .catch((error) => {
         if (!active || error?.code === "ERR_CANCELED" || error?.name === "CanceledError") return;
-        if (type === "all") {
-          setGlobalResults({ ...EMPTY_RESULTS, query: keyword, type: "all" });
-        }
         setSearchError("Không thể tìm kiếm lúc này. Vui lòng thử lại.");
       })
       .finally(() => {
         if (!active) return;
 
-        if (type === "all") {
-          setIsGlobalSearching(false);
-        } else {
-          setTabLoading((prev) => ({ ...prev, [type]: false }));
-        }
+        setTabLoading((prev) => ({ ...prev, [type]: false }));
       });
 
     return () => {
       active = false;
       controller.abort();
     };
-  }, [searchTab, trimmedDebouncedQuery]);
+  }, [conversationItems, currentUserId, friends, searchTab, trimmedDebouncedQuery]);
 
   const filteredConversations = useMemo(() => {
     return conversationItems.filter((conversation) => {
@@ -676,7 +904,20 @@ const ConversationMixedList = ({
     const keyword = trimmedDebouncedQuery;
     const page = tabPages[tab];
 
-    if (!keyword || tabLoading[tab] || tabLoadingMore[tab] || !page.hasMore || !page.nextCursor) return;
+    if (!keyword || tabLoading[tab] || tabLoadingMore[tab]) return;
+
+    if (tab === "users") {
+      const cachedUsers = searchFriendsCache(
+        friends,
+        keyword,
+        Math.max(friends.length, DEFAULT_TAB_LIMITS.users),
+      );
+      setTabPages((prev) => ({ ...prev, users: cachedUsers }));
+      fetchedTabsRef.current = { ...fetchedTabsRef.current, users: true };
+      return;
+    }
+
+    if (!page.hasMore || !page.nextCursor) return;
 
     setTabLoadingMore((prev) => ({ ...prev, [tab]: true }));
     setLoadMoreErrorTab(null);
@@ -689,15 +930,7 @@ const ConversationMixedList = ({
         limit: page.limit || DEFAULT_TAB_LIMITS[tab],
       });
 
-      if (tab === "users") {
-        setTabPages((prev) => ({
-          ...prev,
-          users: {
-            ...response.users,
-            items: appendUniqueById(prev.users.items, response.users.items),
-          },
-        }));
-      } else if (tab === "conversations") {
+      if (tab === "conversations") {
         setTabPages((prev) => ({
           ...prev,
           conversations: {
@@ -725,6 +958,11 @@ const ConversationMixedList = ({
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     const target = event.currentTarget;
+    scrollPositionsRef.current[activeScrollKey] = target.scrollTop;
+
+    if (Date.now() < suppressAutoLoadUntilRef.current) {
+      return;
+    }
 
     if (hasQuery) {
       if (searchTab !== "all" && target.scrollTop + target.clientHeight >= target.scrollHeight - 80) {
@@ -798,7 +1036,6 @@ const ConversationMixedList = ({
       isWaitingForDebounce
       || !hasFreshSearchCache
       || activeSearchTabNeedsFetch
-      || (searchTab === "all" && isGlobalSearching)
     ) {
       return <SearchResultSkeleton />;
     }
@@ -814,8 +1051,12 @@ const ConversationMixedList = ({
     const hasAllResults = resultData.users.items.length > 0
       || resultData.conversations.items.length > 0
       || resultData.messages.items.length > 0;
+    const isAllUserSearchLoading = searchTab === "all" && tabLoading.users;
+    const isAllConversationSearchLoading = searchTab === "all" && tabLoading.conversations;
+    const isAllMessageSearchLoading = searchTab === "all" && tabLoading.messages;
+    const isAllSearchLoading = isAllUserSearchLoading || isAllConversationSearchLoading || isAllMessageSearchLoading;
 
-    if (searchTab === "all" && !hasAllResults) {
+    if (searchTab === "all" && !hasAllResults && !isAllSearchLoading) {
       return <EmptySearchState keyword={trimmedQuery} />;
     }
 
@@ -902,6 +1143,10 @@ const ConversationMixedList = ({
           ))}
         </ResultSection>
 
+        {isAllConversationSearchLoading && resultData.conversations.items.length === 0 && (
+          <SearchSectionSkeleton title="Đoạn chat" rows={2} />
+        )}
+
         <ResultSection title="Tin nhắn" count={resultData.messages.items.length} hasMore={resultData.messages.hasMore} onMore={() => setSearchTab("messages")}>
           {resultData.messages.items.map((item) => (
             <MessageResultRow
@@ -913,6 +1158,10 @@ const ConversationMixedList = ({
             />
           ))}
         </ResultSection>
+
+        {isAllMessageSearchLoading && resultData.messages.items.length === 0 && (
+          <SearchSectionSkeleton title="Tin nhắn" rows={2} />
+        )}
       </div>
     );
   };
@@ -941,8 +1190,8 @@ const ConversationMixedList = ({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 pt-3">
-          <div className="flex min-w-0 items-center gap-4 overflow-x-auto beautiful-scrollbar">
+        <div className="-mx-5 flex items-center justify-between gap-3 border-b border-border/50 px-5 pt-3">
+          <div className="flex min-w-0 items-center gap-4 overflow-x-auto overflow-y-hidden">
             {(hasQuery ? SEARCH_TABS : CONVERSATION_TABS).map((item) => {
               const active = hasQuery
                 ? searchTab === item.value
@@ -959,7 +1208,7 @@ const ConversationMixedList = ({
                       onChangeFilter(item.value as ConversationFilter);
                     }
                   }}
-                  className={`relative h-8 shrink-0 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${
+                  className={`relative h-8 shrink-0 px-0 text-sm text-foreground transition-colors after:absolute after:inset-x-0 after:bottom-0 after:z-10 after:h-0.5 after:rounded-full after:bg-primary after:transition-opacity ${
                     active
                       ? "font-semibold after:opacity-100"
                       : "font-normal after:opacity-0 hover:text-foreground/80"
@@ -972,19 +1221,35 @@ const ConversationMixedList = ({
           </div>
 
           {!hasQuery && (
-            <button
-              type="button"
-              onClick={onCreateGroup}
-              className="shrink-0 rounded-full border border-border/60 bg-background px-3 py-1.5 text-sm font-semibold text-foreground transition-colors hover:bg-muted/50"
-            >
-              Tạo nhóm
-            </button>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onAddFriend}
+                aria-label="Thêm bạn"
+                title="Thêm bạn"
+                className="relative flex size-7 items-center justify-center rounded-md text-slate-950 transition-colors hover:bg-muted/60 dark:text-foreground"
+              >
+                <User className="h-[18px] w-[18px]" strokeWidth={1.55} />
+                <Plus className="absolute right-0 top-0 h-2.5 w-2.5" strokeWidth={2} />
+              </button>
+              <button
+                type="button"
+                onClick={onCreateGroup}
+                aria-label="Tạo nhóm"
+                title="Tạo nhóm"
+                className="relative flex size-7 items-center justify-center rounded-md text-slate-950 transition-colors hover:bg-muted/60 dark:text-foreground"
+              >
+                <Users className="h-[18px] w-[18px]" strokeWidth={1.55} />
+                <Plus className="absolute right-0 top-0 h-2.5 w-2.5" strokeWidth={2} />
+              </button>
+            </div>
           )}
         </div>
       </div>
 
       <div
-        className="-mr-5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden beautiful-scrollbar mobile-hide-scrollbar pb-4 pr-2 pt-1.5"
+        ref={scrollContainerRef}
+        className="-mr-5 min-h-0 flex-1 overflow-y-auto overflow-x-hidden beautiful-scrollbar mobile-hide-scrollbar pb-4 pr-2 pt-2"
         onScroll={handleScroll}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) {

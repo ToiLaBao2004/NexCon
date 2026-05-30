@@ -255,7 +255,7 @@ const UserSearch = ({ className, onOpenChat }: UserSearchProps) => {
                     {status === "searching" ? <Loader2 className="h-5 w-5 animate-spin text-primary" /> : <Search className="h-5 w-5 text-foreground" strokeWidth={1.65} />}
                 </span>
                 <input
-                    placeholder="Tìm kiếm theo email..."
+                    placeholder="Tìm người dùng theo tên hoặc email..."
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     className="flex h-11 w-full rounded-xl border border-border/60 bg-muted/30 px-4 py-2 text-[15px] shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 pl-10 pr-9"

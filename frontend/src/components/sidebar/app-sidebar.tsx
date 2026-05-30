@@ -9,6 +9,7 @@ import {
   SidebarGroupContent,
 } from "@/components/ui/sidebar"
 import NewGroupChatModal from "../chat/NewGroupModal"
+import AddFriendModal from "../chat/AddFriendModal"
 import ConversationMixedList, { type ConversationFilter } from "../chat/ConversationMixedList"
 
 import { cn } from "@/lib/utils"
@@ -18,6 +19,7 @@ import { useIsMobile } from "@/hooks/use-mobile"
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const setFocusedConversation = useChatStore((s) => s.setFocusedConversation);
   const [isGroupModalOpen, setIsGroupModalOpen] = React.useState(false);
+  const [isAddFriendModalOpen, setIsAddFriendModalOpen] = React.useState(false);
   const [conversationFilter, setConversationFilter] = React.useState<ConversationFilter>("all");
   const isMobile = useIsMobile();
 
@@ -45,12 +47,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <ConversationMixedList
                 conversationFilter={conversationFilter}
                 onChangeFilter={setConversationFilter}
+                onAddFriend={() => setIsAddFriendModalOpen(true)}
                 onCreateGroup={() => setIsGroupModalOpen(true)}
               />
             </SidebarGroupContent>
           </SidebarGroup>
         </div>
       </SidebarContent>
+      <AddFriendModal isOpen={isAddFriendModalOpen} onClose={() => setIsAddFriendModalOpen(false)} />
       <NewGroupChatModal isOpen={isGroupModalOpen} onClose={() => setIsGroupModalOpen(false)} />
     </Sidebar>
   )

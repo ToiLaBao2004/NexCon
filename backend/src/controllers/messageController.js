@@ -39,7 +39,7 @@ const MAX_REMINDER_SYSTEM_CONTENT_LENGTH = 1200;
 const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
-const SEARCH_MAX_SCANNED_MESSAGES = 500;
+const SEARCH_SCAN_BATCH_SIZE = 100;
 const moderationCategoryLabels = {
     abusive: 'Ngôn từ xúc phạm',
     harassment: 'Quấy rối hoặc công kích cá nhân',
@@ -67,6 +67,18 @@ function maskPopulatedSender(message) {
         ...raw,
         senderId: maskLockedUserDoc(raw.senderId),
     };
+}
+
+function getMessageSearchableText(message) {
+    const parts = [
+        message.searchContent || normalizeVietnamese(message.content || ''),
+    ];
+
+    if (message.type === 'file' && message.fileName) {
+        parts.push(normalizeVietnamese(message.fileName));
+    }
+
+    return parts.filter(Boolean).join(' ');
 }
 
 function getMessageVisibleToUserIds(message) {
@@ -1006,6 +1018,7 @@ export async function searchMessages(req, res) {
         // Build base filter. searchContent is encrypted at rest, so keyword matching happens after decrypting.
         const filter = {
             conversationId,
+            type: { $ne: 'sticker' },
             isRecalled: { $ne: true },
             reportStatus: { $ne: true },
             $or: [
@@ -1040,22 +1053,72 @@ export async function searchMessages(req, res) {
             }
         }
 
-        const matchedMessages = [];
-        let scannedCount = 0;
+        const matchedMessageIds = [];
         let hasMore = false;
         let nextCursor = null;
+        let exhausted = false;
+        const batchSize = Math.max(limitNumber, SEARCH_SCAN_BATCH_SIZE);
 
-        while (matchedMessages.length < limitNumber && scannedCount < SEARCH_MAX_SCANNED_MESSAGES) {
+        while (matchedMessageIds.length < limitNumber && !exhausted) {
             const pageFilter = { ...filter };
             if (scanCursor) {
                 pageFilter.createdAt = { ...(pageFilter.createdAt || {}), $lt: scanCursor };
             }
 
-            const batchSize = Math.min(limitNumber, SEARCH_MAX_SCANNED_MESSAGES - scannedCount);
-            const messages = await Message.find(pageFilter)
+            const rawBatch = await Message.find(pageFilter)
                 .select('+searchContent')
                 .sort({ createdAt: -1 })
                 .limit(batchSize + 1)
+                .lean();
+
+            const hasExtra = rawBatch.length > batchSize;
+            const pageMessages = hasExtra ? rawBatch.slice(0, batchSize) : rawBatch;
+
+            if (!pageMessages.length) {
+                exhausted = true;
+                nextCursor = null;
+                break;
+            }
+
+            let reachedLimit = false;
+            for (let index = 0; index < pageMessages.length; index += 1) {
+                const rawMessage = pageMessages[index];
+                const message = decryptMessagePayload(rawMessage);
+                if (message.type === 'sticker') continue;
+
+                const searchableText = getMessageSearchableText(message);
+                if (!searchableText.includes(normalizedKeyword)) continue;
+
+                matchedMessageIds.push(rawMessage._id);
+                scanCursor = rawMessage.createdAt;
+                nextCursor = rawMessage.createdAt?.toISOString?.() || rawMessage.createdAt;
+
+                if (matchedMessageIds.length >= limitNumber) {
+                    reachedLimit = true;
+                    hasMore = index < pageMessages.length - 1 || hasExtra;
+                    break;
+                }
+            }
+
+            if (reachedLimit) {
+                break;
+            }
+
+            const lastScanned = pageMessages[pageMessages.length - 1];
+            scanCursor = lastScanned.createdAt;
+            nextCursor = lastScanned.createdAt?.toISOString?.() || lastScanned.createdAt;
+
+            if (!hasExtra) {
+                exhausted = true;
+                nextCursor = null;
+                break;
+            }
+        }
+
+        let matchedMessages = [];
+        if (matchedMessageIds.length) {
+            const populatedMessages = await Message.find({ _id: { $in: matchedMessageIds } })
+                .select('+searchContent')
                 .populate('senderId', 'displayName avatarUrl lock')
                 .populate({
                     path: 'replyTo',
@@ -1064,40 +1127,15 @@ export async function searchMessages(req, res) {
                 })
                 .lean();
 
-            hasMore = messages.length > batchSize;
-            const pageMessages = hasMore ? messages.slice(0, batchSize) : messages;
-            scannedCount += pageMessages.length;
-
-            if (!pageMessages.length) {
-                nextCursor = null;
-                break;
-            }
-
-            const lastScanned = pageMessages[pageMessages.length - 1];
-            scanCursor = lastScanned.createdAt;
-            nextCursor = lastScanned.createdAt?.toISOString?.() || lastScanned.createdAt;
-
-            const pageMatches = pageMessages
+            const messageMap = new Map(populatedMessages.map((message) => [message._id.toString(), message]));
+            matchedMessages = matchedMessageIds
+                .map((messageId) => messageMap.get(messageId.toString()))
+                .filter(Boolean)
                 .map((message) => ({
                     ...maskPopulatedSender(message),
                     replyTo: message.replyTo ? maskPopulatedSender(message.replyTo) : message.replyTo,
                 }))
-                .filter((message) => {
-                    const searchableText = message.searchContent || normalizeVietnamese(message.content || '');
-                    return searchableText.includes(normalizedKeyword);
-                })
                 .map(({ searchContent, ...message }) => message);
-
-            matchedMessages.push(...pageMatches.slice(0, limitNumber - matchedMessages.length));
-
-            if (!hasMore) {
-                nextCursor = null;
-                break;
-            }
-        }
-
-        if (scannedCount >= SEARCH_MAX_SCANNED_MESSAGES && nextCursor) {
-            hasMore = true;
         }
 
         return res.status(200).json({

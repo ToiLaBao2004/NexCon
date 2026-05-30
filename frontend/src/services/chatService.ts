@@ -1,5 +1,14 @@
 import api from '@/lib/axios';
-import type { Conversation, ConversationResponse, GlobalSearchResponse, Message } from '@/types/chat';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { Capacitor } from '@capacitor/core';
+import type {
+	Conversation,
+	ConversationResponse,
+	GlobalSearchMessage,
+	GlobalSearchPage,
+	GlobalSearchResponse,
+	Message,
+} from '@/types/chat';
 import type { SendMessagePayload } from '@/types/store';
 import type { ModerationApiErrorPayload } from '@/types/moderation';
 import { getApiErrorMessage, getApiMessageText, translateApiMessage } from '@/lib/apiMessage';
@@ -22,6 +31,28 @@ interface FetchMessageProps {
 }
 
 const pageLimit = 20;
+
+type GlobalSearchStreamChunk =
+	| { type: 'conversations'; query: string; conversations: GlobalSearchPage<Conversation> }
+	| { type: 'messages'; query: string; messages: GlobalSearchPage<GlobalSearchMessage> }
+	| { type: 'done'; query: string }
+	| { type: 'error'; message: string };
+
+function getApiBaseUrl() {
+	return String(import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+}
+
+function buildStreamUrl(path: string, params: Record<string, string | number | boolean | null | undefined>) {
+	const base = getApiBaseUrl();
+	const url = new URL(`${base}${path}`, window.location.origin);
+
+	Object.entries(params).forEach(([key, value]) => {
+		if (value === undefined || value === null || value === '') return;
+		url.searchParams.set(key, String(value));
+	});
+
+	return url.toString();
+}
 
 function resolveErrorMessage(error: any): string {
 	const serverMsg = getApiMessageText(error);
@@ -99,7 +130,7 @@ export const chatService = {
 
 	async globalSearch(
 		keyword: string,
-		options?: { signal?: AbortSignal; type?: GlobalSearchResponse['type']; cursor?: string | null; limit?: number }
+		options?: { signal?: AbortSignal; type?: GlobalSearchResponse['type']; cursor?: string | null; limit?: number; includeMessages?: boolean }
 	): Promise<GlobalSearchResponse> {
 		const res = await api.get('/search/global', {
 			params: {
@@ -107,10 +138,72 @@ export const chatService = {
 				type: options?.type,
 				cursor: options?.cursor || undefined,
 				limit: options?.limit,
+				includeMessages: options?.includeMessages,
 			},
 			signal: options?.signal,
 		});
 		return res.data as GlobalSearchResponse;
+	},
+
+	async globalSearchStream(
+		keyword: string,
+		options: {
+			signal?: AbortSignal;
+			conversationLimit?: number;
+			messageLimit?: number;
+			onChunk: (chunk: GlobalSearchStreamChunk) => void;
+		}
+	): Promise<void> {
+		const accessToken = useAuthStore.getState().accessToken;
+		const headers: Record<string, string> = {
+			Accept: 'application/x-ndjson',
+		};
+
+		if (accessToken) {
+			headers.Authorization = `Bearer ${accessToken}`;
+		}
+		if (Capacitor.isNativePlatform()) {
+			headers['x-client-type'] = 'mobile';
+		}
+
+		const response = await fetch(buildStreamUrl('/search/global/stream', {
+			keyword,
+			conversationLimit: options.conversationLimit,
+			messageLimit: options.messageLimit,
+		}), {
+			method: 'GET',
+			credentials: 'include',
+			headers,
+			signal: options.signal,
+		});
+
+		if (!response.ok || !response.body) {
+			throw new Error('Không thể tìm kiếm lúc này. Vui lòng thử lại.');
+		}
+
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = '';
+
+		while (true) {
+			const { done, value } = await reader.read();
+			if (done) break;
+
+			buffer += decoder.decode(value, { stream: true });
+			const lines = buffer.split('\n');
+			buffer = lines.pop() || '';
+
+			for (const line of lines) {
+				const trimmed = line.trim();
+				if (!trimmed) continue;
+				options.onChunk(JSON.parse(trimmed) as GlobalSearchStreamChunk);
+			}
+		}
+
+		buffer += decoder.decode();
+		if (buffer.trim()) {
+			options.onChunk(JSON.parse(buffer.trim()) as GlobalSearchStreamChunk);
+		}
 	},
 
 	async fetchMessages(params: FetchMessagesParams): Promise<FetchMessageProps & { anchorId?: string, hasMoreOlder?: boolean, hasMoreNewer?: boolean }> {
