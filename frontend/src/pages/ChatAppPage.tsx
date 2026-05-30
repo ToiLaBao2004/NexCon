@@ -71,8 +71,8 @@ const ChatAppPageContent = ({
         <div
           className={
             isMobile
-              ? "fixed inset-0 z-50 flex flex-col bg-background overflow-hidden"
-              : "fixed inset-y-0 right-0 z-50 flex w-full max-w-[380px] flex-col overflow-hidden border-l border-border/40 bg-background shadow-2xl"
+              ? "fixed inset-0 z-50 flex flex-col bg-background overflow-hidden mobile-safe-area-y"
+              : "fixed inset-y-0 right-0 z-50 flex w-full max-w-[380px] flex-col overflow-hidden border-l border-border/40 bg-background shadow-2xl mobile-safe-area-y"
           }
         >
           <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 bg-card border-b border-border/40">

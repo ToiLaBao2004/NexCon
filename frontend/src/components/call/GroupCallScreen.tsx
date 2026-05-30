@@ -49,7 +49,7 @@ const GroupCallScreen = () => {
 
   if (isActive) {
     return (
-      <div className="fixed top-0 right-0 bottom-0 left-0 md:top-2 md:right-2 md:bottom-2 md:left-[5rem] z-[90] bg-background md:rounded-2xl md:border md:border-border/40 md:shadow-soft flex flex-col overflow-hidden">
+      <div className="fixed top-0 right-0 bottom-0 left-0 z-[90] flex flex-col overflow-hidden bg-background mobile-safe-area-y md:top-2 md:right-2 md:bottom-2 md:left-[5rem] md:rounded-2xl md:border md:border-border/40 md:shadow-soft">
         <GroupCallRoom
           roomName={conversationId}
           roomLabel={groupName ?? undefined}

@@ -241,7 +241,7 @@ export default function ReminderFormModal({
         className={cn(
           'gap-0 overflow-hidden border-border/50 p-0 shadow-2xl flex flex-col',
           isMobile
-            ? 'w-screen h-svh max-w-none rounded-none top-0 left-0 translate-x-0 translate-y-0'
+            ? 'w-screen h-svh max-w-none rounded-none top-0 left-0 translate-x-0 translate-y-0 mobile-safe-area-y'
             : 'max-w-[560px] max-h-[86vh] rounded-xl'
         )}
       >

@@ -206,7 +206,7 @@ export default function ImageViewerModal() {
       ref={overlayRef}
     >
       <div
-        className="absolute top-0 left-0 right-0 flex items-center justify-end px-4 py-3 z-50 pointer-events-none"
+        className="absolute top-0 left-0 right-0 z-50 flex items-center justify-end px-4 py-3 pointer-events-none mobile-safe-area-top"
         style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)" }}
       >
         <div className="flex items-center gap-2 pointer-events-auto">
@@ -275,7 +275,7 @@ export default function ImageViewerModal() {
       </div>
 
       <div
-        className="absolute bottom-0 left-0 right-0 flex justify-center pb-4 pointer-events-none"
+        className="absolute bottom-0 left-0 right-0 flex justify-center pb-4 pointer-events-none mobile-safe-area-bottom-padded"
         style={{ background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)" }}
       >
         {canActOnMessage && (

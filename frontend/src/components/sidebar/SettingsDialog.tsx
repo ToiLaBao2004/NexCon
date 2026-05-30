@@ -153,15 +153,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             <DialogContent className={cn(
                 "gap-0 w-screen h-[100dvh] max-w-none rounded-none border-0 bg-background top-0 left-0 translate-x-0 translate-y-0 sm:h-auto sm:rounded-2xl sm:border sm:border-border/50 sm:shadow-xl sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]",
                 forgotPassStep === "none"
-                    ? "p-0 sm:max-w-[860px] overflow-hidden"
-                    : "p-4 sm:max-w-md sm:p-6 overflow-hidden"
+                    ? "p-0 sm:max-w-[860px] overflow-hidden mobile-safe-area-y"
+                    : "p-4 sm:max-w-md sm:p-6 overflow-hidden mobile-safe-area-y-padded"
             )}>
                 <DialogHeader className="sr-only">
                     <DialogTitle>Cai dat</DialogTitle>
                     <DialogDescription>Tuy chinh thong bao, bao mat va tai khoan.</DialogDescription>
                 </DialogHeader>
                 {forgotPassStep === "none" ? (
-                    <div className="flex flex-col sm:flex-row h-[calc(100dvh-32px)] sm:h-[560px] overflow-hidden bg-card">
+                    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-card sm:h-[560px] sm:flex-row">
                         {/* Sidebar */}
                         <div className="w-full sm:w-[240px] bg-muted/30 border-b sm:border-b-0 sm:border-r border-border/50 flex flex-col p-4 sm:p-5 overflow-hidden">
                             <h2 className="mb-3 px-1 text-[22px] font-bold tracking-tight text-foreground sm:mb-6">Cài đặt</h2>
