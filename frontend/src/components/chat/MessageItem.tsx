@@ -615,7 +615,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							}
 							window.open(url, "_blank", "noopener,noreferrer");
 						} catch {
-							toast.error("KhÃ´ng thá»ƒ má»Ÿ file");
+							toast.error("Không thể mở file");
 						}
 					}}
 					className={cn(

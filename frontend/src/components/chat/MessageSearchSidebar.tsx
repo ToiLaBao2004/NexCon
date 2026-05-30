@@ -471,7 +471,7 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
                 disabled={isLoadingMore}
               >
                 {isLoadingMore ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-                TÃ¬m thÃªm
+                Tìm thêm
               </Button>
             )}
             <p className="text-[14px] font-medium text-foreground mb-1">Không tìm thấy tin nhắn nào</p>

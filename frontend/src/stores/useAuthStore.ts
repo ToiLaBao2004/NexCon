@@ -351,7 +351,7 @@ export const useAuthStore = create<AuthState>()(
           }));
         }
       } catch (error: any) {
-        console.error('Lá»—i khi cáº­p nháº­t tráº¡ng thÃ¡i:', error);
+        console.error('Lỗi khi cập nhật trạng thái:', error);
         throw error;
       }
     },

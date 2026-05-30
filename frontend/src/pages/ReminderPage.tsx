@@ -1051,7 +1051,7 @@ const ReminderPage = () => {
                             className="h-10 w-10 rounded-xl border-border/70 bg-background text-foreground transition-colors hover:bg-rose-500/10 hover:text-rose-500"
                             disabled={isLoading || !includePersonalReminders || visiblePersonalReminderCount === 0}
                             onClick={() => setDeleteScope(activeTab)}
-                            title="XÃ³a táº¥t cáº£"
+                            title="Xóa tất cả"
                         >
                             <Trash2 className="h-4 w-4" strokeWidth={1.65} />
                         </Button>

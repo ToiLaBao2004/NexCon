@@ -254,6 +254,13 @@ const EXACT_MESSAGES: Record<string, string> = {
   "không thể gửi lời mời kết bạn tới tài khoản đã bị khóa.": "Không thể gửi lời mời kết bạn tới tài khoản đã bị khóa.",
   "không thể chấp nhận lời mời từ tài khoản đã bị khóa.": "Không thể chấp nhận lời mời từ tài khoản đã bị khóa.",
   "không thể cập nhật biệt danh cho tài khoản đã bị khóa.": "Không thể cập nhật biệt danh cho tài khoản đã bị khóa.",
+  "bạn đã báo cáo tin nhắn này và báo cáo đang chờ xử lý.": "Bạn đã báo cáo tin nhắn này và báo cáo đang chờ xử lý.",
+  "bạn đã báo cáo người dùng này và báo cáo đang chờ xử lý.": "Bạn đã báo cáo người dùng này và báo cáo đang chờ xử lý.",
+  "báo cáo này đã hoàn tất vòng đời xử lý.": "Báo cáo này đã hoàn tất vòng đời xử lý.",
+  "kháng cáo này đã được xử lý.": "Kháng cáo này đã được xử lý.",
+  "phòng họp đã đạt giới hạn người tham gia.": "Phòng họp đã đạt giới hạn người tham gia.",
+  "mã cuộc họp đã tồn tại. vui lòng tạo mã khác.": "Mã cuộc họp đã tồn tại. Vui lòng tạo mã khác.",
+  "ảnh đang được kiểm duyệt. vui lòng thử lại sau.": "Ảnh đang được kiểm duyệt. Vui lòng thử lại sau.",
   "người nhận không tồn tại.": "Người nhận không tồn tại.",
 };
 
@@ -274,6 +281,202 @@ const STATUS_MESSAGES: Record<number, string> = {
 };
 
 const MESSAGE_RULES: Array<{ test: (message: string) => boolean; text: string }> = [
+  {
+    test: (message) => message.includes("content is required") || message.includes("content cannot be empty"),
+    text: "Vui lòng nhập nội dung.",
+  },
+  {
+    test: (message) => message.includes("search query must not exceed"),
+    text: "Từ khóa tìm kiếm quá dài.",
+  },
+  {
+    test: (message) => message.includes("mentions must be a json array"),
+    text: "Danh sách người được nhắc đến không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("metadata must be a valid json object"),
+    text: "Dữ liệu bổ sung của tin nhắn không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("remindat must be a valid date"),
+    text: "Thời gian nhắc hẹn không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("remindat must be at least"),
+    text: "Thời gian nhắc hẹn cần ít nhất 10 giây trong tương lai.",
+  },
+  {
+    test: (message) => message.includes("invalid repeatrule"),
+    text: "Kiểu lặp nhắc hẹn không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("invalid notifychannels"),
+    text: "Kênh thông báo không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("invalid source.type"),
+    text: "Nguồn nhắc hẹn không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("source.refid is required"),
+    text: "Thiếu thông tin tin nhắn nguồn.",
+  },
+  {
+    test: (message) => message.includes("shared reminder not found"),
+    text: "Không tìm thấy nhắc hẹn chung.",
+  },
+  {
+    test: (message) => message.includes("reminder not found"),
+    text: "Không tìm thấy nhắc hẹn.",
+  },
+  {
+    test: (message) => message.includes("invalid reminder id") || message.includes("invalid reminderid"),
+    text: "Thông tin nhắc hẹn không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("sharedkey is required"),
+    text: "Thiếu thông tin nhắc hẹn chung.",
+  },
+  {
+    test: (message) => message.includes("invalid reminder scope") || message.includes("scope must be one of"),
+    text: "Phạm vi nhắc hẹn không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("bulk delete does not support shared reminders"),
+    text: "Không thể xóa hàng loạt nhắc hẹn chung.",
+  },
+  {
+    test: (message) => message.includes("minutes must be one of"),
+    text: "Thời gian báo lại không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("no valid fields to update"),
+    text: "Không có thay đổi hợp lệ để cập nhật.",
+  },
+  {
+    test: (message) => message.includes("invalid stat") && message.includes("filter"),
+    text: "Bộ lọc trạng thái không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("invalid sourcetype filter"),
+    text: "Bộ lọc nguồn không hợp lệ.",
+  },
+  {
+    test: (message) =>
+      message.includes("invalid from date")
+      || message.includes("invalid to date")
+      || message.includes("invalid fromdate")
+      || message.includes("invalid todate"),
+    text: "Khoảng thời gian lọc không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("invalid cursor"),
+    text: "Không thể tải thêm dữ liệu. Vui lòng thử lại.",
+  },
+  {
+    test: (message) => message.includes("group name and members are required"),
+    text: "Vui lòng nhập tên nhóm và chọn thành viên.",
+  },
+  {
+    test: (message) => message.includes("failed to create conversation"),
+    text: "Không thể tạo cuộc trò chuyện. Vui lòng thử lại.",
+  },
+  {
+    test: (message) => message.includes("invalid conversationid"),
+    text: "Thông tin cuộc trò chuyện không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("invalid aroundid"),
+    text: "Tin nhắn tham chiếu không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("invalid type. must be one of"),
+    text: "Loại nội dung không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("invalid senderid"),
+    text: "Thông tin người gửi không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("message does not belong to this conversation"),
+    text: "Tin nhắn không thuộc cuộc trò chuyện này.",
+  },
+  {
+    test: (message) => message.includes("only group conversations can be renamed"),
+    text: "Chỉ nhóm mới có thể đổi tên.",
+  },
+  {
+    test: (message) => message.includes("email or user id is required"),
+    text: "Thiếu thông tin người dùng.",
+  },
+  {
+    test: (message) => message.includes("invalid user id format"),
+    text: "Thông tin người dùng không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("recipientid is required"),
+    text: "Thiếu thông tin người nhận.",
+  },
+  {
+    test: (message) => message.includes("url is required for link messages"),
+    text: "Vui lòng nhập liên kết.",
+  },
+  {
+    test: (message) => message.includes("image file is required"),
+    text: "Vui lòng chọn ảnh để gửi.",
+  },
+  {
+    test: (message) => message.includes("audio file is required"),
+    text: "Vui lòng ghi âm trước khi gửi.",
+  },
+  {
+    test: (message) => message.includes("file is required"),
+    text: "Vui lòng chọn file để gửi.",
+  },
+  {
+    test: (message) => message.includes("sticker url is required"),
+    text: "Không thể gửi sticker này. Vui lòng thử lại.",
+  },
+  {
+    test: (message) => message.includes("emoji is required"),
+    text: "Vui lòng chọn cảm xúc.",
+  },
+  {
+    test: (message) => message.includes("targetconversationids is required"),
+    text: "Vui lòng chọn cuộc trò chuyện cần chuyển tiếp.",
+  },
+  {
+    test: (message) => message.includes("unsupported message type"),
+    text: "Loại tin nhắn không được hỗ trợ.",
+  },
+  {
+    test: (message) => message.includes("reminder content cannot exceed"),
+    text: "Nội dung nhắc hẹn quá dài.",
+  },
+  {
+    test: (message) => message.includes("could not update conversation after sending message"),
+    text: "Tin nhắn đã được gửi nhưng chưa thể cập nhật hội thoại. Vui lòng tải lại.",
+  },
+  {
+    test: (message) => message.includes("email and otp are required"),
+    text: "Vui lòng nhập email và mã OTP.",
+  },
+  {
+    test: (message) => message.includes("invalid call action payload"),
+    text: "Thông tin cuộc gọi không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("invalid or expired call action token"),
+    text: "Yêu cầu cuộc gọi không hợp lệ hoặc đã hết hạn.",
+  },
+  {
+    test: (message) => message.includes("invalid profile visibility"),
+    text: "Quyền riêng tư hồ sơ không hợp lệ.",
+  },
+  {
+    test: (message) => message.includes("trackid is required") || message.includes("invalid spotify trackid"),
+    text: "Thông tin bài hát không hợp lệ.",
+  },
   {
     test: (message) => message.includes("manual_status must be one of"),
     text: "Trạng thái thủ công không hợp lệ.",
@@ -359,6 +562,17 @@ const normalizeMessage = (value: unknown) => String(value || "")
   .toLowerCase()
   .replace(/\s+/g, " ");
 
+const normalizeDisplayMessage = (value: unknown) => String(value || "")
+  .trim()
+  .replace(/\s+/g, " ");
+
+const isSafeVietnameseMessage = (value: string) => {
+  if (!value || value.length > 500) return false;
+  if (/Ã[\u0080-\u00BF]|Â[\u0080-\u00BF]|Æ[\u0080-\u00BF]|Ä[‘’]|á[º»]|�/.test(value)) return false;
+  if (/[<>]/.test(value)) return false;
+  return /[À-ỹĐđ]/.test(value);
+};
+
 const extractPayload = (value: unknown): ApiPayload | undefined => {
   if (!value || typeof value !== "object") return undefined;
   const error = value as ApiErrorLike;
@@ -371,7 +585,8 @@ const extractStatus = (value: unknown): number | undefined => {
 };
 
 export function translateApiMessage(message: unknown, fallback = "") {
-  const normalized = normalizeMessage(message);
+  const displayMessage = normalizeDisplayMessage(message);
+  const normalized = normalizeMessage(displayMessage);
   if (!normalized) return fallback;
 
   const exact = EXACT_MESSAGES[normalized] || EXACT_MESSAGES[normalized.replace(/\.$/, "")];
@@ -379,6 +594,8 @@ export function translateApiMessage(message: unknown, fallback = "") {
 
   const rule = MESSAGE_RULES.find((item) => item.test(normalized));
   if (rule) return rule.text;
+
+  if (isSafeVietnameseMessage(displayMessage)) return displayMessage;
 
   return fallback;
 }

@@ -1140,14 +1140,14 @@ export async function searchMessages(req, res) {
         const limitNumber = clampSearchLimit(req.query.limit);
 
         if (!q) {
-            return res.status(400).json({ message: 'ChÆ°a nháº­p tá»« khÃ³a tÃ¬m kiáº¿m.' });
+            return res.status(400).json({ message: 'Chưa nhập từ khóa tìm kiếm.' });
         }
         if (q.length > MAX_SEARCH_QUERY_LENGTH) {
             return res.status(400).json({ message: `Search query must not exceed ${MAX_SEARCH_QUERY_LENGTH} characters.` });
         }
 
         if (!conversationId) {
-            return res.status(400).json({ message: 'Thiáº¿u conversationId.' });
+            return res.status(400).json({ message: 'Thiếu conversationId.' });
         }
 
         const conversation = await Conversation.findById(conversationId).select('participants').lean();
@@ -1293,7 +1293,7 @@ export async function searchMessages(req, res) {
         });
     } catch (error) {
         console.error('Error searching messages:', error);
-        return res.status(500).json({ message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™.' });
+        return res.status(500).json({ message: 'Lỗi máy chủ nội bộ.' });
     }
 }
 
@@ -1492,12 +1492,12 @@ export async function getSignedMediaUrl(req, res) {
         const userId = req.user._id.toString();
         const participant = conversation.participants.find((p) => p.userId.toString() === userId);
         if (participant?.clearedAt && new Date(message.createdAt).getTime() <= new Date(participant.clearedAt).getTime()) {
-            return res.status(404).json({ message: 'Tai nguyen khong con ton tai trong cuoc tro chuyen cua ban.' });
+            return res.status(404).json({ message: 'Tài nguyên không còn tồn tại trong cuộc trò chuyện của bạn.' });
         }
 
         const visibleToUserIds = getMessageVisibleToUserIds(message);
         if (visibleToUserIds.length > 0 && !visibleToUserIds.includes(userId)) {
-            return res.status(403).json({ message: 'Ban khong co quyen xem tai nguyen nay.' });
+            return res.status(403).json({ message: 'Bạn không có quyền xem tài nguyên này.' });
         }
 
         const signedUrl = generateSignedUrl(message.filePublicId, message.type);
