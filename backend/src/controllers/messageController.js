@@ -58,6 +58,30 @@ const moderationCategoryLabels = {
     unknown: 'Vi phạm tiêu chuẩn cộng đồng',
 };
 
+const FILENAME_MOJIBAKE_PATTERN = /(?:[\u00C2-\u00C4][\u0080-\u00BF])|(?:\u00E1[\u00BA-\u00BF][\u0080-\u00BF])|(?:\u00C3[\u0080-\u00BF])/;
+const FILENAME_MOJIBAKE_SCORE_PATTERN = /[\u0080-\u009F\u00C2-\u00C4]|\u00E1[\u00BA-\u00BF]/g;
+
+function filenameMojibakeScore(value) {
+    return value.match(FILENAME_MOJIBAKE_SCORE_PATTERN)?.length || 0;
+}
+
+function decodeMojibakeFileName(value) {
+    if (!value || !FILENAME_MOJIBAKE_PATTERN.test(value)) return value || '';
+
+    try {
+        const decoded = Buffer.from(value, 'latin1').toString('utf8');
+        return filenameMojibakeScore(decoded) < filenameMojibakeScore(value) ? decoded : value;
+    } catch {
+        return value;
+    }
+}
+
+function normalizeUploadedFileName(...candidates) {
+    const rawName = candidates.find((candidate) => typeof candidate === 'string' && candidate.trim());
+    const fileName = decodeMojibakeFileName(String(rawName || 'file').trim());
+    return fileName.slice(0, 255);
+}
+
 function clampSearchLimit(value) {
     const parsed = Number(value);
     return Math.max(1, Math.min(SEARCH_MAX_LIMIT, Number.isFinite(parsed) ? parsed : SEARCH_DEFAULT_LIMIT));
@@ -515,6 +539,9 @@ export async function sendMessage(req, res) {
         const senderId = req.user._id;
         const { type = 'text', recipientId, content, replyTo } = req.body;
         const uploadedFile = req.file;
+        const uploadedFileName = uploadedFile
+            ? normalizeUploadedFileName(req.body.fileName, uploadedFile.originalname, type === 'audio' ? 'voice_message.webm' : 'file')
+            : '';
         parseMentionPayload(req.body.mentions);
         const metadata = parseMessageMetadata(req.body.metadata);
 
@@ -635,7 +662,7 @@ export async function sendMessage(req, res) {
 
                 const result = await safeUpload(uploadChatImageFromBuffer, uploadedFile.buffer);
                 messageData.filePublicId = result.public_id;
-                messageData.fileName = uploadedFile.originalname;
+                messageData.fileName = uploadedFileName;
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
                 messageData.metadata = {
@@ -664,10 +691,10 @@ export async function sendMessage(req, res) {
                 const result = await safeUpload(
                     uploadRawFileFromBuffer,
                     uploadedFile.buffer,
-                    uploadedFile.originalname
+                    uploadedFileName
                 );
                 messageData.filePublicId = result.public_id;
-                messageData.fileName = uploadedFile.originalname;
+                messageData.fileName = uploadedFileName;
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
                 if (content?.trim()) messageData.content = content.trim();
@@ -695,7 +722,7 @@ export async function sendMessage(req, res) {
 
                 const transcript = await transcribeAudioFromBuffer(
                     uploadedFile.buffer,
-                    uploadedFile.originalname || 'voice_message.webm',
+                    uploadedFileName || 'voice_message.webm',
                     uploadedFile.mimetype || 'audio/webm'
                 );
 
@@ -714,11 +741,11 @@ export async function sendMessage(req, res) {
                 const result = await safeUpload(
                     uploadAudioFromBuffer,
                     uploadedFile.buffer,
-                    uploadedFile.originalname || 'voice_message.webm'
+                    uploadedFileName || 'voice_message.webm'
                 );
 
                 messageData.filePublicId = result.public_id;
-                messageData.fileName = uploadedFile.originalname || 'voice_message.webm';
+                messageData.fileName = uploadedFileName || 'voice_message.webm';
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
                 if (cleanTranscript) {

@@ -2,6 +2,7 @@ import { cn, formatMessageTime, formatBytes, normalizeUrl } from "@/lib/utils";
 import type { Conversation, Mention, Message, MessageType, Participant, ReplyToMessage } from "@/types/chat";
 import type { ProfileVisibility } from "@/types/user";
 import UserAvatar from "./UserAvatar";
+import FileTypeIcon from "./FileTypeIcon";
 import { Card } from "../ui/card";
 import {
 	DropdownMenu,
@@ -41,6 +42,7 @@ import { ReportDialog } from "@/components/shared/ReportDialog";
 import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import CachedStickerImage from "./CachedStickerImage";
 import { decodeMentionTokens, getMentionTextSegments } from "@/utils/mentions";
+import { decodeMojibakeFileName } from "@/lib/fileName";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -601,6 +603,8 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 	}
 
 	if (type === "file" && (message.filePublicId || message.fileUrl)) {
+		const displayFileName = decodeMojibakeFileName(message.fileName) || "File";
+
 		return (
 			<div className="flex flex-col gap-2">
 				<a
@@ -629,13 +633,13 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							? "bg-white/12 border border-white/10 hover:bg-white/18"
 							: "bg-background/50 dark:bg-black/20 border border-border/40 hover:bg-background/80 dark:hover:bg-black/30"
 					)}
-					download={message.fileName ?? true}
+					download={displayFileName}
 				>
-					<div className={cn("p-2 rounded-lg shrink-0", isOwn ? "bg-white/20" : "bg-primary/10")}>
-						<FileText className={cn("size-5", isOwn ? "text-white" : "text-primary")} />
+					<div className={cn("flex size-10 items-center justify-center rounded-lg shrink-0", isOwn ? "bg-white/20" : "bg-primary/10")}>
+						<FileTypeIcon fileName={displayFileName} mimeType={message.mimeType} className="size-8" />
 					</div>
 					<div className="flex flex-col min-w-0">
-						<span className="max-w-[180px] truncate text-[14px] font-medium sm:text-[15px]">{message.fileName ?? "File"}</span>
+						<span className="max-w-[180px] truncate text-[14px] font-medium sm:text-[15px]">{displayFileName}</span>
 						<span className={cn("text-[12px] sm:text-[13px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
 							{message.fileSize ? formatBytes(message.fileSize) : (message.mimeType ?? "")}
 						</span>
@@ -853,7 +857,7 @@ function ReplyQuoteInline({
 	} else if (replyTo.type === "file") {
 		preview = (
 			<span className="flex items-center gap-1">
-				<FileText className="size-3 shrink-0" /> {replyTo.fileName ?? "Tệp đính kèm"}
+				<FileText className="size-3 shrink-0" /> {decodeMojibakeFileName(replyTo.fileName) || "Tệp đính kèm"}
 			</span>
 		);
 	} else if (replyTo.type === "link") {
@@ -2422,7 +2426,7 @@ const MessageItem = ({
 
 	const messagePreviewText = useMemo(() => {
 		if (message.type === "image") return "[Hình ảnh]";
-		if (message.type === "file") return message.fileName || "[File]";
+		if (message.type === "file") return decodeMojibakeFileName(message.fileName) || "[File]";
 		if (message.type === "sticker") return "[Nhãn dán]";
 		if (message.type === "audio") return "[Tin nhắn thoại]";
 		return getMentionSafeText(message.content, selectedConvo.participants, message.mentions) || "Tin nhắn";
@@ -2488,7 +2492,7 @@ const MessageItem = ({
 			const blobUrl = URL.createObjectURL(blob);
 			const anchor = document.createElement("a");
 			anchor.href = blobUrl;
-			anchor.download = item.fileName || `${item.type}-${item._id}`;
+			anchor.download = decodeMojibakeFileName(item.fileName) || `${item.type}-${item._id}`;
 			document.body.appendChild(anchor);
 			anchor.click();
 			anchor.remove();

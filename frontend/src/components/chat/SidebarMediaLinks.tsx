@@ -1,4 +1,4 @@
-import { CheckCircle2, Link2, FileText, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2, Copy, Check, CalendarDays, UserRound, X } from "lucide-react";
+import { CheckCircle2, Link2, ChevronDown, ChevronUp, MoreHorizontal, Download, Forward, Undo2, Copy, Check, CalendarDays, UserRound, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import type { ReactNode, UIEvent } from "react";
 import type { Conversation, Message } from "@/types/chat";
@@ -21,6 +21,8 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { chatService } from "@/services/chatService";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { toast } from "sonner";
+import FileTypeIcon from "./FileTypeIcon";
+import { decodeMojibakeFileName } from "@/lib/fileName";
 
 const VIEW_ALL_LIMIT: Record<MediaKind, number> = {
   image: 24,
@@ -263,47 +265,6 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
       }
     } catch (e) { }
     return null;
-  };
-
-  // file type icon helper (returns JSX)
-  const FileTypeIcon = ({ fileName }: { fileName?: string | null }) => {
-    const ext = getExt(fileName || "");
-    const baseClasses = "h-6 w-6";
-    if (/^(xlsx|xls|csv)$/.test(ext)) {
-      return (
-        <div className="flex items-center justify-center">
-          <svg className={baseClasses} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="24" height="24" rx="4" fill="#217346" />
-            <path d="M7 8h10v2H7zM7 11h10v2H7z" fill="#fff" />
-          </svg>
-        </div>
-      );
-    }
-    if (/^(docx|doc)$/.test(ext)) {
-      return (
-        <svg className={baseClasses} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="24" height="24" rx="4" fill="#2B579A" />
-          <path d="M7 8h10v2H7zM7 11h10v2H7z" fill="#fff" />
-        </svg>
-      );
-    }
-    if (/^(pdf)$/.test(ext)) {
-      return (
-        <svg className={baseClasses} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="24" height="24" rx="4" fill="#D43F3A" />
-          <path d="M7 8h10v2H7z" fill="#fff" />
-        </svg>
-      );
-    }
-    if (/^(mp3|wav|m4a|ogg)$/.test(ext)) {
-      return (
-        <svg className={baseClasses} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect width="24" height="24" rx="4" fill="#8B5CF6" />
-          <path d="M9 8v8a3 3 0 006 0V8" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    }
-    return <FileText className="h-5 w-5 text-[#475569]" />;
   };
 
   const getHostIcon = (host: string) => {
@@ -613,7 +574,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
         const blobUrl = URL.createObjectURL(blob);
         const anchor = document.createElement("a");
         anchor.href = blobUrl;
-        anchor.download = msg.fileName || `file-${msg._id}`;
+        anchor.download = decodeMojibakeFileName(msg.fileName) || `file-${msg._id}`;
         document.body.appendChild(anchor);
         anchor.click();
         anchor.remove();
@@ -657,7 +618,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
   };
 
   const renderFileRow = (msg: Message) => {
-    const name = msg.fileName ?? msg.content ?? "File";
+    const name = decodeMojibakeFileName(msg.fileName ?? msg.content) || "File";
     const size = msg.fileSize ? formatBytes(msg.fileSize) : msg.mimeType || "";
     const canActOnFile = Boolean((!msg.status || msg.status === "sent") && !msg.isRecalled);
     const canRecallFile = Boolean(
@@ -687,7 +648,7 @@ export function SidebarMediaLinks({ conversation }: { conversation: Conversation
             ) : (isVideoFile(msg) && msg.fileUrl) ? (
               <video src={msg.fileUrl} className="h-full w-full object-cover" muted playsInline preload="metadata" />
             ) : (
-              <FileTypeIcon fileName={msg.fileName} />
+              <FileTypeIcon fileName={name} mimeType={msg.mimeType} className="h-8 w-8" />
             )}
           </div>
           <div className="min-w-0 flex-1">
