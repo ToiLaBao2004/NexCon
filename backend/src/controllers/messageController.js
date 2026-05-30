@@ -563,7 +563,8 @@ export async function sendMessage(req, res) {
                     return res.status(400).json({ message: `Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.` });
                 }
 
-                const moderationResult = await moderateTextMessage(trimmedContent);
+                const moderationContent = replaceMentionTags(trimmedContent);
+                const moderationResult = await moderateTextMessage(moderationContent);
 
                 if (moderationResult.blocked) {
                     return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn vi phạm tiêu chuẩn cộng đồng.', 'text');
