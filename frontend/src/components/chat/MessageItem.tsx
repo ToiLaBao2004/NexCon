@@ -372,6 +372,11 @@ function ImageBatchGrid({
 }) {
 	const visibleItems = items.slice(0, 10);
 	const count = visibleItems.length;
+	const contentItem = items.find((item) =>
+		item.isRecalled !== true
+		&& item.reportStatus !== true
+		&& item.content?.trim()
+	);
 
 	const tileClassName = (index: number) => cn(
 		"relative overflow-hidden bg-muted",
@@ -456,9 +461,9 @@ function ImageBatchGrid({
 					</button>
 				))}
 			</div>
-			{items[0]?.content && !items[0]?.isRecalled && !items[0]?.reportStatus && (
+			{contentItem?.content && (
 				<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
-					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants, onMentionClick)}
+					{renderMentionedText(contentItem.content, contentItem.mentions, isOwn, participants, onMentionClick)}
 				</p>
 			)}
 		</div>
@@ -732,12 +737,14 @@ function ReplyQuoteInline({
 	participants,
 	currentUserId,
 	conversationId,
+	messages,
 }: {
 	replyTo: ReplyToMessage;
 	isOwn: boolean;
 	participants: Participant[];
 	currentUserId: string;
 	conversationId: string;
+	messages: Message[];
 }) {
 	const senderId =
 		typeof replyTo.senderId === "object"
@@ -755,29 +762,68 @@ function ReplyQuoteInline({
 				: null) ||
 			"Người dùng";
 
+	const replyImageBatch = useMemo(() => {
+		if (replyTo.type !== "image") return [];
+
+		const canPreview = (message: ReplyToMessage | Message) =>
+			message.type === "image"
+			&& message.isRecalled !== true
+			&& message.reportStatus !== true
+			&& Boolean(message.filePublicId || message.fileUrl);
+		const fallback = canPreview(replyTo) ? [replyTo] : [];
+		const batchId = replyTo.metadata?.clientBatchId?.trim();
+		if (!batchId) return fallback;
+
+		const batchItems = messages
+			.filter((message) =>
+				message.metadata?.clientBatchId === batchId
+				&& canPreview(message)
+			)
+			.sort((a, b) =>
+				Number(a.metadata?.clientBatchIndex ?? 0) - Number(b.metadata?.clientBatchIndex ?? 0)
+			);
+
+		return batchItems.length > 0 ? batchItems : fallback;
+	}, [messages, replyTo]);
+	const visibleReplyImages = replyImageBatch.slice(0, 3);
+	const hiddenReplyImageCount = Math.max(0, replyImageBatch.length - visibleReplyImages.length);
+
 	let preview: React.ReactNode;
-	if (replyTo.reportStatus) {
+	if (replyTo.reportStatus && visibleReplyImages.length === 0) {
 		preview = <span className="italic">Tin nhắn vi phạm tiêu chuẩn cộng đồng</span>;
 	} else if (replyTo.isRecalled) {
 		preview = <span className="italic">Tin nhắn đã thu hồi</span>;
 	} else if (replyTo.type === "image") {
 		preview = (
 			<span className="flex items-center gap-2">
-				{replyTo.filePublicId || replyTo.fileUrl ? (
-					replyTo.filePublicId ? (
-						<SecureImage
-							messageId={replyTo._id}
-							alt="reply-thumbnail"
-							className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
-						/>
-					) : (
-						<img
-							src={replyTo.fileUrl!}
-							alt="reply-thumbnail"
-							className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
-						/>
-					)
-				) : null}
+				{visibleReplyImages.length > 0 && (
+					<span className="flex shrink-0 items-center gap-1">
+						{visibleReplyImages.map((image) => (
+							image.filePublicId ? (
+								<SecureImage
+									key={image._id}
+									messageId={image._id}
+									alt="reply-thumbnail"
+									className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+									fallbackMinSize={24}
+									showFallbackText={false}
+								/>
+							) : (
+								<img
+									key={image._id}
+									src={image.fileUrl!}
+									alt="reply-thumbnail"
+									className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+								/>
+							)
+						))}
+						{hiddenReplyImageCount > 0 && (
+							<span className="flex size-6 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-[10px] font-semibold text-blue-600 dark:border-blue-400/70 dark:bg-blue-950/50 dark:text-blue-300">
+								+{hiddenReplyImageCount}
+							</span>
+						)}
+					</span>
+				)}
 				<span className="flex items-center gap-1">
 					<ImageIcon className="size-3 shrink-0" /> Hình ảnh
 				</span>
@@ -832,7 +878,9 @@ function ReplyQuoteInline({
 			)}
 			onClick={async (e) => {
 				e.stopPropagation();
-				const el = document.getElementById(`message-${replyTo._id}`);
+				const el = document.getElementById(`message-${replyTo._id}`)
+					?? Array.from(document.querySelectorAll<HTMLElement>("[data-message-ids]"))
+						.find((element) => element.dataset.messageIds?.split(" ").includes(replyTo._id));
 				if (el) {
 					el.scrollIntoView({ behavior: "smooth", block: "center" });
 					el.classList.add("animate-jump-highlight");
@@ -2083,10 +2131,18 @@ const MessageItem = ({
 
 	const { onlineUsers, userPresences } = useSocketStore();
 	const isImageBatch = (imageBatchItems?.length ?? 0) > 1;
+	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
+	const actionableMessage = bubbleMessages.find((item) =>
+		item.isRecalled !== true
+		&& item.reportStatus !== true
+		&& (!item.status || item.status === "sent")
+	) ?? null;
+	const actionMessage = actionableMessage ?? message;
 	const hasUnrecalledBatchMessage = imageBatchItems?.some((item) => item.isRecalled !== true) ?? false;
+	const hasUnmoderatedBatchMessage = imageBatchItems?.some((item) => item.reportStatus !== true) ?? false;
 	const isRecalled = message.isRecalled === true && (!isImageBatch || !hasUnrecalledBatchMessage);
-	const isViolationMessage = message.reportStatus === true;
-	const isPinned = message.isPinned === true;
+	const isViolationMessage = message.reportStatus === true && (!isImageBatch || !hasUnmoderatedBatchMessage);
+	const isPinned = actionMessage.isPinned === true;
 	const isImage = isImageBatch || (message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled && !isViolationMessage);
 	const isLink = message.type === "link" && !isRecalled && !isViolationMessage;
 	const linkPreview = isLink ? message.metadata?.linkPreview : null;
@@ -2115,7 +2171,6 @@ const MessageItem = ({
 	const cachedMediaUrl = useMediaCacheStore(state => state.getUrl(message._id));
 	const isBlob = message.fileUrl?.startsWith("blob:") ?? false;
 	const downloadUrl = (!isBlob && message.fileUrl) || cachedMediaUrl || "#";
-	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
 	const downloadableBubbleMessages = bubbleMessages.filter((item) =>
 		item.isRecalled !== true && item.reportStatus !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
 	);
@@ -2342,7 +2397,7 @@ const MessageItem = ({
 	const handlePointerDownForActions = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (!isCoarsePointer) return;
 		if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-		if (isRecalled || isViolationMessage || (message.status && message.status !== "sent") || isDisbanded) return;
+		if (!actionableMessage || isDisbanded) return;
 
 		clearLongPressTimer();
 		longPressTimeoutRef.current = window.setTimeout(() => {
@@ -2356,19 +2411,19 @@ const MessageItem = ({
 
 	const reactionSummary = useMemo(() => {
 		if (isViolationMessage) return null;
-		if (!message.reactions?.length) return null;
+		if (!actionMessage.reactions?.length) return null;
 
 		const counts: Record<string, number> = {};
-		message.reactions.forEach(r => {
+		actionMessage.reactions.forEach(r => {
 			counts[r.emoji] = (counts[r.emoji] || 0) + 1;
 		});
 
 		const uniqueEmojis = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
-		const totalCount = message.reactions.length;
-		const myReaction = message.reactions.find(r => r.userId === currentUserId);
+		const totalCount = actionMessage.reactions.length;
+		const myReaction = actionMessage.reactions.find(r => r.userId === currentUserId);
 
 		return { uniqueEmojis, totalCount, myReaction };
-	}, [isViolationMessage, message.reactions, currentUserId]);
+	}, [isViolationMessage, actionMessage.reactions, currentUserId]);
 
 	// ── Smart reminder detection ───────────────────────────────────────────────
 	const showSmartReminderButton = useMemo(() => {
@@ -2400,7 +2455,7 @@ const MessageItem = ({
 		if (isReacting) return;
 		setIsReacting(true);
 		try {
-			await reactToMessage(message._id, emoji.native);
+			await reactToMessage(actionMessage._id, emoji.native);
 			setShowTouchActions(false);
 		} catch (error) {
 			console.error("Reaction failed:", error);
@@ -2410,7 +2465,7 @@ const MessageItem = ({
 	};
 
 	const handlePin = async () => {
-		try { await pinMessage(message._id); }
+		try { await pinMessage(actionMessage._id); }
 		catch (e) { console.error("Ghim thất bại:", e); }
 		finally {
 			setShowPinOptions(false);
@@ -2419,8 +2474,8 @@ const MessageItem = ({
 	};
 
 	const handleCopy = () => {
-		if (message.content) {
-			navigator.clipboard.writeText(getMentionSafeText(message.content, selectedConvo.participants, message.mentions));
+		if (actionMessage.content) {
+			navigator.clipboard.writeText(getMentionSafeText(actionMessage.content, selectedConvo.participants, actionMessage.mentions));
 			toast.success("Đã sao chép vào bộ nhớ tạm");
 		}
 	};
@@ -2487,7 +2542,7 @@ const MessageItem = ({
 	const canCreateSharedReminder = selectedConvo.type !== "group"
 		|| selectedConvo.group?.allowMembersCreateSharedReminder !== false
 		|| isCurrentUserGroupAdmin;
-	const canReportMessage = !isOwn && !isDisbanded && !isRecalled && !isViolationMessage && (!message.status || message.status === "sent");
+	const canReportMessage = !isOwn && !isDisbanded && Boolean(actionableMessage);
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
 	return (
@@ -2573,6 +2628,7 @@ const MessageItem = ({
 									participants={selectedConvo.participants}
 									currentUserId={currentUserId}
 									conversationId={selectedConvo._id}
+									messages={messages}
 								/>
 							)}
 							{!isRecalled && !isViolationMessage && message.metadata?.forwardedFrom && (
@@ -2645,7 +2701,7 @@ const MessageItem = ({
 						)}
 
 						{/* Hover Action Bar - Quick Reaction Button */}
-						{!isRecalled && !isViolationMessage && !message.status && !isDisbanded && (
+						{actionableMessage && !isDisbanded && (
 							<div className={cn(
 								"hidden sm:flex absolute top-1/2 -translate-y-1/2 transition-all duration-200 z-30",
 								"opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
@@ -2693,7 +2749,7 @@ const MessageItem = ({
 						)}
 
 
-						{!isRecalled && !isViolationMessage && (!message.status || message.status === "sent") && (
+						{actionableMessage && (
 							<>
 								{/* Desktop Dropdown */}
 								<div className="hidden sm:block">
@@ -2730,7 +2786,7 @@ const MessageItem = ({
 										>
 											<DropdownMenuItem 
 												disabled={isBlocked}
-												onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(message); } }}
+												onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(actionMessage); } }}
 												className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
 											>
 												<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
@@ -2742,7 +2798,7 @@ const MessageItem = ({
 													Chuyển tiếp
 												</DropdownMenuItem>
 											)}
-											{message.content && message.type !== 'sticker' && (
+											{actionMessage.content && actionMessage.type !== 'sticker' && (
 												<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
 													<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
 													Sao chép
@@ -2836,7 +2892,7 @@ const MessageItem = ({
 
 													<button 
 														disabled={isBlocked}
-														onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(message); } }} 
+														onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(actionMessage); } }}
 														className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
 													>
 														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
@@ -2854,7 +2910,7 @@ const MessageItem = ({
 														</button>
 													)}
 
-													{message.content && message.type !== 'sticker' && (
+													{actionMessage.content && actionMessage.type !== 'sticker' && (
 														<button onClick={() => { setShowTouchActions(false); handleCopy(); }} className="flex flex-col items-center gap-2">
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
 																<Copy className="h-5 w-5" strokeWidth={1.5} />
@@ -3110,11 +3166,11 @@ const MessageItem = ({
 				confirmText={isPinned ? "Bỏ ghim" : "Ghim"}
 			/>
 
-			{message.reactions && (
+			{actionMessage.reactions && (
 				<ReactionDetailModal
 					isOpen={showReactionModal}
 					onClose={() => setShowReactionModal(false)}
-					reactions={message.reactions}
+					reactions={actionMessage.reactions}
 				/>
 			)}
 
@@ -3140,8 +3196,8 @@ const MessageItem = ({
 				<ForwardMessageModal
 					open={showForwardModal}
 					onOpenChange={(open) => setShowForwardModal(open)}
-					message={message}
-					messages={bubbleMessages.filter((item) => item.isRecalled !== true && (!item.status || item.status === "sent"))}
+					message={actionMessage}
+					messages={bubbleMessages.filter((item) => item.isRecalled !== true && item.reportStatus !== true && (!item.status || item.status === "sent"))}
 				/>
 			)}
 
@@ -3162,9 +3218,9 @@ const MessageItem = ({
 					open={showReportDialog}
 					onOpenChange={setShowReportDialog}
 					targetType="message"
-					targetId={message._id}
-					targetName={message.senderInfo?.displayName}
-					conversationId={message.conversationId}
+					targetId={actionMessage._id}
+					targetName={actionMessage.senderInfo?.displayName}
+					conversationId={actionMessage.conversationId}
 					preview={messagePreviewText}
 				/>
 			)}

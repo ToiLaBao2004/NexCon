@@ -55,6 +55,7 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const PARTICIPANT_SELECT = 'displayName avatarUrl profileVisibility lock';
 const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
 const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname profileVisibility status lastSeen about lock';
+const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled reportStatus mentions';
 const CONVERSATION_LIST_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_LIST_CACHE_TTL_MS', 10000);
 const CONVERSATION_MESSAGES_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_MESSAGES_CACHE_TTL_MS', 10000);
 const CONVERSATION_ACCESS_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_ACCESS_CACHE_TTL_MS', 5000);
@@ -184,7 +185,9 @@ function sanitizeModeratedMessage(message) {
 			: raw.senderId,
 	};
 
-	if (next.replyTo?.messageId) {
+	if (next.replyTo?._id) {
+		next.replyTo = sanitizeModeratedMessage(next.replyTo);
+	} else if (next.replyTo?.messageId) {
 		next.replyTo = {
 			...next.replyTo,
 			messageId: sanitizeModeratedMessage(next.replyTo.messageId),
@@ -884,7 +887,7 @@ export async function getMessages(req, res) {
 					.populate('senderId', MESSAGE_SENDER_SELECT)
 					.populate({
 						path: 'replyTo',
-						select: '_id senderId type content fileName isRecalled reportStatus mentions',
+						select: REPLY_TO_SELECT,
 						populate: { path: 'senderId', select: 'displayName' },
 					})
 					.lean(),
@@ -894,7 +897,7 @@ export async function getMessages(req, res) {
 					.populate('senderId', MESSAGE_SENDER_SELECT)
 					.populate({
 						path: 'replyTo',
-						select: '_id senderId type content fileName isRecalled reportStatus mentions',
+						select: REPLY_TO_SELECT,
 						populate: { path: 'senderId', select: 'displayName' },
 					})
 					.lean(),
@@ -965,7 +968,7 @@ export async function getMessages(req, res) {
 			.populate('senderId', MESSAGE_SENDER_SELECT)
 			.populate({
 				path: 'replyTo',
-				select: '_id senderId type content fileName isRecalled reportStatus mentions',
+				select: REPLY_TO_SELECT,
 				populate: { path: 'senderId', select: 'displayName' },
 			})
 			.lean();
@@ -999,7 +1002,7 @@ export async function getMessages(req, res) {
 				.populate('senderId', MESSAGE_SENDER_SELECT)
 				.populate({
 					path: 'replyTo',
-					select: '_id senderId type content fileName isRecalled reportStatus mentions',
+					select: REPLY_TO_SELECT,
 					populate: { path: 'senderId', select: 'displayName' },
 				})
 				.lean();

@@ -132,7 +132,13 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
 
   const batchMessages = messages?.length ? messages : [message];
   const isImageBatch = batchMessages.length > 1 && batchMessages.every((item) => item.type === "image");
-  const isSingleImage = batchMessages.length === 1 && message.type === "image" && (message.filePublicId || message.fileUrl);
+  const imagePreviewMessages = batchMessages.filter((item) =>
+    item.type === "image"
+    && item.isRecalled !== true
+    && item.reportStatus !== true
+    && Boolean(item.filePublicId || item.fileUrl)
+  );
+  const hasImagePreview = imagePreviewMessages.length > 0;
   const sourceConversation = useMemo(
     () => conversations.find((conversation) => conversation._id === message.conversationId),
     [conversations, message.conversationId]
@@ -140,7 +146,7 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
   const { text: previewText, Icon: PreviewIcon } = getMessagePreview(message, sourceConversation);
   const resolvedPreviewText = isImageBatch
     ? `${batchMessages.length} hình ảnh`
-    : (isSingleImage ? "Hình ảnh" : previewText);
+    : (hasImagePreview ? "Hình ảnh" : previewText);
 
   // Filter: exclude disbanded groups, show only accessible conversations
   const filteredConversations = useMemo(() => {
@@ -226,12 +232,6 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
     }
   };
 
-  // Selected conversation pills
-  const selectedConvos = useMemo(
-    () => conversations.filter((c) => selectedIds.has(c._id)),
-    [conversations, selectedIds]
-  );
-
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogPortal>
@@ -255,12 +255,12 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
         </DialogHeader>
 
         {/* ── Original message preview ── */}
-        <div className="mx-5 mt-3.5 flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-muted/40 border border-border/40">
-          <div className="h-7 w-7 rounded-md bg-background border border-border/50 flex items-center justify-center shrink-0 mt-0.5 overflow-hidden">
-            <PreviewIcon className="h-3.5 w-3.5 text-muted-foreground" />
+        <div className="mx-5 mt-3.5 flex items-start gap-3 px-4 py-3.5 rounded-xl bg-muted/35 border border-border/50">
+          <div className="h-9 w-9 rounded-lg bg-background border border-border/60 flex items-center justify-center shrink-0 overflow-hidden">
+            <PreviewIcon className="h-4.5 w-4.5 text-foreground" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-medium text-muted-foreground mb-0.5">Tin nhắn gốc</p>
+            <p className="text-[13px] font-semibold text-foreground leading-none mb-2">Tin nhắn gốc</p>
             {message.type === 'sticker' && message.content ? (
               <div className="mt-1">
                 <CachedStickerImage
@@ -269,62 +269,38 @@ const ForwardMessageModal = ({ open, onOpenChange, message, messages }: ForwardM
                   className="size-16 object-contain rounded-lg bg-background/50 p-1 border border-border/40" 
                 />
               </div>
-            ) : isSingleImage ? (
-              <div className="mt-1">
-                {message.filePublicId ? (
-                  <SecureImage
-                    messageId={message._id}
-                    alt={message.fileName ?? "image"}
-                    className="size-16 object-cover rounded-lg border border-border/40"
-                  />
-                ) : (
-                  <img
-                    src={message.fileUrl ?? ""}
-                    alt={message.fileName ?? "image"}
-                    className="size-16 object-cover rounded-lg border border-border/40"
-                  />
-                )}
+            ) : hasImagePreview ? (
+              <div className="flex flex-wrap gap-1.5">
+                {imagePreviewMessages.map((image) => (
+                  image.filePublicId ? (
+                    <SecureImage
+                      key={image._id}
+                      messageId={image._id}
+                      alt={image.fileName ?? "image"}
+                      className="size-16 shrink-0 object-cover rounded-lg border border-border/60"
+                      fallbackMinSize={64}
+                      showFallbackText={false}
+                    />
+                  ) : (
+                    <img
+                      key={image._id}
+                      src={image.fileUrl ?? ""}
+                      alt={image.fileName ?? "image"}
+                      className="size-16 shrink-0 object-cover rounded-lg border border-border/60"
+                    />
+                  )
+                ))}
               </div>
             ) : (
-              <p className="text-[13px] text-foreground/85 line-clamp-2 leading-relaxed break-all">
+              <p className="text-[14px] text-foreground line-clamp-2 leading-relaxed break-all">
                 {resolvedPreviewText}
               </p>
             )}
           </div>
         </div>
 
-        {/* ── Selected pills ── */}
-        {selectedIds.size > 0 && (
-          <div className="px-5 pt-2.5 flex flex-wrap gap-1.5">
-            {selectedConvos.map((c) => {
-              const isGroup = c.type === "group";
-              const otherUser = !isGroup
-                ? c.participants.find((p) => p.userId?._id?.toString() !== user?._id)
-                : null;
-              const name = isGroup
-                ? c.group?.name ?? "Nhóm"
-                : otherUser?.userId?.nickname?.trim() || otherUser?.userId?.displayName || "Người dùng";
-              return (
-                <span
-                  key={c._id}
-                  className="inline-flex items-center gap-1 bg-primary/10 text-primary text-[12px] font-medium px-2 py-1 rounded-full border border-primary/20 transition-all"
-                >
-                  {name}
-                  <button
-                    type="button"
-                    onClick={() => handleToggle(c._id)}
-                    className="hover:opacity-60 transition-opacity ml-0.5"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              );
-            })}
-          </div>
-        )}
-
         {/* ── Search ── */}
-        <div className={cn("px-5", selectedIds.size > 0 ? "pt-2 pb-1.5" : "pt-3.5 pb-1.5")}>
+        <div className="px-5 pt-3.5 pb-1.5">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input

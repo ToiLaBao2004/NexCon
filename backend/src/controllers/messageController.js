@@ -42,6 +42,7 @@ const SEARCH_MAX_LIMIT = 100;
 const SEARCH_SCAN_BATCH_SIZE = 100;
 const IMAGE_MODERATION_STATUS_PENDING = 'pending_review';
 const IMAGE_CLEANUP_RETRY_DELAYS_MS = [0, 500, 2000];
+const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled reportStatus mentions';
 const moderationCategoryLabels = {
     abusive: 'Ngôn từ xúc phạm',
     harassment: 'Quấy rối hoặc công kích cá nhân',
@@ -68,6 +69,18 @@ function maskPopulatedSender(message) {
     return {
         ...raw,
         senderId: maskLockedUserDoc(raw.senderId),
+    };
+}
+
+function sanitizeModeratedReply(replyTo) {
+    const raw = maskPopulatedSender(replyTo);
+    if (!raw?.reportStatus) return raw;
+    return {
+        ...raw,
+        content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
+        filePublicId: undefined,
+        fileUrl: undefined,
+        fileName: undefined,
     };
 }
 
@@ -756,6 +769,13 @@ export async function sendMessage(req, res) {
                 }
                 return res.status(400).json({ message: 'Tin nhắn trả lời không hợp lệ.' });
             }
+            if (repliedMessage.isRecalled || repliedMessage.reportStatus) {
+                if (pendingImageModeration?.publicId) {
+                    void cleanupRejectedImage(pendingImageModeration.publicId);
+                    pendingImageModeration = null;
+                }
+                return res.status(400).json({ message: 'Không thể trả lời tin nhắn đã bị ẩn.' });
+            }
             messageData.replyTo = replyTo;
         }
 
@@ -764,7 +784,7 @@ export async function sendMessage(req, res) {
         if (message.replyTo) {
             message = await message.populate({
                 path: 'replyTo',
-                select: '_id senderId type content fileName isRecalled reportStatus mentions',
+                select: REPLY_TO_SELECT,
                 populate: { path: 'senderId', select: 'displayName' },
             });
         }
@@ -1270,7 +1290,7 @@ export async function searchMessages(req, res) {
                 .populate('senderId', 'displayName avatarUrl lock')
                 .populate({
                     path: 'replyTo',
-                    select: '_id senderId type content fileName isRecalled reportStatus mentions',
+                    select: REPLY_TO_SELECT,
                     populate: { path: 'senderId', select: 'displayName avatarUrl lock' },
                 })
                 .lean();
@@ -1281,7 +1301,7 @@ export async function searchMessages(req, res) {
                 .filter(Boolean)
                 .map((message) => ({
                     ...maskPopulatedSender(message),
-                    replyTo: message.replyTo ? maskPopulatedSender(message.replyTo) : message.replyTo,
+                    replyTo: message.replyTo ? sanitizeModeratedReply(message.replyTo) : message.replyTo,
                 }))
                 .map(({ searchContent, ...message }) => message);
         }

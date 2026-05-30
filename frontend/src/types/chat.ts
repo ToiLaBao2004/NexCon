@@ -104,6 +104,7 @@ export interface ReplyToMessage {
   _id: string;
   senderId: string | { _id: string; displayName: string };
   type: MessageType;
+  metadata?: MessageMetadata;
   content?: string | null;
   fileName?: string | null;
   fileUrl?: string | null;

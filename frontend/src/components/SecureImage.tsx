@@ -7,9 +7,18 @@ interface SecureImageProps {
     alt?: string;
     className?: string;
     onLoadCallback?: () => void;
+    fallbackMinSize?: number;
+    showFallbackText?: boolean;
 }
 
-export default function SecureImage({ messageId, alt, className, onLoadCallback }: SecureImageProps) {
+export default function SecureImage({
+    messageId,
+    alt,
+    className,
+    onLoadCallback,
+    fallbackMinSize = 100,
+    showFallbackText = true,
+}: SecureImageProps) {
     const setUrl = useMediaCacheStore((state) => state.setUrl);
     const clearUrl = useMediaCacheStore((state) => state.clearUrl);
     const [src, setSrc] = useState<string | null>(null);
@@ -128,7 +137,7 @@ export default function SecureImage({ messageId, alt, className, onLoadCallback 
         return (
             <div
                 className={`bg-muted animate-pulse ${className || ''}`}
-                style={{ minHeight: '100px', minWidth: '100px' }}
+                style={{ minHeight: `${fallbackMinSize}px`, minWidth: `${fallbackMinSize}px` }}
             />
         );
     }
@@ -137,9 +146,9 @@ export default function SecureImage({ messageId, alt, className, onLoadCallback 
         return (
             <div
                 className={`flex items-center justify-center bg-muted text-muted-foreground ${className || ''}`}
-                style={{ minHeight: '100px', minWidth: '100px' }}
+                style={{ minHeight: `${fallbackMinSize}px`, minWidth: `${fallbackMinSize}px` }}
             >
-                <span className="text-xs text-center px-2">Không thể tải ảnh</span>
+                {showFallbackText && <span className="text-xs text-center px-2">Không thể tải ảnh</span>}
             </div>
         );
     }
