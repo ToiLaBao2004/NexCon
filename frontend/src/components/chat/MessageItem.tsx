@@ -2068,6 +2068,7 @@ const MessageItem = ({
 	const linkPreview = isLink ? message.metadata?.linkPreview : null;
 	const hasLinkPreview = Boolean(linkPreview?.title || linkPreview?.image || linkPreview?.description);
 	const isSticker = message.type === "sticker" && !isRecalled;
+	const isTextBubble = (!message.type || message.type === "text") && !isRecalled && !isViolationMessage;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
 	const hasContent = isImageBatch
@@ -2509,6 +2510,7 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit gap-0",
 								isOwn && "ms-auto",
+								isTextBubble && "min-w-[68px]",
 								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[14px] leading-relaxed sm:text-[15px]" : "px-4 py-2.5 text-[14px] leading-relaxed sm:text-[15px]"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
 								(isRecalled && !isImageBatch)
