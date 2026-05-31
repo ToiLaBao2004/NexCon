@@ -514,4 +514,39 @@ export const chatService = {
 			throw new Error(resolveErrorMessage(error));
 		}
 	},
+
+	async getDisappearingSetting(conversationId: string) {
+		const res = await api.get(`/dm/conversations/${conversationId}/disappearing`);
+		return res.data as {
+			setting: {
+				enabled: boolean;
+				durationSeconds: number | null;
+				enabledBy?: string | null;
+				enabledAt?: string | null;
+			};
+			canManage: boolean;
+		};
+	},
+
+	async updateDisappearingSetting(
+		conversationId: string,
+		payload: { enabled: boolean; durationSeconds?: number | null },
+	) {
+		const res = await api.put(`/dm/conversations/${conversationId}/disappearing`, payload);
+		return res.data as {
+			setting: {
+				enabled: boolean;
+				durationSeconds: number | null;
+				enabledBy?: string | null;
+				enabledAt?: string | null;
+			};
+			warning?: string | null;
+			unchanged?: boolean;
+		};
+	},
+
+	async reportDisappearingScreenshot(conversationId: string) {
+		const res = await api.post(`/dm/conversations/${conversationId}/screenshot`);
+		return res.data as { accepted: boolean };
+	},
 };

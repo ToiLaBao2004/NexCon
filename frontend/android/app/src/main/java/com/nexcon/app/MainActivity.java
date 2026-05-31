@@ -1,5 +1,6 @@
 package com.nexcon.app;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.os.Build;
 import android.os.Bundle;
@@ -9,6 +10,8 @@ import android.view.WindowManager;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private Activity.ScreenCaptureCallback screenCaptureCallback;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -25,6 +28,22 @@ public class MainActivity extends BridgeActivity {
     public void onPause() {
         NexConAppState.setForeground(false);
         super.onPause();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            registerScreenCaptureCallback();
+        }
+    }
+
+    @Override
+    public void onStop() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            unregisterScreenCaptureCallback();
+        }
+        super.onStop();
     }
 
     @Override
@@ -70,5 +89,34 @@ public class MainActivity extends BridgeActivity {
             return false;
         }
         return CallNotificationHelper.isCallIntent(intent);
+    }
+
+    private void dispatchScreenshotEvent() {
+        if (bridge == null || bridge.getWebView() == null) {
+            return;
+        }
+
+        bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript(
+            "window.dispatchEvent(new CustomEvent('nexcon:native-screenshot'));",
+            null
+        ));
+    }
+
+    private void registerScreenCaptureCallback() {
+        if (screenCaptureCallback != null) {
+            return;
+        }
+
+        screenCaptureCallback = this::dispatchScreenshotEvent;
+        registerScreenCaptureCallback(getMainExecutor(), screenCaptureCallback);
+    }
+
+    private void unregisterScreenCaptureCallback() {
+        if (screenCaptureCallback == null) {
+            return;
+        }
+
+        unregisterScreenCaptureCallback(screenCaptureCallback);
+        screenCaptureCallback = null;
     }
 }

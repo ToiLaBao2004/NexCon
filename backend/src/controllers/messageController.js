@@ -33,6 +33,11 @@ import {
     getDirectConversationKey,
     isDuplicateDirectConversationError,
 } from '../utils/directConversation.js';
+import {
+    getMessageExpirationFields,
+    sanitizeExpiredMessageForClient,
+} from '../utils/disappearingMessages.js';
+import { cacheMessageCountdown } from '../services/disappearingMessageService.js';
 
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
 const MAX_REMINDER_SYSTEM_CONTENT_LENGTH = 1200;
@@ -42,7 +47,7 @@ const SEARCH_MAX_LIMIT = 100;
 const SEARCH_SCAN_BATCH_SIZE = 100;
 const IMAGE_MODERATION_STATUS_PENDING = 'pending_review';
 const IMAGE_CLEANUP_RETRY_DELAYS_MS = [0, 500, 2000];
-const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled reportStatus mentions';
+const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled isExpired expiresAt reportStatus mentions';
 const moderationCategoryLabels = {
     abusive: 'Ngôn từ xúc phạm',
     harassment: 'Quấy rối hoặc công kích cá nhân',
@@ -88,7 +93,7 @@ function clampSearchLimit(value) {
 }
 
 function maskPopulatedSender(message) {
-    const raw = decryptMessagePayload(message);
+    const raw = sanitizeExpiredMessageForClient(decryptMessagePayload(message));
     if (!raw?.senderId || typeof raw.senderId !== 'object') return raw;
     return {
         ...raw,
@@ -534,6 +539,7 @@ const saveConversationForNewMessage = async ({ conversationId, message, senderId
 
 export async function sendMessage(req, res) {
     let pendingImageModeration = null;
+    const deliveryStartedAt = new Date();
 
     try {
         const senderId = req.user._id;
@@ -556,6 +562,7 @@ export async function sendMessage(req, res) {
                 conversation = await Conversation.create({
                     type: 'direct',
                     directKey: getDirectConversationKey(senderId, recipientId),
+                    initiatedBy: senderId,
                     participants: [
                         { userId: senderId, joinedAt: new Date() },
                         { userId: recipientId, joinedAt: new Date() },
@@ -586,6 +593,10 @@ export async function sendMessage(req, res) {
                 avatarUrl: req.user.avatarUrl
             },
             type,
+            ...getMessageExpirationFields({
+                conversation,
+                deliveredAt: deliveryStartedAt,
+            }),
         };
 
         if (Object.keys(metadata).length > 0) {
@@ -796,7 +807,7 @@ export async function sendMessage(req, res) {
                 }
                 return res.status(400).json({ message: 'Tin nhắn trả lời không hợp lệ.' });
             }
-            if (repliedMessage.isRecalled || repliedMessage.reportStatus) {
+            if (repliedMessage.isRecalled || repliedMessage.reportStatus || repliedMessage.isExpired) {
                 if (pendingImageModeration?.publicId) {
                     void cleanupRejectedImage(pendingImageModeration.publicId);
                     pendingImageModeration = null;
@@ -807,6 +818,7 @@ export async function sendMessage(req, res) {
         }
 
         let message = await Message.create(messageData);
+        await cacheMessageCountdown(message);
 
         if (message.replyTo) {
             message = await message.populate({
@@ -971,6 +983,9 @@ export async function recallMessage(req, res) {
         if (message.senderId.toString() !== senderId.toString()) {
             return res.status(403).json({ message: 'Bạn chỉ có thể thu hồi tin nhắn của chính mình.' });
         }
+        if (message.type === 'system' || message.isExpired) {
+            return res.status(400).json({ message: 'This message cannot be recalled.' });
+        }
         if (message.isRecalled) {
             return res.status(400).json({ message: 'Tin nhắn đã được thu hồi.' });
         }
@@ -1049,6 +1064,9 @@ export async function pinMessage(req, res) {
 
         if (message.reportStatus) {
             return res.status(403).json({ message: 'Không thể ghim tin nhắn đã bị xác nhận vi phạm.' });
+        }
+        if (message.type === 'system' || message.isExpired || message.expiresAt) {
+            return res.status(400).json({ message: 'Disappearing and system messages cannot be pinned.' });
         }
 
         const conversation = req.conversation || await Conversation.findById(message.conversationId);
@@ -1215,6 +1233,7 @@ export async function searchMessages(req, res) {
             conversationId,
             type: { $ne: 'sticker' },
             isRecalled: { $ne: true },
+            isExpired: { $ne: true },
             reportStatus: { $ne: true },
             $or: [
                 { 'metadata.visibleToUserIds': { $exists: false } },
@@ -1363,6 +1382,7 @@ export async function getMentionMessages(req, res) {
         const query = {
             conversationId: { $in: conversationIds },
             'mentions.userId': userId,
+            isExpired: { $ne: true },
             reportStatus: { $ne: true },
         };
 
@@ -1452,6 +1472,9 @@ export async function reactToMessage(req, res) {
         if (message.reportStatus) {
             return res.status(403).json({ message: 'Không thể tương tác với tin nhắn đã bị xác nhận vi phạm.' });
         }
+        if (message.isExpired) {
+            return res.status(410).json({ message: 'This message has disappeared.' });
+        }
 
         if (conversation.type === 'direct') {
             const otherParticipant = conversation.participants.find(p => p.userId.toString() !== req.user._id.toString());
@@ -1526,6 +1549,9 @@ export async function getSignedMediaUrl(req, res) {
         if (message.reportStatus) {
             return res.status(403).json({ message: 'Tài nguyên này đã bị ẩn do vi phạm tiêu chuẩn cộng đồng.' });
         }
+        if (message.isExpired) {
+            return res.status(410).json({ message: 'This message has disappeared.' });
+        }
 
         const conversation = await Conversation.findOne({
             _id: message.conversationId,
@@ -1578,6 +1604,9 @@ export async function forwardMessage(req, res) {
         }
         if (source.isRecalled) {
             return res.status(400).json({ message: 'Không thể chuyển tiếp tin nhắn đã thu hồi.' });
+        }
+        if (source.isExpired) {
+            return res.status(410).json({ message: 'This message has disappeared.' });
         }
         if (source.reportStatus) {
             return res.status(403).json({ message: 'Không thể chuyển tiếp tin nhắn đã bị xác nhận vi phạm.' });
@@ -1672,6 +1701,11 @@ export async function forwardMessage(req, res) {
                     ...(source.fileSize ? { fileSize: source.fileSize } : {}),
                     ...(source.mimeType ? { mimeType: source.mimeType } : {}),
                     metadata: forwardedMetadata,
+                    ...getMessageExpirationFields({
+                        conversation: targetConvo,
+                        inheritedDurationSeconds: source.disappearingDurationSeconds,
+                        deliveredAt: new Date(),
+                    }),
                 };
 
                 const mentionableTypes = new Set(['text', 'link', 'image', 'file']);
@@ -1688,6 +1722,7 @@ export async function forwardMessage(req, res) {
                 }
 
                 const newMsg = await Message.create(msgData);
+                await cacheMessageCountdown(newMsg);
 
                 const savedTargetConvo = await saveConversationForNewMessage({
                     conversationId: targetConvo._id,

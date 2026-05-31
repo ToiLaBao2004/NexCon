@@ -18,12 +18,15 @@ import pushRouter from './routes/pushRoute.js';
 import reportRouter from './routes/reportRoute.js';
 import adminRouter from './routes/adminRoute.js';
 import globalSearchRouter from './routes/globalSearchRoute.js';
+import dmRouter from './routes/dmRoute.js';
+import internalDmRouter from './routes/internalDmRoute.js';
 import { app, server, socketRedisAdapterReady } from './socket/index.js';
 import { v2 as cloudinary } from 'cloudinary';
 import { startReminderWorker, reloadPendingReminders } from './workers/reminderWorker.js';
 import { reloadPendingGroupCleanups, startGroupCleanupWorker } from './workers/groupCleanupWorker.js';
 import { reloadPendingConversationClearCleanups, startConversationClearCleanupWorker } from './workers/conversationClearCleanupWorker.js';
 import { startRealtimeTimeoutWorker } from './workers/realtimeTimeoutWorker.js';
+import { ensureDisappearingMessageExpirySweep, startDisappearingMessageWorker } from './workers/disappearingMessageWorker.js';
 import { apiLimiter } from './middlewares/rateLimiters.js';
 import { auditLogMiddleware } from './middlewares/auditLogMiddleware.js';
 import { requireUser } from './middlewares/roleMiddleware.js';
@@ -65,6 +68,8 @@ cloudinary.config({
 app.use('/api/auth', authRouter);
 app.use('/api/otp', otpRouter);
 app.use('/api/push', pushRouter);
+app.use('/internal/dm', internalDmRouter);
+app.use('/api/internal/dm', internalDmRouter);
 
 // private routes
 app.use(authMiddleware);
@@ -80,12 +85,16 @@ app.use('/api/livekit', requireUser, livekitRouter);
 app.use('/api/meetings', requireUser, meetingRouter);
 app.use('/api/reminders', requireUser, reminderRouter);
 app.use('/api/reports', requireUser, reportRouter);
+app.use('/api/dm', dmRouter);
 
 connectDB().then(() => {
     try {
         startSystemMetricsSampler();
         startReminderWorker();
         startRealtimeTimeoutWorker();
+        if (process.env.ENABLE_INLINE_DISAPPEARING_MESSAGE_WORKER !== 'false') {
+            startDisappearingMessageWorker();
+        }
         if (process.env.ENABLE_INLINE_GROUP_CLEANUP_WORKER !== 'false') {
             startGroupCleanupWorker();
         }
@@ -95,6 +104,7 @@ connectDB().then(() => {
         reloadPendingReminders();
         reloadPendingGroupCleanups();
         reloadPendingConversationClearCleanups();
+        ensureDisappearingMessageExpirySweep();
     } catch (err) {
         console.error('[Server] Không thể khởi tạo Reminder Worker (Redis có thể chưa sẵn sàng):', err.message);
     }

@@ -72,6 +72,7 @@ const ChatWindowBody: React.FC = () => {
     loadOlderInJumpMode,
     loadNewerInJumpMode,
     exitJumpMode,
+    expireMessageLocal,
   } = useChatStore();
 
   const convoId = activeConversationId ?? null;
@@ -82,6 +83,23 @@ const ChatWindowBody: React.FC = () => {
     () => (convoId ? allMessages[convoId]?.items ?? [] : []),
     [allMessages, convoId]
   );
+
+  useEffect(() => {
+    if (!convoId) return;
+
+    const expireVisibleMessages = () => {
+      const now = Date.now();
+      for (const message of messages) {
+        if (!message.isExpired && message.expiresAt && new Date(message.expiresAt).getTime() <= now) {
+          expireMessageLocal(convoId, message._id, message.expiresAt);
+        }
+      }
+    };
+
+    expireVisibleMessages();
+    const intervalId = window.setInterval(expireVisibleMessages, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [convoId, expireMessageLocal, messages]);
 
   const messageData = convoId ? allMessages[convoId] : null;
   const hasMoreOlder = isJumpMode ? (jumpContext?.hasMoreOlder ?? false) : (messageData?.hasMore ?? false);

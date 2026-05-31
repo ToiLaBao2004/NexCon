@@ -190,6 +190,7 @@ async function markDeliveredForMessage({ messageId, conversationId, deliveredUse
             conversationId,
             senderId: { $ne: deliveredUserId },
             deliveredTo: { $ne: deliveredUserId },
+            isExpired: { $ne: true },
         },
         { $addToSet: { deliveredTo: deliveredUserId } },
         { new: true, select: 'senderId conversationId' }
@@ -226,6 +227,7 @@ async function syncPendingDirectMessageDeliveries(userId) {
                 conversationId: { $in: conversationIds },
                 senderId: { $ne: userId },
                 deliveredTo: { $ne: userId },
+                isExpired: { $ne: true },
             })
                 .select('_id conversationId senderId')
                 .sort({ createdAt: 1 })

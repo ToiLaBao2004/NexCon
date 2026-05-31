@@ -7,6 +7,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
 import useMediaCacheStore from './useMediaCacheStore';
 import type { Reminder } from '@/types/reminder';
+import type { Conversation } from '@/types/chat';
+import { DISAPPEARED_MESSAGE_PLACEHOLDER } from '@/utils/disappearingMessages';
 
 const MAX_PINNED_CONVERSATIONS = 5;
 
@@ -2157,12 +2159,165 @@ export const useChatStore = create<ChatState>()(
                     return { messages: nextMessages };
                 });
             },
+            expireMessageLocal: (
+                conversationId: string,
+                messageId: string,
+                expiredAt?: string | null,
+                placeholder = DISAPPEARED_MESSAGE_PLACEHOLDER,
+            ) => {
+                useMediaCacheStore.getState().clearUrl(messageId);
+                set((state) => {
+                    const currentMessages = state.messages[conversationId];
+                    const nextMessages = currentMessages
+                        ? {
+                            ...state.messages,
+                            [conversationId]: {
+                                ...currentMessages,
+                                items: currentMessages.items.map((message) =>
+                                    message._id === messageId
+                                        ? {
+                                            ...message,
+                                            content: null,
+                                            filePublicId: null,
+                                            fileUrl: null,
+                                            fileName: null,
+                                            fileSize: null,
+                                            mimeType: null,
+                                            reactions: [],
+                                            isPinned: false,
+                                            pinnedAt: null,
+                                            isExpired: true,
+                                            expiredAt: expiredAt || new Date().toISOString(),
+                                        }
+                                        : message
+                                ),
+                                pinnedMessages: currentMessages.pinnedMessages.filter(
+                                    (message) => message._id !== messageId
+                                ),
+                            },
+                        }
+                        : state.messages;
+
+                    const currentMedia = state.media[conversationId];
+                    const nextMedia = currentMedia
+                        ? {
+                            ...state.media,
+                            [conversationId]: {
+                                images: currentMedia.images.filter((message) => message._id !== messageId),
+                                files: currentMedia.files.filter((message) => message._id !== messageId),
+                                links: currentMedia.links.filter((message) => message._id !== messageId),
+                            },
+                        }
+                        : state.media;
+
+                    const currentPagination = state.mediaPagination[conversationId];
+                    const nextMediaPagination = currentPagination
+                        ? {
+                            ...state.mediaPagination,
+                            [conversationId]: {
+                                ...currentPagination,
+                                image: {
+                                    ...currentPagination.image,
+                                    items: currentPagination.image.items.filter((message) => message._id !== messageId),
+                                },
+                                file: {
+                                    ...currentPagination.file,
+                                    items: currentPagination.file.items.filter((message) => message._id !== messageId),
+                                },
+                                link: {
+                                    ...currentPagination.link,
+                                    items: currentPagination.link.items.filter((message) => message._id !== messageId),
+                                },
+                            },
+                        }
+                        : state.mediaPagination;
+
+                    const patchConversation = (conversation: Conversation) => {
+                        if (conversation._id !== conversationId || conversation.lastMessage?._id !== messageId) {
+                            return conversation;
+                        }
+                        return {
+                            ...conversation,
+                            lastMessage: {
+                                ...conversation.lastMessage,
+                                content: placeholder,
+                                isExpired: true,
+                            },
+                        };
+                    };
+
+                    return {
+                        messages: nextMessages,
+                        media: nextMedia,
+                        mediaPagination: nextMediaPagination,
+                        conversations: state.conversations.map(patchConversation),
+                        groupConversations: state.groupConversations.map(patchConversation),
+                        searchResults: {
+                            ...state.searchResults,
+                            items: state.searchResults.items.filter((message) => message._id !== messageId),
+                        },
+                        replyingTo: state.replyingTo?._id === messageId ? null : state.replyingTo,
+                    };
+                });
+            },
             reactToMessage: async (messageId, emoji) => {
                 try {
                     const { reactions } = await chatService.reactToMessage(messageId, emoji);
                     get().updateMessageReaction(messageId, reactions);
                 } catch (error) {
                     console.error('Failed to react to message:', error);
+                    throw error;
+                }
+            },
+            updateDisappearingSetting: async (conversationId, payload) => {
+                const previous = get().conversations.find((conversation) => conversation._id === conversationId);
+                const optimisticPatch = {
+                    disappearingEnabled: payload.enabled,
+                    ...(payload.durationSeconds
+                        ? { disappearingDurationSeconds: payload.durationSeconds }
+                        : {}),
+                };
+                const patchConversation = (conversation: Conversation, patch: Partial<Conversation>) => (
+                    conversation._id === conversationId ? { ...conversation, ...patch } : conversation
+                );
+
+                set((state) => ({
+                    conversations: state.conversations.map((conversation) =>
+                        patchConversation(conversation, optimisticPatch)
+                    ),
+                    groupConversations: state.groupConversations.map((conversation) =>
+                        patchConversation(conversation, optimisticPatch)
+                    ),
+                }));
+
+                try {
+                    const response = await chatService.updateDisappearingSetting(conversationId, payload);
+                    const confirmedPatch = {
+                        disappearingEnabled: response.setting.enabled,
+                        disappearingDurationSeconds: response.setting.durationSeconds,
+                        disappearingEnabledBy: response.setting.enabledBy ?? null,
+                        disappearingEnabledAt: response.setting.enabledAt ?? null,
+                    };
+                    set((state) => ({
+                        conversations: state.conversations.map((conversation) =>
+                            patchConversation(conversation, confirmedPatch)
+                        ),
+                        groupConversations: state.groupConversations.map((conversation) =>
+                            patchConversation(conversation, confirmedPatch)
+                        ),
+                    }));
+                    return { warning: response.warning };
+                } catch (error) {
+                    if (previous) {
+                        set((state) => ({
+                            conversations: state.conversations.map((conversation) =>
+                                patchConversation(conversation, previous)
+                            ),
+                            groupConversations: state.groupConversations.map((conversation) =>
+                                patchConversation(conversation, previous)
+                            ),
+                        }));
+                    }
                     throw error;
                 }
             },
