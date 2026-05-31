@@ -32,6 +32,7 @@ import { getSystemMessageText } from "@/utils/chatUtils";
 import { FIELD_LIMITS, checkFieldFormat } from "@/lib/fieldFormat";
 import { toast } from "sonner";
 import { decodeMentionTokens } from "@/utils/mentions";
+import { DISAPPEARED_MESSAGE_PLACEHOLDER, isMessageExpired } from "@/utils/disappearingMessages";
 
 const GroupChatCard = ({
 	convo,
@@ -65,6 +66,18 @@ const GroupChatCard = ({
 	const [dropdownOpen, setDropdownOpen] = useState(false);
 	const [openClearConfirm, setOpenClearConfirm] = useState(false);
 	const [pinning, setPinning] = useState(false);
+	const [lastMessageExpiryReached, setLastMessageExpiryReached] = useState(false);
+
+	useEffect(() => {
+		const lastMessage = convo.lastMessage;
+		const alreadyExpired = isMessageExpired(lastMessage);
+		setLastMessageExpiryReached(alreadyExpired);
+		if (!lastMessage?.expiresAt || alreadyExpired) return;
+
+		const delay = new Date(lastMessage.expiresAt).getTime() - Date.now();
+		const timeoutId = window.setTimeout(() => setLastMessageExpiryReached(true), Math.max(0, delay + 50));
+		return () => window.clearTimeout(timeoutId);
+	}, [convo.lastMessage]);
 
 	const isConversationPinned = convo.isPinned === true;
 
@@ -418,6 +431,10 @@ const GroupChatCard = ({
 						const msgObj = previewMessageObj;
 						const type = msgObj.type ?? "text";
 						const content = msgObj.content ?? "";
+
+						if (lastMessageExpiryReached || isMessageExpired(msgObj)) {
+							return <span className="truncate italic">{DISAPPEARED_MESSAGE_PLACEHOLDER}</span>;
+						}
 
 						if (type === "system") {
 							return <span className="truncate italic">{getSystemMessageText(msgObj, user._id)}</span>;

@@ -10,6 +10,7 @@ import { registerCallHandlers, handleCallDisconnect, emitPendingDirectCallsForUs
 import { registerGroupCallHandlers, handleGroupCallDisconnect, emitPendingGroupCallsForUser, declineGroupCallFromPush } from "./groupCallHandler.js";
 import { configureSocketGateway } from "./socketGateway.js";
 import Message from "../models/messageModel.js";
+import { buildUnexpiredMessageFilter } from "../utils/disappearingMessages.js";
 import { buildPresencePayloadForViewer, touchUserActivity } from "../services/userStatusService.js";
 import { configureSocketIoRedisAdapter } from "../config/socketIoRedisAdapter.js";
 import {
@@ -191,6 +192,7 @@ async function markDeliveredForMessage({ messageId, conversationId, deliveredUse
             senderId: { $ne: deliveredUserId },
             deliveredTo: { $ne: deliveredUserId },
             isExpired: { $ne: true },
+            $and: [buildUnexpiredMessageFilter()],
         },
         { $addToSet: { deliveredTo: deliveredUserId } },
         { new: true, select: 'senderId conversationId' }
@@ -228,6 +230,7 @@ async function syncPendingDirectMessageDeliveries(userId) {
                 senderId: { $ne: userId },
                 deliveredTo: { $ne: userId },
                 isExpired: { $ne: true },
+                $and: [buildUnexpiredMessageFilter()],
             })
                 .select('_id conversationId senderId')
                 .sort({ createdAt: 1 })

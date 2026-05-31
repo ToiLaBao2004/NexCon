@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock3 } from "lucide-react";
 import { toast } from "sonner";
 import type { Conversation } from "@/types/chat";
@@ -6,9 +6,10 @@ import { Switch } from "@/components/ui/switch";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useChatStore } from "@/stores/useChatStore";
 import {
-  DEFAULT_DISAPPEARING_DURATION_SECONDS,
+  DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS,
   canManageDisappearingMessages,
   formatDisappearingDuration,
+  isDisappearingModeActive,
 } from "@/utils/disappearingMessages";
 import { DurationPickerModal } from "./DurationPickerModal";
 
@@ -17,9 +18,16 @@ export function DisappearingToggle({ conversation }: { conversation: Conversatio
   const updateSetting = useChatStore((state) => state.updateDisappearingSetting);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const enabled = conversation.disappearingEnabled === true;
-  const duration = conversation.disappearingDurationSeconds || DEFAULT_DISAPPEARING_DURATION_SECONDS;
+  const [now, setNow] = useState(Date.now());
+  const enabled = isDisappearingModeActive(conversation, now);
+  const duration = conversation.disappearingAutoDisableSeconds || DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS;
   const canManage = canManageDisappearingMessages(conversation, userId);
+
+  useEffect(() => {
+    if (!conversation.disappearingDisableAt) return;
+    const intervalId = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, [conversation.disappearingDisableAt]);
 
   const save = async (payload: { enabled: boolean; durationSeconds?: number }) => {
     try {
@@ -45,7 +53,7 @@ export function DisappearingToggle({ conversation }: { conversation: Conversatio
         >
           <span className="block text-[15px] font-normal text-foreground">Tin nhắn tự xóa</span>
           <span className="block truncate text-xs text-muted-foreground">
-            {enabled ? `Sau ${formatDisappearingDuration(duration)}` : "Đang tắt"}
+            {enabled ? `Tự tắt sau ${formatDisappearingDuration(duration)}` : "Đang tắt"}
           </span>
         </button>
         <Switch

@@ -4,7 +4,9 @@ import redisIOClient from '../config/redisIOClient.js';
 import { deleteCloudinaryResource } from '../middlewares/uploadMiddleware.js';
 import { getSocketGateway } from '../socket/socketGateway.js';
 import { invalidateConversationReadCache } from '../utils/readCache.js';
+import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
 import {
+    buildDisappearingSetting,
     DISAPPEARED_MESSAGE_PLACEHOLDER,
     sanitizeExpiredMessageForClient,
 } from '../utils/disappearingMessages.js';
@@ -204,6 +206,96 @@ export async function retryFailedExpiredMediaCleanup({ limit = EXPIRY_BATCH_SIZE
     return messages.length;
 }
 
+async function disableDisappearingConversationById(conversationId, {
+    now = new Date(),
+    io = getSocketGateway().io,
+} = {}) {
+    const disabledAt = new Date(now);
+    const conversation = await Conversation.findOneAndUpdate(
+        {
+            _id: conversationId,
+            disappearingEnabled: true,
+            disappearingDisableAt: { $lte: disabledAt },
+        },
+        {
+            $set: {
+                disappearingEnabled: false,
+                disappearingDisableAt: null,
+            },
+        },
+        { new: true },
+    );
+
+    if (!conversation) return null;
+
+    const senderId = conversation.disappearingEnabledBy || conversation.participants?.[0]?.userId;
+    if (senderId) {
+        const systemMessage = await Message.create({
+            conversationId: conversation._id,
+            senderId,
+            type: 'system',
+            systemType: 'disappearing_messages_disabled',
+            content: '🕐 Disappearing messages turned off automatically. New messages will be kept.',
+            metadata: {
+                enabled: false,
+                autoDisabled: true,
+            },
+        });
+
+        updateConversationLastMessage(conversation, systemMessage, senderId);
+        await conversation.save();
+        if (io) emitNewMessage(io, conversation, systemMessage);
+    } else {
+        invalidateConversationReadCache(conversation);
+    }
+
+    if (io) {
+        io.to(conversation._id.toString()).emit('dm:disappearing-setting-updated', {
+            conversationId: conversation._id.toString(),
+            setting: buildDisappearingSetting(conversation),
+        });
+    }
+
+    return conversation;
+}
+
+export async function disableDueDisappearingConversations({
+    now = new Date(),
+    batchSize = EXPIRY_BATCH_SIZE,
+    maxBatches = MAX_EXPIRY_BATCHES_PER_RUN,
+    io = getSocketGateway().io,
+} = {}) {
+    const disableTime = new Date(now);
+    let disabledConversationCount = 0;
+
+    for (let batch = 0; batch < maxBatches; batch += 1) {
+        const dueConversations = await Conversation.find({
+            disappearingEnabled: true,
+            disappearingDisableAt: { $lte: disableTime },
+        })
+            .select('_id')
+            .sort({ disappearingDisableAt: 1, _id: 1 })
+            .limit(batchSize)
+            .lean();
+
+        if (!dueConversations.length) break;
+
+        const results = await Promise.allSettled(
+            dueConversations.map((conversation) => disableDisappearingConversationById(
+                conversation._id,
+                { now: disableTime, io },
+            ))
+        );
+        disabledConversationCount += results.filter(
+            (result) => result.status === 'fulfilled' && result.value
+        ).length;
+
+        if (dueConversations.length < batchSize) break;
+    }
+
+    return disabledConversationCount;
+}
+
 export async function expireDueMessages({
     now = new Date(),
     batchSize = EXPIRY_BATCH_SIZE,
@@ -211,6 +303,12 @@ export async function expireDueMessages({
     io = getSocketGateway().io,
 } = {}) {
     const expiryTime = new Date(now);
+    const disabledConversationCount = await disableDueDisappearingConversations({
+        now: expiryTime,
+        batchSize,
+        maxBatches,
+        io,
+    });
     let expiredCount = 0;
 
     for (let batch = 0; batch < maxBatches; batch += 1) {
@@ -237,5 +335,5 @@ export async function expireDueMessages({
     }
 
     const retriedMediaCount = await retryFailedExpiredMediaCleanup({ limit: batchSize });
-    return { expiredCount, retriedMediaCount };
+    return { disabledConversationCount, expiredCount, retriedMediaCount };
 }

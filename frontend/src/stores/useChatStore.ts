@@ -2273,8 +2273,11 @@ export const useChatStore = create<ChatState>()(
                 const previous = get().conversations.find((conversation) => conversation._id === conversationId);
                 const optimisticPatch = {
                     disappearingEnabled: payload.enabled,
+                    disappearingDisableAt: payload.enabled && payload.durationSeconds
+                        ? new Date(Date.now() + payload.durationSeconds * 1000).toISOString()
+                        : null,
                     ...(payload.durationSeconds
-                        ? { disappearingDurationSeconds: payload.durationSeconds }
+                        ? { disappearingAutoDisableSeconds: payload.durationSeconds }
                         : {}),
                 };
                 const patchConversation = (conversation: Conversation, patch: Partial<Conversation>) => (
@@ -2294,7 +2297,8 @@ export const useChatStore = create<ChatState>()(
                     const response = await chatService.updateDisappearingSetting(conversationId, payload);
                     const confirmedPatch = {
                         disappearingEnabled: response.setting.enabled,
-                        disappearingDurationSeconds: response.setting.durationSeconds,
+                        disappearingAutoDisableSeconds: response.setting.durationSeconds,
+                        disappearingDisableAt: response.setting.disableAt ?? null,
                         disappearingEnabledBy: response.setting.enabledBy ?? null,
                         disappearingEnabledAt: response.setting.enabledAt ?? null,
                     };

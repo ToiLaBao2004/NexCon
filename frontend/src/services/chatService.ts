@@ -521,6 +521,7 @@ export const chatService = {
 			setting: {
 				enabled: boolean;
 				durationSeconds: number | null;
+				disableAt?: string | null;
 				enabledBy?: string | null;
 				enabledAt?: string | null;
 			};
@@ -537,6 +538,7 @@ export const chatService = {
 			setting: {
 				enabled: boolean;
 				durationSeconds: number | null;
+				disableAt?: string | null;
 				enabledBy?: string | null;
 				enabledAt?: string | null;
 			};

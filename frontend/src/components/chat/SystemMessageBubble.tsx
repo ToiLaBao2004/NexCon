@@ -5,7 +5,7 @@ import type { Conversation, Message } from "@/types/chat";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useChatStore } from "@/stores/useChatStore";
 import {
-  DEFAULT_DISAPPEARING_DURATION_SECONDS,
+  DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS,
   canManageDisappearingMessages,
 } from "@/utils/disappearingMessages";
 import { DurationPickerModal } from "./DurationPickerModal";
@@ -23,8 +23,8 @@ export function SystemMessageBubble({
   const isEnabledMessage = message.systemType === "disappearing_messages_enabled";
   const canManage = canManageDisappearingMessages(conversation, userId);
   const duration = Number(message.metadata?.durationSeconds)
-    || conversation.disappearingDurationSeconds
-    || DEFAULT_DISAPPEARING_DURATION_SECONDS;
+    || conversation.disappearingAutoDisableSeconds
+    || DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS;
 
   return (
     <>

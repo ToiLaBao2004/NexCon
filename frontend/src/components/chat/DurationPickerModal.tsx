@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
-  DEFAULT_DISAPPEARING_DURATION_SECONDS,
+  DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS,
   DISAPPEARING_DURATION_OPTIONS,
   MAX_DISAPPEARING_DURATION_SECONDS,
   MIN_DISAPPEARING_DURATION_SECONDS,
@@ -51,7 +51,7 @@ export function DurationPickerModal({
   onConfirm,
   readOnly = false,
 }: DurationPickerModalProps) {
-  const initialDuration = selectedDurationSeconds || DEFAULT_DISAPPEARING_DURATION_SECONDS;
+  const initialDuration = selectedDurationSeconds || DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS;
   const [selected, setSelected] = useState(initialDuration);
   const [customOpen, setCustomOpen] = useState(false);
   const [customValue, setCustomValue] = useState("1");
@@ -103,7 +103,7 @@ export function DurationPickerModal({
             Tin nhắn tự xóa
           </SheetTitle>
           <SheetDescription>
-            Tin nhắn mới sẽ biến mất sau khoảng thời gian đã chọn.
+            Chế độ tự xóa sẽ tự tắt sau thời gian đã chọn. Mỗi tin nhắn tự xóa sẽ biến mất sau 24 giờ.
           </SheetDescription>
         </SheetHeader>
 
@@ -178,7 +178,7 @@ export function DurationPickerModal({
         <SheetFooter className="border-t border-border/60 px-5 py-4">
           {readOnly && (
             <p className="text-xs text-muted-foreground">
-              Chỉ người tạo hội thoại hoặc quản trị viên nhóm có thể thay đổi cài đặt này.
+              Chỉ quản trị viên nhóm có thể thay đổi cài đặt này.
             </p>
           )}
           <Button

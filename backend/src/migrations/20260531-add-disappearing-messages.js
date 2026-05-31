@@ -15,19 +15,70 @@ async function run() {
         { isExpired: { $exists: false } },
         { $set: { isExpired: false } },
     );
-    const directResult = await Conversation.collection.updateMany(
-        {
-            type: 'direct',
-            initiatedBy: { $exists: false },
-            'participants.0.userId': { $exists: true },
-        },
-        [{
-            $set: {
-                initiatedBy: { $arrayElemAt: ['$participants.userId', 0] },
+    const legacyConversationResult = await Conversation.collection.updateMany(
+        { disappearingDurationSeconds: { $exists: true } },
+        [
+            {
+                $set: {
+                    disappearingAutoDisableSeconds: {
+                        $ifNull: ['$disappearingAutoDisableSeconds', '$disappearingDurationSeconds'],
+                    },
+                },
             },
-        }],
+            { $unset: 'disappearingDurationSeconds' },
+        ],
     );
-
+    const activeConversationResult = await Conversation.collection.updateMany(
+        {
+            disappearingEnabled: true,
+            $or: [
+                { disappearingDisableAt: { $exists: false } },
+                { disappearingDisableAt: null },
+            ],
+        },
+        [
+            {
+                $set: {
+                    disappearingAutoDisableSeconds: {
+                        $ifNull: ['$disappearingAutoDisableSeconds', 24 * 60 * 60],
+                    },
+                    disappearingDisableAt: {
+                        $add: [
+                            { $ifNull: ['$disappearingEnabledAt', '$$NOW'] },
+                            {
+                                $multiply: [
+                                    { $ifNull: ['$disappearingAutoDisableSeconds', 24 * 60 * 60] },
+                                    1000,
+                                ],
+                            },
+                        ],
+                    },
+                },
+            },
+        ],
+    );
+    const messageExpiryResult = await Message.collection.updateMany(
+        {
+            isExpired: { $ne: true },
+            expiresAt: { $exists: true, $ne: null },
+        },
+        [
+            {
+                $set: {
+                    expiresAt: {
+                        $add: [
+                            { $ifNull: ['$deliveryStartedAt', '$createdAt'] },
+                            24 * 60 * 60 * 1000,
+                        ],
+                    },
+                },
+            },
+        ],
+    );
+    const legacyMessageResult = await Message.collection.updateMany(
+        { disappearingDurationSeconds: { $exists: true } },
+        { $unset: { disappearingDurationSeconds: '' } },
+    );
     await Promise.all([
         Conversation.syncIndexes(),
         Message.syncIndexes(),
@@ -36,7 +87,10 @@ async function run() {
     console.log('[Migration] Disappearing messages schema is ready.', {
         conversationsUpdated: conversationResult.modifiedCount,
         messagesUpdated: messageResult.modifiedCount,
-        directInitiatorsBackfilled: directResult.modifiedCount,
+        legacyConversationsUpdated: legacyConversationResult.modifiedCount,
+        activeConversationsScheduledToDisable: activeConversationResult.modifiedCount,
+        messageExpiryTimestampsNormalized: messageExpiryResult.modifiedCount,
+        legacyMessagesUpdated: legacyMessageResult.modifiedCount,
     });
 }
 

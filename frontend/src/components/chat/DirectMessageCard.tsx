@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { ReportDialog } from "../shared/ReportDialog";
 import { getPresenceBadgeStatus, getPresenceForUser } from '@/utils/userPresence';
 import { decodeMentionTokens } from '@/utils/mentions';
+import { DISAPPEARED_MESSAGE_PLACEHOLDER, isMessageExpired } from '@/utils/disappearingMessages';
 
 const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation; density?: "default" | "people" }) => {
   const { user } = useAuthStore();
@@ -52,6 +53,18 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
   const [openClearConfirm, setOpenClearConfirm] = useState(false);
   const [pinning, setPinning] = useState(false);
   const [openReportUser, setOpenReportUser] = useState(false);
+  const [lastMessageExpiryReached, setLastMessageExpiryReached] = useState(false);
+
+  useEffect(() => {
+    const lastMessage = convo.lastMessage;
+    const alreadyExpired = isMessageExpired(lastMessage);
+    setLastMessageExpiryReached(alreadyExpired);
+    if (!lastMessage?.expiresAt || alreadyExpired) return;
+
+    const delay = new Date(lastMessage.expiresAt).getTime() - Date.now();
+    const timeoutId = window.setTimeout(() => setLastMessageExpiryReached(true), Math.max(0, delay + 50));
+    return () => window.clearTimeout(timeoutId);
+  }, [convo.lastMessage]);
 
   const isConversationPinned = convo.isPinned === true;
 
@@ -435,6 +448,10 @@ const DirectMessageCard = ({ convo, density = "default" }: { convo: Conversation
             const msgObj = previewMessageObj;
             const content = msgObj.content ?? "";
             const type = msgObj.type ?? "text";
+
+            if (lastMessageExpiryReached || isMessageExpired(msgObj)) {
+              return <span className="truncate italic">{DISAPPEARED_MESSAGE_PLACEHOLDER}</span>;
+            }
 
             if (type === "system") {
               return <span className="truncate italic">{getSystemMessageText(msgObj, user._id)}</span>;
