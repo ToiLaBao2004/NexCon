@@ -17,28 +17,53 @@ export const DISAPPEARING_DURATION_OPTIONS = [
   { label: "7 ngày", value: 604800 },
 ] as const;
 
-export const getDisappearingSystemMessageContent = (
-  message: Pick<Message, "systemType" | "metadata" | "content">,
-) => {
-  const actorName = typeof message.metadata?.actorName === "string"
-    && message.metadata.actorName.trim()
-    ? message.metadata.actorName.trim()
-    : "Một thành viên";
+type DisappearingSystemMessageLike = Pick<Message, "systemType" | "metadata" | "content" | "senderInfo">;
 
+export const getDisappearingSystemMessageActorName = (
+  message: DisappearingSystemMessageLike,
+) => {
+  if (typeof message.metadata?.actorName === "string" && message.metadata.actorName.trim()) {
+    return message.metadata.actorName.trim();
+  }
+  if (message.senderInfo?.displayName?.trim()) return message.senderInfo.displayName.trim();
+  return "Một thành viên";
+};
+
+export const hasDisappearingSystemMessageActor = (
+  message: DisappearingSystemMessageLike,
+) => (
+  message.systemType === "disappearing_messages_enabled"
+  || (
+    message.systemType === "disappearing_messages_disabled"
+    && message.metadata?.autoDisabled !== true
+  )
+);
+
+export const getDisappearingSystemMessageActionText = (
+  message: DisappearingSystemMessageLike,
+) => {
   if (message.systemType === "disappearing_messages_enabled") {
     const durationSeconds = Number(message.metadata?.durationSeconds)
       || DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS;
-    return `${actorName} đã bật chế độ tin nhắn tự xóa trong ${formatDisappearingDuration(durationSeconds)}. Tin nhắn mới sẽ tự xóa sau 24 giờ. Nhấn để thay đổi.`;
+    return `đã bật chế độ tin nhắn tự xóa trong ${formatDisappearingDuration(durationSeconds)}. Tin nhắn mới sẽ tự xóa sau 24 giờ. Nhấn để thay đổi.`;
   }
 
   if (message.systemType === "disappearing_messages_disabled") {
     if (message.metadata?.autoDisabled === true) {
       return "Chế độ tin nhắn tự xóa đã tự động tắt. Tin nhắn mới sẽ được giữ lại.";
     }
-    return `${actorName} đã tắt chế độ tin nhắn tự xóa. Tin nhắn mới sẽ được giữ lại.`;
+    return "đã tắt chế độ tin nhắn tự xóa. Tin nhắn mới sẽ được giữ lại.";
   }
 
   return message.content || "";
+};
+
+export const getDisappearingSystemMessageContent = (
+  message: DisappearingSystemMessageLike,
+) => {
+  const actionText = getDisappearingSystemMessageActionText(message);
+  if (!hasDisappearingSystemMessageActor(message)) return actionText;
+  return `${getDisappearingSystemMessageActorName(message)} ${actionText}`;
 };
 
 const getReferenceId = (value: unknown) => {

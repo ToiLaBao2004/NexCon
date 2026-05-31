@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Loader2, RefreshCw, ShieldAlert, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import AdminIconButton from "@/components/admin/AdminIconButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -105,10 +106,9 @@ export default function AdminAppealsPage() {
               Chấp nhận kháng cáo sẽ mở khóa tài khoản và reset số lần vi phạm còn hiệu lực.
             </p>
           </div>
-          <Button className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void loadAppeals()}>
+          <AdminIconButton label="Làm mới" className="rounded-md" onClick={() => void loadAppeals()}>
             <RefreshCw className="size-4" />
-            Làm mới
-          </Button>
+          </AdminIconButton>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -215,24 +215,24 @@ export default function AdminAppealsPage() {
                     className="min-h-32 resize-none"
                     disabled={selectedAppeal.status !== "pending"}
                   />
-                  <div className="grid gap-2">
-                    <Button
+                  <div className="flex flex-wrap gap-2">
+                    <AdminIconButton
+                      label="Chấp nhận và mở khóa"
                       className="rounded-md"
                       disabled={submitting || selectedAppeal.status !== "pending"}
                       onClick={() => void handleReview("approve")}
                     >
                       <CheckCircle2 className="size-4" />
-                      Chấp nhận và mở khóa
-                    </Button>
-                    <Button
+                    </AdminIconButton>
+                    <AdminIconButton
+                      label="Từ chối kháng cáo"
                       variant="destructive"
                       className="rounded-md"
                       disabled={submitting || selectedAppeal.status !== "pending"}
                       onClick={() => void handleReview("reject")}
                     >
                       <XCircle className="size-4" />
-                      Từ chối kháng cáo
-                    </Button>
+                    </AdminIconButton>
                   </div>
                 </div>
               </div>

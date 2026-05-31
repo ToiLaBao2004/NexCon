@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { Bot, CheckCircle2, Loader2, MessageSquareWarning, RefreshCw, UserRoundX, XCircle } from "lucide-react";
+import { Bot, CheckCircle2, Clock3, Loader2, MessageSquareWarning, RefreshCw, UserRoundX, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import AdminEvidencePreview from "@/components/admin/AdminEvidencePreview";
+import AdminIconButton from "@/components/admin/AdminIconButton";
 import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -181,20 +182,19 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
           </div>
           <div className="flex flex-wrap gap-2">
             {isMessagePage && (
-              <Button
+              <AdminIconButton
+                label="AI lọc hàng loạt"
                 variant="secondary"
                 className="rounded-md"
                 disabled={loading || aiReviewing || reports.every((report) => !["pending", "reviewing"].includes(report.status))}
                 onClick={() => void handleAiBatchReview()}
               >
                 {aiReviewing ? <Loader2 className="size-4 animate-spin" /> : <Bot className="size-4" />}
-                AI lọc hàng loạt
-              </Button>
+              </AdminIconButton>
             )}
-            <Button className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void loadReports()} disabled={aiReviewing}>
+            <AdminIconButton label="Làm mới" className="rounded-md" onClick={() => void loadReports()} disabled={aiReviewing}>
               <RefreshCw className="size-4" />
-              Làm mới
-            </Button>
+            </AdminIconButton>
           </div>
         </div>
 
@@ -317,33 +317,34 @@ export default function AdminReportsPage({ targetType }: { targetType: ReportTar
                     className="min-h-32 resize-none"
                     disabled={completed}
                   />
-                  <div className="grid gap-2">
-                    <Button
+                  <div className="flex flex-wrap gap-2">
+                    <AdminIconButton
+                      label="Đánh dấu đang xem xét"
                       variant="outline"
                       className="rounded-md"
                       disabled={submitting || aiReviewing || completed}
                       onClick={() => void handleReviewing()}
                     >
-                      Đánh dấu đang xem xét
-                    </Button>
-                    <Button
+                      <Clock3 className="size-4" />
+                    </AdminIconButton>
+                    <AdminIconButton
+                      label="Xác nhận vi phạm"
                       variant="destructive"
                       className="rounded-md"
                       disabled={submitting || aiReviewing || completed}
                       onClick={() => void handleResolve("violation")}
                     >
                       <CheckCircle2 className="size-4" />
-                      Xác nhận vi phạm
-                    </Button>
-                    <Button
+                    </AdminIconButton>
+                    <AdminIconButton
+                      label="Không vi phạm"
                       variant="secondary"
                       className="rounded-md"
                       disabled={submitting || aiReviewing || completed}
                       onClick={() => void handleResolve("no_violation")}
                     >
                       <XCircle className="size-4" />
-                      Không vi phạm
-                    </Button>
+                    </AdminIconButton>
                   </div>
                 </div>
               </div>

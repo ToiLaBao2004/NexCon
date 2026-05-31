@@ -45,7 +45,7 @@ export default function PublicAuthRoute() {
 
   const current = useAuthStore.getState();
   if (current.accessToken) {
-    return <Navigate to={current.user?.role === "admin" ? "/admin" : "/chat"} replace />;
+    return <Navigate to={current.user?.role === "admin" ? "/admin/overview" : "/chat"} replace />;
   }
 
   return <Outlet />;

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   Activity,
   CalendarDays,
+  Eye,
   FileText,
   Loader2,
   Lock,
@@ -14,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
+import AdminIconButton from "@/components/admin/AdminIconButton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -208,9 +210,9 @@ export default function AdminUserDrawer({
                 {locked(user) && <Badge variant="destructive">Đang khóa</Badge>}
               </SheetDescription>
             </div>
-            <Button variant="outline" size="icon-sm" className="rounded-md" onClick={() => void refreshCurrent()}>
+            <AdminIconButton label="Làm mới hồ sơ" variant="outline" size="icon-sm" className="rounded-md" onClick={() => void refreshCurrent()}>
               {loadingProfile ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            </Button>
+            </AdminIconButton>
           </div>
         </SheetHeader>
 
@@ -334,14 +336,14 @@ function ProfileTab({
             placeholder="Ghi chú nội bộ cho thao tác kiểm duyệt"
             className="min-h-24 resize-none"
           />
-          <Button className="w-full rounded-md" disabled={!manualReason.trim()} onClick={onManualViolation}>
-            <ShieldAlert className="size-4" />
-            Ghi nhận vi phạm
-          </Button>
-          <Button variant={locked(user) ? "outline" : "destructive"} className="w-full rounded-md" onClick={onLockToggle}>
-            {locked(user) ? <Unlock className="size-4" /> : <Lock className="size-4" />}
-            {locked(user) ? "Mở khóa tài khoản" : "Khóa tài khoản"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <AdminIconButton label="Ghi nhận vi phạm" disabled={!manualReason.trim()} onClick={onManualViolation}>
+              <ShieldAlert className="size-4" />
+            </AdminIconButton>
+            <AdminIconButton label={locked(user) ? "Mở khóa tài khoản" : "Khóa tài khoản"} variant={locked(user) ? "outline" : "destructive"} onClick={onLockToggle}>
+              {locked(user) ? <Unlock className="size-4" /> : <Lock className="size-4" />}
+            </AdminIconButton>
+          </div>
         </div>
       </section>
     </div>
@@ -374,9 +376,9 @@ function GroupsTab({ groups }: { groups: AdminConversation[] }) {
           <Badge variant={group.role === "admin" ? "default" : "outline"} className="w-fit">
             {group.role === "admin" ? "admin" : "member"}
           </Badge>
-          <Button variant="outline" size="sm" className="h-8 rounded-md" disabled>
-            Xem nhóm
-          </Button>
+          <AdminIconButton label="Xem nhóm" variant="outline" size="icon-sm" className="rounded-md" disabled>
+            <Eye className="size-4" />
+          </AdminIconButton>
         </div>
       ))}
     </div>

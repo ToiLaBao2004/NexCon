@@ -1,7 +1,7 @@
-import { ExternalLink, FileText, ImageIcon, LinkIcon, Music, ShieldCheck } from "lucide-react";
+import { Copy, ExternalLink, FileText, ImageIcon, LinkIcon, Music, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import AdminIconButton from "@/components/admin/AdminIconButton";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { AdminMessage } from "@/services/adminService";
 import { decodeMentionTokens } from "@/utils/mentions";
 
@@ -115,12 +115,11 @@ export default function AdminEvidencePreview({
             {fileMeta && <p className="mt-1 text-xs text-muted-foreground">{fileMeta}</p>}
           </div>
           {safeSignedUrl ? (
-            <Button asChild variant="outline" size="sm" className="rounded-md">
+            <AdminIconButton asChild label="Mở file đã ký" variant="outline" size="icon-sm" className="rounded-md">
               <a href={safeSignedUrl} target="_blank" rel="noopener noreferrer" download={message.fileName || undefined}>
                 <ExternalLink className="size-4" />
-                Mở file đã ký
               </a>
-            </Button>
+            </AdminIconButton>
           ) : (
             <Badge variant="secondary">Không có link an toàn</Badge>
           )}
@@ -146,18 +145,19 @@ export default function AdminEvidencePreview({
             </div>
             <p className="mt-1 break-all text-sm text-muted-foreground">{safeContent || safePreview}</p>
             {displayUrl && (
-              <Button
+              <AdminIconButton
+                label="Sao chép link"
                 type="button"
                 variant="outline"
-                size="sm"
+                size="icon-sm"
                 className="mt-3 rounded-md"
                 onClick={() => {
                   void navigator.clipboard.writeText(displayUrl.href);
                   toast.success("Đã sao chép link để kiểm tra riêng");
                 }}
               >
-                Sao chép link
-              </Button>
+                <Copy className="size-4" />
+              </AdminIconButton>
             )}
           </div>
         </div>
