@@ -8,6 +8,7 @@ import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
 import { maskLockedUser } from '../utils/lockedUser.js';
 import { applyProfileVisibility } from '../utils/profilePrivacy.js';
+import { DISAPPEARED_MESSAGE_PLACEHOLDER } from '../utils/disappearingMessages.js';
 
 const MAX_SEARCH_QUERY_LENGTH = 100;
 const DEFAULT_USER_LIMIT = 5;
@@ -364,10 +365,12 @@ async function resolveSafeLastMessage(rawConversation, myId, myParticipant) {
         ...conversation,
         lastMessage: {
             _id: safeFallback._id,
-            content: safeFallback.content,
+            content: safeFallback.isExpired ? DISAPPEARED_MESSAGE_PLACEHOLDER : safeFallback.content,
             type: safeFallback.type,
             systemType: safeFallback.systemType || null,
             metadata: metadataObject(safeFallback.metadata),
+            expiresAt: safeFallback.expiresAt || null,
+            isExpired: safeFallback.isExpired === true,
             createdAt: safeFallback.createdAt,
             senderId: safeFallback.senderId,
         },
@@ -686,6 +689,7 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
         conversationId: { $in: conversationIds },
         type: { $ne: 'sticker' },
         isRecalled: { $ne: true },
+        isExpired: { $ne: true },
         reportStatus: { $ne: true },
         $or: [
             { 'metadata.visibleToUserIds': { $exists: false } },

@@ -61,6 +61,7 @@ import { ImageCropDialog, type CropPreset } from "@/components/shared/ImageCropD
 import { validateImageFile } from "@/lib/imageCrop";
 import { getPresenceBadgeStatus, getPresenceForUser, getPresenceText } from "@/utils/userPresence";
 import { getApiErrorMessage } from "@/lib/apiMessage";
+import { DisappearingToggle } from "./DisappearingToggle";
 
 interface ConversationInfoSidebarProps {
   conversation: Conversation;
@@ -344,6 +345,7 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
           conversationId={conversation._id}
           conversationName={directDisplayName}
         />
+        <DisappearingToggle conversation={conversation} />
         <div className="h-2 w-full shrink-0 bg-muted/40 pointer-events-none" />
 
         {/* Media, Files, Links */}
@@ -493,6 +495,8 @@ export default function ConversationInfoSidebar({ conversation, }: ConversationI
       </div>
 
       <ConversationLists conversation={conversation} mutualGroupCount={mutualGroupCount} memberCount={memberCount} />
+
+      {!isDisbanded && <DisappearingToggle conversation={conversation} />}
 
       {!isDisbanded && (
         <button

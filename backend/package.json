@@ -8,7 +8,9 @@
     "test": "node --test",
     "start": "node src/server.js",
     "worker:group-cleanup": "node src/workers/groupCleanupWorkerRunner.js",
-    "worker:conversation-clear-cleanup": "node src/workers/conversationClearCleanupWorkerRunner.js"
+    "worker:conversation-clear-cleanup": "node src/workers/conversationClearCleanupWorkerRunner.js",
+    "worker:dm-disappearing-expiry": "node src/workers/disappearingMessageWorkerRunner.js",
+    "migrate:dm-disappearing": "node src/migrations/20260531-add-disappearing-messages.js"
   },
   "type": "module",
   "keywords": [],

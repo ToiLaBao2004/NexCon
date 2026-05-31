@@ -2,11 +2,16 @@ import { v2 as cloudinary } from 'cloudinary';
 import { decryptConversationPayload, decryptMessagePayload } from './messageCrypto.js';
 import { replaceMentionTags } from './mentions.js';
 import { invalidateConversationReadCache } from './readCache.js';
+import {
+    DISAPPEARED_MESSAGE_PLACEHOLDER,
+    sanitizeExpiredMessageForClient,
+} from './disappearingMessages.js';
 
 export { replaceMentionTags };
 
 const resolveLastMessagePreview = (rawMessage) => {
     const message = decryptMessagePayload(rawMessage);
+    if (message.isExpired) return DISAPPEARED_MESSAGE_PLACEHOLDER;
     if (message.isRecalled) return 'Tin nhắn đã được thu hồi';
 
     switch (message.type) {
@@ -119,6 +124,8 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
     if (metadata) lastMessage.metadata = metadata;
     if (safeMessage.mentions?.length) lastMessage.mentions = safeMessage.mentions;
     if (safeMessage.deliveredTo?.length) lastMessage.deliveredTo = safeMessage.deliveredTo;
+    if (safeMessage.expiresAt) lastMessage.expiresAt = safeMessage.expiresAt;
+    if (safeMessage.isExpired) lastMessage.isExpired = true;
 
     conversation.set({ lastMessage });
 
@@ -149,7 +156,7 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
 };
 
 export const emitNewMessage = (io, conversation, message, signedUrl = null) => {
-    const payloadMessage = decryptMessagePayload(message);
+    const payloadMessage = sanitizeExpiredMessageForClient(decryptMessagePayload(message));
     payloadMessage.signedUrl = signedUrl ?? null;
 
     const safeConversation = decryptConversationPayload(conversation);

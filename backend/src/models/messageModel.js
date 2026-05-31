@@ -47,6 +47,7 @@ const messageSchema = new mongoose.Schema({
             'group_avatar_permission_changed',
             'call', 'admin_transferred', 'group_avatar_updated', 'group_name_updated',
             'message_pinned', 'message_unpinned',
+            'disappearing_messages_enabled', 'disappearing_messages_disabled',
             'reminder_created_local', 'shared_reminder_created', 'shared_reminder_participation_changed', 'shared_reminder_cancelled', 'shared_reminder_updated',
             'shared_reminder_permission_changed'],
     },
@@ -107,6 +108,29 @@ const messageSchema = new mongoose.Schema({
         type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
         default: undefined,
     },
+    deliveryStartedAt: {
+        type: Date,
+    },
+    disappearingDurationSeconds: {
+        type: Number,
+        min: 60,
+        max: 30 * 24 * 60 * 60,
+    },
+    expiresAt: {
+        type: Date,
+        index: true,
+    },
+    isExpired: {
+        type: Boolean,
+        default: false,
+    },
+    expiredAt: {
+        type: Date,
+    },
+    expiryMediaCleanupStatus: {
+        type: String,
+        enum: ['pending', 'completed', 'failed', 'skipped'],
+    },
 }, {
     timestamps: true,
     toJSON: { getters: true },
@@ -147,6 +171,7 @@ messageSchema.index({ conversationId: 1, isPinned: 1, pinnedAt: -1 });
 messageSchema.index({ conversationId: 1, searchContent: 1 });
 // Mention inbox queries filter by mentioned user and newest messages first.
 messageSchema.index({ 'mentions.userId': 1, createdAt: -1 });
+messageSchema.index({ isExpired: 1, expiresAt: 1 });
 
 export const MESSAGE_TYPE_LIST = MESSAGE_TYPES;
 const MessageModel = mongoose.models.Message || mongoose.model('Message', messageSchema);

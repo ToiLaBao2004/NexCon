@@ -116,6 +116,12 @@ const lastMessageSchema = new mongoose.Schema({
         type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
         default: undefined,
     },
+    expiresAt: {
+        type: Date,
+    },
+    isExpired: {
+        type: Boolean,
+    },
     createdAt: {
         type: Date
     }
@@ -135,6 +141,10 @@ const conversationSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    initiatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    },
     participants: {
         type: [participantSchema],
         required: true
@@ -148,6 +158,22 @@ const conversationSchema = new mongoose.Schema({
     unreadCounts: {
         type: Map,
         of: Number,
+    },
+    disappearingEnabled: {
+        type: Boolean,
+        default: false,
+    },
+    disappearingDurationSeconds: {
+        type: Number,
+        min: 60,
+        max: 30 * 24 * 60 * 60,
+    },
+    disappearingEnabledBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+    },
+    disappearingEnabledAt: {
+        type: Date,
     },
     disbanded: { type: Boolean },
     disbandedAt: {

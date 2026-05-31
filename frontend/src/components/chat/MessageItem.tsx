@@ -43,6 +43,9 @@ import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import CachedStickerImage from "./CachedStickerImage";
 import { decodeMentionTokens, getMentionTextSegments } from "@/utils/mentions";
 import { decodeMojibakeFileName } from "@/lib/fileName";
+import { CountdownBadge } from "./CountdownBadge";
+import { ExpiredMessagePlaceholder } from "./ExpiredMessagePlaceholder";
+import { SystemMessageBubble } from "./SystemMessageBubble";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -2088,7 +2091,18 @@ const MessageItem = ({
 	onReply,
 }: MessageItemProps) => {
 	if (message.type === "system") {
+		if (
+			message.systemType === "disappearing_messages_enabled"
+			|| message.systemType === "disappearing_messages_disabled"
+		) {
+			return <SystemMessageBubble message={message} conversation={selectedConvo} />;
+		}
 		return <SystemMessageComponent message={message} selectedConvo={selectedConvo} currentUserId={currentUserId} />;
+	}
+
+	if (message.isExpired) {
+		const sender = typeof message.senderId === "object" ? (message.senderId as any)?._id : message.senderId;
+		return <ExpiredMessagePlaceholder isOwn={String(sender) === String(currentUserId)} />;
 	}
 
 	const prev = messages[index - 1];
@@ -2142,6 +2156,7 @@ const MessageItem = ({
 		&& (!item.status || item.status === "sent")
 	) ?? null;
 	const actionMessage = actionableMessage ?? message;
+	const isDisappearing = Boolean(actionMessage.expiresAt);
 	const hasUnrecalledBatchMessage = imageBatchItems?.some((item) => item.isRecalled !== true) ?? false;
 	const hasUnmoderatedBatchMessage = imageBatchItems?.some((item) => item.reportStatus !== true) ?? false;
 	const isRecalled = message.isRecalled === true && (!isImageBatch || !hasUnrecalledBatchMessage);
@@ -2454,6 +2469,10 @@ const MessageItem = ({
 	};
 
 	const handlePin = async () => {
+		if (isDisappearing) {
+			toast.warning("Tin nhắn tự xóa không thể ghim.");
+			return;
+		}
 		try { await pinMessage(actionMessage._id); }
 		catch (e) { console.error("Ghim thất bại:", e); }
 		finally {
@@ -2666,6 +2685,7 @@ const MessageItem = ({
 
 							</div>
 						</Card>
+						<CountdownBadge expiresAt={message.expiresAt} />
 
 						{/* Reaction Display */}
 						{reactionSummary && (
@@ -2802,9 +2822,9 @@ const MessageItem = ({
 												</DropdownMenuItem>
 											)}
 											<DropdownMenuItem 
-												disabled={isBlocked}
-												onClick={() => { if(!isBlocked) { setShowTouchActions(false); setShowPinOptions(true); } }}
-												className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
+												disabled={isBlocked || isDisappearing}
+												onClick={() => { if(!isBlocked && !isDisappearing) { setShowTouchActions(false); setShowPinOptions(true); } }}
+												className={cn((isBlocked || isDisappearing) && "opacity-50 grayscale cursor-not-allowed")}
 											>
 												{isPinned ? (
 													<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
@@ -2920,9 +2940,9 @@ const MessageItem = ({
 													)}
 
 													<button 
-														disabled={isBlocked}
-														onClick={() => { if(!isBlocked) { setShowTouchActions(false); setShowPinOptions(true); } }} 
-														className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
+														disabled={isBlocked || isDisappearing}
+														onClick={() => { if(!isBlocked && !isDisappearing) { setShowTouchActions(false); setShowPinOptions(true); } }}
+														className={cn("flex flex-col items-center gap-2", (isBlocked || isDisappearing) && "opacity-40 grayscale cursor-not-allowed")}
 													>
 														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
 															{isPinned ? <PinOff className="h-5 w-5" strokeWidth={1.5} /> : <Pin className="h-5 w-5" strokeWidth={1.5} />}

@@ -75,6 +75,8 @@ export interface LastMessage {
   } | string;
   mentions?: Mention[];
   deliveredTo?: string[];
+  expiresAt?: string | null;
+  isExpired?: boolean;
 }
 
 export interface Conversation {
@@ -90,6 +92,11 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   disbanded?: boolean;
+  initiatedBy?: string | null;
+  disappearingEnabled?: boolean;
+  disappearingDurationSeconds?: number | null;
+  disappearingEnabledBy?: string | null;
+  disappearingEnabledAt?: string | null;
 }
 
 export interface ConversationResponse {
@@ -181,6 +188,11 @@ export interface Message {
   mentions?: Mention[];
   deliveredTo?: string[];
   isDelivered?: boolean;
+  deliveryStartedAt?: string | null;
+  disappearingDurationSeconds?: number | null;
+  expiresAt?: string | null;
+  isExpired?: boolean;
+  expiredAt?: string | null;
 }
 
 export interface GlobalSearchUser {

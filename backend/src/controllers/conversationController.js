@@ -42,6 +42,10 @@ import {
 	invalidateConversationListReadCache,
 	setCachedJson,
 } from '../utils/readCache.js';
+import {
+	DISAPPEARED_MESSAGE_PLACEHOLDER,
+	sanitizeExpiredMessageForClient,
+} from '../utils/disappearingMessages.js';
 
 const MUTE_DURATION_MS = {
 	'1h': 60 * 60 * 1000,
@@ -55,7 +59,7 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const PARTICIPANT_SELECT = 'displayName avatarUrl profileVisibility lock';
 const MESSAGE_SENDER_SELECT = 'displayName avatarUrl lock';
 const CLIENT_PARTICIPANT_SELECT = 'displayName avatarUrl nickname profileVisibility status lastSeen about lock';
-const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled reportStatus mentions';
+const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled isExpired expiresAt reportStatus mentions';
 const CONVERSATION_LIST_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_LIST_CACHE_TTL_MS', 10000);
 const CONVERSATION_MESSAGES_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_MESSAGES_CACHE_TTL_MS', 10000);
 const CONVERSATION_ACCESS_CACHE_TTL_MS = getPositiveIntEnv('CONVERSATION_ACCESS_CACHE_TTL_MS', 5000);
@@ -177,7 +181,7 @@ function isGroupAdmin(conversation, userId) {
 
 function sanitizeModeratedMessage(message) {
 	if (!message) return message;
-	const raw = decryptMessagePayload(message);
+	const raw = sanitizeExpiredMessageForClient(decryptMessagePayload(message));
 	const next = {
 		...raw,
 		senderId: raw.senderId && typeof raw.senderId === 'object'
@@ -194,7 +198,7 @@ function sanitizeModeratedMessage(message) {
 		};
 	}
 
-	if (!next.reportStatus) return next;
+	if (next.isExpired || !next.reportStatus) return next;
 	return {
 		...next,
 		content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
@@ -269,6 +273,7 @@ export async function createConversation(req, res) {
 					conversation = await Conversation.create({
 						type: 'direct',
 						directKey,
+						initiatedBy: userId,
 						participants: [
 							{ userId: userId, userInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl }, joinedAt: new Date() },
 							{ userId: participantId, userInfo: { displayName: partner?.displayName || 'User', avatarUrl: partner?.avatarUrl }, joinedAt: new Date() }
@@ -308,6 +313,7 @@ export async function createConversation(req, res) {
 			});
 			conversation = new Conversation({
 				type: 'group',
+				initiatedBy: userId,
 				group: {
 					name: normalizedGroupName,
 					createdBy: userId,
@@ -457,12 +463,14 @@ export async function getConversations(req, res) {
 				...conversation,
 				lastMessage: {
 					_id: safeFallback._id,
-					content: safeFallback.content,
+					content: safeFallback.isExpired ? DISAPPEARED_MESSAGE_PLACEHOLDER : safeFallback.content,
 					type: safeFallback.type,
 					systemType: safeFallback.systemType || null,
 					metadata: fallbackMetadata,
 					mentions: safeFallback.mentions || [],
 					deliveredTo: safeFallback.deliveredTo || [],
+					expiresAt: safeFallback.expiresAt || null,
+					isExpired: safeFallback.isExpired === true,
 					createdAt: safeFallback.createdAt,
 					senderId: safeFallback.senderId,
 				},
@@ -1346,6 +1354,7 @@ export async function getMediaByType(req, res) {
 		const query = {
 			conversationId,
 			isRecalled: { $ne: true },
+			isExpired: { $ne: true },
 			reportStatus: { $ne: true },
 			$or: [
 				{ 'metadata.visibleToUserIds': { $exists: false } },

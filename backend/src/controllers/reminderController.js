@@ -365,12 +365,16 @@ export async function createSharedReminderFromMessage(req, res) {
                 }
             }
 
-            const messageQuery = Message.findById(messageId).select('_id conversationId');
+            const messageQuery = Message.findById(messageId).select('_id conversationId isExpired');
             if (session) messageQuery.session(session);
 
             const messageDoc = await messageQuery;
             if (!messageDoc || toObjectIdString(messageDoc.conversationId) !== toObjectIdString(conversation._id)) {
                 throw buildHttpError(400, 'Tin nhắn nguồn không thuộc cuộc trò chuyện.');
+            }
+
+            if (messageDoc.isExpired) {
+                throw buildHttpError(410, 'Tin nhắn nguồn đã biến mất.');
             }
 
             await ensureCreatorPendingReminderLimit(userId, session);

@@ -954,6 +954,33 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useChatStore.getState().fetchConversations(true);
     });
 
+    socket.on("dm:disappearing-setting-updated", ({ conversationId, setting }) => {
+      if (!conversationId || !setting) return;
+      useChatStore.getState().updateConversation({
+        _id: conversationId,
+        disappearingEnabled: setting.enabled === true,
+        disappearingDurationSeconds: setting.durationSeconds ?? null,
+        disappearingEnabledBy: setting.enabledBy ?? null,
+        disappearingEnabledAt: setting.enabledAt ?? null,
+      });
+    });
+
+    socket.on("dm:message-expired", ({ conversationId, messageId, expiredAt, placeholder }) => {
+      if (!conversationId || !messageId) return;
+      useChatStore.getState().expireMessageLocal(
+        conversationId,
+        messageId,
+        expiredAt,
+        placeholder,
+      );
+    });
+
+    socket.on("dm:screenshot-detected", ({ actorId, actorName }) => {
+      const currentUserId = useAuthStore.getState().user?._id;
+      if (!actorId || String(actorId) === String(currentUserId)) return;
+      toast.info(`${actorName || "Một thành viên"} đã chụp ảnh màn hình trong cuộc trò chuyện tự xóa.`);
+    });
+
     socket.on("conversation-mute-updated", ({ conversationId, userId, mute }) => {
       const targetConversationId = conversationId?.toString?.() || conversationId;
       const targetUserId = userId?.toString?.() || userId;

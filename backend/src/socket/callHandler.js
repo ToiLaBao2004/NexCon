@@ -117,6 +117,7 @@ async function findOrCreateDirectConversation(userId1, userId2) {
             conversation = await Conversation.create({
                 type: 'direct',
                 directKey: getDirectConversationKey(userId1, userId2),
+                initiatedBy: userId1,
                 participants: [
                     { userId: userId1, joinedAt: new Date() },
                     { userId: userId2, joinedAt: new Date() }

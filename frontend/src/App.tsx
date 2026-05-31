@@ -46,6 +46,7 @@ import { useAppStatusStore } from "./stores/useAppStatusStore";
 import { useCallStore } from "./stores/useCallStore";
 import { useGroupCallStore } from "./stores/useGroupCallStore";
 import { consumePendingNativeCallAction } from "@/lib/nativeCallAction";
+import { NativeScreenshotReporter } from "@/components/chat/NativeScreenshotReporter";
 
 function BackButtonHandler() {
   useBackButton();
@@ -263,6 +264,7 @@ function App() {
     <BrowserRouter>
       <BackButtonHandler />
       <NativeFcmHandler enabled={isAuth && !isAdmin} />
+      <NativeScreenshotReporter enabled={isAuth && !isAdmin} />
       <AppStatusLayer />
       <Toaster
         theme={isDark ? "dark" : "light"}

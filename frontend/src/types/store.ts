@@ -142,7 +142,7 @@ export interface ChatState {
   addMessage: (message: Message) => Promise<void>;
   createReminderSystemMessage: (conversationId: string, reminder: Reminder) => Promise<void>;
   updateParticipantNickname: (friendId: string, nickname?: string | null) => void;
-  updateConversation: (conversation: Conversation) => void;
+  updateConversation: (conversation: Partial<Conversation> & Pick<Conversation, '_id'>) => void;
   markAsSeen: (conversationId?: string) => Promise<void>;
   markAsUnread: (conversationId: string) => Promise<void>;
   updateGroupName: (conversationId: string, name: string) => Promise<void>;
@@ -181,6 +181,16 @@ export interface ChatState {
   ) => Promise<{ forwarded: number; errors: { conversationId: string; reason: string }[] }>;
   muteConversation: (conversationId: string, target: 'messages' | 'meetings' | 'both', duration: '1h' | '8h' | '24h' | 'forever' | 'off') => Promise<void>;
   markMessageDelivered: (messageId: string, conversationId: string, deliveredUserId?: string) => void;
+  updateDisappearingSetting: (
+    conversationId: string,
+    payload: { enabled: boolean; durationSeconds?: number | null }
+  ) => Promise<{ warning?: string | null }>;
+  expireMessageLocal: (
+    conversationId: string,
+    messageId: string,
+    expiredAt?: string | null,
+    placeholder?: string
+  ) => void;
 
 
   // Sidebar
