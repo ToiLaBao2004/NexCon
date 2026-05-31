@@ -43,7 +43,9 @@ import {
 	setCachedJson,
 } from '../utils/readCache.js';
 import {
+	buildUnexpiredMessageFilter,
 	DISAPPEARED_MESSAGE_PLACEHOLDER,
+	isMessageExpired,
 	sanitizeExpiredMessageForClient,
 } from '../utils/disappearingMessages.js';
 
@@ -273,7 +275,6 @@ export async function createConversation(req, res) {
 					conversation = await Conversation.create({
 						type: 'direct',
 						directKey,
-						initiatedBy: userId,
 						participants: [
 							{ userId: userId, userInfo: { displayName: req.user.displayName, avatarUrl: req.user.avatarUrl }, joinedAt: new Date() },
 							{ userId: participantId, userInfo: { displayName: partner?.displayName || 'User', avatarUrl: partner?.avatarUrl }, joinedAt: new Date() }
@@ -313,7 +314,6 @@ export async function createConversation(req, res) {
 			});
 			conversation = new Conversation({
 				type: 'group',
-				initiatedBy: userId,
 				group: {
 					name: normalizedGroupName,
 					createdBy: userId,
@@ -431,6 +431,12 @@ export async function getConversations(req, res) {
 		let conversations = decryptConversationsPayload(rawConversations);
 
 		conversations = await Promise.all(conversations.map(async (conversation) => {
+			if (conversation.lastMessage) {
+				conversation.lastMessage = sanitizeExpiredMessageForClient(conversation.lastMessage);
+				if (isMessageExpired(conversation.lastMessage)) {
+					conversation.lastMessage.content = DISAPPEARED_MESSAGE_PLACEHOLDER;
+				}
+			}
 			const lastMetadata = conversation.lastMessage?.metadata instanceof Map
 				? Object.fromEntries(conversation.lastMessage.metadata)
 				: (conversation.lastMessage?.metadata || {});
@@ -454,7 +460,7 @@ export async function getConversations(req, res) {
 				};
 			}
 
-			const safeFallback = decryptMessagePayload(fallback);
+			const safeFallback = sanitizeExpiredMessageForClient(decryptMessagePayload(fallback));
 			const fallbackMetadata = safeFallback.metadata instanceof Map
 				? Object.fromEntries(safeFallback.metadata)
 				: (safeFallback.metadata || null);
@@ -463,7 +469,7 @@ export async function getConversations(req, res) {
 				...conversation,
 				lastMessage: {
 					_id: safeFallback._id,
-					content: safeFallback.isExpired ? DISAPPEARED_MESSAGE_PLACEHOLDER : safeFallback.content,
+					content: isMessageExpired(safeFallback) ? DISAPPEARED_MESSAGE_PLACEHOLDER : safeFallback.content,
 					type: safeFallback.type,
 					systemType: safeFallback.systemType || null,
 					metadata: fallbackMetadata,
@@ -1356,6 +1362,7 @@ export async function getMediaByType(req, res) {
 			isRecalled: { $ne: true },
 			isExpired: { $ne: true },
 			reportStatus: { $ne: true },
+			$and: [buildUnexpiredMessageFilter()],
 			$or: [
 				{ 'metadata.visibleToUserIds': { $exists: false } },
 				{ 'metadata.visibleToUserIds': { $size: 0 } },

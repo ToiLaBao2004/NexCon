@@ -34,7 +34,10 @@ import {
     isDuplicateDirectConversationError,
 } from '../utils/directConversation.js';
 import {
+    buildUnexpiredMessageFilter,
+    DISAPPEARED_MESSAGE_PLACEHOLDER,
     getMessageExpirationFields,
+    isMessageExpired,
     sanitizeExpiredMessageForClient,
 } from '../utils/disappearingMessages.js';
 import { cacheMessageCountdown } from '../services/disappearingMessageService.js';
@@ -562,7 +565,6 @@ export async function sendMessage(req, res) {
                 conversation = await Conversation.create({
                     type: 'direct',
                     directKey: getDirectConversationKey(senderId, recipientId),
-                    initiatedBy: senderId,
                     participants: [
                         { userId: senderId, joinedAt: new Date() },
                         { userId: recipientId, joinedAt: new Date() },
@@ -807,7 +809,7 @@ export async function sendMessage(req, res) {
                 }
                 return res.status(400).json({ message: 'Tin nhắn trả lời không hợp lệ.' });
             }
-            if (repliedMessage.isRecalled || repliedMessage.reportStatus || repliedMessage.isExpired) {
+            if (repliedMessage.isRecalled || repliedMessage.reportStatus || isMessageExpired(repliedMessage)) {
                 if (pendingImageModeration?.publicId) {
                     void cleanupRejectedImage(pendingImageModeration.publicId);
                     pendingImageModeration = null;
@@ -983,7 +985,7 @@ export async function recallMessage(req, res) {
         if (message.senderId.toString() !== senderId.toString()) {
             return res.status(403).json({ message: 'Bạn chỉ có thể thu hồi tin nhắn của chính mình.' });
         }
-        if (message.type === 'system' || message.isExpired) {
+        if (message.type === 'system' || isMessageExpired(message)) {
             return res.status(400).json({ message: 'This message cannot be recalled.' });
         }
         if (message.isRecalled) {
@@ -1235,6 +1237,7 @@ export async function searchMessages(req, res) {
             isRecalled: { $ne: true },
             isExpired: { $ne: true },
             reportStatus: { $ne: true },
+            $and: [buildUnexpiredMessageFilter()],
             $or: [
                 { 'metadata.visibleToUserIds': { $exists: false } },
                 { 'metadata.visibleToUserIds': { $size: 0 } },
@@ -1345,6 +1348,7 @@ export async function searchMessages(req, res) {
             matchedMessages = matchedMessageIds
                 .map((messageId) => messageMap.get(messageId.toString()))
                 .filter(Boolean)
+                .filter((message) => !isMessageExpired(message))
                 .map((message) => ({
                     ...maskPopulatedSender(message),
                     replyTo: message.replyTo ? sanitizeModeratedReply(message.replyTo) : message.replyTo,
@@ -1384,6 +1388,7 @@ export async function getMentionMessages(req, res) {
             'mentions.userId': userId,
             isExpired: { $ne: true },
             reportStatus: { $ne: true },
+            $and: [buildUnexpiredMessageFilter()],
         };
 
         if (before) {
@@ -1472,8 +1477,8 @@ export async function reactToMessage(req, res) {
         if (message.reportStatus) {
             return res.status(403).json({ message: 'Không thể tương tác với tin nhắn đã bị xác nhận vi phạm.' });
         }
-        if (message.isExpired) {
-            return res.status(410).json({ message: 'This message has disappeared.' });
+        if (isMessageExpired(message)) {
+            return res.status(410).json({ message: DISAPPEARED_MESSAGE_PLACEHOLDER });
         }
 
         if (conversation.type === 'direct') {
@@ -1549,8 +1554,8 @@ export async function getSignedMediaUrl(req, res) {
         if (message.reportStatus) {
             return res.status(403).json({ message: 'Tài nguyên này đã bị ẩn do vi phạm tiêu chuẩn cộng đồng.' });
         }
-        if (message.isExpired) {
-            return res.status(410).json({ message: 'This message has disappeared.' });
+        if (isMessageExpired(message)) {
+            return res.status(410).json({ message: DISAPPEARED_MESSAGE_PLACEHOLDER });
         }
 
         const conversation = await Conversation.findOne({
@@ -1605,8 +1610,8 @@ export async function forwardMessage(req, res) {
         if (source.isRecalled) {
             return res.status(400).json({ message: 'Không thể chuyển tiếp tin nhắn đã thu hồi.' });
         }
-        if (source.isExpired) {
-            return res.status(410).json({ message: 'This message has disappeared.' });
+        if (isMessageExpired(source)) {
+            return res.status(410).json({ message: DISAPPEARED_MESSAGE_PLACEHOLDER });
         }
         if (source.reportStatus) {
             return res.status(403).json({ message: 'Không thể chuyển tiếp tin nhắn đã bị xác nhận vi phạm.' });
@@ -1703,7 +1708,7 @@ export async function forwardMessage(req, res) {
                     metadata: forwardedMetadata,
                     ...getMessageExpirationFields({
                         conversation: targetConvo,
-                        inheritedDurationSeconds: source.disappearingDurationSeconds,
+                        inheritedDisappearing: Boolean(source.expiresAt),
                         deliveredAt: new Date(),
                     }),
                 };

@@ -92,9 +92,9 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   disbanded?: boolean;
-  initiatedBy?: string | null;
   disappearingEnabled?: boolean;
-  disappearingDurationSeconds?: number | null;
+  disappearingAutoDisableSeconds?: number | null;
+  disappearingDisableAt?: string | null;
   disappearingEnabledBy?: string | null;
   disappearingEnabledAt?: string | null;
 }
@@ -189,7 +189,6 @@ export interface Message {
   deliveredTo?: string[];
   isDelivered?: boolean;
   deliveryStartedAt?: string | null;
-  disappearingDurationSeconds?: number | null;
   expiresAt?: string | null;
   isExpired?: boolean;
   expiredAt?: string | null;

@@ -9,6 +9,7 @@ import BlockUser from '../models/blockUserModel.js';
 import { generateRoomCode } from './meetingController.js';
 import { emitToUser, io } from '../socket/index.js';
 import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
+import { isMessageExpired } from '../utils/disappearingMessages.js';
 import { scheduleReminderJob, removeReminderJob } from '../config/reminderQueue.js';
 import {
     REMINDER_REPEAT_RULES,
@@ -365,7 +366,7 @@ export async function createSharedReminderFromMessage(req, res) {
                 }
             }
 
-            const messageQuery = Message.findById(messageId).select('_id conversationId isExpired');
+            const messageQuery = Message.findById(messageId).select('_id conversationId isExpired expiresAt');
             if (session) messageQuery.session(session);
 
             const messageDoc = await messageQuery;
@@ -373,7 +374,7 @@ export async function createSharedReminderFromMessage(req, res) {
                 throw buildHttpError(400, 'Tin nhắn nguồn không thuộc cuộc trò chuyện.');
             }
 
-            if (messageDoc.isExpired) {
+            if (isMessageExpired(messageDoc)) {
                 throw buildHttpError(410, 'Tin nhắn nguồn đã biến mất.');
             }
 

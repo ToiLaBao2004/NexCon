@@ -4,6 +4,7 @@ import { replaceMentionTags } from './mentions.js';
 import { invalidateConversationReadCache } from './readCache.js';
 import {
     DISAPPEARED_MESSAGE_PLACEHOLDER,
+    isMessageExpired,
     sanitizeExpiredMessageForClient,
 } from './disappearingMessages.js';
 
@@ -11,7 +12,7 @@ export { replaceMentionTags };
 
 const resolveLastMessagePreview = (rawMessage) => {
     const message = decryptMessagePayload(rawMessage);
-    if (message.isExpired) return DISAPPEARED_MESSAGE_PLACEHOLDER;
+    if (isMessageExpired(message)) return DISAPPEARED_MESSAGE_PLACEHOLDER;
     if (message.isRecalled) return 'Tin nhắn đã được thu hồi';
 
     switch (message.type) {

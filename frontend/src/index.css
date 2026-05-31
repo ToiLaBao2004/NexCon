@@ -201,6 +201,47 @@
     background-color: hsl(222 47% 10%);
   }
 
+  .chat-thread-background {
+    position: relative;
+    isolation: isolate;
+    background-color: hsl(210 35% 96%);
+  }
+
+  .chat-thread-background::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: hsl(215 35% 45% / 0.18);
+    -webkit-mask-image: url("./assets/chat-pattern.svg");
+    mask-image: url("./assets/chat-pattern.svg");
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-repeat: repeat;
+    mask-repeat: repeat;
+    -webkit-mask-size: 360px 360px;
+    mask-size: 360px 360px;
+  }
+
+  .chat-thread-background > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .dark .chat-thread-background {
+    background-color: hsl(223 43% 9%);
+  }
+
+  .dark .chat-thread-background::before {
+    background: linear-gradient(
+      135deg,
+      hsl(280 85% 72% / 0.22),
+      hsl(205 95% 72% / 0.2),
+      hsl(335 85% 72% / 0.18)
+    );
+  }
+
   /* Status indicators */
   .status-online {
     @apply bg-[hsl(var(--online))] shadow-[0_0_8px_hsl(var(--online)/0.5)];

@@ -1,7 +1,8 @@
 export const MIN_DISAPPEARING_DURATION_SECONDS = 60;
 export const MAX_DISAPPEARING_DURATION_SECONDS = 30 * 24 * 60 * 60;
-export const DEFAULT_DISAPPEARING_DURATION_SECONDS = 24 * 60 * 60;
-export const DISAPPEARED_MESSAGE_PLACEHOLDER = 'This message has disappeared.';
+export const DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS = 24 * 60 * 60;
+export const DISAPPEARING_MESSAGE_TTL_SECONDS = 24 * 60 * 60;
+export const DISAPPEARED_MESSAGE_PLACEHOLDER = 'Tin nhắn này đã biến mất.';
 
 export function normalizeDisappearingDurationSeconds(value, { required = true } = {}) {
     if ((value === undefined || value === null || value === '') && !required) {
@@ -32,44 +33,77 @@ export function canManageDisappearingMessages(conversation, userId) {
         ));
     }
 
-    const initiatorId = (
-        conversation.initiatedBy
-        || conversation.participants?.[0]?.userId
-    );
-    return (initiatorId?._id || initiatorId)?.toString?.() === normalizedUserId;
+    return Boolean(conversation.participants?.some(
+        (participant) => (participant.userId?._id || participant.userId)?.toString?.() === normalizedUserId
+    ));
+}
+
+export function isDisappearingModeActive(conversation, at = new Date()) {
+    if (conversation?.disappearingEnabled !== true) return false;
+    if (!conversation.disappearingDisableAt) return true;
+
+    const disableAt = new Date(conversation.disappearingDisableAt);
+    const referenceTime = new Date(at);
+    return !Number.isNaN(disableAt.getTime())
+        && !Number.isNaN(referenceTime.getTime())
+        && disableAt.getTime() > referenceTime.getTime();
 }
 
 export function getMessageExpirationFields({
     conversation,
-    inheritedDurationSeconds = null,
+    inheritedDisappearing = false,
     deliveredAt = new Date(),
 } = {}) {
-    const rawDuration = inheritedDurationSeconds
-        ?? (conversation?.disappearingEnabled ? conversation.disappearingDurationSeconds : null);
-
-    if (rawDuration === undefined || rawDuration === null) {
-        return {};
-    }
-
-    const durationSeconds = normalizeDisappearingDurationSeconds(rawDuration);
     const deliveryStartedAt = new Date(deliveredAt);
     if (Number.isNaN(deliveryStartedAt.getTime())) {
         throw new Error('deliveredAt must be a valid date.');
     }
 
+    if (!inheritedDisappearing && !isDisappearingModeActive(conversation, deliveryStartedAt)) {
+        return {};
+    }
+
     return {
         deliveryStartedAt,
-        disappearingDurationSeconds: durationSeconds,
-        expiresAt: new Date(deliveryStartedAt.getTime() + durationSeconds * 1000),
+        expiresAt: new Date(deliveryStartedAt.getTime() + DISAPPEARING_MESSAGE_TTL_SECONDS * 1000),
         isExpired: false,
     };
 }
 
+export function isMessageExpired(message, at = new Date()) {
+    if (message?.isExpired === true) return true;
+    if (!message?.expiresAt) return false;
+
+    const expiresAt = new Date(message.expiresAt);
+    const referenceTime = new Date(at);
+    return !Number.isNaN(expiresAt.getTime())
+        && !Number.isNaN(referenceTime.getTime())
+        && expiresAt.getTime() <= referenceTime.getTime();
+}
+
+export function buildUnexpiredMessageFilter(at = new Date()) {
+    return {
+        $or: [
+            { expiresAt: { $exists: false } },
+            { expiresAt: null },
+            { expiresAt: { $gt: new Date(at) } },
+        ],
+    };
+}
+
 export function sanitizeExpiredMessageForClient(message) {
-    if (!message?.isExpired) return message;
+    if (!message) return message;
+
+    const replyTo = message.replyTo
+        ? sanitizeExpiredMessageForClient(message.replyTo)
+        : message.replyTo;
+    if (!isMessageExpired(message)) {
+        return replyTo === message.replyTo ? message : { ...message, replyTo };
+    }
 
     return {
         ...message,
+        replyTo,
         content: null,
         searchContent: undefined,
         filePublicId: undefined,
@@ -81,13 +115,16 @@ export function sanitizeExpiredMessageForClient(message) {
         reactions: [],
         isPinned: false,
         pinnedAt: null,
+        isExpired: true,
+        expiredAt: message.expiredAt ?? message.expiresAt,
     };
 }
 
 export function buildDisappearingSetting(conversation) {
     return {
-        enabled: conversation?.disappearingEnabled === true,
-        durationSeconds: conversation?.disappearingDurationSeconds ?? null,
+        enabled: isDisappearingModeActive(conversation),
+        durationSeconds: conversation?.disappearingAutoDisableSeconds ?? null,
+        disableAt: conversation?.disappearingDisableAt ?? null,
         enabledBy: conversation?.disappearingEnabledBy ?? null,
         enabledAt: conversation?.disappearingEnabledAt ?? null,
     };

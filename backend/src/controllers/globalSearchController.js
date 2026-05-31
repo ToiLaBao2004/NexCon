@@ -8,7 +8,12 @@ import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import { decryptConversationPayload, decryptMessagePayload } from '../utils/messageCrypto.js';
 import { maskLockedUser } from '../utils/lockedUser.js';
 import { applyProfileVisibility } from '../utils/profilePrivacy.js';
-import { DISAPPEARED_MESSAGE_PLACEHOLDER } from '../utils/disappearingMessages.js';
+import {
+    buildUnexpiredMessageFilter,
+    DISAPPEARED_MESSAGE_PLACEHOLDER,
+    isMessageExpired,
+    sanitizeExpiredMessageForClient,
+} from '../utils/disappearingMessages.js';
 
 const MAX_SEARCH_QUERY_LENGTH = 100;
 const DEFAULT_USER_LIMIT = 5;
@@ -328,7 +333,11 @@ function buildNicknameMap(friends, myId) {
 async function resolveSafeLastMessage(rawConversation, myId, myParticipant) {
     const conversation = decryptConversationPayload(rawConversation);
     const clearedAt = myParticipant?.clearedAt ? new Date(myParticipant.clearedAt) : null;
-    const lastMessage = conversation.lastMessage || null;
+    const lastMessage = sanitizeExpiredMessageForClient(conversation.lastMessage || null);
+    if (isMessageExpired(lastMessage)) {
+        lastMessage.content = DISAPPEARED_MESSAGE_PLACEHOLDER;
+    }
+    conversation.lastMessage = lastMessage;
 
     if (
         lastMessage
@@ -360,12 +369,12 @@ async function resolveSafeLastMessage(rawConversation, myId, myParticipant) {
         return { ...conversation, lastMessage: null };
     }
 
-    const safeFallback = decryptMessagePayload(fallback);
+    const safeFallback = sanitizeExpiredMessageForClient(decryptMessagePayload(fallback));
     return {
         ...conversation,
         lastMessage: {
             _id: safeFallback._id,
-            content: safeFallback.isExpired ? DISAPPEARED_MESSAGE_PLACEHOLDER : safeFallback.content,
+            content: isMessageExpired(safeFallback) ? DISAPPEARED_MESSAGE_PLACEHOLDER : safeFallback.content,
             type: safeFallback.type,
             systemType: safeFallback.systemType || null,
             metadata: metadataObject(safeFallback.metadata),
@@ -691,6 +700,7 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
         isRecalled: { $ne: true },
         isExpired: { $ne: true },
         reportStatus: { $ne: true },
+        $and: [buildUnexpiredMessageFilter()],
         $or: [
             { 'metadata.visibleToUserIds': { $exists: false } },
             { 'metadata.visibleToUserIds': { $size: 0 } },
@@ -806,7 +816,8 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
             const rawMessage = messageMap.get(match.messageId.toString());
             if (!rawMessage) return null;
 
-            const message = decryptMessagePayload(rawMessage);
+            const message = sanitizeExpiredMessageForClient(decryptMessagePayload(rawMessage));
+            if (isMessageExpired(message)) return null;
             const { searchContent, ...safeMessage } = message;
             if (safeMessage.senderId && typeof safeMessage.senderId === 'object') {
                 safeMessage.senderId = sanitizeParticipantUser(safeMessage.senderId);
@@ -817,7 +828,7 @@ async function searchMessagesForGlobal({ currentUserId, normalizedKeyword, limit
                 conversation: formattedConversationMap.get(match.conversationId) || null,
             };
         })
-        .filter((message) => Boolean(message.conversation));
+        .filter((message) => Boolean(message?.conversation));
 
     const finalHasMore = hasMore && items.length > 0;
     const nextCursor = finalHasMore && pageMatches.length > 0

@@ -141,10 +141,6 @@ const conversationSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    initiatedBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-    },
     participants: {
         type: [participantSchema],
         required: true
@@ -163,10 +159,14 @@ const conversationSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    disappearingDurationSeconds: {
+    disappearingAutoDisableSeconds: {
         type: Number,
         min: 60,
         max: 30 * 24 * 60 * 60,
+    },
+    disappearingDisableAt: {
+        type: Date,
+        index: true,
     },
     disappearingEnabledBy: {
         type: mongoose.Schema.Types.ObjectId,

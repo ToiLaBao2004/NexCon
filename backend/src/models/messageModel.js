@@ -111,11 +111,6 @@ const messageSchema = new mongoose.Schema({
     deliveryStartedAt: {
         type: Date,
     },
-    disappearingDurationSeconds: {
-        type: Number,
-        min: 60,
-        max: 30 * 24 * 60 * 60,
-    },
     expiresAt: {
         type: Date,
         index: true,

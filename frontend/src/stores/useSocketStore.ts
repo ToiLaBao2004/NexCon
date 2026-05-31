@@ -959,7 +959,8 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useChatStore.getState().updateConversation({
         _id: conversationId,
         disappearingEnabled: setting.enabled === true,
-        disappearingDurationSeconds: setting.durationSeconds ?? null,
+        disappearingAutoDisableSeconds: setting.durationSeconds ?? null,
+        disappearingDisableAt: setting.disableAt ?? null,
         disappearingEnabledBy: setting.enabledBy ?? null,
         disappearingEnabledAt: setting.enabledAt ?? null,
       });

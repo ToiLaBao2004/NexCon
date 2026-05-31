@@ -26,6 +26,7 @@ import { UserProfileDialog } from "../shared/UserProfileDialog";
 import { decodeMentionTokens } from "@/utils/mentions";
 import { SHOW_CONVERSATION_LIST_EVENT } from "@/constants/chatEvents";
 import type { FriendItem } from "@/types/user";
+import { DISAPPEARED_MESSAGE_PLACEHOLDER, isMessageExpired } from "@/utils/disappearingMessages";
 
 export type ConversationFilter = "all" | "unread";
 
@@ -138,6 +139,10 @@ const getConversationSubtitle = (conversation: Conversation, currentUserId?: str
       : "Chưa có tin nhắn";
   }
 
+  if (isMessageExpired(lastMessage)) {
+    return DISAPPEARED_MESSAGE_PLACEHOLDER;
+  }
+
   if (lastMessage.type === "system") {
     return getSystemMessageText(lastMessage, currentUserId || "");
   }
@@ -202,9 +207,13 @@ const getMatchedGroupMemberLabel = (
   return `${matchedMembers.slice(0, 2).join(", ")} +${matchedMembers.length - 2}`;
 };
 
-type MessagePreviewLike = Pick<Message, "type" | "systemType" | "metadata" | "content" | "fileName" | "mentions">;
+type MessagePreviewLike = Pick<Message, "type" | "systemType" | "metadata" | "content" | "fileName" | "mentions" | "isExpired" | "expiresAt">;
 
 const getMessagePreview = (message: MessagePreviewLike, currentUserId?: string, source?: Conversation) => {
+  if (isMessageExpired(message)) {
+    return DISAPPEARED_MESSAGE_PLACEHOLDER;
+  }
+
   if (message.type === "system") {
     return getSystemMessageText(message, currentUserId || "");
   }

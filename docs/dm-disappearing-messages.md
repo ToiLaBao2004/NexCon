@@ -4,7 +4,8 @@
 
 - `PUT /api/dm/conversations/:id/disappearing`
   - Body: `{ "enabled": true, "durationSeconds": 3600 }`
-  - Only the direct-conversation initiator or a group admin can update the setting.
+  - `durationSeconds` is the auto-disable timeout for the mode.
+  - Any direct-conversation participant or a group admin can update the setting.
 - `GET /api/dm/conversations/:id/disappearing`
 - `POST /api/dm/conversations/:id/screenshot`
   - Called by native clients after a screenshot callback while a disappearing conversation is active.
@@ -13,7 +14,7 @@
 - `DELETE /internal/dm/expire-batch`
   - Internal cron/webhook endpoint. Send `x-internal-job-secret`.
 
-The BullMQ `dm-disappearing-expiry` worker also runs `expire-batch` every minute.
+The BullMQ `dm-disappearing-expiry` worker runs `expire-batch` every minute to auto-disable elapsed modes and expire due messages.
 
 ## WebSocket Events
 
@@ -25,6 +26,7 @@ type DisappearingSettingUpdated = {
   setting: {
     enabled: boolean;
     durationSeconds: number | null;
+    disableAt: string | null;
     enabledBy: string | null;
     enabledAt: string | null;
   };
@@ -34,7 +36,7 @@ type DisappearingMessageExpired = {
   conversationId: string;
   messageId: string;
   expiredAt: string;
-  placeholder: "This message has disappeared.";
+  placeholder: "Tin nhắn này đã biến mất.";
 };
 
 type ScreenshotDetected = {
@@ -56,7 +58,9 @@ Expiry events update the UI only. They do not create deletion push notifications
 ## Storage Rules
 
 - `deliveryStartedAt` is the server-received timestamp. This keeps the timer correct when a sender uploads while offline and reconnects later.
-- Forwarded disappearing messages retain their source `disappearingDurationSeconds`.
+- `durationSeconds` controls when disappearing-message mode turns itself off. It does not control message expiry.
+- Every disappearing message expires after a fixed 24 hours.
+- Forwarded disappearing messages remain disappearing and receive a new fixed 24-hour TTL from delivery in the target conversation.
 - Expiry is a soft-delete: encrypted audit content remains stored, `searchContent` is unset immediately, reactions are cleared, pins are removed, and client serializers hide content and media metadata.
 - Cloudinary media is deleted after expiry when no active forwarded message still references the same asset.
 

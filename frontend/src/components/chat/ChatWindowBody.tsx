@@ -752,8 +752,8 @@ const ChatWindowBody: React.FC = () => {
 
   if (messages.length === 0 && activeTypingUserIds.length === 0 && !messageLoading) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        Chưa có tin nhắn nào trong cuộc trò chuyện này!
+      <div className="chat-thread-background flex h-full items-center justify-center text-muted-foreground">
+        <span>Chưa có tin nhắn nào trong cuộc trò chuyện này!</span>
       </div>
     );
   }
@@ -765,7 +765,7 @@ const ChatWindowBody: React.FC = () => {
   const showFloatingTyping = activeTypingParticipants.length > 0 && !isNearBottom;
 
   return (
-    <div className="flex flex-col h-full bg-chat-surface overflow-hidden relative">
+    <div className="chat-thread-background flex flex-col h-full bg-chat-surface overflow-hidden relative">
       <PinnedMessagesBanner />
 
       <div

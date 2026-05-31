@@ -1,9 +1,10 @@
-import type { Conversation } from "@/types/chat";
+import type { Conversation, Message } from "@/types/chat";
 
 export const MIN_DISAPPEARING_DURATION_SECONDS = 60;
 export const MAX_DISAPPEARING_DURATION_SECONDS = 30 * 24 * 60 * 60;
-export const DEFAULT_DISAPPEARING_DURATION_SECONDS = 24 * 60 * 60;
-export const DISAPPEARED_MESSAGE_PLACEHOLDER = "This message has disappeared.";
+export const DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS = 24 * 60 * 60;
+export const DISAPPEARING_MESSAGE_TTL_SECONDS = 24 * 60 * 60;
+export const DISAPPEARED_MESSAGE_PLACEHOLDER = "Tin nhắn này đã biến mất.";
 
 export const DISAPPEARING_DURATION_OPTIONS = [
   { label: "1 phút", value: 60 },
@@ -43,7 +44,25 @@ export const canManageDisappearingMessages = (
     ));
   }
 
-  const initiatorId = conversation.initiatedBy
-    || conversation.participants?.[0]?.userId?._id;
-  return getReferenceId(initiatorId) === String(userId);
+  return Boolean(conversation.participants?.some(
+    (participant) => getReferenceId(participant.userId) === String(userId)
+  ));
+};
+
+export const isDisappearingModeActive = (
+  conversation?: Pick<Conversation, "disappearingEnabled" | "disappearingDisableAt"> | null,
+  at = Date.now(),
+) => {
+  if (conversation?.disappearingEnabled !== true) return false;
+  if (!conversation.disappearingDisableAt) return true;
+  return new Date(conversation.disappearingDisableAt).getTime() > at;
+};
+
+export const isMessageExpired = (
+  message?: Pick<Message, "isExpired" | "expiresAt"> | null,
+  at = Date.now(),
+) => {
+  if (message?.isExpired === true) return true;
+  if (!message?.expiresAt) return false;
+  return new Date(message.expiresAt).getTime() <= at;
 };

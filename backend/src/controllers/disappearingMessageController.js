@@ -9,9 +9,10 @@ import {
 } from '../services/disappearingMessageService.js';
 import { emitNewMessage, updateConversationLastMessage } from '../utils/messageHelper.js';
 import {
-    DEFAULT_DISAPPEARING_DURATION_SECONDS,
+    DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS,
     buildDisappearingSetting,
     canManageDisappearingMessages,
+    isDisappearingModeActive,
     normalizeDisappearingDurationSeconds,
 } from '../utils/disappearingMessages.js';
 
@@ -79,12 +80,12 @@ export async function updateDisappearingSetting(req, res) {
         }
         if (!canManageDisappearingMessages(conversation, req.user._id)) {
             return res.status(403).json({
-                message: 'Only the conversation initiator or a group admin can change disappearing messages.',
+                message: 'Only group admins can change disappearing messages in group conversations.',
             });
         }
 
-        let durationSeconds = conversation.disappearingDurationSeconds
-            || DEFAULT_DISAPPEARING_DURATION_SECONDS;
+        let durationSeconds = conversation.disappearingAutoDisableSeconds
+            || DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS;
         if (enabled) {
             try {
                 durationSeconds = normalizeDisappearingDurationSeconds(
@@ -96,7 +97,10 @@ export async function updateDisappearingSetting(req, res) {
         }
 
         const isUnchanged = conversation.disappearingEnabled === enabled
-            && (!enabled || conversation.disappearingDurationSeconds === durationSeconds);
+            && (!enabled || (
+                isDisappearingModeActive(conversation)
+                && conversation.disappearingAutoDisableSeconds === durationSeconds
+            ));
         if (isUnchanged) {
             return res.status(200).json({
                 setting: buildDisappearingSetting(conversation),
@@ -104,10 +108,16 @@ export async function updateDisappearingSetting(req, res) {
             });
         }
 
+        const changedAt = new Date();
         conversation.disappearingEnabled = enabled;
-        conversation.disappearingDurationSeconds = enabled ? durationSeconds : conversation.disappearingDurationSeconds;
+        conversation.disappearingAutoDisableSeconds = enabled
+            ? durationSeconds
+            : conversation.disappearingAutoDisableSeconds;
+        conversation.disappearingDisableAt = enabled
+            ? new Date(changedAt.getTime() + durationSeconds * 1000)
+            : null;
         conversation.disappearingEnabledBy = req.user._id;
-        conversation.disappearingEnabledAt = new Date();
+        conversation.disappearingEnabledAt = changedAt;
 
         const pinnedCount = enabled
             ? await Message.countDocuments({
@@ -133,7 +143,7 @@ export async function updateDisappearingSetting(req, res) {
                 ? 'disappearing_messages_enabled'
                 : 'disappearing_messages_disabled',
             content: enabled
-                ? `🕐 ${actorName} turned on disappearing messages. New messages will disappear after ${formatDuration(durationSeconds)}. Tap to change.`
+                ? `🕐 ${actorName} turned on disappearing messages for ${formatDuration(durationSeconds)}. New messages will disappear after 24 hours. Tap to change.`
                 : `🕐 ${actorName} turned off disappearing messages. New messages will be kept.`,
             metadata: {
                 actorId: req.user._id,
@@ -170,7 +180,7 @@ export async function reportDisappearingScreenshot(req, res) {
         if (!conversation) {
             return res.status(404).json({ message: 'Conversation not found.' });
         }
-        if (conversation.disappearingEnabled !== true) {
+        if (!isDisappearingModeActive(conversation)) {
             return res.status(409).json({ message: 'Disappearing messages are not enabled.' });
         }
 

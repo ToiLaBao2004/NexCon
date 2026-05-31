@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Capacitor } from "@capacitor/core";
 import { chatService } from "@/services/chatService";
 import { useChatStore } from "@/stores/useChatStore";
+import { isDisappearingModeActive } from "@/utils/disappearingMessages";
 
 const SCREENSHOT_THROTTLE_MS = 2000;
 
@@ -19,7 +20,7 @@ export function NativeScreenshotReporter({ enabled }: { enabled: boolean }) {
       const conversation = chatState.conversations.find(
         (item) => item._id === chatState.activeConversationId
       );
-      if (!conversation || conversation.disappearingEnabled !== true) return;
+      if (!conversation || !isDisappearingModeActive(conversation)) return;
 
       lastReportAtRef.current = now;
       void chatService.reportDisappearingScreenshot(conversation._id).catch((error) => {
