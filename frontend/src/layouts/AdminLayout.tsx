@@ -8,7 +8,7 @@ import {
   UnlockKeyhole,
   UserRoundX,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import AdminIconButton from "@/components/admin/AdminIconButton";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/useAuthStore";
 
@@ -68,10 +68,9 @@ export default function AdminLayout() {
         </nav>
 
         <div className="border-t border-border/70 p-3">
-          <Button variant="ghost" className="w-full justify-start rounded-md" onClick={handleSignOut}>
+          <AdminIconButton label="Đăng xuất" tooltipSide="right" variant="ghost" className="rounded-md" onClick={handleSignOut}>
             <LogOut className="size-4" />
-            Đăng xuất
-          </Button>
+          </AdminIconButton>
         </div>
       </aside>
 
@@ -95,9 +94,9 @@ export default function AdminLayout() {
               </NavLink>
             );
           })}
-          <Button variant="ghost" size="icon" className="ml-auto rounded-md" onClick={handleSignOut}>
+          <AdminIconButton label="Đăng xuất" tooltipSide="bottom" variant="ghost" className="ml-auto rounded-md" onClick={handleSignOut}>
             <LogOut className="size-4" />
-          </Button>
+          </AdminIconButton>
         </header>
 
         <main className="min-h-0 flex-1 overflow-hidden">

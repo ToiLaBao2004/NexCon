@@ -1168,7 +1168,7 @@ function SystemMessageComponent({
 
 		if (!canOpenProfile) {
 			return (
-				<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap mx-0.5">
+				<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap">
 					{content}
 				</span>
 			);
@@ -1180,7 +1180,7 @@ function SystemMessageComponent({
 				type="button"
 				onClick={(event) => openActorProfile(actor, event)}
 				onPointerDown={(event) => event.stopPropagation()}
-				className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap mx-0.5 rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+				className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
 			>
 				{content}
 			</button>
@@ -1254,41 +1254,13 @@ function SystemMessageComponent({
 		const visibleActors = uniqueActors.slice(0, MAX_VISIBLE);
 		const remainingCount = Math.max(0, uniqueActors.length - MAX_VISIBLE);
 		return (
-			<span className="inline-flex flex-wrap items-center gap-1 align-middle mx-0.5">
+			<span className="inline-flex flex-wrap items-center gap-1 align-middle">
 				{visibleActors.map((actor, idx) => actorBadge(actor, `added-actor-${actor.id}-${idx}`))}
 				{remainingCount > 0 && (
 					<span className="inline-flex items-center whitespace-nowrap rounded-full px-1.5 text-[13px] font-semibold text-slate-700 dark:text-slate-200">
 						và {remainingCount} người khác
 					</span>
 				)}
-			</span>
-		);
-		const visibleNames = visibleActors.map((actor) => getViewerName(actor)).join(", ");
-		const namesText = remainingCount > 0
-			? `${visibleNames} và ${remainingCount} người khác`
-			: visibleNames;
-
-		return (
-			<span className="inline-flex items-center gap-1.5 align-middle mx-0.5">
-				<span className="inline-flex -space-x-1.5 shrink-0">
-					{visibleActors.map((actor, idx) => (
-						<UserAvatar
-							key={`added-avatar-${actor.id}-${idx}`}
-							type="seen"
-							name={actor.name}
-							avatarUrl={actor.avatarUrl ?? undefined}
-							className="size-[20px] border border-background shadow-sm"
-						/>
-					))}
-					{remainingCount > 0 && (
-						<span className="inline-flex size-[20px] items-center justify-center rounded-full border border-background bg-slate-500 text-[9px] font-semibold text-white shadow-sm">
-							+{remainingCount}
-						</span>
-					)}
-				</span>
-				<span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">
-					{namesText}
-				</span>
 			</span>
 		);
 	};
@@ -1849,7 +1821,7 @@ function SystemMessageComponent({
 		return (
 			<>
 				<SystemMessagePill contentClassName="font-medium tracking-normal">
-					<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
+					<span className="inline align-middle">
 						{systemContent}
 					</span>
 				</SystemMessagePill>

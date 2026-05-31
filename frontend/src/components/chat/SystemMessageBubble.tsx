@@ -7,10 +7,21 @@ import { useChatStore } from "@/stores/useChatStore";
 import {
   DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS,
   canManageDisappearingMessages,
+  getDisappearingSystemMessageActionText,
+  getDisappearingSystemMessageActorName,
   getDisappearingSystemMessageContent,
+  hasDisappearingSystemMessageActor,
 } from "@/utils/disappearingMessages";
 import { DurationPickerModal } from "./DurationPickerModal";
 import { SystemMessagePill } from "./SystemMessagePill";
+import UserAvatar from "./UserAvatar";
+
+const getReferenceId = (value: unknown) => {
+  if (value && typeof value === "object" && "_id" in value) {
+    return String((value as { _id?: unknown })._id || "");
+  }
+  return String(value || "");
+};
 
 export function SystemMessageBubble({
   message,
@@ -27,6 +38,15 @@ export function SystemMessageBubble({
   const duration = Number(message.metadata?.durationSeconds)
     || conversation.disappearingAutoDisableSeconds
     || DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS;
+  const hasActor = hasDisappearingSystemMessageActor(message);
+  const actorId = getReferenceId(message.metadata?.actorId || message.senderId);
+  const actor = conversation.participants.find(
+    (participant) => getReferenceId(participant.userId) === actorId,
+  );
+  const actorName = getDisappearingSystemMessageActorName(message);
+  const actorAvatarUrl = message.senderInfo?.avatarUrl
+    || actor?.userId?.avatarUrl
+    || undefined;
 
   return (
     <>
@@ -34,7 +54,22 @@ export function SystemMessageBubble({
         icon={<Clock3 className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />}
         onClick={isEnabledMessage ? () => setPickerOpen(true) : undefined}
       >
-        {getDisappearingSystemMessageContent(message)}
+        {hasActor ? (
+          <>
+            <span className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap">
+              <UserAvatar
+                type="seen"
+                name={actorName}
+                avatarUrl={actorAvatarUrl}
+                className="size-[20px] shrink-0 border border-background shadow-sm"
+              />
+              <span className="font-semibold text-foreground">{actorName}</span>
+            </span>{" "}
+            {getDisappearingSystemMessageActionText(message)}
+          </>
+        ) : (
+          getDisappearingSystemMessageContent(message)
+        )}
       </SystemMessagePill>
 
       <DurationPickerModal

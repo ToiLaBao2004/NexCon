@@ -13,7 +13,7 @@ export default function OAuthSuccess() {
     handleGoogleCallback()
       .then(() => {
         const role = useAuthStore.getState().user?.role;
-        navigate(role === 'admin' ? '/admin' : '/');
+        navigate(role === 'admin' ? '/admin/overview' : '/');
       })
       .catch(() => navigate('/signin'));
   }, []);

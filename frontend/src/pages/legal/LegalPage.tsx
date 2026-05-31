@@ -234,7 +234,7 @@ export default function LegalPage({ type }: LegalPageProps) {
       ? (location.state as { from: string }).from
       : null;
   const isSignedIn = Boolean(accessToken);
-  const fallbackPath = isSignedIn ? (user?.role === "admin" ? "/admin" : "/chat") : "/signin";
+  const fallbackPath = isSignedIn ? (user?.role === "admin" ? "/admin/overview" : "/chat") : "/signin";
   const returnPath = fromPath || fallbackPath;
   const linkState = fromPath ? { from: fromPath } : undefined;
 

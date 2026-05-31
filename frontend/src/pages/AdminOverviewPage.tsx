@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode, type UIEvent } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Eye, Loader2, RefreshCw, Search, ShieldAlert, Users } from "lucide-react";
 import { toast } from "sonner";
+import AdminIconButton from "@/components/admin/AdminIconButton";
 import AdminUserDrawer from "@/components/admin/AdminUserDrawer";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getAvatarSrc } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
@@ -160,10 +160,9 @@ export default function AdminOverviewPage() {
                 className="h-10 pl-9"
               />
             </div>
-            <Button className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void refresh()}>
+            <AdminIconButton label="Làm mới" className="rounded-md" onClick={() => void refresh()}>
               <RefreshCw className="size-4" />
-              Làm mới
-            </Button>
+            </AdminIconButton>
           </div>
         </div>
 
@@ -239,9 +238,9 @@ export default function AdminOverviewPage() {
                       {formatDateTime(user.lastSeenAt)}
                     </div>
 
-                    <Button className="w-fit rounded-md" size="sm" onClick={() => setDrawerUserId(user._id)}>
-                      Xem
-                    </Button>
+                    <AdminIconButton label={`Xem ${userLabel(user)}`} size="icon-sm" className="rounded-md" onClick={() => setDrawerUserId(user._id)}>
+                      <Eye className="size-4" />
+                    </AdminIconButton>
                   </div>
               ))}
             </div>
@@ -250,10 +249,9 @@ export default function AdminOverviewPage() {
           {!loadingUsers && users.length > 0 && (
             <div className="flex justify-center py-4">
               {hasMore ? (
-                <Button variant="outline" className="rounded-md" disabled={loadingMore} onClick={() => void loadMore()}>
+                <AdminIconButton label="Tải thêm" variant="outline" className="rounded-md" disabled={loadingMore} onClick={() => void loadMore()}>
                   {loadingMore ? <Loader2 className="size-4 animate-spin" /> : <Users className="size-4" />}
-                  Tải thêm
-                </Button>
+                </AdminIconButton>
               ) : (
                 <span className="text-sm text-muted-foreground">Đã tải hết danh sách.</span>
               )}

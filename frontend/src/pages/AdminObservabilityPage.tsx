@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
+import AdminIconButton from "@/components/admin/AdminIconButton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -150,14 +151,14 @@ export default function AdminObservabilityPage() {
                 </Button>
               ))}
             </div>
-            <Button
-              className="rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            <AdminIconButton
+              label="Làm mới"
+              className="rounded-md"
               disabled={refreshing}
               onClick={() => void loadObservability(true)}
             >
               {refreshing ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-              Làm mới
-            </Button>
+            </AdminIconButton>
           </div>
         </div>
       </header>

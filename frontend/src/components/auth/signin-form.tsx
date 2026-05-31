@@ -89,7 +89,7 @@ export function SigninForm({
       setHasPendingAppeal(false);
       await signIn(email, password);
       const role = useAuthStore.getState().user?.role;
-      navigate(role === "admin" ? "/admin" : "/");
+      navigate(role === "admin" ? "/admin/overview" : "/");
     } catch (error: any) {
       console.error("Sign in failed:", error);
       const message = getApiErrorMessage(error, "Đăng nhập thất bại.");
@@ -162,7 +162,7 @@ export function SigninForm({
     const success = await loginGoogle();
     if (success) {
       const role = useAuthStore.getState().user?.role;
-      navigate(role === "admin" ? "/admin" : "/");
+      navigate(role === "admin" ? "/admin/overview" : "/");
     }
   }
 
