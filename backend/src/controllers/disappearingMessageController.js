@@ -24,19 +24,19 @@ function isConversationMember(conversation, userId) {
 
 function formatDuration(durationSeconds) {
     const presets = new Map([
-        [60, '1 minute'],
-        [300, '5 minutes'],
-        [1800, '30 minutes'],
-        [3600, '1 hour'],
-        [21600, '6 hours'],
-        [43200, '12 hours'],
-        [86400, '24 hours'],
-        [604800, '7 days'],
+        [60, '1 phút'],
+        [300, '5 phút'],
+        [1800, '30 phút'],
+        [3600, '1 giờ'],
+        [21600, '6 giờ'],
+        [43200, '12 giờ'],
+        [86400, '24 giờ'],
+        [604800, '7 ngày'],
     ]);
     if (presets.has(durationSeconds)) return presets.get(durationSeconds);
-    if (durationSeconds % 86400 === 0) return `${durationSeconds / 86400} days`;
-    if (durationSeconds % 3600 === 0) return `${durationSeconds / 3600} hours`;
-    return `${Math.ceil(durationSeconds / 60)} minutes`;
+    if (durationSeconds % 86400 === 0) return `${durationSeconds / 86400} ngày`;
+    if (durationSeconds % 3600 === 0) return `${durationSeconds / 3600} giờ`;
+    return `${Math.ceil(durationSeconds / 60)} phút`;
 }
 
 async function findMemberConversation(conversationId, userId) {
@@ -127,10 +127,10 @@ export async function updateDisappearingSetting(req, res) {
             })
             : 0;
         const warning = pinnedCount > 0
-            ? `${pinnedCount} pinned message(s) will stay pinned. New disappearing messages cannot be pinned.`
+            ? `${pinnedCount} tin nhắn đã ghim vẫn được giữ nguyên. Tin nhắn tự xóa mới không thể ghim.`
             : null;
 
-        const actorName = req.user.displayName || 'A participant';
+        const actorName = req.user.displayName || 'Một thành viên';
         const systemMessage = await Message.create({
             conversationId: conversation._id,
             senderId: req.user._id,
@@ -143,8 +143,8 @@ export async function updateDisappearingSetting(req, res) {
                 ? 'disappearing_messages_enabled'
                 : 'disappearing_messages_disabled',
             content: enabled
-                ? `🕐 ${actorName} turned on disappearing messages for ${formatDuration(durationSeconds)}. New messages will disappear after 24 hours. Tap to change.`
-                : `🕐 ${actorName} turned off disappearing messages. New messages will be kept.`,
+                ? `🕐 ${actorName} đã bật chế độ tin nhắn tự xóa trong ${formatDuration(durationSeconds)}. Tin nhắn mới sẽ tự xóa sau 24 giờ. Nhấn để thay đổi.`
+                : `🕐 ${actorName} đã tắt chế độ tin nhắn tự xóa. Tin nhắn mới sẽ được giữ lại.`,
             metadata: {
                 actorId: req.user._id,
                 actorName,

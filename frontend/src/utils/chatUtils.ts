@@ -1,3 +1,5 @@
+import { getDisappearingSystemMessageContent } from "./disappearingMessages";
+
 export const getSystemMessageText = (
     message: any,
     currentUserId: string
@@ -156,6 +158,10 @@ export const getSystemMessageText = (
 
             return `${callTypeLabel}${suffix}`;
         }
+
+        case "disappearing_messages_enabled":
+        case "disappearing_messages_disabled":
+            return getDisappearingSystemMessageContent(message);
 
         case "approval_mode_changed": {
             const changedBy = meta.changedBy;

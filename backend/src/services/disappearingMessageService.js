@@ -235,7 +235,7 @@ async function disableDisappearingConversationById(conversationId, {
             senderId,
             type: 'system',
             systemType: 'disappearing_messages_disabled',
-            content: '🕐 Disappearing messages turned off automatically. New messages will be kept.',
+            content: '🕐 Chế độ tin nhắn tự xóa đã tự động tắt. Tin nhắn mới sẽ được giữ lại.',
             metadata: {
                 enabled: false,
                 autoDisabled: true,
