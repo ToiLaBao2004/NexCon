@@ -1200,7 +1200,7 @@ const ConversationMixedList = ({
         </div>
 
         <div className="-mx-5 flex items-center justify-between gap-3 border-b border-border/50 px-5 pt-3">
-          <div className="flex min-w-0 items-center gap-4 overflow-x-auto overflow-y-hidden">
+          <div className="beautiful-scrollbar flex min-w-0 items-center gap-4 overflow-x-auto overflow-y-hidden">
             {(hasQuery ? SEARCH_TABS : CONVERSATION_TABS).map((item) => {
               const active = hasQuery
                 ? searchTab === item.value
