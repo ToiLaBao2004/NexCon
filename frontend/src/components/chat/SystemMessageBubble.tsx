@@ -7,8 +7,10 @@ import { useChatStore } from "@/stores/useChatStore";
 import {
   DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS,
   canManageDisappearingMessages,
+  getDisappearingSystemMessageContent,
 } from "@/utils/disappearingMessages";
 import { DurationPickerModal } from "./DurationPickerModal";
+import { SystemMessagePill } from "./SystemMessagePill";
 
 export function SystemMessageBubble({
   message,
@@ -28,17 +30,12 @@ export function SystemMessageBubble({
 
   return (
     <>
-      <div className="my-4 flex w-full justify-center px-3">
-        <button
-          type="button"
-          disabled={!isEnabledMessage}
-          onClick={() => setPickerOpen(true)}
-          className="max-w-[92%] rounded-2xl bg-muted/45 px-4 py-2 text-center text-[13px] leading-relaxed text-muted-foreground disabled:cursor-default"
-        >
-          <Clock3 className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />
-          {message.content}
-        </button>
-      </div>
+      <SystemMessagePill
+        icon={<Clock3 className="mr-1 inline h-3.5 w-3.5 align-[-2px]" />}
+        onClick={isEnabledMessage ? () => setPickerOpen(true) : undefined}
+      >
+        {getDisappearingSystemMessageContent(message)}
+      </SystemMessagePill>
 
       <DurationPickerModal
         open={pickerOpen}

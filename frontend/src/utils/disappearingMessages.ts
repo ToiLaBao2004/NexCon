@@ -17,6 +17,30 @@ export const DISAPPEARING_DURATION_OPTIONS = [
   { label: "7 ngày", value: 604800 },
 ] as const;
 
+export const getDisappearingSystemMessageContent = (
+  message: Pick<Message, "systemType" | "metadata" | "content">,
+) => {
+  const actorName = typeof message.metadata?.actorName === "string"
+    && message.metadata.actorName.trim()
+    ? message.metadata.actorName.trim()
+    : "Một thành viên";
+
+  if (message.systemType === "disappearing_messages_enabled") {
+    const durationSeconds = Number(message.metadata?.durationSeconds)
+      || DEFAULT_DISAPPEARING_AUTO_DISABLE_SECONDS;
+    return `${actorName} đã bật chế độ tin nhắn tự xóa trong ${formatDisappearingDuration(durationSeconds)}. Tin nhắn mới sẽ tự xóa sau 24 giờ. Nhấn để thay đổi.`;
+  }
+
+  if (message.systemType === "disappearing_messages_disabled") {
+    if (message.metadata?.autoDisabled === true) {
+      return "Chế độ tin nhắn tự xóa đã tự động tắt. Tin nhắn mới sẽ được giữ lại.";
+    }
+    return `${actorName} đã tắt chế độ tin nhắn tự xóa. Tin nhắn mới sẽ được giữ lại.`;
+  }
+
+  return message.content || "";
+};
+
 const getReferenceId = (value: unknown) => {
   if (value && typeof value === "object" && "_id" in value) {
     return String((value as { _id?: unknown })._id || "");

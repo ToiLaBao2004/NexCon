@@ -43,9 +43,9 @@ import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import CachedStickerImage from "./CachedStickerImage";
 import { decodeMentionTokens, getMentionTextSegments } from "@/utils/mentions";
 import { decodeMojibakeFileName } from "@/lib/fileName";
-import { CountdownBadge } from "./CountdownBadge";
 import { ExpiredMessagePlaceholder } from "./ExpiredMessagePlaceholder";
 import { SystemMessageBubble } from "./SystemMessageBubble";
+import { SystemMessagePill } from "./SystemMessagePill";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -1848,15 +1848,11 @@ function SystemMessageComponent({
 
 		return (
 			<>
-				<div className="my-4 flex w-full animate-in justify-center fade-in transition-all duration-300">
-					<div className="flex max-w-[92%] items-center gap-2 rounded-lg border border-border/70 bg-card/90 px-3 py-1.5 font-sans shadow-sm backdrop-blur-sm">
-						<p className="text-[13px] font-medium tracking-normal text-muted-foreground break-words">
-							<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
-								{systemContent}
-							</span>
-						</p>
-					</div>
-				</div>
+				<SystemMessagePill contentClassName="font-medium tracking-normal">
+					<span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1 align-middle">
+						{systemContent}
+					</span>
+				</SystemMessagePill>
 				{actorProfileDialog}
 
 				<div className="my-2 mx-auto w-full max-w-[520px] space-y-2 font-sans animate-in fade-in duration-300">
@@ -2068,13 +2064,9 @@ function SystemMessageComponent({
 
 	return (
 		<>
-			<div className="flex justify-center my-4 w-full animate-in fade-in transition-all duration-300 px-3">
-				<div className="max-w-[95%] sm:max-w-[85%] text-center rounded-[20px] border border-border/70 bg-card/90 px-4 py-2 shadow-sm backdrop-blur-sm">
-					<p className="text-[13px] font-normal leading-[1.6] break-words text-slate-600 dark:text-slate-300">
-						{systemContent}
-					</p>
-				</div>
-			</div>
+			<SystemMessagePill>
+				{systemContent}
+			</SystemMessagePill>
 			{actorProfileDialog}
 		</>
 	);
@@ -2685,8 +2677,6 @@ const MessageItem = ({
 
 							</div>
 						</Card>
-						<CountdownBadge expiresAt={message.expiresAt} />
-
 						{/* Reaction Display */}
 						{reactionSummary && (
 							<button
