@@ -1156,19 +1156,21 @@ function SystemMessageComponent({
 		const canOpenProfile = Boolean(actor.id && !actor.id.startsWith("name:"));
 		const content = (
 			<>
-				<UserAvatar
-					type="seen"
-					name={getViewerName(actor)}
-					avatarUrl={actor.avatarUrl ?? undefined}
-					className="size-[20px] shrink-0 border border-background shadow-sm"
-				/>
+				<span className="mr-1.5 inline-flex align-[-4px]">
+					<UserAvatar
+						type="seen"
+						name={getViewerName(actor)}
+						avatarUrl={actor.avatarUrl ?? undefined}
+						className="size-[20px] shrink-0 border border-background shadow-sm"
+					/>
+				</span>
 				<span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">{getViewerName(actor)}</span>
 			</>
 		);
 
 		if (!canOpenProfile) {
 			return (
-				<span key={key || actor.id} className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap">
+				<span key={key || actor.id} className="inline whitespace-nowrap">
 					{content}
 				</span>
 			);
@@ -1180,7 +1182,7 @@ function SystemMessageComponent({
 				type="button"
 				onClick={(event) => openActorProfile(actor, event)}
 				onPointerDown={(event) => event.stopPropagation()}
-				className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+				className="inline whitespace-nowrap rounded-full outline-none transition-opacity hover:opacity-80 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
 			>
 				{content}
 			</button>
@@ -1188,7 +1190,7 @@ function SystemMessageComponent({
 	}, [getViewerName, openActorProfile]);
 
 	const textPart = (value: string, key?: string) => (
-		<span key={key || value} className="inline align-middle font-normal text-[13px] text-slate-600 dark:text-slate-300">
+		<span key={key || value} className="inline font-normal text-[13px] text-slate-600 dark:text-slate-300">
 			{value}
 		</span>
 	);
@@ -1228,7 +1230,7 @@ function SystemMessageComponent({
 				event.stopPropagation();
 				scrollToReminderCard();
 			}}
-			className="cursor-pointer inline align-middle font-medium text-[13px] text-sky-700 underline decoration-sky-500/60 underline-offset-2 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
+			className="cursor-pointer inline font-medium text-[13px] text-sky-700 underline decoration-sky-500/60 underline-offset-2 hover:text-sky-800 dark:text-sky-300 dark:hover:text-sky-200"
 		>
 			{value}
 		</span>
