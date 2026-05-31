@@ -847,21 +847,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
 
       toast.info(mentionTitle, {
         duration: 7000,
-        className: "rounded-xl border border-border/70 bg-card text-card-foreground shadow-xl",
-        descriptionClassName: "mt-1 text-[13px] leading-snug text-muted-foreground",
         action: {
           label: 'Xem tin',
           onClick: () => {
             navigateToAppPath(targetUrl);
           },
-        },
-        actionButtonStyle: {
-          height: "32px",
-          borderRadius: "9999px",
-          background: "hsl(var(--primary))",
-          color: "hsl(var(--primary-foreground))",
-          fontWeight: "600",
-          padding: "0 12px",
         },
         description: mentionDescription,
       });
@@ -1072,9 +1062,22 @@ export const useSocketStore = create<SocketState>((set, get) => ({
             },
           }
           : state.messages;
+        const currentMedia = state.media[targetConversationId];
+        const nextMedia = currentMedia
+          ? {
+            ...state.media,
+            [targetConversationId]: {
+              ...currentMedia,
+              images: currentMedia.images.filter((message) => String(message._id) !== String(targetMessageId)),
+              files: currentMedia.files.filter((message) => String(message._id) !== String(targetMessageId)),
+              links: currentMedia.links.filter((message) => String(message._id) !== String(targetMessageId)),
+            },
+          }
+          : state.media;
 
         return {
           messages: nextMessages,
+          media: nextMedia,
           conversations: state.conversations.map((conversation) => {
             if (String(conversation._id) !== String(targetConversationId)) return conversation;
             if (String(conversation.lastMessage?._id) !== String(targetMessageId)) return conversation;

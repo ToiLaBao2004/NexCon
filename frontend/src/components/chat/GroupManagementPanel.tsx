@@ -1,5 +1,5 @@
 import { Dialog, DialogPortal, DialogOverlay, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, KeyRound } from "lucide-react";
+import { ChevronLeft, KeyRound, LockKeyhole } from "lucide-react";
 import { useChatStore } from "@/stores/useChatStore";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { useState } from "react";
@@ -27,8 +27,11 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
   const allowMembersChangeAvatar = conversation?.group?.allowMembersChangeAvatar !== false;
   const allowMembersCreateSharedReminder = conversation?.group?.allowMembersCreateSharedReminder !== false;
   const participants = conversation?.participants || [];
+  const isReadOnly = !isGroupAdmin;
+  const settingRowClassName = `flex items-center justify-between gap-4 ${isReadOnly ? "pointer-events-none select-none opacity-50" : ""}`;
 
   const handleDisband = async () => {
+    if (isReadOnly) return;
     try {
       await disbandGroup(conversationId);
       setShowConfirmDisband(false);
@@ -39,6 +42,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
   };
 
   const handleToggleApproval = async (checked: boolean) => {
+    if (isReadOnly) return;
     try {
       await updateGroupSettings(conversationId, { isApprovalRequired: checked });
     } catch (error) {
@@ -47,6 +51,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
   };
 
   const handleToggleMemberAvatar = async (checked: boolean) => {
+    if (isReadOnly) return;
     try {
       await updateGroupSettings(conversationId, { allowMembersChangeAvatar: checked });
     } catch (error) {
@@ -55,6 +60,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
   };
 
   const handleToggleSharedReminder = async (checked: boolean) => {
+    if (isReadOnly) return;
     try {
       await updateGroupSettings(conversationId, { allowMembersCreateSharedReminder: checked });
     } catch (error) {
@@ -68,7 +74,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
         <DialogPortal>
           <DialogOverlay className="bg-transparent" />
           <DialogPrimitive.Content
-            className="fixed inset-y-0 right-0 z-[201] m-0 flex w-screen flex-col rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
+            className="fixed inset-y-0 right-0 z-[201] m-0 flex w-screen flex-col rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none mobile-safe-area-y sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
           >
             <div className="flex items-center gap-3 px-4 py-4 border-b border-border/40 bg-card shrink-0">
               <button
@@ -83,9 +89,14 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
             </div>
 
             <div className="flex-1 overflow-auto beautiful-scrollbar p-4 bg-card flex flex-col gap-6">
-              {isGroupAdmin ? (
-                <>
-                  <div className="flex items-center justify-between">
+                  {isReadOnly && (
+                    <div className="flex items-center justify-center gap-2 px-3 py-2 text-sm font-normal text-foreground">
+                      <LockKeyhole className="h-4 w-4 shrink-0" strokeWidth={1.5} />
+                      <span>Tính năng chỉ dành cho trưởng nhóm</span>
+                    </div>
+                  )}
+
+                  <div className={settingRowClassName}>
                     <div className="flex items-center gap-2">
                       <span className="text-[15px] font-medium text-foreground">Chế độ phê duyệt thành viên mới</span>
                       <TooltipProvider>
@@ -103,10 +114,11 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                       <Switch
                           checked={isApprovalRequired}
                           onCheckedChange={handleToggleApproval}
+                          disabled={isReadOnly}
                       />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className={settingRowClassName}>
                     <div className="flex items-center gap-2">
                       <span className="text-[15px] font-medium text-foreground">Cho phép thành viên đổi tên và ảnh đại diện của nhóm</span>
                     </div>
@@ -114,10 +126,11 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                       <Switch
                         checked={allowMembersChangeAvatar}
                         onCheckedChange={handleToggleMemberAvatar}
+                        disabled={isReadOnly}
                       />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
+                  <div className={settingRowClassName}>
                     <div className="flex items-center gap-2">
                       <span className="text-[15px] font-medium text-foreground">Cho phép thành viên tạo nhắc hẹn chung</span>
                     </div>
@@ -125,10 +138,12 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                       <Switch
                         checked={allowMembersCreateSharedReminder}
                         onCheckedChange={handleToggleSharedReminder}
+                        disabled={isReadOnly}
                       />
                     </div>
                   </div>
 
+                  {isGroupAdmin && (
                   <div className="mt-auto w-full pt-4 border-t border-border/40 flex flex-col gap-3">
                     <button
                       onClick={() => setShowTransferModal(true)}
@@ -145,12 +160,7 @@ export function GroupManagementPanel({ open, onOpenChange, conversationId, isGro
                       Giải tán nhóm
                     </button>
                   </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground/70">
-                  <p className="text-sm">Thành viên không thể thực hiện thao tác quản lý nhóm lúc này.</p>
-                </div>
-              )}
+                  )}
             </div>
           </DialogPrimitive.Content>
         </DialogPortal>

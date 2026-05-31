@@ -2,6 +2,7 @@ import { cn, formatMessageTime, formatBytes, normalizeUrl } from "@/lib/utils";
 import type { Conversation, Mention, Message, MessageType, Participant, ReplyToMessage } from "@/types/chat";
 import type { ProfileVisibility } from "@/types/user";
 import UserAvatar from "./UserAvatar";
+import FileTypeIcon from "./FileTypeIcon";
 import { Card } from "../ui/card";
 import {
 	DropdownMenu,
@@ -41,6 +42,7 @@ import { ReportDialog } from "@/components/shared/ReportDialog";
 import { UserProfileDialog } from "@/components/shared/UserProfileDialog";
 import CachedStickerImage from "./CachedStickerImage";
 import { decodeMentionTokens, getMentionTextSegments } from "@/utils/mentions";
+import { decodeMojibakeFileName } from "@/lib/fileName";
 
 const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewResponse>();
 
@@ -50,18 +52,31 @@ const MAX_VISIBLE_SEEN_AVATARS = 8;
 const singleImageFrameClass = "relative h-auto w-[280px] max-w-[70vw] aspect-[14/9] overflow-hidden rounded-xl bg-muted";
 const imagePreviewClass = "h-full w-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity";
 
-function MentionChip({ children, isOwn }: { children: React.ReactNode; isOwn: boolean }) {
+function MentionChip({
+	children,
+	isOwn,
+	onClick,
+}: {
+	children: React.ReactNode;
+	isOwn: boolean;
+	onClick?: () => void;
+}) {
 	return (
-		<span
+		<button
+			type="button"
+			onClick={(event) => {
+				event.stopPropagation();
+				onClick?.();
+			}}
 			className={cn(
-				"inline-flex items-center rounded-md px-1.5 py-0.5 font-semibold align-baseline",
+				"inline cursor-pointer border-0 bg-transparent p-0 font-semibold align-baseline transition-opacity hover:opacity-70",
 				isOwn
-					? "bg-white/15 text-white"
-					: "bg-blue-500/10 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300"
+					? "text-white"
+					: "text-blue-700 dark:text-blue-300"
 			)}
 		>
 			{children}
-		</span>
+		</button>
 	);
 }
 
@@ -70,11 +85,16 @@ function renderMentionedText(
 	mentions: Mention[] | undefined,
 	isOwn: boolean,
 	participants: Participant[],
+	onMentionClick?: (userId: string) => void,
 ) {
 	const parts = getMentionTextSegments(text, mentions, participants).map((segment, index) => {
 		if (segment.type === "mention") {
 			return (
-				<MentionChip key={`mention-${segment.userId}-${index}`} isOwn={isOwn}>
+				<MentionChip
+					key={`mention-${segment.userId}-${index}`}
+					isOwn={isOwn}
+					onClick={() => onMentionClick?.(segment.userId)}
+				>
 					{segment.text}
 				</MentionChip>
 			);
@@ -256,11 +276,13 @@ function AudioMessageBubble({
 	isOwn,
 	downloadUrl,
 	participants,
+	onMentionClick,
 }: {
 	message: Message;
 	isOwn: boolean;
 	downloadUrl: string;
 	participants: Participant[];
+	onMentionClick?: (userId: string) => void;
 }) {
 	const [showTranscript, setShowTranscript] = useState(false);
 	const hasTranscript = Boolean(message.content?.trim());
@@ -317,7 +339,8 @@ function AudioMessageBubble({
 						message.content ?? "",
 						message.mentions,
 						isOwn,
-						participants
+						participants,
+						onMentionClick
 					)}
 				</div>
 			)}
@@ -341,14 +364,21 @@ function ImageBatchGrid({
 	isOwn,
 	participants,
 	conversationId,
+	onMentionClick,
 }: {
 	items: Message[];
 	isOwn: boolean;
 	participants: Participant[];
 	conversationId: string;
+	onMentionClick?: (userId: string) => void;
 }) {
 	const visibleItems = items.slice(0, 10);
 	const count = visibleItems.length;
+	const contentItem = items.find((item) =>
+		item.isRecalled !== true
+		&& item.reportStatus !== true
+		&& item.content?.trim()
+	);
 
 	const tileClassName = (index: number) => cn(
 		"relative overflow-hidden bg-muted",
@@ -433,20 +463,20 @@ function ImageBatchGrid({
 					</button>
 				))}
 			</div>
-			{items[0]?.content && !items[0]?.isRecalled && !items[0]?.reportStatus && (
+			{contentItem?.content && (
 				<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
-					{renderMentionedText(items[0].content, items[0].mentions, isOwn, participants)}
+					{renderMentionedText(contentItem.content, contentItem.mentions, isOwn, participants, onMentionClick)}
 				</p>
 			)}
 		</div>
 	);
 }
 
-function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchItems }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[]; imageBatchItems?: Message[] }) {
+function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchItems, onMentionClick }: { message: Message; isOwn: boolean; downloadUrl: string; participants: Participant[]; imageBatchItems?: Message[]; onMentionClick?: (userId: string) => void }) {
 	const type: MessageType = message.type ?? "text";
 
 	if (imageBatchItems && imageBatchItems.length > 1) {
-		return <ImageBatchGrid items={imageBatchItems} isOwn={isOwn} participants={participants} conversationId={message.conversationId} />;
+		return <ImageBatchGrid items={imageBatchItems} isOwn={isOwn} participants={participants} conversationId={message.conversationId} onMentionClick={onMentionClick} />;
 	}
 
 	if (message.reportStatus) {
@@ -533,7 +563,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				)}
 				{message.content && (
 					<p className="px-2 text-[14px] leading-relaxed sm:text-[15px]">
-						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
+						{renderMentionedText(message.content, message.mentions, isOwn, participants, onMentionClick)}
 					</p>
 				)}
 			</div>
@@ -567,11 +597,14 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				isOwn={isOwn}
 				downloadUrl={downloadUrl}
 				participants={participants}
+				onMentionClick={onMentionClick}
 			/>
 		);
 	}
 
 	if (type === "file" && (message.filePublicId || message.fileUrl)) {
+		const displayFileName = decodeMojibakeFileName(message.fileName) || "File";
+
 		return (
 			<div className="flex flex-col gap-2">
 				<a
@@ -591,7 +624,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							}
 							window.open(url, "_blank", "noopener,noreferrer");
 						} catch {
-							toast.error("KhÃ´ng thá»ƒ má»Ÿ file");
+							toast.error("Không thể mở file");
 						}
 					}}
 					className={cn(
@@ -600,13 +633,13 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 							? "bg-white/12 border border-white/10 hover:bg-white/18"
 							: "bg-background/50 dark:bg-black/20 border border-border/40 hover:bg-background/80 dark:hover:bg-black/30"
 					)}
-					download={message.fileName ?? true}
+					download={displayFileName}
 				>
-					<div className={cn("p-2 rounded-lg shrink-0", isOwn ? "bg-white/20" : "bg-primary/10")}>
-						<FileText className={cn("size-5", isOwn ? "text-white" : "text-primary")} />
+					<div className={cn("flex size-10 items-center justify-center rounded-lg shrink-0", isOwn ? "bg-white/20" : "bg-primary/10")}>
+						<FileTypeIcon fileName={displayFileName} mimeType={message.mimeType} className="size-8" />
 					</div>
 					<div className="flex flex-col min-w-0">
-						<span className="max-w-[180px] truncate text-[14px] font-medium sm:text-[15px]">{message.fileName ?? "File"}</span>
+						<span className="max-w-[180px] truncate text-[14px] font-medium sm:text-[15px]">{displayFileName}</span>
 						<span className={cn("text-[12px] sm:text-[13px]", isOwn ? "text-white/70" : "text-muted-foreground")}>
 							{message.fileSize ? formatBytes(message.fileSize) : (message.mimeType ?? "")}
 						</span>
@@ -615,7 +648,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 				</a>
 				{message.content && (
 					<div className="px-2 text-[14px] leading-relaxed whitespace-pre-wrap break-words sm:text-[15px]">
-						{renderMentionedText(message.content, message.mentions, isOwn, participants)}
+						{renderMentionedText(message.content, message.mentions, isOwn, participants, onMentionClick)}
 					</div>
 				)}
 			</div>
@@ -698,7 +731,7 @@ function MessageContent({ message, isOwn, downloadUrl, participants, imageBatchI
 		);
 	}
 
-	return renderMentionedText(message.content ?? "", message.mentions, isOwn, participants);
+	return renderMentionedText(message.content ?? "", message.mentions, isOwn, participants, onMentionClick);
 }
 
 // Reply quote (rendered inside the Card bubble) 
@@ -708,12 +741,14 @@ function ReplyQuoteInline({
 	participants,
 	currentUserId,
 	conversationId,
+	messages,
 }: {
 	replyTo: ReplyToMessage;
 	isOwn: boolean;
 	participants: Participant[];
 	currentUserId: string;
 	conversationId: string;
+	messages: Message[];
 }) {
 	const senderId =
 		typeof replyTo.senderId === "object"
@@ -731,29 +766,68 @@ function ReplyQuoteInline({
 				: null) ||
 			"Người dùng";
 
+	const replyImageBatch = useMemo(() => {
+		if (replyTo.type !== "image") return [];
+
+		const canPreview = (message: ReplyToMessage | Message) =>
+			message.type === "image"
+			&& message.isRecalled !== true
+			&& message.reportStatus !== true
+			&& Boolean(message.filePublicId || message.fileUrl);
+		const fallback = canPreview(replyTo) ? [replyTo] : [];
+		const batchId = replyTo.metadata?.clientBatchId?.trim();
+		if (!batchId) return fallback;
+
+		const batchItems = messages
+			.filter((message) =>
+				message.metadata?.clientBatchId === batchId
+				&& canPreview(message)
+			)
+			.sort((a, b) =>
+				Number(a.metadata?.clientBatchIndex ?? 0) - Number(b.metadata?.clientBatchIndex ?? 0)
+			);
+
+		return batchItems.length > 0 ? batchItems : fallback;
+	}, [messages, replyTo]);
+	const visibleReplyImages = replyImageBatch.slice(0, 3);
+	const hiddenReplyImageCount = Math.max(0, replyImageBatch.length - visibleReplyImages.length);
+
 	let preview: React.ReactNode;
-	if (replyTo.reportStatus) {
+	if (replyTo.reportStatus && visibleReplyImages.length === 0) {
 		preview = <span className="italic">Tin nhắn vi phạm tiêu chuẩn cộng đồng</span>;
 	} else if (replyTo.isRecalled) {
 		preview = <span className="italic">Tin nhắn đã thu hồi</span>;
 	} else if (replyTo.type === "image") {
 		preview = (
 			<span className="flex items-center gap-2">
-				{replyTo.filePublicId || replyTo.fileUrl ? (
-					replyTo.filePublicId ? (
-						<SecureImage
-							messageId={replyTo._id}
-							alt="reply-thumbnail"
-							className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
-						/>
-					) : (
-						<img
-							src={replyTo.fileUrl!}
-							alt="reply-thumbnail"
-							className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
-						/>
-					)
-				) : null}
+				{visibleReplyImages.length > 0 && (
+					<span className="flex shrink-0 items-center gap-1">
+						{visibleReplyImages.map((image) => (
+							image.filePublicId ? (
+								<SecureImage
+									key={image._id}
+									messageId={image._id}
+									alt="reply-thumbnail"
+									className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+									fallbackMinSize={24}
+									showFallbackText={false}
+								/>
+							) : (
+								<img
+									key={image._id}
+									src={image.fileUrl!}
+									alt="reply-thumbnail"
+									className="size-6 rounded-md object-cover border border-blue-200 dark:border-blue-400"
+								/>
+							)
+						))}
+						{hiddenReplyImageCount > 0 && (
+							<span className="flex size-6 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-[10px] font-semibold text-blue-600 dark:border-blue-400/70 dark:bg-blue-950/50 dark:text-blue-300">
+								+{hiddenReplyImageCount}
+							</span>
+						)}
+					</span>
+				)}
 				<span className="flex items-center gap-1">
 					<ImageIcon className="size-3 shrink-0" /> Hình ảnh
 				</span>
@@ -783,7 +857,7 @@ function ReplyQuoteInline({
 	} else if (replyTo.type === "file") {
 		preview = (
 			<span className="flex items-center gap-1">
-				<FileText className="size-3 shrink-0" /> {replyTo.fileName ?? "Tệp đính kèm"}
+				<FileText className="size-3 shrink-0" /> {decodeMojibakeFileName(replyTo.fileName) || "Tệp đính kèm"}
 			</span>
 		);
 	} else if (replyTo.type === "link") {
@@ -808,7 +882,9 @@ function ReplyQuoteInline({
 			)}
 			onClick={async (e) => {
 				e.stopPropagation();
-				const el = document.getElementById(`message-${replyTo._id}`);
+				const el = document.getElementById(`message-${replyTo._id}`)
+					?? Array.from(document.querySelectorAll<HTMLElement>("[data-message-ids]"))
+						.find((element) => element.dataset.messageIds?.split(" ").includes(replyTo._id));
 				if (el) {
 					el.scrollIntoView({ behavior: "smooth", block: "center" });
 					el.classList.add("animate-jump-highlight");
@@ -2059,15 +2135,24 @@ const MessageItem = ({
 
 	const { onlineUsers, userPresences } = useSocketStore();
 	const isImageBatch = (imageBatchItems?.length ?? 0) > 1;
+	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
+	const actionableMessage = bubbleMessages.find((item) =>
+		item.isRecalled !== true
+		&& item.reportStatus !== true
+		&& (!item.status || item.status === "sent")
+	) ?? null;
+	const actionMessage = actionableMessage ?? message;
 	const hasUnrecalledBatchMessage = imageBatchItems?.some((item) => item.isRecalled !== true) ?? false;
+	const hasUnmoderatedBatchMessage = imageBatchItems?.some((item) => item.reportStatus !== true) ?? false;
 	const isRecalled = message.isRecalled === true && (!isImageBatch || !hasUnrecalledBatchMessage);
-	const isViolationMessage = message.reportStatus === true;
-	const isPinned = message.isPinned === true;
+	const isViolationMessage = message.reportStatus === true && (!isImageBatch || !hasUnmoderatedBatchMessage);
+	const isPinned = actionMessage.isPinned === true;
 	const isImage = isImageBatch || (message.type === "image" && !!(message.fileUrl || message.filePublicId) && !isRecalled && !isViolationMessage);
 	const isLink = message.type === "link" && !isRecalled && !isViolationMessage;
 	const linkPreview = isLink ? message.metadata?.linkPreview : null;
 	const hasLinkPreview = Boolean(linkPreview?.title || linkPreview?.image || linkPreview?.description);
 	const isSticker = message.type === "sticker" && !isRecalled;
+	const isTextBubble = (!message.type || message.type === "text") && !isRecalled && !isViolationMessage;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
 
 	const hasContent = isImageBatch
@@ -2090,7 +2175,6 @@ const MessageItem = ({
 	const cachedMediaUrl = useMediaCacheStore(state => state.getUrl(message._id));
 	const isBlob = message.fileUrl?.startsWith("blob:") ?? false;
 	const downloadUrl = (!isBlob && message.fileUrl) || cachedMediaUrl || "#";
-	const bubbleMessages = imageBatchItems?.length ? imageBatchItems : [message];
 	const downloadableBubbleMessages = bubbleMessages.filter((item) =>
 		item.isRecalled !== true && item.reportStatus !== true && (item.fileUrl || item.filePublicId) && (!item.status || item.status === "sent")
 	);
@@ -2137,17 +2221,6 @@ const MessageItem = ({
 			return (senderObj ? senderObj._id : msg.senderId)?.toString?.() ?? "";
 		};
 
-		const latestSentIndexBySender = new Map<string, number>();
-		messages.forEach((msg, idx) => {
-			if (msg.type === "system" && msg.systemType !== "call") return;
-			if (msg.status && msg.status !== "sent") return;
-
-			const senderId = resolveSenderId(msg);
-			if (senderId) {
-				latestSentIndexBySender.set(senderId, idx);
-			}
-		});
-
 		for (const p of selectedConvo.participants) {
 			const pid = p.userId?._id?.toString();
 			if (!pid || pid === currentUserIdStr) continue;
@@ -2157,7 +2230,6 @@ const MessageItem = ({
 			if (lastReadIndex === undefined) continue;
 
 			let targetMessageId: string | null = null;
-			let targetMessageIndex = -1;
 			for (let i = lastReadIndex; i >= 0; i -= 1) {
 				const msg = messages[i];
 				if (msg.type === "system" && msg.systemType !== "call") continue;
@@ -2165,14 +2237,11 @@ const MessageItem = ({
 
 				if (!msg.status || msg.status === "sent") {
 					targetMessageId = msg._id;
-					targetMessageIndex = i;
 					break;
 				}
 			}
 
 			if (!targetMessageId) continue;
-			const latestSentIndex = latestSentIndexBySender.get(pid);
-			if (latestSentIndex !== undefined && latestSentIndex > targetMessageIndex) continue;
 
 			if (!map[targetMessageId]) map[targetMessageId] = [];
 			map[targetMessageId].push({
@@ -2249,6 +2318,24 @@ const MessageItem = ({
 		});
 	}, [participant?.userId, selectedConvo.type]);
 
+	const openMentionProfile = useCallback((userId: string) => {
+		const mentionedParticipant = selectedConvo.participants.find(
+			(item) => item.userId?._id?.toString?.() === userId.toString()
+		)?.userId;
+		if (!mentionedParticipant?._id) return;
+
+		setProfileUser({
+			_id: mentionedParticipant._id.toString(),
+			displayName: mentionedParticipant.displayName || mentionedParticipant.nickname?.trim() || "Người dùng",
+			email: mentionedParticipant.email || "",
+			avatarUrl: mentionedParticipant.avatarUrl || undefined,
+			bio: mentionedParticipant.bio,
+			phone: mentionedParticipant.phone,
+			profileVisibility: mentionedParticipant.profileVisibility,
+			profileVisibleToViewer: mentionedParticipant.profileVisibleToViewer,
+		});
+	}, [selectedConvo.participants]);
+
 	const clearLongPressTimer = useCallback(() => {
 		if (longPressTimeoutRef.current !== null) {
 			window.clearTimeout(longPressTimeoutRef.current);
@@ -2299,7 +2386,7 @@ const MessageItem = ({
 	const handlePointerDownForActions = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (!isCoarsePointer) return;
 		if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-		if (isRecalled || isViolationMessage || (message.status && message.status !== "sent") || isDisbanded) return;
+		if (!actionableMessage || isDisbanded) return;
 
 		clearLongPressTimer();
 		longPressTimeoutRef.current = window.setTimeout(() => {
@@ -2313,19 +2400,19 @@ const MessageItem = ({
 
 	const reactionSummary = useMemo(() => {
 		if (isViolationMessage) return null;
-		if (!message.reactions?.length) return null;
+		if (!actionMessage.reactions?.length) return null;
 
 		const counts: Record<string, number> = {};
-		message.reactions.forEach(r => {
+		actionMessage.reactions.forEach(r => {
 			counts[r.emoji] = (counts[r.emoji] || 0) + 1;
 		});
 
 		const uniqueEmojis = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 3);
-		const totalCount = message.reactions.length;
-		const myReaction = message.reactions.find(r => r.userId === currentUserId);
+		const totalCount = actionMessage.reactions.length;
+		const myReaction = actionMessage.reactions.find(r => r.userId === currentUserId);
 
 		return { uniqueEmojis, totalCount, myReaction };
-	}, [isViolationMessage, message.reactions, currentUserId]);
+	}, [isViolationMessage, actionMessage.reactions, currentUserId]);
 
 	// ── Smart reminder detection ───────────────────────────────────────────────
 	const showSmartReminderButton = useMemo(() => {
@@ -2339,7 +2426,7 @@ const MessageItem = ({
 
 	const messagePreviewText = useMemo(() => {
 		if (message.type === "image") return "[Hình ảnh]";
-		if (message.type === "file") return message.fileName || "[File]";
+		if (message.type === "file") return decodeMojibakeFileName(message.fileName) || "[File]";
 		if (message.type === "sticker") return "[Nhãn dán]";
 		if (message.type === "audio") return "[Tin nhắn thoại]";
 		return getMentionSafeText(message.content, selectedConvo.participants, message.mentions) || "Tin nhắn";
@@ -2357,7 +2444,7 @@ const MessageItem = ({
 		if (isReacting) return;
 		setIsReacting(true);
 		try {
-			await reactToMessage(message._id, emoji.native);
+			await reactToMessage(actionMessage._id, emoji.native);
 			setShowTouchActions(false);
 		} catch (error) {
 			console.error("Reaction failed:", error);
@@ -2367,7 +2454,7 @@ const MessageItem = ({
 	};
 
 	const handlePin = async () => {
-		try { await pinMessage(message._id); }
+		try { await pinMessage(actionMessage._id); }
 		catch (e) { console.error("Ghim thất bại:", e); }
 		finally {
 			setShowPinOptions(false);
@@ -2376,8 +2463,8 @@ const MessageItem = ({
 	};
 
 	const handleCopy = () => {
-		if (message.content) {
-			navigator.clipboard.writeText(getMentionSafeText(message.content, selectedConvo.participants, message.mentions));
+		if (actionMessage.content) {
+			navigator.clipboard.writeText(getMentionSafeText(actionMessage.content, selectedConvo.participants, actionMessage.mentions));
 			toast.success("Đã sao chép vào bộ nhớ tạm");
 		}
 	};
@@ -2405,7 +2492,7 @@ const MessageItem = ({
 			const blobUrl = URL.createObjectURL(blob);
 			const anchor = document.createElement("a");
 			anchor.href = blobUrl;
-			anchor.download = item.fileName || `${item.type}-${item._id}`;
+			anchor.download = decodeMojibakeFileName(item.fileName) || `${item.type}-${item._id}`;
 			document.body.appendChild(anchor);
 			anchor.click();
 			anchor.remove();
@@ -2425,17 +2512,19 @@ const MessageItem = ({
 		}
 	};
 
-	const handleRecall = async () => {
-		try {
-			for (const item of bubbleMessages.filter((entry) => entry.isRecalled !== true && entry.reportStatus !== true && (!entry.status || entry.status === "sent"))) {
-				await recallMessage(item._id);
+	const handleRecall = () => {
+		const recallTargets = bubbleMessages.filter((entry) => entry.isRecalled !== true && entry.reportStatus !== true && (!entry.status || entry.status === "sent"));
+		setShowConfirmRecall(false);
+		setShowTouchActions(false);
+
+		void (async () => {
+			try {
+				for (const item of recallTargets) {
+					await recallMessage(item._id);
+				}
 			}
-		}
-		catch (e: any) { toast.error(e.message || "Thu hồi thất bại"); }
-		finally {
-			setShowConfirmRecall(false);
-			setShowTouchActions(false);
-		}
+			catch (e: any) { toast.error(e.message || "Thu hồi thất bại"); }
+		})();
 	};
 
 	const canCreateReminder = !isDisbanded && !isRecalled && !isViolationMessage && message.type === "text";
@@ -2444,7 +2533,7 @@ const MessageItem = ({
 	const canCreateSharedReminder = selectedConvo.type !== "group"
 		|| selectedConvo.group?.allowMembersCreateSharedReminder !== false
 		|| isCurrentUserGroupAdmin;
-	const canReportMessage = !isOwn && !isDisbanded && !isRecalled && !isViolationMessage && (!message.status || message.status === "sent");
+	const canReportMessage = !isOwn && !isDisbanded && Boolean(actionableMessage);
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
 	return (
@@ -2509,6 +2598,7 @@ const MessageItem = ({
 							className={cn(
 								"shadow-sm overflow-hidden w-fit gap-0",
 								isOwn && "ms-auto",
+								isTextBubble && "min-w-[68px]",
 								(isVisualOnly || hasLinkPreview) ? "p-0 bg-transparent border-0 shadow-none" : (isImage ? "p-2.5 text-[14px] leading-relaxed sm:text-[15px]" : "px-4 py-2.5 text-[14px] leading-relaxed sm:text-[15px]"),
 								reactionSummary && !isVisualOnly && "min-w-[85px]",
 								(isRecalled && !isImageBatch)
@@ -2529,6 +2619,7 @@ const MessageItem = ({
 									participants={selectedConvo.participants}
 									currentUserId={currentUserId}
 									conversationId={selectedConvo._id}
+									messages={messages}
 								/>
 							)}
 							{!isRecalled && !isViolationMessage && message.metadata?.forwardedFrom && (
@@ -2545,6 +2636,7 @@ const MessageItem = ({
 										downloadUrl={downloadUrl}
 										participants={selectedConvo.participants}
 										imageBatchItems={imageBatchItems}
+										onMentionClick={openMentionProfile}
 									/>
 								</div>
 
@@ -2600,7 +2692,7 @@ const MessageItem = ({
 						)}
 
 						{/* Hover Action Bar - Quick Reaction Button */}
-						{!isRecalled && !isViolationMessage && !message.status && !isDisbanded && (
+						{actionableMessage && !isDisbanded && (
 							<div className={cn(
 								"hidden sm:flex absolute top-1/2 -translate-y-1/2 transition-all duration-200 z-30",
 								"opacity-0 group-hover:opacity-100 pointer-events-none group-hover:pointer-events-auto",
@@ -2648,7 +2740,7 @@ const MessageItem = ({
 						)}
 
 
-						{!isRecalled && !isViolationMessage && (!message.status || message.status === "sent") && (
+						{actionableMessage && (
 							<>
 								{/* Desktop Dropdown */}
 								<div className="hidden sm:block">
@@ -2685,7 +2777,7 @@ const MessageItem = ({
 										>
 											<DropdownMenuItem 
 												disabled={isBlocked}
-												onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(message); } }}
+												onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(actionMessage); } }}
 												className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
 											>
 												<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
@@ -2697,7 +2789,7 @@ const MessageItem = ({
 													Chuyển tiếp
 												</DropdownMenuItem>
 											)}
-											{message.content && message.type !== 'sticker' && (
+											{actionMessage.content && actionMessage.type !== 'sticker' && (
 												<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
 													<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
 													Sao chép
@@ -2791,7 +2883,7 @@ const MessageItem = ({
 
 													<button 
 														disabled={isBlocked}
-														onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(message); } }} 
+														onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(actionMessage); } }}
 														className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
 													>
 														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
@@ -2809,7 +2901,7 @@ const MessageItem = ({
 														</button>
 													)}
 
-													{message.content && message.type !== 'sticker' && (
+													{actionMessage.content && actionMessage.type !== 'sticker' && (
 														<button onClick={() => { setShowTouchActions(false); handleCopy(); }} className="flex flex-col items-center gap-2">
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
 																<Copy className="h-5 w-5" strokeWidth={1.5} />
@@ -3065,11 +3157,11 @@ const MessageItem = ({
 				confirmText={isPinned ? "Bỏ ghim" : "Ghim"}
 			/>
 
-			{message.reactions && (
+			{actionMessage.reactions && (
 				<ReactionDetailModal
 					isOpen={showReactionModal}
 					onClose={() => setShowReactionModal(false)}
-					reactions={message.reactions}
+					reactions={actionMessage.reactions}
 				/>
 			)}
 
@@ -3095,8 +3187,8 @@ const MessageItem = ({
 				<ForwardMessageModal
 					open={showForwardModal}
 					onOpenChange={(open) => setShowForwardModal(open)}
-					message={message}
-					messages={bubbleMessages.filter((item) => item.isRecalled !== true && (!item.status || item.status === "sent"))}
+					message={actionMessage}
+					messages={bubbleMessages.filter((item) => item.isRecalled !== true && item.reportStatus !== true && (!item.status || item.status === "sent"))}
 				/>
 			)}
 
@@ -3117,9 +3209,9 @@ const MessageItem = ({
 					open={showReportDialog}
 					onOpenChange={setShowReportDialog}
 					targetType="message"
-					targetId={message._id}
-					targetName={message.senderInfo?.displayName}
-					conversationId={message.conversationId}
+					targetId={actionMessage._id}
+					targetName={actionMessage.senderInfo?.displayName}
+					conversationId={actionMessage.conversationId}
 					preview={messagePreviewText}
 				/>
 			)}

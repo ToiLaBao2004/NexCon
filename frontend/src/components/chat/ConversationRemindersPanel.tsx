@@ -829,7 +829,7 @@ export function ConversationRemindersPanel({
         {/* Backdrop — click to close */}
         <DialogOverlay className="z-[200] bg-transparent" />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 right-0 z-[201] flex w-screen flex-col rounded-none border-l border-border/40 bg-card font-sans shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
+          className="fixed inset-y-0 right-0 z-[201] flex w-screen flex-col rounded-none border-l border-border/40 bg-card font-sans shadow-2xl focus:outline-none mobile-safe-area-y sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300"
         >
           {/*  Header  */}
           <div className="flex items-center gap-2 px-4 py-4 border-b border-border/40 bg-card shrink-0">

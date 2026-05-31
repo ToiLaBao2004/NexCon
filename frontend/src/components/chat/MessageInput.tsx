@@ -1,5 +1,5 @@
 import { useAuthStore } from "@/stores/useAuthStore";
-import type { Conversation, MessageType } from "@/types/chat";
+import type { Conversation, Message, MessageType } from "@/types/chat";
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Button } from "../ui/button";
 import { useNavigate } from "react-router";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
 import CachedStickerImage from "./CachedStickerImage";
+import SecureImage from "../SecureImage";
 import { getAvatarSrc } from "@/lib/avatar";
 import { isUrl, formatBytes } from "@/lib/utils";
 import { draftStorage } from "@/lib/draftStorage";
@@ -83,7 +84,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const navigate = useNavigate();
 	const isMobile = useIsMobile();
 	const { emitTyping, emitStopTyping } = useSocketStore();
-	const { sendMessage, markAsSeen, replyingTo, setReplyingTo, setDraft, clearDraft } = useChatStore();
+	const { sendMessage, markAsSeen, messages, replyingTo, setReplyingTo, setDraft, clearDraft } = useChatStore();
 	const { blockedUsers, blockedBy, fetchBlockedList } = useFriendStore();
 	const currentUserId = user?._id ?? "";
 
@@ -183,10 +184,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				label: "Xem chi tiết",
 				onClick: () => navigate(targetPath),
 			},
-			actionButtonStyle: {
-				backgroundColor: "hsl(var(--primary))",
-				color: "hsl(var(--primary-foreground))",
-			},
 		});
 	}, [navigate]);
 
@@ -202,8 +199,35 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const participants = selectedConvo.participants;
 	const attachment = attachments[0] ?? null;
+	const replyingToImageBatch = useMemo(() => {
+		if (!replyingTo || replyingTo.type !== "image") return [];
+
+		const canPreview = (message: Message) =>
+			message.type === "image"
+			&& message.isRecalled !== true
+			&& message.reportStatus !== true
+			&& Boolean(message.filePublicId || message.fileUrl);
+		const fallback = canPreview(replyingTo) ? [replyingTo] : [];
+		const batchId = replyingTo.metadata?.clientBatchId?.trim();
+		if (!batchId) return fallback;
+
+		const batchItems = (messages[selectedConvo._id]?.items ?? [])
+			.filter((message) =>
+				message.metadata?.clientBatchId === batchId
+				&& canPreview(message)
+			)
+			.sort((a, b) =>
+				Number(a.metadata?.clientBatchIndex ?? 0) - Number(b.metadata?.clientBatchIndex ?? 0)
+			);
+
+		return batchItems.length > 0 ? batchItems : fallback;
+	}, [messages, replyingTo, selectedConvo._id]);
+	const visibleReplyingToImages = replyingToImageBatch.slice(0, 4);
+	const hiddenReplyingToImageCount = Math.max(0, replyingToImageBatch.length - visibleReplyingToImages.length);
+	const hasReplyingToImageThumbnail = visibleReplyingToImages.length > 0;
 	const replyingToPreview = useMemo(() => {
 		if (!replyingTo) return "";
+		if (replyingTo.reportStatus) return "Tin nhắn vi phạm tiêu chuẩn cộng đồng";
 		if (replyingTo.isRecalled) return "Tin nhắn đã thu hồi";
 		if (replyingTo.type === "image") return "Hình ảnh";
 		if (replyingTo.type === "sticker") return "Nhãn dán";
@@ -942,6 +966,34 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 								Đang trả lời
 							</span>
 							<div className="flex items-center gap-2">
+								{hasReplyingToImageThumbnail && (
+									<div className="flex min-w-0 items-center gap-1">
+										{visibleReplyingToImages.map((image) => (
+											image.filePublicId ? (
+												<SecureImage
+													key={image._id}
+													messageId={image._id}
+													alt="reply-thumbnail"
+													className="size-8 shrink-0 rounded-md border border-blue-200 object-cover dark:border-blue-400"
+													fallbackMinSize={32}
+													showFallbackText={false}
+												/>
+											) : (
+												<img
+													key={image._id}
+													src={image.fileUrl!}
+													alt="reply-thumbnail"
+													className="size-8 shrink-0 rounded-md border border-blue-200 object-cover dark:border-blue-400"
+												/>
+											)
+										))}
+										{hiddenReplyingToImageCount > 0 && (
+											<span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-blue-200 bg-blue-50 text-[11px] font-semibold text-blue-600 dark:border-blue-400/70 dark:bg-blue-950/50 dark:text-blue-300">
+												+{hiddenReplyingToImageCount}
+											</span>
+										)}
+									</div>
+								)}
 								{replyingTo.type === "sticker" && replyingTo.content && (
 									<CachedStickerImage
 										src={replyingTo.content}
@@ -949,9 +1001,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 										className="size-8 rounded-md object-contain bg-white/10"
 									/>
 								)}
-								<span className="text-[11px] text-muted-foreground truncate leading-snug mt-px">
-									{replyingToPreview}
-								</span>
+								{!hasReplyingToImageThumbnail && (
+									<span className="text-[11px] text-muted-foreground truncate leading-snug mt-px">
+										{replyingToPreview}
+									</span>
+								)}
 							</div>
 						</div>
 					</div>

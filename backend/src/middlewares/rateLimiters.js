@@ -94,7 +94,7 @@ const OTP_MESSAGE = 'Bạn yêu cầu OTP quá nhanh. Vui lòng thử lại sau.
 const API_MESSAGE = 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.';
 
 const API_WINDOW_MS = toNumber(process.env.RATE_LIMIT_API_WINDOW_MS, 15 * 60 * 1000);
-const API_MAX = toNumber(process.env.RATE_LIMIT_API_MAX, 300);
+const API_MAX = toNumber(process.env.RATE_LIMIT_API_MAX, 1200);
 
 export const apiLimiter = createIpLimiter({
     windowMs: API_WINDOW_MS,

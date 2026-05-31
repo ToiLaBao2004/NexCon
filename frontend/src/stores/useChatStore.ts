@@ -903,9 +903,14 @@ export const useChatStore = create<ChatState>()(
                         _id: replyingTo._id,
                         senderId: replyingTo.senderId,
                         type: replyingTo.type,
+                        metadata: replyingTo.metadata,
                         content: replyingTo.content,
                         fileName: replyingTo.fileName,
+                        fileUrl: replyingTo.fileUrl,
+                        filePublicId: replyingTo.filePublicId,
                         isRecalled: replyingTo.isRecalled,
+                        reportStatus: replyingTo.reportStatus,
+                        mentions: replyingTo.mentions,
                     }
                     : null;
 

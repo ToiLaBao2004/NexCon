@@ -176,24 +176,28 @@ export default function ImageViewerModal() {
     }
   };
 
-  const handleRecall = async () => {
+  const handleRecall = () => {
     if (!viewerMessage || isRecalling) return;
-    try {
-      setIsRecalling(true);
-      await recallMessage(viewerMessage._id);
-      if (viewerMessage.conversationId) {
-        recallMessageLocal(viewerMessage.conversationId, viewerMessage._id, {
-          content: "Tin nhắn này đã được thu hồi",
-          isRecalled: true,
-        });
+    const messageToRecall = viewerMessage;
+    setIsRecalling(true);
+    setShowRecallConfirm(false);
+    closeViewer();
+
+    void (async () => {
+      try {
+        await recallMessage(messageToRecall._id);
+        if (messageToRecall.conversationId) {
+          recallMessageLocal(messageToRecall.conversationId, messageToRecall._id, {
+            content: "Tin nhắn này đã được thu hồi",
+            isRecalled: true,
+          });
+        }
+      } catch (error: any) {
+        toast.error(error?.message || "Thu hồi thất bại");
+      } finally {
+        setIsRecalling(false);
       }
-      setShowRecallConfirm(false);
-      closeViewer();
-    } catch (error: any) {
-      toast.error(error?.message || "Thu hồi thất bại");
-    } finally {
-      setIsRecalling(false);
-    }
+    })();
   };
 
   if (!isOpen || !image) return null;
@@ -206,7 +210,7 @@ export default function ImageViewerModal() {
       ref={overlayRef}
     >
       <div
-        className="absolute top-0 left-0 right-0 flex items-center justify-end px-4 py-3 z-50 pointer-events-none"
+        className="absolute top-0 left-0 right-0 z-50 flex items-center justify-end px-4 py-3 pointer-events-none mobile-safe-area-top"
         style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.55), transparent)" }}
       >
         <div className="flex items-center gap-2 pointer-events-auto">
@@ -275,7 +279,7 @@ export default function ImageViewerModal() {
       </div>
 
       <div
-        className="absolute bottom-0 left-0 right-0 flex justify-center pb-4 pointer-events-none"
+        className="absolute bottom-0 left-0 right-0 flex justify-center pb-4 pointer-events-none mobile-safe-area-bottom-padded"
         style={{ background: "linear-gradient(to top, rgba(0,0,0,0.4), transparent)" }}
       >
         {canActOnMessage && (

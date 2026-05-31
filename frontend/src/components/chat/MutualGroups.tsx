@@ -65,7 +65,7 @@ export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: Pa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         <DialogOverlay className="bg-transparent" />
-        <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-[201] m-0 w-screen rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
+        <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-[201] m-0 flex w-screen flex-col rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none mobile-safe-area-y sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card">
             <button
               onClick={() => onOpenChange(false)}
@@ -78,7 +78,7 @@ export function MutualGroupsPanel({ open, onOpenChange, otherParticipantId }: Pa
             </DialogHeader>
           </div>
 
-          <div className="p-3 overflow-auto beautiful-scrollbar h-full bg-card">
+          <div className="min-h-0 flex-1 overflow-auto bg-card p-3 beautiful-scrollbar">
             {mutualGroups.length === 0 ? (
               <p className="text-sm text-muted-foreground px-2 py-2">Không có nhóm chung</p>
             ) : (

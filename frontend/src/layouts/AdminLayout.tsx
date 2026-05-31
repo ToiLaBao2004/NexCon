@@ -75,7 +75,7 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="safe-area-top flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border/70 bg-card px-3 md:hidden">
           {navItems.map((item) => {
             const Icon = item.icon;

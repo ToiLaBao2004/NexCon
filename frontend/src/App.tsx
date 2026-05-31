@@ -130,6 +130,7 @@ function NativeFcmHandler({ enabled }: { enabled: boolean }) {
 
 function App() {
   const initTheme = useThemeStore((state) => state.initTheme);
+  const isDark = useThemeStore((state) => state.isDark);
   const { accessToken, user } = useAuthStore();
   const { connectSocket, disconnectSocket } = useSocketStore();
   const { isSupported, requestPermission, subscribe } = usePushNotification();
@@ -264,14 +265,17 @@ function App() {
       <NativeFcmHandler enabled={isAuth && !isAdmin} />
       <AppStatusLayer />
       <Toaster
-        richColors
-        expand
+        theme={isDark ? "dark" : "light"}
+        className="nexcon-toaster"
+        closeButton
+        expand={false}
         visibleToasts={6}
         position="top-center"
         offset={16}
         mobileOffset={8}
         toastOptions={{
-          style: { zIndex: 2147483647 },
+          className: "nexcon-toast",
+          duration: 4200,
         }}
       />
       

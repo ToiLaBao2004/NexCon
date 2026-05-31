@@ -239,7 +239,10 @@ export const chatService = {
 		if (recipientId) formData.append('recipientId', recipientId);
 		if (conversationId) formData.append('conversationId', conversationId);
 		if (content) formData.append('content', content);
-		if (file) formData.append('file', file);
+		if (file) {
+			formData.append('file', file);
+			formData.append('fileName', file.name);
+		}
 		if (replyToMessageId) formData.append('replyTo', replyToMessageId);
 		if (Array.isArray(mentions) && mentions.length > 0) {
 			formData.append('mentions', JSON.stringify(mentions));

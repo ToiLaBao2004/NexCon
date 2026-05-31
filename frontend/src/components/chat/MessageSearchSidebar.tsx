@@ -270,7 +270,7 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
           "flex flex-col bg-background border-l border-border/40 overflow-hidden",
           useOverlay
             // Mobile/Tablet: fixed right-side panel full height, sits above backdrop
-            ? "fixed right-0 top-0 bottom-0 z-50 w-full max-w-[380px] shadow-2xl animate-in slide-in-from-right duration-300"
+            ? "fixed right-0 top-0 bottom-0 z-50 w-full max-w-[380px] shadow-2xl animate-in slide-in-from-right duration-300 mobile-safe-area-y"
             // Desktop: flex sibling, fixed width
             : "h-full w-[380px] min-w-[380px] shrink-0"
         )}
@@ -471,7 +471,7 @@ export default function MessageSearchSidebar({ onClose }: MessageSearchSidebarPr
                 disabled={isLoadingMore}
               >
                 {isLoadingMore ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-                TÃ¬m thÃªm
+                Tìm thêm
               </Button>
             )}
             <p className="text-[14px] font-medium text-foreground mb-1">Không tìm thấy tin nhắn nào</p>

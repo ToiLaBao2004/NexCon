@@ -36,6 +36,11 @@ const normalizeSearchText = (value?: string | null) =>
     .toLowerCase()
     .trim();
 
+const getUserId = (value: any) => {
+  const user = value?.userId || value;
+  return String(user?._id || user || "");
+};
+
 export default function MembersPanel({ conversationId, participants, memberCount, isGroupAdmin, currentUserId, adminIds = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -79,20 +84,41 @@ export default function MembersPanel({ conversationId, participants, memberCount
 
   const filteredParticipants = useMemo(() => {
     const query = normalizeSearchText(memberSearch);
+    const orderedAdminIds = adminIds.map(getUserId).filter(Boolean);
 
-    if (!query) {
-      return participants;
-    }
+    const matchingParticipants = query
+      ? participants.filter((p: any) => {
+        const u = p.userId || p;
+        const searchableText = normalizeSearchText(
+          [u?.nickname, u?.displayName, u?.email, u?.phone].filter(Boolean).join(" ")
+        );
 
-    return participants.filter((p: any) => {
-      const u = p.userId || p;
-      const searchableText = normalizeSearchText(
-        [u?.nickname, u?.displayName, u?.email, u?.phone].filter(Boolean).join(" ")
-      );
+        return searchableText.includes(query);
+      })
+      : participants;
 
-      return searchableText.includes(query);
-    });
-  }, [participants, memberSearch]);
+    return matchingParticipants
+      .map((participant: any, index: number) => ({
+        participant,
+        index,
+        adminIndex: orderedAdminIds.indexOf(getUserId(participant)),
+      }))
+      .sort((a, b) => {
+        const aIsAdmin = a.adminIndex !== -1;
+        const bIsAdmin = b.adminIndex !== -1;
+
+        if (aIsAdmin !== bIsAdmin) {
+          return aIsAdmin ? -1 : 1;
+        }
+
+        if (aIsAdmin && bIsAdmin && a.adminIndex !== b.adminIndex) {
+          return a.adminIndex - b.adminIndex;
+        }
+
+        return a.index - b.index;
+      })
+      .map(({ participant }) => participant);
+  }, [participants, memberSearch, adminIds]);
 
   const onHandleApproval = async (userId: string, action: 'approve' | 'reject') => {
     if (!conversationId) return;
@@ -152,7 +178,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogPortal>
           <DialogOverlay className="bg-transparent" />
-          <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-[201] m-0 w-screen rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
+          <DialogPrimitive.Content className="fixed inset-y-0 right-0 z-[201] m-0 flex w-screen flex-col rounded-none border-l border-border/40 bg-card p-0 shadow-2xl focus:outline-none mobile-safe-area-y sm:w-[380px] sm:max-w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right-full data-[state=open]:slide-in-from-right-full duration-300">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border/40 bg-card">
               <button onClick={() => setOpen(false)} className="p-1 rounded hover:bg-muted/10">
                 <ChevronLeft className="h-5 w-5" />
@@ -162,7 +188,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
               </DialogHeader>
             </div>
 
-            <div className="p-1 overflow-y-auto h-[calc(100%-57px)] bg-card beautiful-scrollbar">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-card p-1 beautiful-scrollbar">
               <div className="flex flex-col gap-0.5 pb-4">
                 {isGroupAdmin && approvalQueue?.length > 0 && (
                   <div className="mb-4">
@@ -239,7 +265,7 @@ export default function MembersPanel({ conversationId, participants, memberCount
                   const isMe = u?._id?.toString() === currentUserId?.toString();
                   const presence = getPresenceForUser(u?._id?.toString?.() || "", userPresences, u?.presence ?? null, onlineUsers);
                   const badgeStatus = getPresenceBadgeStatus(presence);
-                  const isLeader = adminIds.some((id) => id?.toString?.() === u?._id?.toString?.());
+                  const isLeader = adminIds.some((id) => getUserId(id) === getUserId(u));
 
                   return (
                     <div

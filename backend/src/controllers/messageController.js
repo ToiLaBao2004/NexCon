@@ -40,6 +40,9 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
 const SEARCH_SCAN_BATCH_SIZE = 100;
+const IMAGE_MODERATION_STATUS_PENDING = 'pending_review';
+const IMAGE_CLEANUP_RETRY_DELAYS_MS = [0, 500, 2000];
+const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled reportStatus mentions';
 const moderationCategoryLabels = {
     abusive: 'Ngôn từ xúc phạm',
     harassment: 'Quấy rối hoặc công kích cá nhân',
@@ -55,6 +58,30 @@ const moderationCategoryLabels = {
     unknown: 'Vi phạm tiêu chuẩn cộng đồng',
 };
 
+const FILENAME_MOJIBAKE_PATTERN = /(?:[\u00C2-\u00C4][\u0080-\u00BF])|(?:\u00E1[\u00BA-\u00BF][\u0080-\u00BF])|(?:\u00C3[\u0080-\u00BF])/;
+const FILENAME_MOJIBAKE_SCORE_PATTERN = /[\u0080-\u009F\u00C2-\u00C4]|\u00E1[\u00BA-\u00BF]/g;
+
+function filenameMojibakeScore(value) {
+    return value.match(FILENAME_MOJIBAKE_SCORE_PATTERN)?.length || 0;
+}
+
+function decodeMojibakeFileName(value) {
+    if (!value || !FILENAME_MOJIBAKE_PATTERN.test(value)) return value || '';
+
+    try {
+        const decoded = Buffer.from(value, 'latin1').toString('utf8');
+        return filenameMojibakeScore(decoded) < filenameMojibakeScore(value) ? decoded : value;
+    } catch {
+        return value;
+    }
+}
+
+function normalizeUploadedFileName(...candidates) {
+    const rawName = candidates.find((candidate) => typeof candidate === 'string' && candidate.trim());
+    const fileName = decodeMojibakeFileName(String(rawName || 'file').trim());
+    return fileName.slice(0, 255);
+}
+
 function clampSearchLimit(value) {
     const parsed = Number(value);
     return Math.max(1, Math.min(SEARCH_MAX_LIMIT, Number.isFinite(parsed) ? parsed : SEARCH_DEFAULT_LIMIT));
@@ -66,6 +93,18 @@ function maskPopulatedSender(message) {
     return {
         ...raw,
         senderId: maskLockedUserDoc(raw.senderId),
+    };
+}
+
+function sanitizeModeratedReply(replyTo) {
+    const raw = maskPopulatedSender(replyTo);
+    if (!raw?.reportStatus) return raw;
+    return {
+        ...raw,
+        content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
+        filePublicId: undefined,
+        fileUrl: undefined,
+        fileName: undefined,
     };
 }
 
@@ -262,6 +301,190 @@ async function sendOfflineMessagePushes({ conversation, message, senderId, sende
     }));
 }
 
+async function cleanupRejectedImage(publicId) {
+    if (!publicId) return;
+
+    for (let index = 0; index < IMAGE_CLEANUP_RETRY_DELAYS_MS.length; index += 1) {
+        const delay = IMAGE_CLEANUP_RETRY_DELAYS_MS[index];
+        if (delay > 0) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+
+        try {
+            await deleteCloudinaryResource(publicId, 'image', 'authenticated');
+            return;
+        } catch (error) {
+            const isLastAttempt = index === IMAGE_CLEANUP_RETRY_DELAYS_MS.length - 1;
+            console.error(
+                `[ImageModeration] Cannot delete rejected asset${isLastAttempt ? '' : ', retrying'}:`,
+                publicId,
+                error?.message || error
+            );
+        }
+    }
+}
+
+async function moderateDeliveredImage({
+    messageId,
+    conversationId,
+    publicId,
+    imageBuffer,
+    mimeType,
+    notificationPayload,
+}) {
+    try {
+        const result = await moderateImageMessage(imageBuffer, mimeType);
+        const moderationStatus = result.blocked
+            ? 'rejected'
+            : (result.moderationSkipped ? 'skipped' : 'approved');
+
+        if (!result.blocked) {
+            const updateResult = await Message.updateOne(
+                {
+                    _id: messageId,
+                    isRecalled: { $ne: true },
+                    'metadata.imageModerationStatus': IMAGE_MODERATION_STATUS_PENDING,
+                },
+                {
+                    $set: {
+                        'metadata.imageModerationStatus': moderationStatus,
+                        'metadata.imageModerationCategory': result.category || 'safe',
+                    },
+                }
+            );
+            const matchedCount = updateResult.matchedCount ?? updateResult.n ?? 0;
+            if (matchedCount > 0 && notificationPayload) {
+                schedulePostMessageNotifications(notificationPayload);
+            }
+            return;
+        }
+
+        const moderatedMessage = await Message.findOneAndUpdate(
+            {
+                _id: messageId,
+                isRecalled: { $ne: true },
+            },
+            {
+                $set: {
+                    reportStatus: true,
+                    'metadata.imageModerationStatus': moderationStatus,
+                    'metadata.imageModerationCategory': result.category || 'unknown',
+                    'metadata.imageModerationReason': String(result.reason || '').slice(0, 1000),
+                },
+            },
+            { new: true }
+        ).lean();
+
+        await cleanupRejectedImage(publicId);
+
+        if (!moderatedMessage) return;
+
+        const conversation = await Conversation.findById(conversationId);
+        if (conversation?.lastMessage?._id?.toString?.() === messageId.toString()) {
+            conversation.lastMessage.content = 'Tin nhắn vi phạm tiêu chuẩn cộng đồng';
+            await conversation.save();
+        }
+
+        io.to(conversationId.toString()).emit('message-moderated', {
+            conversationId: conversationId.toString(),
+            messageId: messageId.toString(),
+            reportStatus: true,
+            content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
+        });
+    } catch (error) {
+        console.error('[ImageModeration] Background review failed:', error);
+    }
+}
+
+function scheduleImageModeration(payload) {
+    setImmediate(() => {
+        void moderateDeliveredImage(payload);
+    });
+}
+
+async function sendPostMessageNotifications({ conversation, message, senderId, senderName, senderAvatarUrl }) {
+    const mentionTargetIds = new Set(
+        (message.mentions || [])
+            .map((mention) => mention.userId.toString())
+            .filter((mentionUserId) => mentionUserId !== senderId.toString())
+    );
+
+    try {
+        await sendOfflineMessagePushes({
+            conversation,
+            message,
+            senderId,
+            senderName,
+            skipUserIds: mentionTargetIds,
+        });
+    } catch (error) {
+        console.error('Error sending offline message pushes:', error);
+    }
+
+    if (!Array.isArray(message.mentions) || message.mentions.length === 0) return;
+
+    const cleanContent = replaceMentionTags(message.content, message.mentions);
+    const preview = cleanContent?.substring(0, 100) ?? '';
+    const conversationUrl = `${process.env.FRONTEND_URL}/chat?conversationId=${conversation._id}&messageId=${message._id}`;
+    const mentionTargets = new Set();
+
+    for (const mention of message.mentions) {
+        const mentionUserId = mention.userId.toString();
+        if (mentionUserId === senderId.toString() || mentionTargets.has(mentionUserId)) continue;
+
+        mentionTargets.add(mentionUserId);
+
+        const delivered = await emitToUser(mentionUserId, 'user_mentioned', {
+            messageId: message._id,
+            conversationId: message.conversationId,
+            mentionedBy: {
+                userId: senderId,
+                displayName: senderName,
+                avatarUrl: senderAvatarUrl,
+            },
+            preview,
+            createdAt: message.createdAt,
+        });
+
+        if (delivered) continue;
+
+        await createNotification(
+            mention.userId,
+            'Bạn được nhắc đến',
+            `${senderName}${preview ? `: "${preview}"` : ''}`,
+            conversationUrl,
+            {
+                type: 'mention',
+                targetId: message._id,
+                actorId: senderId,
+                recipientId: mention.userId,
+                metadata: {
+                    conversationId: conversation._id.toString(),
+                    preview,
+                },
+            }
+        );
+
+        try {
+            await sendPushToUser(mentionUserId, {
+                title: 'Bạn được nhắc đến',
+                body: `${senderName}${preview ? `: ${preview}` : ''}`,
+                url: conversationUrl,
+            });
+        } catch (pushError) {
+            console.error('Error sending mention push notification:', pushError);
+        }
+    }
+}
+
+function schedulePostMessageNotifications(payload) {
+    setImmediate(() => {
+        void sendPostMessageNotifications(payload).catch((error) => {
+            console.error('Error sending post-message notifications:', error);
+        });
+    });
+}
+
 const saveConversationForNewMessage = async ({ conversationId, message, senderId, mentions = [] }) => {
     const maxAttempts = 3;
 
@@ -310,10 +533,15 @@ const saveConversationForNewMessage = async ({ conversationId, message, senderId
 };
 
 export async function sendMessage(req, res) {
+    let pendingImageModeration = null;
+
     try {
         const senderId = req.user._id;
         const { type = 'text', recipientId, content, replyTo } = req.body;
         const uploadedFile = req.file;
+        const uploadedFileName = uploadedFile
+            ? normalizeUploadedFileName(req.body.fileName, uploadedFile.originalname, type === 'audio' ? 'voice_message.webm' : 'file')
+            : '';
         parseMentionPayload(req.body.mentions);
         const metadata = parseMessageMetadata(req.body.metadata);
 
@@ -375,7 +603,8 @@ export async function sendMessage(req, res) {
                     return res.status(400).json({ message: `Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.` });
                 }
 
-                const moderationResult = await moderateTextMessage(trimmedContent);
+                const moderationContent = replaceMentionTags(trimmedContent);
+                const moderationResult = await moderateTextMessage(moderationContent);
 
                 if (moderationResult.blocked) {
                     return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn vi phạm tiêu chuẩn cộng đồng.', 'text');
@@ -431,17 +660,20 @@ export async function sendMessage(req, res) {
                 const imageBuffer = uploadedFile.buffer;
                 const mimeType = uploadedFile.mimetype;
 
-                const moderationResult = await moderateImageMessage(imageBuffer, mimeType);
-
-                if (moderationResult.blocked) {
-                    return respondWithModerationBlock(req, res, moderationResult, 'Ảnh vi phạm tiêu chuẩn cộng đồng.', 'image');
-                }
-
                 const result = await safeUpload(uploadChatImageFromBuffer, uploadedFile.buffer);
                 messageData.filePublicId = result.public_id;
-                messageData.fileName = uploadedFile.originalname;
+                messageData.fileName = uploadedFileName;
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
+                messageData.metadata = {
+                    ...(messageData.metadata || {}),
+                    imageModerationStatus: IMAGE_MODERATION_STATUS_PENDING,
+                };
+                pendingImageModeration = {
+                    publicId: result.public_id,
+                    imageBuffer,
+                    mimeType,
+                };
                 if (content?.trim()) messageData.content = content.trim();
                 break;
             }
@@ -459,10 +691,10 @@ export async function sendMessage(req, res) {
                 const result = await safeUpload(
                     uploadRawFileFromBuffer,
                     uploadedFile.buffer,
-                    uploadedFile.originalname
+                    uploadedFileName
                 );
                 messageData.filePublicId = result.public_id;
-                messageData.fileName = uploadedFile.originalname;
+                messageData.fileName = uploadedFileName;
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
                 if (content?.trim()) messageData.content = content.trim();
@@ -490,7 +722,7 @@ export async function sendMessage(req, res) {
 
                 const transcript = await transcribeAudioFromBuffer(
                     uploadedFile.buffer,
-                    uploadedFile.originalname || 'voice_message.webm',
+                    uploadedFileName || 'voice_message.webm',
                     uploadedFile.mimetype || 'audio/webm'
                 );
 
@@ -509,11 +741,11 @@ export async function sendMessage(req, res) {
                 const result = await safeUpload(
                     uploadAudioFromBuffer,
                     uploadedFile.buffer,
-                    uploadedFile.originalname || 'voice_message.webm'
+                    uploadedFileName || 'voice_message.webm'
                 );
 
                 messageData.filePublicId = result.public_id;
-                messageData.fileName = uploadedFile.originalname || 'voice_message.webm';
+                messageData.fileName = uploadedFileName || 'voice_message.webm';
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
                 if (cleanTranscript) {
@@ -558,7 +790,18 @@ export async function sendMessage(req, res) {
         if (replyTo) {
             const repliedMessage = await Message.findById(replyTo);
             if (!repliedMessage || repliedMessage.conversationId.toString() !== conversation._id.toString()) {
+                if (pendingImageModeration?.publicId) {
+                    void cleanupRejectedImage(pendingImageModeration.publicId);
+                    pendingImageModeration = null;
+                }
                 return res.status(400).json({ message: 'Tin nhắn trả lời không hợp lệ.' });
+            }
+            if (repliedMessage.isRecalled || repliedMessage.reportStatus) {
+                if (pendingImageModeration?.publicId) {
+                    void cleanupRejectedImage(pendingImageModeration.publicId);
+                    pendingImageModeration = null;
+                }
+                return res.status(400).json({ message: 'Không thể trả lời tin nhắn đã bị ẩn.' });
             }
             messageData.replyTo = replyTo;
         }
@@ -568,7 +811,7 @@ export async function sendMessage(req, res) {
         if (message.replyTo) {
             message = await message.populate({
                 path: 'replyTo',
-                select: '_id senderId type content fileName isRecalled reportStatus mentions',
+                select: REPLY_TO_SELECT,
                 populate: { path: 'senderId', select: 'displayName' },
             });
         }
@@ -600,79 +843,31 @@ export async function sendMessage(req, res) {
         const signedUrl = generateSignedUrl(message.filePublicId, message.type);
         emitNewMessage(io, conversation, message, signedUrl);
 
-        const mentionTargetIds = new Set(
-            (message.mentions || [])
-                .map((mention) => mention.userId.toString())
-                .filter((mentionUserId) => mentionUserId !== senderId.toString())
-        );
-
-        await sendOfflineMessagePushes({
+        const notificationPayload = {
             conversation,
             message,
             senderId,
             senderName: req.user.displayName,
-            skipUserIds: mentionTargetIds,
-        });
+            senderAvatarUrl: req.user.avatarUrl,
+        };
 
-        if (Array.isArray(message.mentions) && message.mentions.length > 0) {
-            const cleanContent = replaceMentionTags(message.content, message.mentions);
-            const preview = cleanContent?.substring(0, 100) ?? '';
-            const conversationUrl = `${process.env.FRONTEND_URL}/chat?conversationId=${conversation._id}&messageId=${message._id}`;
-            const mentionTargets = new Set();
-
-            for (const mention of message.mentions) {
-                const mentionUserId = mention.userId.toString();
-                if (mentionUserId === senderId.toString() || mentionTargets.has(mentionUserId)) {
-                    continue;
-                }
-
-                mentionTargets.add(mentionUserId);
-
-                const delivered = await emitToUser(mentionUserId, 'user_mentioned', {
-                    messageId: message._id,
-                    conversationId: message.conversationId,
-                    mentionedBy: {
-                        userId: senderId,
-                        displayName: req.user.displayName,
-                        avatarUrl: req.user.avatarUrl,
-                    },
-                    preview,
-                    createdAt: message.createdAt,
-                });
-
-                if (!delivered) {
-                    await createNotification(
-                        mention.userId,
-                        'Bạn được nhắc đến',
-                        `${req.user.displayName}${preview ? `: "${preview}"` : ''}`,
-                        conversationUrl,
-                        {
-                            type: 'mention',
-                            targetId: message._id,
-                            actorId: senderId,
-                            recipientId: mention.userId,
-                            metadata: {
-                                conversationId: conversation._id.toString(),
-                                preview,
-                            },
-                        }
-                    );
-
-                    try {
-                        await sendPushToUser(mentionUserId, {
-                            title: 'Bạn được nhắc đến',
-                            body: `${req.user.displayName}${preview ? `: ${preview}` : ''}`,
-                            url: conversationUrl,
-                        });
-                    } catch (pushError) {
-                        console.error('Error sending mention push notification:', pushError);
-                    }
-                }
-            }
+        if (pendingImageModeration) {
+            scheduleImageModeration({
+                ...pendingImageModeration,
+                messageId: message._id,
+                conversationId: conversation._id,
+                notificationPayload,
+            });
+            pendingImageModeration = null;
+        } else {
+            schedulePostMessageNotifications(notificationPayload);
         }
 
         return res.status(201).json({ message, signedUrl });
     } catch (error) {
+        if (pendingImageModeration?.publicId) {
+            void cleanupRejectedImage(pendingImageModeration.publicId);
+        }
         console.error('Error sending message:', error);
         const statusCode = error.statusCode ?? 500;
         const message = statusCode !== 500 ? error.message : 'Internal server error.';
@@ -992,14 +1187,14 @@ export async function searchMessages(req, res) {
         const limitNumber = clampSearchLimit(req.query.limit);
 
         if (!q) {
-            return res.status(400).json({ message: 'ChÆ°a nháº­p tá»« khÃ³a tÃ¬m kiáº¿m.' });
+            return res.status(400).json({ message: 'Chưa nhập từ khóa tìm kiếm.' });
         }
         if (q.length > MAX_SEARCH_QUERY_LENGTH) {
             return res.status(400).json({ message: `Search query must not exceed ${MAX_SEARCH_QUERY_LENGTH} characters.` });
         }
 
         if (!conversationId) {
-            return res.status(400).json({ message: 'Thiáº¿u conversationId.' });
+            return res.status(400).json({ message: 'Thiếu conversationId.' });
         }
 
         const conversation = await Conversation.findById(conversationId).select('participants').lean();
@@ -1122,7 +1317,7 @@ export async function searchMessages(req, res) {
                 .populate('senderId', 'displayName avatarUrl lock')
                 .populate({
                     path: 'replyTo',
-                    select: '_id senderId type content fileName isRecalled reportStatus mentions',
+                    select: REPLY_TO_SELECT,
                     populate: { path: 'senderId', select: 'displayName avatarUrl lock' },
                 })
                 .lean();
@@ -1133,7 +1328,7 @@ export async function searchMessages(req, res) {
                 .filter(Boolean)
                 .map((message) => ({
                     ...maskPopulatedSender(message),
-                    replyTo: message.replyTo ? maskPopulatedSender(message.replyTo) : message.replyTo,
+                    replyTo: message.replyTo ? sanitizeModeratedReply(message.replyTo) : message.replyTo,
                 }))
                 .map(({ searchContent, ...message }) => message);
         }
@@ -1145,7 +1340,7 @@ export async function searchMessages(req, res) {
         });
     } catch (error) {
         console.error('Error searching messages:', error);
-        return res.status(500).json({ message: 'Lá»—i mÃ¡y chá»§ ná»™i bá»™.' });
+        return res.status(500).json({ message: 'Lỗi máy chủ nội bộ.' });
     }
 }
 
@@ -1344,12 +1539,12 @@ export async function getSignedMediaUrl(req, res) {
         const userId = req.user._id.toString();
         const participant = conversation.participants.find((p) => p.userId.toString() === userId);
         if (participant?.clearedAt && new Date(message.createdAt).getTime() <= new Date(participant.clearedAt).getTime()) {
-            return res.status(404).json({ message: 'Tai nguyen khong con ton tai trong cuoc tro chuyen cua ban.' });
+            return res.status(404).json({ message: 'Tài nguyên không còn tồn tại trong cuộc trò chuyện của bạn.' });
         }
 
         const visibleToUserIds = getMessageVisibleToUserIds(message);
         if (visibleToUserIds.length > 0 && !visibleToUserIds.includes(userId)) {
-            return res.status(403).json({ message: 'Ban khong co quyen xem tai nguyen nay.' });
+            return res.status(403).json({ message: 'Bạn không có quyền xem tài nguyên này.' });
         }
 
         const signedUrl = generateSignedUrl(message.filePublicId, message.type);
@@ -1403,6 +1598,9 @@ export async function forwardMessage(req, res) {
         const sourceMetadata = source.metadata instanceof Map
             ? Object.fromEntries(source.metadata)
             : (source.metadata || {});
+        if (source.type === 'image' && sourceMetadata.imageModerationStatus === IMAGE_MODERATION_STATUS_PENDING) {
+            return res.status(409).json({ message: 'Ảnh đang được kiểm duyệt. Vui lòng thử lại sau.' });
+        }
         const forwardedFrom = {
             messageId: source._id.toString(),
             conversationId: source.conversationId.toString(),
