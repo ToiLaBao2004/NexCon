@@ -107,7 +107,7 @@ export function DurationPickerModal({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="overflow-y-auto px-4 py-2">
+        <div className="beautiful-scrollbar overflow-y-auto px-4 py-2">
           {DISAPPEARING_DURATION_OPTIONS.map((option) => (
             <button
               key={option.value}
@@ -155,6 +155,7 @@ export function DurationPickerModal({
                 disabled={readOnly}
                 onChange={(event) => setCustomValue(event.target.value)}
                 aria-label="Thời lượng tùy chỉnh"
+                className="hide-number-spin-button"
               />
               <select
                 value={customUnit}

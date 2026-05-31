@@ -300,6 +300,17 @@
     height: 4px;
 }
 
+.hide-number-spin-button {
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.hide-number-spin-button::-webkit-inner-spin-button,
+.hide-number-spin-button::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
 .stable-y-scroll {
     scrollbar-gutter: stable;
     overflow-anchor: none;
