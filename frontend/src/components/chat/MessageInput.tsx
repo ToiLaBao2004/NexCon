@@ -28,6 +28,7 @@ import {
 	normalizeMentionSearch,
 	reconcileDraftMentions,
 	sanitizeDraftMentions,
+	splitMentionMessagePayload,
 	type DraftMention,
 	type MentionCandidate,
 	type MentionTokenRange,
@@ -302,11 +303,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const prevMentions = selectedMentions;
 		const shouldRestoreFocus = shouldRestoreTextInputAfterSend();
 		const tokenized = buildMentionMessagePayload(currValue, prevMentions);
-		const tokenizedContent = tokenized.content.trim();
-		if (type === "text" && tokenizedContent.length > MAX_TEXT_MESSAGE_LENGTH) {
-			toast.error(`Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
-			return;
-		}
+		const textChunks = splitMentionMessagePayload(
+			tokenized.content,
+			tokenized.mentions,
+			MAX_TEXT_MESSAGE_LENGTH,
+		);
 		const withTarget = (payload: Parameters<typeof sendMessage>[0]) => {
 			if (selectedConvo.type === "direct") {
 				payload.recipientId = otherUserId as string;
@@ -333,7 +334,46 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		clearDraft(selectedConvo._id);
 		draftStorage.delete(selectedConvo._id);
 
-		let sentCount = 0;
+		let nextTextChunkIndex = 0;
+		let attachmentsSent = false;
+
+		const applyTextChunk = (
+			payload: Parameters<typeof sendMessage>[0],
+			chunk?: (typeof textChunks)[number],
+		) => {
+			if (!chunk) return payload;
+			payload.content = chunk.content;
+			if (chunk.mentions.length > 0) payload.mentions = chunk.mentions;
+			return payload;
+		};
+
+		const sendTextChunks = async (startIndex: number) => {
+			for (let index = startIndex; index < textChunks.length; index += 1) {
+				const chunk = textChunks[index];
+				const chunkType = type === "link" && textChunks.length === 1 ? "link" : "text";
+				await sendMessage(applyTextChunk(withTarget({ type: chunkType }), chunk));
+				nextTextChunkIndex = index + 1;
+			}
+		};
+
+		const getRestoredTextDraft = (skipFailedChunk: boolean) => {
+			const restoreStartIndex = Math.min(
+				textChunks.length,
+				nextTextChunkIndex + (skipFailedChunk ? 1 : 0),
+			);
+
+			if (restoreStartIndex === 0) {
+				return { value: currValue, mentions: prevMentions };
+			}
+
+			return {
+				value: textChunks
+					.slice(restoreStartIndex)
+					.map((chunk) => decodeMentionTokens(chunk.content, selectedConvo, chunk.mentions))
+					.join("\n"),
+				mentions: [],
+			};
+		};
 
 		try {
 			if (prevAttachments.length > 0) {
@@ -346,8 +386,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					const payload = withTarget({ type: item.type, file: item.file });
 
 					if (index === 0 || isImageBatch) {
-						if (tokenizedContent) payload.content = tokenizedContent;
-						if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
+						applyTextChunk(payload, textChunks[0]);
 					}
 					if (replyingTo?._id && isImageBatch) {
 						payload.replyToMessageId = replyingTo._id;
@@ -360,12 +399,12 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						};
 					}
 
-					return sendMessage(payload, (_pct) => {
-					});
+					return sendMessage(payload);
 				});
 
 				const results = await Promise.allSettled(sendTasks);
 				const isFilteredError = (reason: any) => isModerationBlockError(reason);
+				const fulfilledCount = results.filter((result) => result.status === "fulfilled").length;
 				const filteredCount = results.filter((result) =>
 					result.status === "rejected" && isFilteredError(result.reason)
 				).length;
@@ -379,18 +418,23 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				if (firstUploadError?.status === "rejected") {
 					throw firstUploadError.reason;
 				}
-			} else {
-				const payload = withTarget({ type });
-				if (tokenizedContent) payload.content = tokenizedContent;
-				if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
 
-				await sendMessage(payload, (_pct) => {
-				});
+				attachmentsSent = true;
+				if (textChunks[0] && fulfilledCount > 0) {
+					nextTextChunkIndex = 1;
+				}
+				await sendTextChunks(nextTextChunkIndex);
+			} else {
+				await sendTextChunks(0);
 			}
 
 			revokeAttachmentPreviews(prevAttachments);
 		} catch (error: any) {
-			if (prevAttachments.length > 1 && prevAttachments.every((item) => item.type === "image")) {
+			if (
+				!attachmentsSent
+				&& prevAttachments.length > 1
+				&& prevAttachments.every((item) => item.type === "image")
+			) {
 				revokeAttachmentPreviews(prevAttachments);
 				if (shouldRestoreFailedPayload()) {
 					valueRef.current = "";
@@ -406,35 +450,30 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			}
 
 			const isModerationError = isModerationBlockError(error);
+			const restoredTextDraft = getRestoredTextDraft(isModerationError);
+			const restoredAttachments = attachmentsSent || isModerationError ? [] : prevAttachments;
 
-			const failedAttachmentIndex = prevAttachments.length > 0 ? sentCount : -1;
-			const restoreStart = isModerationError && failedAttachmentIndex >= 0
-				? failedAttachmentIndex + 1
-				: sentCount;
-			const restoredAttachments = prevAttachments.slice(restoreStart);
-			const revokeCount = isModerationError && failedAttachmentIndex >= 0
-				? failedAttachmentIndex + 1
-				: sentCount;
-
-			revokeAttachmentPreviews(prevAttachments.slice(0, revokeCount));
+			if (attachmentsSent || isModerationError) {
+				revokeAttachmentPreviews(prevAttachments);
+			}
 
 			if (isModerationError) {
 				if (shouldRestoreFailedPayload()) {
-					valueRef.current = "";
+					valueRef.current = restoredTextDraft.value;
 					attachmentsRef.current = restoredAttachments;
-					setValue("");
+					setValue(restoredTextDraft.value);
 					setAttachments(restoredAttachments);
+					setSelectedMentions(restoredTextDraft.mentions);
 				}
 
 				showModerationBlockToast(error);
 			} else {
 				if (shouldRestoreFailedPayload()) {
-					const restoredValue = sentCount === 0 ? currValue : "";
-					valueRef.current = restoredValue;
+					valueRef.current = restoredTextDraft.value;
 					attachmentsRef.current = restoredAttachments;
-					setValue(restoredValue);
+					setValue(restoredTextDraft.value);
 					setAttachments(restoredAttachments);
-					setSelectedMentions(sentCount === 0 ? prevMentions : []);
+					setSelectedMentions(restoredTextDraft.mentions);
 				}
 
 				toast.error(
@@ -687,31 +726,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		const imageItems = items.filter((item) => item.type.startsWith("image/"));
 		if (imageItems.length === 0) {
-			const pastedText = e.clipboardData.getData("text");
-			if (!pastedText) return;
-
-			const textarea = e.currentTarget;
-			const start = textarea.selectionStart ?? value.length;
-			const end = textarea.selectionEnd ?? value.length;
-			const nextValue = `${value.slice(0, start)}${pastedText}${value.slice(end)}`;
-
-			if (nextValue.length <= MAX_TEXT_MESSAGE_LENGTH) return;
-
-			e.preventDefault();
-			const available = MAX_TEXT_MESSAGE_LENGTH - (value.length - (end - start));
-			const insertedText = pastedText.slice(0, Math.max(0, available));
-			const truncatedValue = `${value.slice(0, start)}${insertedText}${value.slice(end)}`;
-			const previousValue = valueRef.current;
-			valueRef.current = truncatedValue;
-			setValue(truncatedValue);
-			setSelectedMentions((current) => reconcileDraftMentions(previousValue, truncatedValue, current));
-			requestAnimationFrame(() => {
-				const nextCursor = start + insertedText.length;
-				textarea.style.height = "auto";
-				textarea.style.height = `${textarea.scrollHeight}px`;
-				textarea.setSelectionRange(nextCursor, nextCursor);
-			});
-			toast.warning(`Tin nhắn quá dài, đã thu gọn xuống còn ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
 			return;
 		}
 
@@ -933,7 +947,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}
 
 	const canSend = attachments.length > 0 || value.trim().length > 0;
-	const showTextLimit = value.length >= MAX_TEXT_MESSAGE_LENGTH - 100;
 	const handleSendButtonPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
 		if (!isMobile || event.pointerType === "mouse" || !canSend) return;
 		if (typeof document !== "undefined" && document.activeElement === textInputRef.current) {
@@ -1134,7 +1147,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 								restoreMessageScrollPosition();
 								markAsSeen();
 							}}
-							maxLength={MAX_TEXT_MESSAGE_LENGTH}
 							enterKeyHint="send"
 							rows={1}
 							placeholder={
@@ -1142,7 +1154,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									? ""
 									: ""
 							}
-							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-hidden bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none"
+							className="beautiful-scrollbar pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none"
 						/>
 						{mentionOpen && (
 							<div className="absolute bottom-full left-0 z-40 mb-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/70 bg-popover shadow-xl">
@@ -1206,11 +1218,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					</Button>
 				)}
 			</div>
-			{showTextLimit && !isRecording && (
-				<div className="px-3 pb-1 text-right text-[11px] text-muted-foreground">
-					{value.length}/{MAX_TEXT_MESSAGE_LENGTH}
-				</div>
-			)}
 		</div>
 	);
 };
