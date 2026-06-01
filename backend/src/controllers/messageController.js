@@ -48,23 +48,9 @@ const MAX_SEARCH_QUERY_LENGTH = 100;
 const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
 const SEARCH_SCAN_BATCH_SIZE = 100;
-const IMAGE_MODERATION_STATUS_PENDING = 'pending_review';
-const IMAGE_CLEANUP_RETRY_DELAYS_MS = [0, 500, 2000];
+const MESSAGE_MODERATION_STATUS_PENDING = 'pending_review';
+const MEDIA_CLEANUP_RETRY_DELAYS_MS = [0, 500, 2000];
 const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled isExpired expiresAt reportStatus mentions';
-const moderationCategoryLabels = {
-    abusive: 'Ngôn từ xúc phạm',
-    harassment: 'Quấy rối hoặc công kích cá nhân',
-    hate: 'Ngôn từ thù ghét',
-    sexual: 'Nội dung tình dục hoặc nhạy cảm',
-    dangerous: 'Nội dung nguy hiểm',
-    scam: 'Lừa đảo hoặc giả mạo',
-    self_harm: 'Tự gây hại',
-    spam: 'Spam gây hại',
-    unsafe_link: 'Liên kết không an toàn',
-    illegal: 'Nội dung bất hợp pháp',
-    violence: 'Bạo lực hoặc đe dọa',
-    unknown: 'Vi phạm tiêu chuẩn cộng đồng',
-};
 
 const FILENAME_MOJIBAKE_PATTERN = /(?:[\u00C2-\u00C4][\u0080-\u00BF])|(?:\u00E1[\u00BA-\u00BF][\u0080-\u00BF])|(?:\u00C3[\u0080-\u00BF])/;
 const FILENAME_MOJIBAKE_SCORE_PATTERN = /[\u0080-\u009F\u00C2-\u00C4]|\u00E1[\u00BA-\u00BF]/g;
@@ -135,43 +121,6 @@ function getMessageVisibleToUserIds(message) {
     return Array.isArray(metadata.visibleToUserIds)
         ? metadata.visibleToUserIds.map((id) => id.toString())
         : [];
-}
-
-function respondWithModerationBlock(req, res, moderationResult, message, messageType) {
-    const reason = moderationResult.reason || message;
-    const categoryLabel = moderationCategoryLabels[moderationResult.category] || moderationCategoryLabels.unknown;
-    const restrictionMessage = 'Tin nhắn chưa được gửi và chưa được tính vào số lần vi phạm. Nếu bạn cho rằng AI nhầm lẫn, hãy chỉnh sửa nội dung rồi gửi lại.';
-
-    return res.status(400).json({
-        code: 'COMMUNITY_STANDARD_VIOLATION',
-        title: 'Tin nhắn chưa được gửi',
-        message: `${message} Lý do: ${categoryLabel}. ${reason}`,
-        detail: restrictionMessage,
-        whatViolated: {
-            category: moderationResult.category || 'unknown',
-            label: categoryLabel,
-            reason,
-            confidence: moderationResult.confidence ?? null,
-            messageType,
-        },
-        restriction: {
-            type: 'message_block',
-            locked: false,
-            blockedUntil: null,
-            isTemporary: false,
-            canAppeal: false,
-            detailsUrl: '/community-standards',
-            appealUrl: '/signin',
-            message: restrictionMessage,
-        },
-        moderation: {
-            category: moderationResult.category,
-            reason,
-            source: moderationResult.source,
-            confidence: moderationResult.confidence ?? null,
-            countedAsViolation: false,
-        },
-    });
 }
 
 const parseMessageMetadata = (rawMetadata) => {
@@ -309,22 +258,181 @@ async function sendOfflineMessagePushes({ conversation, message, senderId, sende
     }));
 }
 
-async function cleanupRejectedImage(publicId) {
+function getModerationMediaResourceType(messageType) {
+    return messageType === 'image' ? 'image' : 'raw';
+}
+
+function isMessageModerationPending(metadata = {}) {
+    return metadata.moderationStatus === MESSAGE_MODERATION_STATUS_PENDING
+        || metadata.imageModerationStatus === MESSAGE_MODERATION_STATUS_PENDING;
+}
+
+function markMessageModerationPending(messageData, extraMetadata = {}) {
+    messageData.metadata = {
+        ...(messageData.metadata || {}),
+        moderationStatus: MESSAGE_MODERATION_STATUS_PENDING,
+        ...extraMetadata,
+    };
+}
+
+function skippedModerationResult(category, reason) {
+    return {
+        allowed: true,
+        blocked: false,
+        category,
+        confidence: 0,
+        reason,
+        userMessage: null,
+        source: 'system',
+        moderationSkipped: true,
+    };
+}
+
+function selectModerationResult(results = []) {
+    const availableResults = results.filter(Boolean);
+    return availableResults.find((result) => result.blocked)
+        || availableResults.find((result) => result.moderationSkipped || result.error || result.skipped)
+        || availableResults[0]
+        || skippedModerationResult('missing_content', 'Không có nội dung để kiểm duyệt.');
+}
+
+function getFileMetadataForModeration({ content, fileName, mimeType }) {
+    return [
+        content ? `Caption/content: ${content}` : '',
+        fileName ? `File name: ${fileName}` : '',
+        mimeType ? `MIME type: ${mimeType}` : '',
+    ].filter(Boolean).join('\n');
+}
+
+async function reviewDeliveredMessage({
+    type,
+    content,
+    mediaBuffer,
+    fileName,
+    mimeType,
+}) {
+    switch (type) {
+        case 'text':
+            return {
+                result: await moderateTextMessage(replaceMentionTags(content || ''), { modality: 'text' }),
+            };
+
+        case 'link':
+            return {
+                result: await moderateLinkMessage(content || ''),
+            };
+
+        case 'image': {
+            const results = await Promise.all([
+                moderateImageMessage(mediaBuffer, mimeType || 'image/jpeg'),
+                content?.trim()
+                    ? moderateTextMessage(replaceMentionTags(content), { modality: 'image_caption' })
+                    : null,
+            ]);
+            return { result: selectModerationResult(results) };
+        }
+
+        case 'audio': {
+            const transcript = await transcribeAudioFromBuffer(
+                mediaBuffer,
+                fileName || 'voice_message.webm',
+                mimeType || 'audio/webm'
+            );
+
+            if (!transcript) {
+                return {
+                    result: skippedModerationResult(
+                        'transcription_unavailable',
+                        'Không thể chuyển tin nhắn thoại thành văn bản.'
+                    ),
+                    transcript: '',
+                    transcriptStatus: 'unavailable',
+                };
+            }
+
+            return {
+                result: await moderateTextMessage(transcript, { modality: 'voice_transcript' }),
+                transcript,
+                transcriptStatus: 'completed',
+            };
+        }
+
+        case 'file': {
+            const metadataText = getFileMetadataForModeration({ content, fileName, mimeType });
+            const results = await Promise.all([
+                mimeType?.startsWith?.('image/') && mediaBuffer
+                    ? moderateImageMessage(mediaBuffer, mimeType)
+                    : null,
+                metadataText
+                    ? moderateTextMessage(metadataText, { modality: 'file_metadata' })
+                    : null,
+            ]);
+            return { result: selectModerationResult(results) };
+        }
+
+        default:
+            return {
+                result: skippedModerationResult('unsupported_type', `Loại tin nhắn ${type || 'không rõ'} chưa hỗ trợ kiểm duyệt.`),
+            };
+    }
+}
+
+function getModerationStatus(result) {
+    if (result.blocked) return 'rejected';
+    if (result.moderationSkipped || result.error || result.skipped) return 'skipped';
+    return 'approved';
+}
+
+function buildModerationUpdate({ type, result, transcript, transcriptStatus }) {
+    const moderationStatus = getModerationStatus(result);
+    const fields = {
+        'metadata.moderationStatus': moderationStatus,
+        'metadata.moderationCategory': result.category || (result.blocked ? 'unknown' : 'safe'),
+    };
+
+    if (result.reason && moderationStatus !== 'approved') {
+        fields['metadata.moderationReason'] = String(result.reason).slice(0, 1000);
+    }
+
+    if (type === 'image') {
+        fields['metadata.imageModerationStatus'] = moderationStatus;
+        fields['metadata.imageModerationCategory'] = fields['metadata.moderationCategory'];
+        if (fields['metadata.moderationReason']) {
+            fields['metadata.imageModerationReason'] = fields['metadata.moderationReason'];
+        }
+    }
+
+    if (type === 'audio') {
+        fields['metadata.transcriptStatus'] = transcriptStatus || 'unavailable';
+        if (!result.blocked && transcript) {
+            fields.content = transcript;
+            fields.searchContent = normalizeVietnamese(transcript);
+        }
+    }
+
+    return fields;
+}
+
+function getMatchedCount(updateResult) {
+    return updateResult.matchedCount ?? updateResult.n ?? 0;
+}
+
+async function cleanupRejectedMedia(publicId, resourceType) {
     if (!publicId) return;
 
-    for (let index = 0; index < IMAGE_CLEANUP_RETRY_DELAYS_MS.length; index += 1) {
-        const delay = IMAGE_CLEANUP_RETRY_DELAYS_MS[index];
+    for (let index = 0; index < MEDIA_CLEANUP_RETRY_DELAYS_MS.length; index += 1) {
+        const delay = MEDIA_CLEANUP_RETRY_DELAYS_MS[index];
         if (delay > 0) {
             await new Promise((resolve) => setTimeout(resolve, delay));
         }
 
         try {
-            await deleteCloudinaryResource(publicId, 'image', 'authenticated');
+            await deleteCloudinaryResource(publicId, resourceType, 'authenticated');
             return;
         } catch (error) {
-            const isLastAttempt = index === IMAGE_CLEANUP_RETRY_DELAYS_MS.length - 1;
+            const isLastAttempt = index === MEDIA_CLEANUP_RETRY_DELAYS_MS.length - 1;
             console.error(
-                `[ImageModeration] Cannot delete rejected asset${isLastAttempt ? '' : ', retrying'}:`,
+                `[Moderation] Cannot delete rejected asset${isLastAttempt ? '' : ', retrying'}:`,
                 publicId,
                 error?.message || error
             );
@@ -332,37 +440,58 @@ async function cleanupRejectedImage(publicId) {
     }
 }
 
-async function moderateDeliveredImage({
+async function moderateDeliveredMessage({
     messageId,
     conversationId,
+    type,
     publicId,
-    imageBuffer,
+    mediaBuffer,
+    content,
+    fileName,
     mimeType,
     notificationPayload,
 }) {
     try {
-        const result = await moderateImageMessage(imageBuffer, mimeType);
-        const moderationStatus = result.blocked
-            ? 'rejected'
-            : (result.moderationSkipped ? 'skipped' : 'approved');
+        const review = await reviewDeliveredMessage({
+            type,
+            content,
+            mediaBuffer,
+            fileName,
+            mimeType,
+        });
+        const updateFields = buildModerationUpdate({ type, ...review });
+        const result = review.result;
 
         if (!result.blocked) {
             const updateResult = await Message.updateOne(
                 {
                     _id: messageId,
                     isRecalled: { $ne: true },
-                    'metadata.imageModerationStatus': IMAGE_MODERATION_STATUS_PENDING,
+                    reportStatus: { $ne: true },
+                    'metadata.moderationStatus': MESSAGE_MODERATION_STATUS_PENDING,
                 },
                 {
-                    $set: {
-                        'metadata.imageModerationStatus': moderationStatus,
-                        'metadata.imageModerationCategory': result.category || 'safe',
-                    },
+                    $set: updateFields,
                 }
             );
-            const matchedCount = updateResult.matchedCount ?? updateResult.n ?? 0;
-            if (matchedCount > 0 && notificationPayload) {
-                schedulePostMessageNotifications(notificationPayload);
+
+            if (getMatchedCount(updateResult) > 0) {
+                if (type === 'audio') {
+                    io.to(conversationId.toString()).emit('message-moderation-updated', {
+                        conversationId: conversationId.toString(),
+                        messageId: messageId.toString(),
+                        content: review.transcript || null,
+                        metadata: {
+                            moderationStatus: updateFields['metadata.moderationStatus'],
+                            moderationCategory: updateFields['metadata.moderationCategory'],
+                            transcriptStatus: updateFields['metadata.transcriptStatus'],
+                        },
+                    });
+                }
+
+                if (notificationPayload) {
+                    schedulePostMessageNotifications(notificationPayload);
+                }
             }
             return;
         }
@@ -371,19 +500,21 @@ async function moderateDeliveredImage({
             {
                 _id: messageId,
                 isRecalled: { $ne: true },
+                reportStatus: { $ne: true },
+                'metadata.moderationStatus': MESSAGE_MODERATION_STATUS_PENDING,
             },
             {
                 $set: {
                     reportStatus: true,
-                    'metadata.imageModerationStatus': moderationStatus,
-                    'metadata.imageModerationCategory': result.category || 'unknown',
-                    'metadata.imageModerationReason': String(result.reason || '').slice(0, 1000),
+                    ...updateFields,
                 },
             },
             { new: true }
         ).lean();
 
-        await cleanupRejectedImage(publicId);
+        if (publicId) {
+            await cleanupRejectedMedia(publicId, getModerationMediaResourceType(type));
+        }
 
         if (!moderatedMessage) return;
 
@@ -400,13 +531,53 @@ async function moderateDeliveredImage({
             content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
         });
     } catch (error) {
-        console.error('[ImageModeration] Background review failed:', error);
+        console.error('[Moderation] Background review failed:', error);
+
+        try {
+            const skippedFields = buildModerationUpdate({
+                type,
+                result: skippedModerationResult('moderation_error', 'Không thể hoàn tất kiểm duyệt nền.'),
+                transcriptStatus: type === 'audio' ? 'unavailable' : undefined,
+            });
+            const updateResult = await Message.updateOne(
+                {
+                    _id: messageId,
+                    isRecalled: { $ne: true },
+                    reportStatus: { $ne: true },
+                    'metadata.moderationStatus': MESSAGE_MODERATION_STATUS_PENDING,
+                },
+                {
+                    $set: skippedFields,
+                }
+            );
+
+            if (getMatchedCount(updateResult) > 0) {
+                if (type === 'audio') {
+                    io.to(conversationId.toString()).emit('message-moderation-updated', {
+                        conversationId: conversationId.toString(),
+                        messageId: messageId.toString(),
+                        content: null,
+                        metadata: {
+                            moderationStatus: skippedFields['metadata.moderationStatus'],
+                            moderationCategory: skippedFields['metadata.moderationCategory'],
+                            transcriptStatus: skippedFields['metadata.transcriptStatus'],
+                        },
+                    });
+                }
+
+                if (notificationPayload) {
+                    schedulePostMessageNotifications(notificationPayload);
+                }
+            }
+        } catch (updateError) {
+            console.error('[Moderation] Cannot mark failed background review as skipped:', updateError);
+        }
     }
 }
 
-function scheduleImageModeration(payload) {
+function scheduleMessageModeration(payload) {
     setImmediate(() => {
-        void moderateDeliveredImage(payload);
+        void moderateDeliveredMessage(payload);
     });
 }
 
@@ -541,7 +712,7 @@ const saveConversationForNewMessage = async ({ conversationId, message, senderId
 };
 
 export async function sendMessage(req, res) {
-    let pendingImageModeration = null;
+    let pendingModeration = null;
     const deliveryStartedAt = new Date();
 
     try {
@@ -616,14 +787,12 @@ export async function sendMessage(req, res) {
                     return res.status(400).json({ message: `Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.` });
                 }
 
-                const moderationContent = replaceMentionTags(trimmedContent);
-                const moderationResult = await moderateTextMessage(moderationContent);
-
-                if (moderationResult.blocked) {
-                    return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn vi phạm tiêu chuẩn cộng đồng.', 'text');
-                }
-
                 messageData.content = trimmedContent;
+                markMessageModerationPending(messageData);
+                pendingModeration = {
+                    type,
+                    content: trimmedContent,
+                };
                 break;
             }
 
@@ -633,17 +802,20 @@ export async function sendMessage(req, res) {
                 }
 
                 const trimmedLink = content.trim();
-                const moderationResult = await moderateLinkMessage(trimmedLink);
-
-                if (moderationResult.blocked) {
-                    return respondWithModerationBlock(req, res, moderationResult, 'Link vi phạm tiêu chuẩn cộng đồng.', 'link');
-                }
-
                 let normalizedUrl = trimmedLink;
                 try {
                     normalizedUrl = new URL(trimmedLink).toString();
                 } catch {
-                    normalizedUrl = new URL(`https://${trimmedLink}`).toString();
+                    try {
+                        normalizedUrl = new URL(`https://${trimmedLink}`).toString();
+                    } catch {
+                        return res.status(400).json({ message: 'Link không hợp lệ.' });
+                    }
+                }
+
+                const normalizedProtocol = new URL(normalizedUrl).protocol.toLowerCase();
+                if (!['http:', 'https:'].includes(normalizedProtocol)) {
+                    return res.status(400).json({ message: 'Chỉ cho phép link http hoặc https.' });
                 }
 
                 messageData.content = normalizedUrl;
@@ -654,6 +826,11 @@ export async function sendMessage(req, res) {
                     linkPreview: preview,
                 };
 
+                markMessageModerationPending(messageData);
+                pendingModeration = {
+                    type,
+                    content: normalizedUrl,
+                };
                 break;
             }
 
@@ -678,13 +855,15 @@ export async function sendMessage(req, res) {
                 messageData.fileName = uploadedFileName;
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
-                messageData.metadata = {
-                    ...(messageData.metadata || {}),
-                    imageModerationStatus: IMAGE_MODERATION_STATUS_PENDING,
-                };
-                pendingImageModeration = {
+                markMessageModerationPending(messageData, {
+                    imageModerationStatus: MESSAGE_MODERATION_STATUS_PENDING,
+                });
+                pendingModeration = {
+                    type,
                     publicId: result.public_id,
-                    imageBuffer,
+                    mediaBuffer: imageBuffer,
+                    content: content?.trim() || '',
+                    fileName: uploadedFileName,
                     mimeType,
                 };
                 if (content?.trim()) messageData.content = content.trim();
@@ -711,6 +890,15 @@ export async function sendMessage(req, res) {
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
                 if (content?.trim()) messageData.content = content.trim();
+                markMessageModerationPending(messageData);
+                pendingModeration = {
+                    type,
+                    publicId: result.public_id,
+                    mediaBuffer: uploadedFile.buffer,
+                    content: content?.trim() || '',
+                    fileName: uploadedFileName,
+                    mimeType: uploadedFile.mimetype,
+                };
                 break;
             }
 
@@ -733,24 +921,6 @@ export async function sendMessage(req, res) {
                     });
                 }
 
-                const transcript = await transcribeAudioFromBuffer(
-                    uploadedFile.buffer,
-                    uploadedFileName || 'voice_message.webm',
-                    uploadedFile.mimetype || 'audio/webm'
-                );
-
-                const cleanTranscript = transcript;
-
-                if (cleanTranscript) {
-                    const moderationResult = await moderateTextMessage(cleanTranscript, { modality: 'voice_transcript' });
-
-                    if (moderationResult.blocked) {
-                        return respondWithModerationBlock(req, res, moderationResult, 'Tin nhắn thoại vi phạm tiêu chuẩn cộng đồng.', 'audio');
-                    }
-                } else {
-                    console.warn('[Moderation] Audio transcription unavailable, allowing voice message.');
-                }
-
                 const result = await safeUpload(
                     uploadAudioFromBuffer,
                     uploadedFile.buffer,
@@ -761,13 +931,15 @@ export async function sendMessage(req, res) {
                 messageData.fileName = uploadedFileName || 'voice_message.webm';
                 messageData.fileSize = uploadedFile.size;
                 messageData.mimeType = uploadedFile.mimetype;
-                if (cleanTranscript) {
-                    messageData.content = cleanTranscript;
-                }
-                messageData.metadata = {
-                    ...(messageData.metadata || {}),
-                    transcript: cleanTranscript || null,
-                    transcriptStatus: cleanTranscript ? 'completed' : 'unavailable',
+                markMessageModerationPending(messageData, {
+                    transcriptStatus: 'pending',
+                });
+                pendingModeration = {
+                    type,
+                    publicId: result.public_id,
+                    mediaBuffer: uploadedFile.buffer,
+                    fileName: uploadedFileName || 'voice_message.webm',
+                    mimeType: uploadedFile.mimetype,
                 };
 
                 break;
@@ -803,16 +975,16 @@ export async function sendMessage(req, res) {
         if (replyTo) {
             const repliedMessage = await Message.findById(replyTo);
             if (!repliedMessage || repliedMessage.conversationId.toString() !== conversation._id.toString()) {
-                if (pendingImageModeration?.publicId) {
-                    void cleanupRejectedImage(pendingImageModeration.publicId);
-                    pendingImageModeration = null;
+                if (pendingModeration?.publicId) {
+                    void cleanupRejectedMedia(pendingModeration.publicId, getModerationMediaResourceType(type));
+                    pendingModeration = null;
                 }
                 return res.status(400).json({ message: 'Tin nhắn trả lời không hợp lệ.' });
             }
             if (repliedMessage.isRecalled || repliedMessage.reportStatus || isMessageExpired(repliedMessage)) {
-                if (pendingImageModeration?.publicId) {
-                    void cleanupRejectedImage(pendingImageModeration.publicId);
-                    pendingImageModeration = null;
+                if (pendingModeration?.publicId) {
+                    void cleanupRejectedMedia(pendingModeration.publicId, getModerationMediaResourceType(type));
+                    pendingModeration = null;
                 }
                 return res.status(400).json({ message: 'Không thể trả lời tin nhắn đã bị ẩn.' });
             }
@@ -865,22 +1037,22 @@ export async function sendMessage(req, res) {
             senderAvatarUrl: req.user.avatarUrl,
         };
 
-        if (pendingImageModeration) {
-            scheduleImageModeration({
-                ...pendingImageModeration,
+        if (pendingModeration) {
+            scheduleMessageModeration({
+                ...pendingModeration,
                 messageId: message._id,
                 conversationId: conversation._id,
                 notificationPayload,
             });
-            pendingImageModeration = null;
+            pendingModeration = null;
         } else {
             schedulePostMessageNotifications(notificationPayload);
         }
 
         return res.status(201).json({ message, signedUrl });
     } catch (error) {
-        if (pendingImageModeration?.publicId) {
-            void cleanupRejectedImage(pendingImageModeration.publicId);
+        if (pendingModeration?.publicId) {
+            void cleanupRejectedMedia(pendingModeration.publicId, getModerationMediaResourceType(pendingModeration.type));
         }
         console.error('Error sending message:', error);
         const statusCode = error.statusCode ?? 500;
@@ -1632,8 +1804,8 @@ export async function forwardMessage(req, res) {
         const sourceMetadata = source.metadata instanceof Map
             ? Object.fromEntries(source.metadata)
             : (source.metadata || {});
-        if (source.type === 'image' && sourceMetadata.imageModerationStatus === IMAGE_MODERATION_STATUS_PENDING) {
-            return res.status(409).json({ message: 'Ảnh đang được kiểm duyệt. Vui lòng thử lại sau.' });
+        if (isMessageModerationPending(sourceMetadata)) {
+            return res.status(409).json({ message: 'Tin nhắn đang được kiểm duyệt. Vui lòng thử lại sau.' });
         }
         const forwardedFrom = {
             messageId: source._id.toString(),
