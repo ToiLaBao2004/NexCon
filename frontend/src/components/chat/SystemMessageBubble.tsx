@@ -56,13 +56,15 @@ export function SystemMessageBubble({
       >
         {hasActor ? (
           <>
-            <span className="inline-flex items-center gap-1.5 align-middle whitespace-nowrap">
-              <UserAvatar
-                type="seen"
-                name={actorName}
-                avatarUrl={actorAvatarUrl}
-                className="size-[20px] shrink-0 border border-background shadow-sm"
-              />
+            <span className="whitespace-nowrap">
+              <span className="mr-1.5 inline-flex align-[-4px]">
+                <UserAvatar
+                  type="seen"
+                  name={actorName}
+                  avatarUrl={actorAvatarUrl}
+                  className="size-[20px] shrink-0 border border-background shadow-sm"
+                />
+              </span>
               <span className="font-semibold text-foreground">{actorName}</span>
             </span>{" "}
             {getDisappearingSystemMessageActionText(message)}
