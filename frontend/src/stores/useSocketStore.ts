@@ -19,6 +19,7 @@ import { flashTabTitle } from "@/utils/tabTitle";
 import { useAppStatusStore } from "./useAppStatusStore";
 import { consumePendingNativeCallAction } from "@/lib/nativeCallAction";
 import type { UserPresence } from "@/types/user";
+import type { Message } from "@/types/chat";
 import { decodeMentionTokens } from "@/utils/mentions";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
@@ -1116,6 +1117,40 @@ export const useSocketStore = create<SocketState>((set, get) => ({
                 : conversation.lastMessage,
             };
           }),
+        };
+      });
+    });
+
+    socket.on("message-moderation-updated", ({ conversationId, messageId, content, metadata }) => {
+      const targetConversationId = conversationId?.toString?.() || conversationId;
+      const targetMessageId = messageId?.toString?.() || messageId;
+      if (!targetConversationId || !targetMessageId) return;
+
+      const patchMessage = (message: Message) =>
+        String(message._id) === String(targetMessageId)
+          ? {
+            ...message,
+            ...(content !== undefined ? { content } : {}),
+            metadata: {
+              ...(message.metadata || {}),
+              ...(metadata || {}),
+            },
+          }
+          : message;
+
+      useChatStore.setState((state) => {
+        const currentMessages = state.messages[targetConversationId];
+        if (!currentMessages) return state;
+
+        return {
+          messages: {
+            ...state.messages,
+            [targetConversationId]: {
+              ...currentMessages,
+              items: currentMessages.items.map(patchMessage),
+              pinnedMessages: (currentMessages.pinnedMessages || []).map(patchMessage),
+            },
+          },
         };
       });
     });
