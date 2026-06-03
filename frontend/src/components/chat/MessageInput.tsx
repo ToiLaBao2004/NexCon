@@ -9,7 +9,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
-import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
+import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic, UploadCloud } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
 import CachedStickerImage from "./CachedStickerImage";
 import SecureImage from "../SecureImage";
@@ -98,9 +98,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const [mentionOpen, setMentionOpen] = useState(false);
 	const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 	const [selectedMentions, setSelectedMentions] = useState<DraftMention[]>([]);
+	const [isDraggingFiles, setIsDraggingFiles] = useState(false);
 	const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const valueRef = useRef(value);
 	const attachmentsRef = useRef<Attachment[]>([]);
+	const dragDepthRef = useRef(0);
 
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const imageInputRef = useRef<HTMLInputElement>(null);
@@ -827,6 +829,56 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}, 400);
 	};
 
+	const hasFileDragData = (event: React.DragEvent<HTMLElement>) =>
+		Array.from(event.dataTransfer.types).includes("Files");
+
+	const handleAttachmentDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+		if (!hasFileDragData(event)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		event.dataTransfer.dropEffect = "copy";
+		dragDepthRef.current += 1;
+		setIsDraggingFiles(true);
+	};
+
+	const handleAttachmentDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+		if (!hasFileDragData(event)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		event.dataTransfer.dropEffect = "copy";
+	};
+
+	const handleAttachmentDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+		if (!hasFileDragData(event)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+		if (dragDepthRef.current === 0) {
+			setIsDraggingFiles(false);
+		}
+	};
+
+	const handleAttachmentDrop = (event: React.DragEvent<HTMLDivElement>) => {
+		if (!hasFileDragData(event)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		dragDepthRef.current = 0;
+		setIsDraggingFiles(false);
+
+		const droppedFiles = Array.from(event.dataTransfer.files ?? []);
+		if (droppedFiles.length === 0) return;
+
+		if (droppedFiles.every((file) => file.type.startsWith("image/"))) {
+			attachImages(droppedFiles);
+			return;
+		}
+
+		if (droppedFiles.length > 1) {
+			toast.warning("Chỉ có thể thả nhiều ảnh cùng lúc. Đã chọn file đầu tiên.");
+		}
+		attachFile(droppedFiles[0]);
+	};
+
 	/** Gửi trực tiếp một audio file (từ VoiceRecorder) */
 	const sendAudio = useCallback(async (file: File) => {
 		setIsRecording(false);
@@ -968,7 +1020,21 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	return (
-		<div className="flex min-w-0 flex-col bg-background border-t border-border/80">
+		<div
+			className={`relative flex min-w-0 flex-col bg-background border-t border-border/80 transition-colors ${isDraggingFiles ? "bg-primary/5" : ""}`}
+			onDragEnter={handleAttachmentDragEnter}
+			onDragLeave={handleAttachmentDragLeave}
+			onDragOver={handleAttachmentDragOver}
+			onDrop={handleAttachmentDrop}
+		>
+			{isDraggingFiles && (
+				<div className="pointer-events-none absolute inset-2 z-30 flex items-center justify-center rounded-lg border-2 border-dashed border-primary/50 bg-background/90 shadow-sm backdrop-blur-sm">
+					<div className="flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
+						<UploadCloud className="size-4 shrink-0" />
+						<span>Thả file để đính kèm</span>
+					</div>
+				</div>
+			)}
 
 			{replyingTo && (
 				<div className="flex items-center gap-2 px-3 pt-2.5 pb-1 animate-in slide-in-from-bottom-2 duration-200">
