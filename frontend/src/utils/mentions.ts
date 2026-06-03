@@ -205,6 +205,109 @@ export const buildMentionMessagePayload = (
 	return { content, mentions: payloadMentions };
 };
 
+export const splitMentionMessagePayload = (
+	content: string,
+	mentions: Mention[],
+	maxLength: number,
+): { content: string; mentions: Mention[] }[] => {
+	const sourceContent = String(content ?? "");
+	const normalizeTransportLineEndings = (value: string) =>
+		value.replace(/\r\n|\r|\n/g, "\r\n");
+	const rawContent = normalizeTransportLineEndings(sourceContent);
+	const normalizedContent = rawContent.trim();
+	const safeMaxLength = Math.floor(maxLength);
+
+	if (!normalizedContent) return [];
+	if (!Number.isFinite(safeMaxLength) || safeMaxLength <= 0) {
+		throw new Error("maxLength must be a positive number");
+	}
+
+	const leadingWhitespaceLength = rawContent.length - rawContent.trimStart().length;
+	const normalizedMentions = mentions.map((mention) => {
+		const transportStart = normalizeTransportLineEndings(
+			sourceContent.slice(0, mention.offset),
+		).length;
+		const transportEnd = normalizeTransportLineEndings(
+			sourceContent.slice(0, mention.offset + mention.length),
+		).length;
+
+		return {
+			...mention,
+			offset: transportStart - leadingWhitespaceLength,
+			length: transportEnd - transportStart,
+		};
+	});
+	const tokenRanges: { start: number; end: number }[] = [];
+	const tokenRegex = createMentionTokenRegex();
+	let tokenMatch: RegExpExecArray | null = null;
+
+	while ((tokenMatch = tokenRegex.exec(normalizedContent)) !== null) {
+		tokenRanges.push({
+			start: tokenMatch.index,
+			end: tokenMatch.index + tokenMatch[0].length,
+		});
+	}
+
+	const isInsideMentionToken = (boundary: number) =>
+		tokenRanges.some((range) => range.start < boundary && boundary < range.end);
+
+	const findSplitEnd = (start: number) => {
+		const hardEnd = Math.min(start + safeMaxLength, normalizedContent.length);
+		if (hardEnd >= normalizedContent.length) return hardEnd;
+
+		const intersectingToken = tokenRanges.find(
+			(range) => range.start < hardEnd && hardEnd < range.end,
+		);
+		let safeEnd = intersectingToken && intersectingToken.start > start
+			? intersectingToken.start
+			: hardEnd;
+		const preferredBreakFloor = start + Math.floor((safeEnd - start) / 2);
+
+		for (let index = safeEnd - 1; index > preferredBreakFloor; index -= 1) {
+			if (/\s/.test(normalizedContent[index]) && !isInsideMentionToken(index)) {
+				safeEnd = index;
+				break;
+			}
+		}
+
+		return safeEnd > start ? safeEnd : hardEnd;
+	};
+
+	const chunks: { content: string; mentions: Mention[] }[] = [];
+	let cursor = 0;
+
+	while (cursor < normalizedContent.length) {
+		const chunkStart = cursor;
+		const chunkEnd = findSplitEnd(chunkStart);
+		const rawChunk = normalizedContent.slice(chunkStart, chunkEnd);
+		const trimmedContent = rawChunk.trim();
+
+		if (trimmedContent) {
+			const leadingWhitespaceLength = rawChunk.length - rawChunk.trimStart().length;
+			const contentStart = chunkStart + leadingWhitespaceLength;
+			const contentEnd = contentStart + trimmedContent.length;
+			const chunkMentions = normalizedMentions
+				.filter((mention) =>
+					mention.offset >= contentStart
+					&& mention.offset + mention.length <= contentEnd
+				)
+				.map((mention) => ({
+					...mention,
+					offset: mention.offset - contentStart,
+				}));
+
+			chunks.push({ content: trimmedContent, mentions: chunkMentions });
+		}
+
+		cursor = chunkEnd;
+		while (cursor < normalizedContent.length && /\s/.test(normalizedContent[cursor])) {
+			cursor += 1;
+		}
+	}
+
+	return chunks;
+};
+
 export const sanitizeDraftMentions = (rawMentions: unknown, text: string): DraftMention[] => {
 	if (!Array.isArray(rawMentions)) return [];
 

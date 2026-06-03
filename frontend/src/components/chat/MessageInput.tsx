@@ -7,9 +7,10 @@ import EmojiPicker from "./EmojiPicker";
 import VoiceRecorder from "./VoiceRecorder";
 import { useChatStore } from "@/stores/useChatStore";
 import { useFriendStore } from "@/stores/useFriendStore";
+import { useImageViewerStore } from "@/stores/useImageViewerStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
-import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic } from "lucide-react";
+import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic, UploadCloud, Loader2 } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
 import CachedStickerImage from "./CachedStickerImage";
 import SecureImage from "../SecureImage";
@@ -28,6 +29,7 @@ import {
 	normalizeMentionSearch,
 	reconcileDraftMentions,
 	sanitizeDraftMentions,
+	splitMentionMessagePayload,
 	type DraftMention,
 	type MentionCandidate,
 	type MentionTokenRange,
@@ -40,9 +42,11 @@ const MAX_IMAGE_ATTACHMENTS = 10;
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
 
 interface Attachment {
+	id: string;
 	type: "image" | "file" | "audio";
 	file: File;
 	preview?: string;
+	isLoading?: boolean;
 }
 
 const revokeAttachmentPreview = (attachment?: Attachment | null) => {
@@ -62,19 +66,17 @@ const createClientBatchId = () => {
 	return `batch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: number, label?: string }) {
+const createAttachmentId = () => {
+	if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+		return crypto.randomUUID();
+	}
+	return `attachment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+function AttachmentLoadingOverlay() {
 	return (
-		<div className="px-3 pb-2">
-			<div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-				<span>{label}</span>
-				<span>{Math.round(percent)}%</span>
-			</div>
-			<div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-				<div
-					className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-200"
-					style={{ width: `${percent}%` }}
-				/>
-			</div>
+		<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-[1px]">
+			<Loader2 className="size-5 animate-spin text-primary" />
 		</div>
 	);
 }
@@ -90,16 +92,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const [value, setValue] = useState("");
 	const [attachments, setAttachments] = useState<Attachment[]>([]);
-	const [loadingLocal, setLoadingLocal] = useState(false);
 	const [isRecording, setIsRecording] = useState(false);
 	const [mentionQuery, setMentionQuery] = useState("");
 	const [mentionRange, setMentionRange] = useState<MentionTokenRange | null>(null);
 	const [mentionOpen, setMentionOpen] = useState(false);
 	const [activeMentionIndex, setActiveMentionIndex] = useState(0);
 	const [selectedMentions, setSelectedMentions] = useState<DraftMention[]>([]);
+	const [isDraggingFiles, setIsDraggingFiles] = useState(false);
 	const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const valueRef = useRef(value);
 	const attachmentsRef = useRef<Attachment[]>([]);
+	const dragDepthRef = useRef(0);
 
 	const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const imageInputRef = useRef<HTMLInputElement>(null);
@@ -267,6 +270,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const otherUser = participants.find((p) => p.userId?._id?.toString() !== currentUserId);
 	const otherUserId = otherUser?.userId?._id;
 	const isOtherUserLocked = Boolean(otherUser?.userId?.isLocked || otherUser?.userId?.lock?.isLocked);
+	const conversationInputName = selectedConvo.type === "direct"
+		? otherUser?.userId?.nickname?.trim() || otherUser?.userId?.displayName || "ng\u01b0\u1eddi d\u00f9ng"
+		: selectedConvo.group?.name || "nh\u00f3m";
+	const messageInputPlaceholder = `Nh\u1eadp tin nh\u1eafn t\u1edbi ${conversationInputName}`;
 
 	const isBlockedByMe = blockedUsers.some((u) => u._id === otherUserId);
 	const isBlockedByOther = otherUserId && blockedBy.includes(otherUserId);
@@ -302,11 +309,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		const prevMentions = selectedMentions;
 		const shouldRestoreFocus = shouldRestoreTextInputAfterSend();
 		const tokenized = buildMentionMessagePayload(currValue, prevMentions);
-		const tokenizedContent = tokenized.content.trim();
-		if (type === "text" && tokenizedContent.length > MAX_TEXT_MESSAGE_LENGTH) {
-			toast.error(`Tin nhắn không được vượt quá ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
-			return;
-		}
+		const textChunks = splitMentionMessagePayload(
+			tokenized.content,
+			tokenized.mentions,
+			MAX_TEXT_MESSAGE_LENGTH,
+		);
 		const withTarget = (payload: Parameters<typeof sendMessage>[0]) => {
 			if (selectedConvo.type === "direct") {
 				payload.recipientId = otherUserId as string;
@@ -333,7 +340,46 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		clearDraft(selectedConvo._id);
 		draftStorage.delete(selectedConvo._id);
 
-		let sentCount = 0;
+		let nextTextChunkIndex = 0;
+		let attachmentsSent = false;
+
+		const applyTextChunk = (
+			payload: Parameters<typeof sendMessage>[0],
+			chunk?: (typeof textChunks)[number],
+		) => {
+			if (!chunk) return payload;
+			payload.content = chunk.content;
+			if (chunk.mentions.length > 0) payload.mentions = chunk.mentions;
+			return payload;
+		};
+
+		const sendTextChunks = async (startIndex: number) => {
+			for (let index = startIndex; index < textChunks.length; index += 1) {
+				const chunk = textChunks[index];
+				const chunkType = type === "link" && textChunks.length === 1 ? "link" : "text";
+				await sendMessage(applyTextChunk(withTarget({ type: chunkType }), chunk));
+				nextTextChunkIndex = index + 1;
+			}
+		};
+
+		const getRestoredTextDraft = (skipFailedChunk: boolean) => {
+			const restoreStartIndex = Math.min(
+				textChunks.length,
+				nextTextChunkIndex + (skipFailedChunk ? 1 : 0),
+			);
+
+			if (restoreStartIndex === 0) {
+				return { value: currValue, mentions: prevMentions };
+			}
+
+			return {
+				value: textChunks
+					.slice(restoreStartIndex)
+					.map((chunk) => decodeMentionTokens(chunk.content, selectedConvo, chunk.mentions))
+					.join("\n"),
+				mentions: [],
+			};
+		};
 
 		try {
 			if (prevAttachments.length > 0) {
@@ -346,8 +392,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					const payload = withTarget({ type: item.type, file: item.file });
 
 					if (index === 0 || isImageBatch) {
-						if (tokenizedContent) payload.content = tokenizedContent;
-						if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
+						applyTextChunk(payload, textChunks[0]);
 					}
 					if (replyingTo?._id && isImageBatch) {
 						payload.replyToMessageId = replyingTo._id;
@@ -360,12 +405,12 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						};
 					}
 
-					return sendMessage(payload, (_pct) => {
-					});
+					return sendMessage(payload);
 				});
 
 				const results = await Promise.allSettled(sendTasks);
 				const isFilteredError = (reason: any) => isModerationBlockError(reason);
+				const fulfilledCount = results.filter((result) => result.status === "fulfilled").length;
 				const filteredCount = results.filter((result) =>
 					result.status === "rejected" && isFilteredError(result.reason)
 				).length;
@@ -379,18 +424,23 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				if (firstUploadError?.status === "rejected") {
 					throw firstUploadError.reason;
 				}
-			} else {
-				const payload = withTarget({ type });
-				if (tokenizedContent) payload.content = tokenizedContent;
-				if (tokenized.mentions.length > 0) payload.mentions = tokenized.mentions;
 
-				await sendMessage(payload, (_pct) => {
-				});
+				attachmentsSent = true;
+				if (textChunks[0] && fulfilledCount > 0) {
+					nextTextChunkIndex = 1;
+				}
+				await sendTextChunks(nextTextChunkIndex);
+			} else {
+				await sendTextChunks(0);
 			}
 
 			revokeAttachmentPreviews(prevAttachments);
 		} catch (error: any) {
-			if (prevAttachments.length > 1 && prevAttachments.every((item) => item.type === "image")) {
+			if (
+				!attachmentsSent
+				&& prevAttachments.length > 1
+				&& prevAttachments.every((item) => item.type === "image")
+			) {
 				revokeAttachmentPreviews(prevAttachments);
 				if (shouldRestoreFailedPayload()) {
 					valueRef.current = "";
@@ -406,35 +456,30 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			}
 
 			const isModerationError = isModerationBlockError(error);
+			const restoredTextDraft = getRestoredTextDraft(isModerationError);
+			const restoredAttachments = attachmentsSent || isModerationError ? [] : prevAttachments;
 
-			const failedAttachmentIndex = prevAttachments.length > 0 ? sentCount : -1;
-			const restoreStart = isModerationError && failedAttachmentIndex >= 0
-				? failedAttachmentIndex + 1
-				: sentCount;
-			const restoredAttachments = prevAttachments.slice(restoreStart);
-			const revokeCount = isModerationError && failedAttachmentIndex >= 0
-				? failedAttachmentIndex + 1
-				: sentCount;
-
-			revokeAttachmentPreviews(prevAttachments.slice(0, revokeCount));
+			if (attachmentsSent || isModerationError) {
+				revokeAttachmentPreviews(prevAttachments);
+			}
 
 			if (isModerationError) {
 				if (shouldRestoreFailedPayload()) {
-					valueRef.current = "";
+					valueRef.current = restoredTextDraft.value;
 					attachmentsRef.current = restoredAttachments;
-					setValue("");
+					setValue(restoredTextDraft.value);
 					setAttachments(restoredAttachments);
+					setSelectedMentions(restoredTextDraft.mentions);
 				}
 
 				showModerationBlockToast(error);
 			} else {
 				if (shouldRestoreFailedPayload()) {
-					const restoredValue = sentCount === 0 ? currValue : "";
-					valueRef.current = restoredValue;
+					valueRef.current = restoredTextDraft.value;
 					attachmentsRef.current = restoredAttachments;
-					setValue(restoredValue);
+					setValue(restoredTextDraft.value);
 					setAttachments(restoredAttachments);
-					setSelectedMentions(sentCount === 0 ? prevMentions : []);
+					setSelectedMentions(restoredTextDraft.mentions);
 				}
 
 				toast.error(
@@ -628,9 +673,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				: undefined;
 
 			const nextAttachments = [{
+				id: createAttachmentId(),
 				type: draftAttachment.type,
 				file: draftAttachment.file,
-				preview: preview
+				preview: preview,
+				isLoading: false
 			}];
 			attachmentsRef.current = nextAttachments;
 			setAttachments(nextAttachments);
@@ -641,9 +688,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						? URL.createObjectURL(stored.file)
 						: undefined;
 					const nextAttachments = [{
+						id: createAttachmentId(),
 						type: stored.type,
 						file: stored.file,
-						preview
+						preview,
+						isLoading: false
 					}];
 					attachmentsRef.current = nextAttachments;
 					setAttachments(nextAttachments);
@@ -687,31 +736,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 		const imageItems = items.filter((item) => item.type.startsWith("image/"));
 		if (imageItems.length === 0) {
-			const pastedText = e.clipboardData.getData("text");
-			if (!pastedText) return;
-
-			const textarea = e.currentTarget;
-			const start = textarea.selectionStart ?? value.length;
-			const end = textarea.selectionEnd ?? value.length;
-			const nextValue = `${value.slice(0, start)}${pastedText}${value.slice(end)}`;
-
-			if (nextValue.length <= MAX_TEXT_MESSAGE_LENGTH) return;
-
-			e.preventDefault();
-			const available = MAX_TEXT_MESSAGE_LENGTH - (value.length - (end - start));
-			const insertedText = pastedText.slice(0, Math.max(0, available));
-			const truncatedValue = `${value.slice(0, start)}${insertedText}${value.slice(end)}`;
-			const previousValue = valueRef.current;
-			valueRef.current = truncatedValue;
-			setValue(truncatedValue);
-			setSelectedMentions((current) => reconcileDraftMentions(previousValue, truncatedValue, current));
-			requestAnimationFrame(() => {
-				const nextCursor = start + insertedText.length;
-				textarea.style.height = "auto";
-				textarea.style.height = `${textarea.scrollHeight}px`;
-				textarea.setSelectionRange(nextCursor, nextCursor);
-			});
-			toast.warning(`Tin nhắn quá dài, đã thu gọn xuống còn ${MAX_TEXT_MESSAGE_LENGTH} ký tự.`);
 			return;
 		}
 
@@ -738,11 +762,25 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		attachImages(pastedImages);
 	};
 
-	const buildImageAttachment = (file: File): Attachment => ({
+	const buildImageAttachment = (file: File, isLoading = false): Attachment => ({
+		id: createAttachmentId(),
 		type: "image",
 		file,
 		preview: URL.createObjectURL(file),
+		isLoading,
 	});
+
+	const markAttachmentsReady = (attachmentIds: string[]) => {
+		const readyIds = new Set(attachmentIds);
+
+		setAttachments((current) => {
+			const nextAttachments = current.map((item) =>
+				readyIds.has(item.id) ? { ...item, isLoading: false } : item
+			);
+			attachmentsRef.current = nextAttachments;
+			return nextAttachments;
+		});
+	};
 
 	const attachImages = (files: File[]) => {
 		const validFiles: File[] = [];
@@ -767,23 +805,24 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 
 		const nextFiles = validFiles.slice(0, availableSlots);
+		const nextImageAttachments = nextFiles.map((file) => buildImageAttachment(file, true));
+		const loadingAttachmentIds = nextImageAttachments.map((item) => item.id);
 		if (validFiles.length > availableSlots) {
 			toast.warning(`Chỉ thêm ${availableSlots} ảnh đầu tiên.`);
 		}
 
-		setLoadingLocal(true);
+		setAttachments((current) => {
+			const shouldReplace = current.some((item) => item.type !== "image");
+			if (shouldReplace) {
+				revokeAttachmentPreviews(current);
+			}
+			const base = shouldReplace ? [] : current;
+			const nextAttachments = [...base, ...nextImageAttachments];
+			attachmentsRef.current = nextAttachments;
+			return nextAttachments;
+		});
 		setTimeout(() => {
-			setAttachments((current) => {
-				const shouldReplace = current.some((item) => item.type !== "image");
-				if (shouldReplace) {
-					revokeAttachmentPreviews(current);
-				}
-				const base = shouldReplace ? [] : current;
-				const nextAttachments = [...base, ...nextFiles.map(buildImageAttachment)];
-				attachmentsRef.current = nextAttachments;
-				return nextAttachments;
-			});
-			setLoadingLocal(false);
+			markAttachmentsReady(loadingAttachmentIds);
 		}, 200);
 	};
 
@@ -801,16 +840,72 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			return;
 		}
 
-		setLoadingLocal(true);
+		const nextFileAttachment: Attachment = {
+			id: createAttachmentId(),
+			type: "file",
+			file,
+			isLoading: true,
+		};
+
+		setAttachments((current) => {
+			revokeAttachmentPreviews(current);
+			const nextAttachments = [nextFileAttachment];
+			attachmentsRef.current = nextAttachments;
+			return nextAttachments;
+		});
 		setTimeout(() => {
-			setAttachments((current) => {
-				revokeAttachmentPreviews(current);
-				const nextAttachments = [{ type: "file" as const, file }];
-				attachmentsRef.current = nextAttachments;
-				return nextAttachments;
-			});
-			setLoadingLocal(false);
+			markAttachmentsReady([nextFileAttachment.id]);
 		}, 400);
+	};
+
+	const hasFileDragData = (event: React.DragEvent<HTMLElement>) =>
+		Array.from(event.dataTransfer.types).includes("Files");
+
+	const handleAttachmentDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+		if (!hasFileDragData(event)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		event.dataTransfer.dropEffect = "copy";
+		dragDepthRef.current += 1;
+		setIsDraggingFiles(true);
+	};
+
+	const handleAttachmentDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+		if (!hasFileDragData(event)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		event.dataTransfer.dropEffect = "copy";
+	};
+
+	const handleAttachmentDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+		if (!hasFileDragData(event)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+		if (dragDepthRef.current === 0) {
+			setIsDraggingFiles(false);
+		}
+	};
+
+	const handleAttachmentDrop = (event: React.DragEvent<HTMLDivElement>) => {
+		if (!hasFileDragData(event)) return;
+		event.preventDefault();
+		event.stopPropagation();
+		dragDepthRef.current = 0;
+		setIsDraggingFiles(false);
+
+		const droppedFiles = Array.from(event.dataTransfer.files ?? []);
+		if (droppedFiles.length === 0) return;
+
+		if (droppedFiles.every((file) => file.type.startsWith("image/"))) {
+			attachImages(droppedFiles);
+			return;
+		}
+
+		if (droppedFiles.length > 1) {
+			toast.warning("Chỉ có thể thả nhiều ảnh cùng lúc. Đã chọn file đầu tiên.");
+		}
+		attachFile(droppedFiles[0]);
 	};
 
 	/** Gửi trực tiếp một audio file (từ VoiceRecorder) */
@@ -898,6 +993,15 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		});
 	};
 
+	const openAttachmentPreview = (item: Attachment) => {
+		if (item.type !== "image" || !item.preview) return;
+		useImageViewerStore.getState().openViewer({
+			src: item.preview,
+			downloadUrl: item.preview,
+			alt: item.file.name || "image-preview",
+		});
+	};
+
 	if (!user) return null;
 
 	if (selectedConvo.type === "direct") {
@@ -933,7 +1037,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	}
 
 	const canSend = attachments.length > 0 || value.trim().length > 0;
-	const showTextLimit = value.length >= MAX_TEXT_MESSAGE_LENGTH - 100;
 	const handleSendButtonPointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
 		if (!isMobile || event.pointerType === "mouse" || !canSend) return;
 		if (typeof document !== "undefined" && document.activeElement === textInputRef.current) {
@@ -955,7 +1058,21 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	};
 
 	return (
-		<div className="flex min-w-0 flex-col bg-background border-t border-border/80">
+		<div
+			className={`relative flex min-w-0 flex-col bg-background border-t border-border/80 transition-colors ${isDraggingFiles ? "bg-primary/5" : ""}`}
+			onDragEnter={handleAttachmentDragEnter}
+			onDragLeave={handleAttachmentDragLeave}
+			onDragOver={handleAttachmentDragOver}
+			onDrop={handleAttachmentDrop}
+		>
+			{isDraggingFiles && (
+				<div className="pointer-events-none absolute inset-2 z-30 flex items-center justify-center rounded-lg border-2 border-dashed border-primary/50 bg-background/90 shadow-sm backdrop-blur-sm">
+					<div className="flex items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
+						<UploadCloud className="size-4 shrink-0" />
+						<span>Thả file để đính kèm</span>
+					</div>
+				</div>
+			)}
 
 			{replyingTo && (
 				<div className="flex items-center gap-2 px-3 pt-2.5 pb-1 animate-in slide-in-from-bottom-2 duration-200">
@@ -1019,53 +1136,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				</div>
 			)}
 
-			{loadingLocal && <ProgressBar percent={100} label="Đang tải" />}
-
-			{attachments.length > 0 && (
-				<div className="flex items-center gap-2 px-3 pt-2.5">
-					{attachments.every((item) => item.type === "image") ? (
-						<div className="flex max-w-full items-center gap-2 overflow-x-auto beautiful-scrollbar pb-1">
-							{attachments.map((item, index) => (
-								<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/80 shrink-0">
-									{item.preview && <img src={item.preview} alt="preview" className="w-full h-full object-cover" />}
-									<button
-										type="button"
-										onClick={() => removeAttachment(index)}
-										className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 hover:bg-black/80 transition-colors"
-									>
-										<X className="size-3 text-white" />
-									</button>
-								</div>
-							))}
-							{attachments.length > 1 && (
-								<span className="text-xs text-muted-foreground shrink-0">
-									{attachments.length}/{MAX_IMAGE_ATTACHMENTS}
-								</span>
-							)}
-						</div>
-					) : attachment.type === "audio" && attachment.preview ? (
-						<div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 text-sm max-w-xs w-full">
-							<audio controls src={attachment.preview} className="h-8 w-48" />
-							<button onClick={() => removeAttachment(0)} className="ml-1 hover:text-destructive transition-colors shrink-0">
-								<X className="size-4" />
-							</button>
-						</div>
-					) : (
-						<div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 text-sm max-w-xs">
-							<FileText className="size-4 text-primary shrink-0" />
-							<div className="flex flex-col min-w-0">
-								<span className="truncate font-medium text-foreground">{attachment.file.name}</span>
-								<span className="text-xs text-muted-foreground">{formatBytes(attachment.file.size)}</span>
-							</div>
-							<button onClick={() => removeAttachment(0)} className="ml-1 hover:text-destructive transition-colors shrink-0">
-								<X className="size-4" />
-							</button>
-						</div>
-					)}
-				</div>
-			)}
-
-			<div className="relative z-10 flex min-w-0 items-center gap-1.5 border-t border-border/70 bg-background p-2">
+			<div className="relative z-10 bg-background">
 
 				<input
 					ref={imageInputRef}
@@ -1082,6 +1153,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					onChange={(e) => { const f = e.target.files?.[0]; if (f) attachFile(f); e.target.value = ""; }}
 				/>
 
+				<div className="flex h-9 min-w-0 items-center gap-1.5 px-3">
 				<Button
 					variant="ghost" size="icon"
 					className="size-9 shrink-0 hover:bg-primary/10 transition-colors"
@@ -1115,14 +1187,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				{!isRecording && (
 					<StickerPickerPopover onSelect={handleStickerSelect} />
 				)}
+				</div>
 
+				<div className="flex min-h-[52px] min-w-0 items-end gap-2 border-t border-border/60 px-3 py-1.5">
 				{isRecording ? (
 					<VoiceRecorder
 						onSend={sendAudio}
 						onCancel={() => setIsRecording(false)}
 					/>
 				) : (
-					<div className="relative flex min-w-0 flex-1 items-center">
+					<>
+					<div className="relative flex min-w-0 flex-1 items-center rounded-2xl bg-muted/25 px-3 dark:bg-muted/20">
 						<textarea
 							ref={textInputRef}
 							onPointerDown={captureMessageScrollPosition}
@@ -1134,15 +1209,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 								restoreMessageScrollPosition();
 								markAsSeen();
 							}}
-							maxLength={MAX_TEXT_MESSAGE_LENGTH}
 							enterKeyHint="send"
 							rows={1}
-							placeholder={
-								attachment
-									? ""
-									: ""
-							}
-							className="pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-hidden bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none"
+							placeholder={messageInputPlaceholder}
+							className="beautiful-scrollbar min-h-11 max-h-32 w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-2.5 text-sm shadow-none outline-none transition-colors placeholder:text-[15px] placeholder:italic dark:bg-transparent"
 						/>
 						{mentionOpen && (
 							<div className="absolute bottom-full left-0 z-40 mb-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/70 bg-popover shadow-xl">
@@ -1179,38 +1249,85 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							</div>
 						)}
 
-						<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-							<Button asChild variant="ghost" size="icon" className="size-8 hover:bg-primary/10">
-								<div>
-									<EmojiPicker onChange={(emoji: string) => {
-										const nextValue = `${value}${emoji}`;
-										valueRef.current = nextValue;
-										setValue(nextValue);
-									}} />
+					</div>
+					<div className="flex shrink-0 items-end gap-1 pb-1">
+						<Button asChild variant="ghost" size="icon" className="size-8 rounded-full hover:bg-primary/10">
+							<div>
+								<EmojiPicker onChange={(emoji: string) => {
+									const nextValue = `${value}${emoji}`;
+									valueRef.current = nextValue;
+									setValue(nextValue);
+								}} />
+							</div>
+						</Button>
+						<Button
+							onPointerDown={handleSendButtonPointerDown}
+							onClick={handleSendButtonClick}
+							className="shrink-0 rounded-full bg-gradient-chat transition-all hover:scale-105 hover:shadow-glow"
+							disabled={!canSend}
+							size="icon"
+							title="Gửi"
+						>
+							<Send className="size-4 text-white" />
+						</Button>
+					</div>
+					</>
+				)}
+				</div>
+
+				{attachments.length > 0 && (
+					<div className="flex items-center gap-2 border-t border-border/60 px-3 py-2">
+						{attachments.every((item) => item.type === "image") ? (
+							<div className="flex max-w-full items-center gap-2 overflow-x-auto beautiful-scrollbar">
+								{attachments.map((item, index) => (
+									<div key={item.id} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border/80">
+										<button
+											type="button"
+											onClick={() => openAttachmentPreview(item)}
+											className="block h-full w-full cursor-zoom-in overflow-hidden bg-muted/40"
+											title="Xem ảnh"
+										>
+											{item.preview && <img src={item.preview} alt={item.file.name || "preview"} className="h-full w-full object-cover" />}
+											{item.isLoading && <AttachmentLoadingOverlay />}
+										</button>
+										<button
+											type="button"
+											onClick={() => removeAttachment(index)}
+											className="absolute top-0.5 right-0.5 z-20 rounded-full bg-black/60 p-0.5 transition-colors hover:bg-black/80"
+										>
+											<X className="size-3 text-white" />
+										</button>
+									</div>
+								))}
+								{attachments.length > 1 && (
+									<span className="shrink-0 text-xs text-muted-foreground">
+										{attachments.length}/{MAX_IMAGE_ATTACHMENTS}
+									</span>
+								)}
+							</div>
+						) : attachment.type === "audio" && attachment.preview ? (
+							<div className="flex w-full max-w-xs items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm">
+								<audio controls src={attachment.preview} className="h-8 w-48" />
+								<button onClick={() => removeAttachment(0)} className="ml-1 shrink-0 transition-colors hover:text-destructive">
+									<X className="size-4" />
+								</button>
+							</div>
+						) : (
+							<div className="relative flex max-w-xs items-center gap-2 overflow-hidden rounded-md bg-muted/60 px-3 py-2 text-sm">
+								<FileText className="size-4 shrink-0 text-primary" />
+								<div className="flex min-w-0 flex-col">
+									<span className="truncate font-medium text-foreground">{attachment.file.name}</span>
+									<span className="text-xs text-muted-foreground">{formatBytes(attachment.file.size)}</span>
 								</div>
-							</Button>
-						</div>
+								{attachment.isLoading && <AttachmentLoadingOverlay />}
+								<button onClick={() => removeAttachment(0)} className="relative z-20 ml-1 shrink-0 transition-colors hover:text-destructive">
+									<X className="size-4" />
+								</button>
+							</div>
+						)}
 					</div>
 				)}
-
-				{!isRecording && (
-					<Button
-						onPointerDown={handleSendButtonPointerDown}
-						onClick={handleSendButtonClick}
-						className="bg-gradient-chat hover:shadow-glow transition-all hover:scale-105 shrink-0"
-						disabled={!canSend}
-						size="icon"
-						title="Gửi"
-					>
-						<Send className="size-4 text-white" />
-					</Button>
-				)}
 			</div>
-			{showTextLimit && !isRecording && (
-				<div className="px-3 pb-1 text-right text-[11px] text-muted-foreground">
-					{value.length}/{MAX_TEXT_MESSAGE_LENGTH}
-				</div>
-			)}
 		</div>
 	);
 };
