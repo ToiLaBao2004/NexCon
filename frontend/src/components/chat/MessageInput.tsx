@@ -7,6 +7,7 @@ import EmojiPicker from "./EmojiPicker";
 import VoiceRecorder from "./VoiceRecorder";
 import { useChatStore } from "@/stores/useChatStore";
 import { useFriendStore } from "@/stores/useFriendStore";
+import { useImageViewerStore } from "@/stores/useImageViewerStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
 import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic, UploadCloud, Loader2 } from "lucide-react";
@@ -41,9 +42,11 @@ const MAX_IMAGE_ATTACHMENTS = 10;
 const MAX_TEXT_MESSAGE_LENGTH = 1000;
 
 interface Attachment {
+	id: string;
 	type: "image" | "file" | "audio";
 	file: File;
 	preview?: string;
+	isLoading?: boolean;
 }
 
 const revokeAttachmentPreview = (attachment?: Attachment | null) => {
@@ -61,6 +64,13 @@ const createClientBatchId = () => {
 		return crypto.randomUUID();
 	}
 	return `batch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const createAttachmentId = () => {
+	if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+		return crypto.randomUUID();
+	}
+	return `attachment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
 function AttachmentLoadingOverlay() {
@@ -82,7 +92,6 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	const [value, setValue] = useState("");
 	const [attachments, setAttachments] = useState<Attachment[]>([]);
-	const [loadingLocal, setLoadingLocal] = useState(false);
 	const [isRecording, setIsRecording] = useState(false);
 	const [mentionQuery, setMentionQuery] = useState("");
 	const [mentionRange, setMentionRange] = useState<MentionTokenRange | null>(null);
@@ -664,9 +673,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				: undefined;
 
 			const nextAttachments = [{
+				id: createAttachmentId(),
 				type: draftAttachment.type,
 				file: draftAttachment.file,
-				preview: preview
+				preview: preview,
+				isLoading: false
 			}];
 			attachmentsRef.current = nextAttachments;
 			setAttachments(nextAttachments);
@@ -677,9 +688,11 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						? URL.createObjectURL(stored.file)
 						: undefined;
 					const nextAttachments = [{
+						id: createAttachmentId(),
 						type: stored.type,
 						file: stored.file,
-						preview
+						preview,
+						isLoading: false
 					}];
 					attachmentsRef.current = nextAttachments;
 					setAttachments(nextAttachments);
@@ -749,11 +762,25 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		attachImages(pastedImages);
 	};
 
-	const buildImageAttachment = (file: File): Attachment => ({
+	const buildImageAttachment = (file: File, isLoading = false): Attachment => ({
+		id: createAttachmentId(),
 		type: "image",
 		file,
 		preview: URL.createObjectURL(file),
+		isLoading,
 	});
+
+	const markAttachmentsReady = (attachmentIds: string[]) => {
+		const readyIds = new Set(attachmentIds);
+
+		setAttachments((current) => {
+			const nextAttachments = current.map((item) =>
+				readyIds.has(item.id) ? { ...item, isLoading: false } : item
+			);
+			attachmentsRef.current = nextAttachments;
+			return nextAttachments;
+		});
+	};
 
 	const attachImages = (files: File[]) => {
 		const validFiles: File[] = [];
@@ -778,6 +805,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		}
 
 		const nextFiles = validFiles.slice(0, availableSlots);
+		const nextImageAttachments = nextFiles.map((file) => buildImageAttachment(file, true));
+		const loadingAttachmentIds = nextImageAttachments.map((item) => item.id);
 		if (validFiles.length > availableSlots) {
 			toast.warning(`Chỉ thêm ${availableSlots} ảnh đầu tiên.`);
 		}
@@ -788,13 +817,12 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				revokeAttachmentPreviews(current);
 			}
 			const base = shouldReplace ? [] : current;
-			const nextAttachments = [...base, ...nextFiles.map(buildImageAttachment)];
+			const nextAttachments = [...base, ...nextImageAttachments];
 			attachmentsRef.current = nextAttachments;
 			return nextAttachments;
 		});
-		setLoadingLocal(true);
 		setTimeout(() => {
-			setLoadingLocal(false);
+			markAttachmentsReady(loadingAttachmentIds);
 		}, 200);
 	};
 
@@ -812,15 +840,21 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			return;
 		}
 
+		const nextFileAttachment: Attachment = {
+			id: createAttachmentId(),
+			type: "file",
+			file,
+			isLoading: true,
+		};
+
 		setAttachments((current) => {
 			revokeAttachmentPreviews(current);
-			const nextAttachments = [{ type: "file" as const, file }];
+			const nextAttachments = [nextFileAttachment];
 			attachmentsRef.current = nextAttachments;
 			return nextAttachments;
 		});
-		setLoadingLocal(true);
 		setTimeout(() => {
-			setLoadingLocal(false);
+			markAttachmentsReady([nextFileAttachment.id]);
 		}, 400);
 	};
 
@@ -956,6 +990,15 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			const nextAttachments = current.filter((_, itemIndex) => itemIndex !== index);
 			attachmentsRef.current = nextAttachments;
 			return nextAttachments;
+		});
+	};
+
+	const openAttachmentPreview = (item: Attachment) => {
+		if (item.type !== "image" || !item.preview) return;
+		useImageViewerStore.getState().openViewer({
+			src: item.preview,
+			downloadUrl: item.preview,
+			alt: item.file.name || "image-preview",
 		});
 	};
 
@@ -1237,9 +1280,16 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						{attachments.every((item) => item.type === "image") ? (
 							<div className="flex max-w-full items-center gap-2 overflow-x-auto beautiful-scrollbar">
 								{attachments.map((item, index) => (
-									<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border/80">
-										{item.preview && <img src={item.preview} alt="preview" className="h-full w-full object-cover" />}
-										{loadingLocal && <AttachmentLoadingOverlay />}
+									<div key={item.id} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border/80">
+										<button
+											type="button"
+											onClick={() => openAttachmentPreview(item)}
+											className="block h-full w-full cursor-zoom-in overflow-hidden bg-muted/40"
+											title="Xem ảnh"
+										>
+											{item.preview && <img src={item.preview} alt={item.file.name || "preview"} className="h-full w-full object-cover" />}
+											{item.isLoading && <AttachmentLoadingOverlay />}
+										</button>
 										<button
 											type="button"
 											onClick={() => removeAttachment(index)}
@@ -1269,7 +1319,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 									<span className="truncate font-medium text-foreground">{attachment.file.name}</span>
 									<span className="text-xs text-muted-foreground">{formatBytes(attachment.file.size)}</span>
 								</div>
-								{loadingLocal && <AttachmentLoadingOverlay />}
+								{attachment.isLoading && <AttachmentLoadingOverlay />}
 								<button onClick={() => removeAttachment(0)} className="relative z-20 ml-1 shrink-0 transition-colors hover:text-destructive">
 									<X className="size-4" />
 								</button>
