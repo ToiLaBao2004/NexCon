@@ -9,7 +9,7 @@ import { useChatStore } from "@/stores/useChatStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { useSocketStore } from "@/stores/useSocketStore";
 import { toast } from "sonner";
-import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic, UploadCloud } from "lucide-react";
+import { Paperclip, ImagePlus, Send, X, FileText, Reply, Mic, UploadCloud, Loader2 } from "lucide-react";
 import StickerPickerPopover from "./StickerPickerPopover";
 import CachedStickerImage from "./CachedStickerImage";
 import SecureImage from "../SecureImage";
@@ -63,19 +63,10 @@ const createClientBatchId = () => {
 	return `batch-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-function ProgressBar({ percent, label = "Đang tải lên…" }: { percent: number, label?: string }) {
+function AttachmentLoadingOverlay() {
 	return (
-		<div className="px-3 pb-2">
-			<div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-				<span>{label}</span>
-				<span>{Math.round(percent)}%</span>
-			</div>
-			<div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-				<div
-					className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-200"
-					style={{ width: `${percent}%` }}
-				/>
-			</div>
+		<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/70 backdrop-blur-[1px]">
+			<Loader2 className="size-5 animate-spin text-primary" />
 		</div>
 	);
 }
@@ -270,6 +261,10 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 	const otherUser = participants.find((p) => p.userId?._id?.toString() !== currentUserId);
 	const otherUserId = otherUser?.userId?._id;
 	const isOtherUserLocked = Boolean(otherUser?.userId?.isLocked || otherUser?.userId?.lock?.isLocked);
+	const conversationInputName = selectedConvo.type === "direct"
+		? otherUser?.userId?.nickname?.trim() || otherUser?.userId?.displayName || "ng\u01b0\u1eddi d\u00f9ng"
+		: selectedConvo.group?.name || "nh\u00f3m";
+	const messageInputPlaceholder = `Nh\u1eadp tin nh\u1eafn t\u1edbi ${conversationInputName}`;
 
 	const isBlockedByMe = blockedUsers.some((u) => u._id === otherUserId);
 	const isBlockedByOther = otherUserId && blockedBy.includes(otherUserId);
@@ -787,18 +782,18 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			toast.warning(`Chỉ thêm ${availableSlots} ảnh đầu tiên.`);
 		}
 
+		setAttachments((current) => {
+			const shouldReplace = current.some((item) => item.type !== "image");
+			if (shouldReplace) {
+				revokeAttachmentPreviews(current);
+			}
+			const base = shouldReplace ? [] : current;
+			const nextAttachments = [...base, ...nextFiles.map(buildImageAttachment)];
+			attachmentsRef.current = nextAttachments;
+			return nextAttachments;
+		});
 		setLoadingLocal(true);
 		setTimeout(() => {
-			setAttachments((current) => {
-				const shouldReplace = current.some((item) => item.type !== "image");
-				if (shouldReplace) {
-					revokeAttachmentPreviews(current);
-				}
-				const base = shouldReplace ? [] : current;
-				const nextAttachments = [...base, ...nextFiles.map(buildImageAttachment)];
-				attachmentsRef.current = nextAttachments;
-				return nextAttachments;
-			});
 			setLoadingLocal(false);
 		}, 200);
 	};
@@ -817,14 +812,14 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 			return;
 		}
 
+		setAttachments((current) => {
+			revokeAttachmentPreviews(current);
+			const nextAttachments = [{ type: "file" as const, file }];
+			attachmentsRef.current = nextAttachments;
+			return nextAttachments;
+		});
 		setLoadingLocal(true);
 		setTimeout(() => {
-			setAttachments((current) => {
-				revokeAttachmentPreviews(current);
-				const nextAttachments = [{ type: "file" as const, file }];
-				attachmentsRef.current = nextAttachments;
-				return nextAttachments;
-			});
 			setLoadingLocal(false);
 		}, 400);
 	};
@@ -1098,53 +1093,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				</div>
 			)}
 
-			{loadingLocal && <ProgressBar percent={100} label="Đang tải" />}
-
-			{attachments.length > 0 && (
-				<div className="flex items-center gap-2 px-3 pt-2.5">
-					{attachments.every((item) => item.type === "image") ? (
-						<div className="flex max-w-full items-center gap-2 overflow-x-auto beautiful-scrollbar pb-1">
-							{attachments.map((item, index) => (
-								<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-border/80 shrink-0">
-									{item.preview && <img src={item.preview} alt="preview" className="w-full h-full object-cover" />}
-									<button
-										type="button"
-										onClick={() => removeAttachment(index)}
-										className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 hover:bg-black/80 transition-colors"
-									>
-										<X className="size-3 text-white" />
-									</button>
-								</div>
-							))}
-							{attachments.length > 1 && (
-								<span className="text-xs text-muted-foreground shrink-0">
-									{attachments.length}/{MAX_IMAGE_ATTACHMENTS}
-								</span>
-							)}
-						</div>
-					) : attachment.type === "audio" && attachment.preview ? (
-						<div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 text-sm max-w-xs w-full">
-							<audio controls src={attachment.preview} className="h-8 w-48" />
-							<button onClick={() => removeAttachment(0)} className="ml-1 hover:text-destructive transition-colors shrink-0">
-								<X className="size-4" />
-							</button>
-						</div>
-					) : (
-						<div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2 text-sm max-w-xs">
-							<FileText className="size-4 text-primary shrink-0" />
-							<div className="flex flex-col min-w-0">
-								<span className="truncate font-medium text-foreground">{attachment.file.name}</span>
-								<span className="text-xs text-muted-foreground">{formatBytes(attachment.file.size)}</span>
-							</div>
-							<button onClick={() => removeAttachment(0)} className="ml-1 hover:text-destructive transition-colors shrink-0">
-								<X className="size-4" />
-							</button>
-						</div>
-					)}
-				</div>
-			)}
-
-			<div className="relative z-10 flex min-w-0 items-center gap-1.5 border-t border-border/70 bg-background p-2">
+			<div className="relative z-10 bg-background">
 
 				<input
 					ref={imageInputRef}
@@ -1161,6 +1110,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					onChange={(e) => { const f = e.target.files?.[0]; if (f) attachFile(f); e.target.value = ""; }}
 				/>
 
+				<div className="flex h-9 min-w-0 items-center gap-1.5 px-3">
 				<Button
 					variant="ghost" size="icon"
 					className="size-9 shrink-0 hover:bg-primary/10 transition-colors"
@@ -1194,14 +1144,17 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				{!isRecording && (
 					<StickerPickerPopover onSelect={handleStickerSelect} />
 				)}
+				</div>
 
+				<div className="flex min-h-[52px] min-w-0 items-end gap-2 border-t border-border/60 px-3 py-1.5">
 				{isRecording ? (
 					<VoiceRecorder
 						onSend={sendAudio}
 						onCancel={() => setIsRecording(false)}
 					/>
 				) : (
-					<div className="relative flex min-w-0 flex-1 items-center">
+					<>
+					<div className="relative flex min-w-0 flex-1 items-center rounded-2xl bg-muted/25 px-3 dark:bg-muted/20">
 						<textarea
 							ref={textInputRef}
 							onPointerDown={captureMessageScrollPosition}
@@ -1215,12 +1168,8 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							}}
 							enterKeyHint="send"
 							rows={1}
-							placeholder={
-								attachment
-									? ""
-									: ""
-							}
-							className="beautiful-scrollbar pr-12 py-[8px] min-h-[36px] max-h-32 resize-none overflow-y-auto bg-white dark:bg-muted border border-border/80 focus:border-primary/50 transition-colors w-full rounded-md px-3 text-sm shadow-xs outline-none"
+							placeholder={messageInputPlaceholder}
+							className="beautiful-scrollbar min-h-11 max-h-32 w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-2.5 text-sm shadow-none outline-none transition-colors placeholder:text-[15px] placeholder:italic dark:bg-transparent"
 						/>
 						{mentionOpen && (
 							<div className="absolute bottom-full left-0 z-40 mb-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/70 bg-popover shadow-xl">
@@ -1257,31 +1206,76 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							</div>
 						)}
 
-						<div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-							<Button asChild variant="ghost" size="icon" className="size-8 hover:bg-primary/10">
-								<div>
-									<EmojiPicker onChange={(emoji: string) => {
-										const nextValue = `${value}${emoji}`;
-										valueRef.current = nextValue;
-										setValue(nextValue);
-									}} />
-								</div>
-							</Button>
-						</div>
 					</div>
+					<div className="flex shrink-0 items-end gap-1 pb-1">
+						<Button asChild variant="ghost" size="icon" className="size-8 rounded-full hover:bg-primary/10">
+							<div>
+								<EmojiPicker onChange={(emoji: string) => {
+									const nextValue = `${value}${emoji}`;
+									valueRef.current = nextValue;
+									setValue(nextValue);
+								}} />
+							</div>
+						</Button>
+						<Button
+							onPointerDown={handleSendButtonPointerDown}
+							onClick={handleSendButtonClick}
+							className="shrink-0 rounded-full bg-gradient-chat transition-all hover:scale-105 hover:shadow-glow"
+							disabled={!canSend}
+							size="icon"
+							title="Gửi"
+						>
+							<Send className="size-4 text-white" />
+						</Button>
+					</div>
+					</>
 				)}
+				</div>
 
-				{!isRecording && (
-					<Button
-						onPointerDown={handleSendButtonPointerDown}
-						onClick={handleSendButtonClick}
-						className="bg-gradient-chat hover:shadow-glow transition-all hover:scale-105 shrink-0"
-						disabled={!canSend}
-						size="icon"
-						title="Gửi"
-					>
-						<Send className="size-4 text-white" />
-					</Button>
+				{attachments.length > 0 && (
+					<div className="flex items-center gap-2 border-t border-border/60 px-3 py-2">
+						{attachments.every((item) => item.type === "image") ? (
+							<div className="flex max-w-full items-center gap-2 overflow-x-auto beautiful-scrollbar">
+								{attachments.map((item, index) => (
+									<div key={`${item.file.name}-${item.file.lastModified}-${index}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border/80">
+										{item.preview && <img src={item.preview} alt="preview" className="h-full w-full object-cover" />}
+										{loadingLocal && <AttachmentLoadingOverlay />}
+										<button
+											type="button"
+											onClick={() => removeAttachment(index)}
+											className="absolute top-0.5 right-0.5 z-20 rounded-full bg-black/60 p-0.5 transition-colors hover:bg-black/80"
+										>
+											<X className="size-3 text-white" />
+										</button>
+									</div>
+								))}
+								{attachments.length > 1 && (
+									<span className="shrink-0 text-xs text-muted-foreground">
+										{attachments.length}/{MAX_IMAGE_ATTACHMENTS}
+									</span>
+								)}
+							</div>
+						) : attachment.type === "audio" && attachment.preview ? (
+							<div className="flex w-full max-w-xs items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm">
+								<audio controls src={attachment.preview} className="h-8 w-48" />
+								<button onClick={() => removeAttachment(0)} className="ml-1 shrink-0 transition-colors hover:text-destructive">
+									<X className="size-4" />
+								</button>
+							</div>
+						) : (
+							<div className="relative flex max-w-xs items-center gap-2 overflow-hidden rounded-md bg-muted/60 px-3 py-2 text-sm">
+								<FileText className="size-4 shrink-0 text-primary" />
+								<div className="flex min-w-0 flex-col">
+									<span className="truncate font-medium text-foreground">{attachment.file.name}</span>
+									<span className="text-xs text-muted-foreground">{formatBytes(attachment.file.size)}</span>
+								</div>
+								{loadingLocal && <AttachmentLoadingOverlay />}
+								<button onClick={() => removeAttachment(0)} className="relative z-20 ml-1 shrink-0 transition-colors hover:text-destructive">
+									<X className="size-4" />
+								</button>
+							</div>
+						)}
+					</div>
 				)}
 			</div>
 		</div>
