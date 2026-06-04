@@ -52,8 +52,8 @@ const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewRespon
 /* ── Custom audio player for voice messages ─────────────────────────────────── */
 const AUDIO_BAR_COUNT = 32;
 const MAX_VISIBLE_SEEN_AVATARS = 8;
-const singleImageFrameClass = "relative h-auto w-[280px] max-w-[70vw] aspect-[14/9] overflow-hidden rounded-xl bg-muted";
-const imagePreviewClass = "h-full w-full object-cover cursor-zoom-in hover:opacity-90 transition-opacity";
+const singleImageFrameClass = "relative inline-flex max-w-[70vw] overflow-hidden rounded-xl bg-muted sm:max-w-[360px]";
+const imagePreviewClass = "block h-auto w-auto max-h-[420px] max-w-[70vw] object-contain cursor-zoom-in hover:opacity-90 transition-opacity sm:max-w-[360px]";
 
 function MentionChip({
 	children,
