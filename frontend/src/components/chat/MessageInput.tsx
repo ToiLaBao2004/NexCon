@@ -274,6 +274,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 		? otherUser?.userId?.nickname?.trim() || otherUser?.userId?.displayName || "ng\u01b0\u1eddi d\u00f9ng"
 		: selectedConvo.group?.name || "nh\u00f3m";
 	const messageInputPlaceholder = `Nh\u1eadp tin nh\u1eafn t\u1edbi ${conversationInputName}`;
+	const visibleMessageInputPlaceholder = isMobile ? "" : messageInputPlaceholder;
 
 	const isBlockedByMe = blockedUsers.some((u) => u._id === otherUserId);
 	const isBlockedByOther = otherUserId && blockedBy.includes(otherUserId);
@@ -1059,7 +1060,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 
 	return (
 		<div
-			className={`relative flex min-w-0 flex-col bg-background border-t border-border/80 transition-colors ${isDraggingFiles ? "bg-primary/5" : ""}`}
+			className={`relative flex min-w-0 flex-col bg-background border-t border-border/80 pb-[env(safe-area-inset-bottom)] transition-colors md:pb-0 ${isDraggingFiles ? "bg-primary/5" : ""}`}
 			onDragEnter={handleAttachmentDragEnter}
 			onDragLeave={handleAttachmentDragLeave}
 			onDragOver={handleAttachmentDragOver}
@@ -1153,7 +1154,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					onChange={(e) => { const f = e.target.files?.[0]; if (f) attachFile(f); e.target.value = ""; }}
 				/>
 
-				<div className="flex h-9 min-w-0 items-center gap-1.5 px-3">
+				<div className="flex h-9 min-w-0 items-center gap-0.5 px-2 md:gap-1.5 md:px-3">
 				<Button
 					variant="ghost" size="icon"
 					className="size-9 shrink-0 hover:bg-primary/10 transition-colors"
@@ -1189,7 +1190,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 				)}
 				</div>
 
-				<div className="flex min-h-[52px] min-w-0 items-end gap-2 border-t border-border/60 px-3 py-1.5">
+				<div className="flex min-h-[48px] min-w-0 items-end gap-1.5 border-t border-border/60 px-2 py-1 md:min-h-[52px] md:gap-2 md:px-3 md:py-1.5">
 				{isRecording ? (
 					<VoiceRecorder
 						onSend={sendAudio}
@@ -1197,7 +1198,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 					/>
 				) : (
 					<>
-					<div className="relative flex min-w-0 flex-1 items-center rounded-2xl bg-muted/25 px-3 dark:bg-muted/20">
+					<div className="relative flex min-w-0 flex-1 items-center rounded-2xl bg-muted/25 px-2.5 dark:bg-muted/20 md:px-3">
 						<textarea
 							ref={textInputRef}
 							onPointerDown={captureMessageScrollPosition}
@@ -1211,8 +1212,9 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 							}}
 							enterKeyHint="send"
 							rows={1}
-							placeholder={messageInputPlaceholder}
-							className="beautiful-scrollbar min-h-11 max-h-32 w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-2.5 text-sm shadow-none outline-none transition-colors placeholder:text-[15px] placeholder:italic dark:bg-transparent"
+							aria-label={messageInputPlaceholder}
+							placeholder={visibleMessageInputPlaceholder}
+							className="beautiful-scrollbar min-h-10 max-h-32 w-full resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-2 text-sm shadow-none outline-none transition-colors placeholder:text-[15px] placeholder:italic dark:bg-transparent md:min-h-11 md:py-2.5"
 						/>
 						{mentionOpen && (
 							<div className="absolute bottom-full left-0 z-40 mb-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border/70 bg-popover shadow-xl">
@@ -1250,7 +1252,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						)}
 
 					</div>
-					<div className="flex shrink-0 items-end gap-1 pb-1">
+					<div className="flex shrink-0 items-end gap-1 pb-0.5 md:pb-1">
 						<Button asChild variant="ghost" size="icon" className="size-8 rounded-full hover:bg-primary/10">
 							<div>
 								<EmojiPicker onChange={(emoji: string) => {
@@ -1263,7 +1265,7 @@ const MessageInput = ({ selectedConvo }: { selectedConvo: Conversation }) => {
 						<Button
 							onPointerDown={handleSendButtonPointerDown}
 							onClick={handleSendButtonClick}
-							className="shrink-0 rounded-full bg-gradient-chat transition-all hover:scale-105 hover:shadow-glow"
+							className="size-9 shrink-0 rounded-full bg-gradient-chat transition-all hover:scale-105 hover:shadow-glow"
 							disabled={!canSend}
 							size="icon"
 							title="Gửi"
