@@ -4,18 +4,31 @@ import Friend from '../models/friendModel.js';
 import Notification from '../models/notificationModel.js';
 import BlockUser from "../models/blockUserModel.js";
 import Conversation from "../models/conversationModel.js";
-import { io, getReceiverSocketId, emitToUser, emitOnlineUsers, getOnlineUserIdsForUsers } from "../socket/index.js";
+import {
+    io,
+    getReceiverSocketId,
+    emitToUser,
+    emitOnlineUsers,
+    getOnlineUserIdsForUsers,
+    joinUserSocketsToRoom,
+} from "../socket/index.js";
 import { createNotification } from "../services/notificationServices.js";
 import { checkFieldFormat } from "../utils/fieldFormat.js";
 import { maskLockedUserDoc } from "../utils/lockedUser.js";
 import { applyProfileVisibility } from "../utils/profilePrivacy.js";
 import { getVisiblePresencesForUsers } from "../services/userStatusService.js";
 import {
+    buildDirectConversationLookup,
+    getDirectConversationKey,
+    isDuplicateDirectConversationError,
+} from "../utils/directConversation.js";
+import {
     buildReadCacheKey,
     createPendingJson,
     getCachedJson,
     getPendingJson,
     getPositiveIntEnv,
+    invalidateConversationListReadCache,
     invalidateFriendReadCache,
     setCachedJson,
 } from "../utils/readCache.js";
@@ -59,6 +72,7 @@ const GENERIC_EMAIL_DOMAINS = new Set([
 
 const NON_ADMIN_USER_FILTER = { role: { $ne: 'admin' } };
 const PROFILE_USER_SELECT = 'displayName email avatarUrl bio phone music profileVisibility lock';
+const DIRECT_CONVERSATION_PARTICIPANT_SELECT = 'displayName avatarUrl nickname profileVisibility status lastSeen about lock';
 
 const getIdString = (value) => {
     if (!value) return '';
@@ -129,6 +143,91 @@ async function emitSentRequestUpdated(senderId, requestId) {
             friendRequest: payload
         });
     }
+}
+
+function sanitizeConversationForFriendEvent(conversation) {
+    const raw = conversation?.toObject ? conversation.toObject() : conversation;
+    if (!raw) return raw;
+
+    return {
+        ...raw,
+        participants: (raw.participants || []).map((participant) => ({
+            ...participant,
+            userId: participant.userId && typeof participant.userId === 'object'
+                ? maskLockedUserDoc(participant.userId)
+                : participant.userId,
+        })),
+        lastMessage: raw.lastMessage?.senderId && typeof raw.lastMessage.senderId === 'object'
+            ? {
+                ...raw.lastMessage,
+                senderId: maskLockedUserDoc(raw.lastMessage.senderId),
+            }
+            : raw.lastMessage,
+    };
+}
+
+async function findOrCreateDirectConversationForFriends(userA, userB) {
+    const userAId = getIdString(userA);
+    const userBId = getIdString(userB);
+
+    let conversation = await Conversation.findOne(buildDirectConversationLookup(userAId, userBId));
+
+    if (!conversation) {
+        try {
+            conversation = await Conversation.create({
+                type: 'direct',
+                directKey: getDirectConversationKey(userAId, userBId),
+                participants: [
+                    {
+                        userId: userAId,
+                        userInfo: {
+                            displayName: userA.displayName,
+                            avatarUrl: userA.avatarUrl,
+                        },
+                        joinedAt: new Date(),
+                    },
+                    {
+                        userId: userBId,
+                        userInfo: {
+                            displayName: userB.displayName,
+                            avatarUrl: userB.avatarUrl,
+                        },
+                        joinedAt: new Date(),
+                    },
+                ],
+            });
+        } catch (error) {
+            if (!isDuplicateDirectConversationError(error)) {
+                throw error;
+            }
+
+            conversation = await Conversation.findOne(buildDirectConversationLookup(userAId, userBId));
+            if (!conversation) {
+                throw error;
+            }
+        }
+    }
+
+    await conversation.populate([
+        { path: 'participants.userId', select: DIRECT_CONVERSATION_PARTICIPANT_SELECT },
+        { path: 'lastMessage.senderId', select: 'displayName avatarUrl lock' },
+    ]);
+
+    invalidateConversationListReadCache([userAId, userBId]);
+
+    return sanitizeConversationForFriendEvent(conversation);
+}
+
+async function emitDirectConversationReady(conversation, userIds = []) {
+    if (!conversation?._id) return;
+
+    await Promise.all(userIds.filter(Boolean).map(async (userId) => {
+        const normalizedUserId = getIdString(userId);
+        if (!normalizedUserId) return;
+
+        joinUserSocketsToRoom(normalizedUserId, conversation._id.toString());
+        await emitToUser(normalizedUserId, "new-conversation", { conversation });
+    }));
 }
 
 export async function sendFriendRequest(req, res) {
@@ -247,6 +346,8 @@ export async function sendFriendRequest(req, res) {
             });
             await newFriend.save();
             invalidateFriendReadCache([sender._id, receiver._id]);
+            const directConversation = await findOrCreateDirectConversationForFriends(sender, receiver);
+            await emitDirectConversationReady(directConversation, [sender._id, receiver._id]);
             await createNotification(receiver._id,
                 "Friend Request Accepted",
                 `${sender.displayName} đã chấp nhận lời mời kết bạn của bạn.`,
@@ -257,15 +358,20 @@ export async function sendFriendRequest(req, res) {
                 io.to(receiverSocketId).emit("friend-request-accepted", {
                     from: { _id: sender._id, displayName: sender.displayName },
                     newFriend: toFriendItem(newFriend, sender),
+                    conversation: directConversation,
                     message: `${sender.displayName} đã chấp nhận lời mời kết bạn của bạn.`
                 });
             }
             emitToUser(sender._id.toString(), "friend-request-resolved", {
                 requestId: reverseRequest._id.toString(),
                 action: "accepted",
-                newFriend: toFriendItem(newFriend, receiver)
+                newFriend: toFriendItem(newFriend, receiver),
+                conversation: directConversation,
             });
-            return res.status(201).json({ message: `Bạn và ${receiver.displayName} hiện đã là bạn bè.` });
+            return res.status(201).json({
+                message: `Bạn và ${receiver.displayName} hiện đã là bạn bè.`,
+                conversation: directConversation,
+            });
         }
         const friendRequest = new FriendRequest({
             from: sender._id,
@@ -329,6 +435,8 @@ export async function acceptFriendRequest(req, res) {
         friendRequest.status = 'accepted';
         await friendRequest.save();
         invalidateFriendReadCache([receiver._id, sender._id]);
+        const directConversation = await findOrCreateDirectConversationForFriends(receiver, sender);
+        await emitDirectConversationReady(directConversation, [receiver._id, sender._id]);
         await createNotification(sender._id,
             "Friend Request Accepted",
             `${receiver.displayName} đã chấp nhận lời mời kết bạn của bạn.`,
@@ -339,6 +447,7 @@ export async function acceptFriendRequest(req, res) {
             io.to(senderSocketId).emit("friend-request-accepted", {
                 from: { _id: receiver._id, displayName: receiver.displayName, avatarUrl: receiver.avatarUrl },
                 message: `${receiver.displayName} đã chấp nhận lời mời kết bạn của bạn!`,
+                conversation: directConversation,
                 newFriend: {
                     _id: newFriend._id,
                     friendId: receiver._id,
@@ -357,7 +466,8 @@ export async function acceptFriendRequest(req, res) {
                 displayName: sender.displayName,
                 avatarUrl: sender.avatarUrl,
                 createdAt: newFriend.createdAt
-            }
+            },
+            conversation: directConversation,
         });
 
         await emitOnlineUsers({ broadcast: true });
@@ -370,7 +480,8 @@ export async function acceptFriendRequest(req, res) {
                 displayName: sender.displayName,
                 avatarUrl: sender.avatarUrl,
                 createdAt: newFriend.createdAt
-            }
+            },
+            conversation: directConversation,
         });
     } catch (error) {
         console.error('Accept friend request error:', error);
