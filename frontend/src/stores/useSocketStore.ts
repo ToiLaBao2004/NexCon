@@ -19,7 +19,7 @@ import { flashTabTitle } from "@/utils/tabTitle";
 import { useAppStatusStore } from "./useAppStatusStore";
 import { consumePendingNativeCallAction } from "@/lib/nativeCallAction";
 import type { UserPresence } from "@/types/user";
-import type { Message } from "@/types/chat";
+import type { Conversation, Message } from "@/types/chat";
 import { decodeMentionTokens } from "@/utils/mentions";
 
 const baseURL = import.meta.env.VITE_SOCKET_URL;
@@ -88,6 +88,18 @@ const syncCurrentUserProfile = (updatedUser: any) => {
     },
   });
 
+  void useChatStore.getState().fetchConversations(true);
+};
+
+const syncConversationFromFriendEvent = (
+  conversation?: (Partial<Conversation> & Pick<Conversation, "_id">) | null,
+  joinConversation?: (conversationId: string) => void,
+) => {
+  if (!conversation?._id) return;
+
+  const conversationId = String(conversation._id);
+  useChatStore.getState().updateConversation(conversation);
+  joinConversation?.(conversationId);
   void useChatStore.getState().fetchConversations(true);
 };
 
@@ -678,10 +690,11 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       );
     });
 
-    socket.on("friend-request-accepted", ({ from, message, newFriend }) => {
+    socket.on("friend-request-accepted", ({ from, message, newFriend, conversation }) => {
       if (newFriend) {
         useFriendStore.getState().addFriend(newFriend);
       }
+      syncConversationFromFriendEvent(conversation, get().joinConversation);
       useFriendStore.getState().fetchFriends(true);
       useFriendStore.getState().fetchSentRequests(true);
       toast.success(
@@ -701,13 +714,14 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       useFriendStore.getState().fetchIncomingRequests(true);
     });
 
-    socket.on("friend-request-resolved", ({ requestId, action, newFriend }) => {
+    socket.on("friend-request-resolved", ({ requestId, action, newFriend, conversation }) => {
       if (requestId) {
         useFriendStore.getState().removeIncomingRequest(requestId);
       }
       if (action === "accepted" && newFriend) {
         useFriendStore.getState().addFriend(newFriend);
         useFriendStore.getState().fetchFriends(true);
+        syncConversationFromFriendEvent(conversation, get().joinConversation);
       }
       useFriendStore.getState().fetchIncomingRequests(true);
     });
