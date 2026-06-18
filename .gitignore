@@ -45,3 +45,5 @@ frontend/android/local.properties
 firebase-service-account.json
 *.jks
 *.keystore
+
+/docs

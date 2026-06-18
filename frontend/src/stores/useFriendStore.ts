@@ -19,6 +19,14 @@ let fetchIncomingRequestsPromise: Promise<void> | null = null;
 let fetchSentRequestsPromise: Promise<void> | null = null;
 let fetchBlockedListPromise: Promise<void> | null = null;
 
+function refreshConversationFromFriendResponse(conversation: any) {
+	if (!conversation?._id) return;
+
+	const chatStore = useChatStore.getState();
+	chatStore.updateConversation(conversation);
+	void chatStore.fetchConversations(true);
+}
+
 export const useFriendStore = create<FriendState>((set, get) => ({
 	loading: false,
 	sendingRequest: false,
@@ -224,6 +232,7 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 					targetUserId ? suggestion._id !== targetUserId : suggestion.email?.toLowerCase() !== normalizedEmail
 				))
 			}));
+			refreshConversationFromFriendResponse(data.conversation);
 
 			toast.success(getApiSuccessMessage(data, 'Đã gửi lời mời kết bạn!'));
 		} catch (error: any) {
@@ -266,6 +275,7 @@ export const useFriendStore = create<FriendState>((set, get) => ({
 				incomingRequests: state.incomingRequests.filter((r) => r._id !== requestId),
 				friends: data.newFriend ? [data.newFriend, ...state.friends] : state.friends
 			}));
+			refreshConversationFromFriendResponse(data.conversation);
 		} catch (error: any) {
 			console.error('Lỗi khi chấp nhận kết bạn:', error);
 			toast.error(getApiErrorMessage(error, 'Chấp nhận lời mời thất bại.'));
