@@ -20,6 +20,7 @@ export default function EditMusicProfile() {
     } = useUserStore();
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const trimmedQuery = query.trim();
 
     const debouncedSearch = useCallback((value: string) => {
         if (debounceRef.current) {
@@ -75,7 +76,7 @@ export default function EditMusicProfile() {
     };
 
     return (
-        <div className="space-y-5">
+        <div className="relative space-y-5">
             <div>
                 <input
                     type="text"
@@ -92,16 +93,16 @@ export default function EditMusicProfile() {
             </div>
 
             {/* Loading state */}
-            {(musicLoading || isSearching) && query.trim().length >= 2 && (
-                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 py-2 pl-1">
+            {(musicLoading || isSearching) && trimmedQuery.length >= 2 && (
+                <div className="absolute left-0 right-0 top-12 z-50 !mt-2 flex items-center gap-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3.5 text-sm text-gray-500 dark:text-gray-400 shadow-2xl">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Đang tìm kiếm...
                 </div>
             )}
 
             {/* Search Results */}
-            {musicResults.length > 0 && query.trim().length >= 2 && (
-                <div className="max-h-50 overflow-y-auto beautiful-scrollbar rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm divide-y divide-gray-200 dark:divide-gray-700">
+            {musicResults.length > 0 && trimmedQuery.length >= 2 && !musicLoading && !isSearching && (
+                <div className="absolute left-0 right-0 top-12 z-50 !mt-2 max-h-64 overflow-y-auto beautiful-scrollbar rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-2xl divide-y divide-gray-200 dark:divide-gray-700">
                     {musicResults.map((track: any) => (
                         <button
                             key={track.trackId}
@@ -138,8 +139,8 @@ export default function EditMusicProfile() {
             )}
 
             {/* No results */}
-            {query.trim().length >= 2 && !musicLoading && !isSearching && musicResults.length === 0 && (
-                <div className="text-sm text-gray-500 dark:text-gray-400 py-4 text-center">
+            {trimmedQuery.length >= 2 && !musicLoading && !isSearching && musicResults.length === 0 && (
+                <div className="absolute left-0 right-0 top-12 z-50 !mt-2 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 text-sm text-gray-500 dark:text-gray-400 text-center shadow-2xl">
                     Không tìm thấy bài hát nào với từ khóa "{query}"
                 </div>
             )}
