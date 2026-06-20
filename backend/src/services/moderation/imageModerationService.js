@@ -2,6 +2,24 @@ import { getGeminiModelForImage } from '../getGeminiModelService.js';
 import { buildImageModerationPrompt } from './moderationPromptService.js';
 
 const BLOCK_THRESHOLD = 0.8;
+const SAFETY_BLOCK_CONFIDENCE_FLOOR = 0.9;
+
+const SAFETY_BLOCK_REASONS = new Set(['SAFETY', 'PROHIBITED_CONTENT']);
+const SAFETY_FINISH_REASONS = new Set(['SAFETY']);
+
+const SAFETY_CATEGORY_MAP = {
+    HARM_CATEGORY_SEXUALLY_EXPLICIT: 'sexual',
+    HARM_CATEGORY_HATE_SPEECH: 'hate',
+    HARM_CATEGORY_HARASSMENT: 'harassment',
+    HARM_CATEGORY_DANGEROUS_CONTENT: 'dangerous',
+};
+
+const SAFETY_PROBABILITY_SCORE = {
+    NEGLIGIBLE: 0.1,
+    LOW: 0.35,
+    MEDIUM: 0.82,
+    HIGH: 0.98,
+};
 
 const parseGeminiJson = (text) => {
     try {
@@ -29,6 +47,70 @@ function allowOnModerationFailure({ category, reason, raw = null }) {
         moderationSkipped: true,
         raw,
     };
+}
+
+function safetyProbabilityScore(probability) {
+    return SAFETY_PROBABILITY_SCORE[String(probability || '').toUpperCase()] ?? 0;
+}
+
+function pickStrongestSafetyRating(safetyRatings = []) {
+    return [...safetyRatings]
+        .filter((rating) => rating?.category)
+        .sort((a, b) => safetyProbabilityScore(b.probability) - safetyProbabilityScore(a.probability))[0] || null;
+}
+
+function buildSafetyBlockedResult({ safetyRatings = [], raw = null, reason = '' } = {}) {
+    const strongestRating = pickStrongestSafetyRating(safetyRatings);
+    const category = SAFETY_CATEGORY_MAP[strongestRating?.category] || 'unknown';
+    const confidence = Math.max(
+        SAFETY_BLOCK_CONFIDENCE_FLOOR,
+        safetyProbabilityScore(strongestRating?.probability)
+    );
+
+    return {
+        blocked: true,
+        safe: false,
+        category,
+        confidence,
+        reason: reason || 'Ảnh bị hệ thống an toàn của AI đánh dấu là nội dung nhạy cảm/không phù hợp.',
+        userMessage: 'Ảnh vi phạm tiêu chuẩn cộng đồng.',
+        source: 'gemini_safety',
+        raw,
+    };
+}
+
+export function extractGeminiImageSafetyBlock(responseOrError) {
+    const response = responseOrError?.response || responseOrError;
+    const promptFeedback = response?.promptFeedback;
+
+    if (SAFETY_BLOCK_REASONS.has(String(promptFeedback?.blockReason || '').toUpperCase())) {
+        return buildSafetyBlockedResult({
+            safetyRatings: promptFeedback?.safetyRatings || [],
+            raw: promptFeedback,
+            reason: promptFeedback?.blockReasonMessage,
+        });
+    }
+
+    const safetyCandidate = response?.candidates?.find?.((candidate) =>
+        SAFETY_FINISH_REASONS.has(String(candidate?.finishReason || '').toUpperCase())
+    );
+
+    if (safetyCandidate) {
+        return buildSafetyBlockedResult({
+            safetyRatings: safetyCandidate.safetyRatings || [],
+            raw: safetyCandidate,
+            reason: safetyCandidate.finishMessage,
+        });
+    }
+
+    const message = String(responseOrError?.message || '');
+    if (/blocked due to (SAFETY|PROHIBITED_CONTENT)/i.test(message)) {
+        return buildSafetyBlockedResult({
+            raw: { message },
+        });
+    }
+
+    return null;
 }
 
 const normalizeModerationResult = (data) => {
@@ -74,7 +156,23 @@ export const moderateImageMessage = async (imageBuffer, mimeType = 'image/jpeg')
             },
         ]);
 
-        const text = result.response.text();
+        const safetyBlock = extractGeminiImageSafetyBlock(result.response);
+        if (safetyBlock) {
+            return safetyBlock;
+        }
+
+        let text = '';
+        try {
+            text = result.response.text();
+        } catch (error) {
+            const blockedBySafety = extractGeminiImageSafetyBlock(error);
+            if (blockedBySafety) {
+                return blockedBySafety;
+            }
+
+            throw error;
+        }
+
         const parsed = parseGeminiJson(text);
 
         if (!parsed) {
