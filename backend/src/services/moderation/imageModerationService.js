@@ -2,10 +2,10 @@ import { getGeminiModelForImage } from '../getGeminiModelService.js';
 import { buildImageModerationPrompt } from './moderationPromptService.js';
 
 const BLOCK_THRESHOLD = 0.8;
-const SAFETY_BLOCK_CONFIDENCE_FLOOR = 0.9;
+const MODEL_BLOCK_CONFIDENCE_FLOOR = 0.9;
 
-const SAFETY_BLOCK_REASONS = new Set(['SAFETY', 'PROHIBITED_CONTENT']);
-const SAFETY_FINISH_REASONS = new Set(['SAFETY']);
+const MODEL_BLOCK_REASONS = new Set(['SAFETY', 'PROHIBITED_CONTENT', 'OTHER']);
+const MODEL_BLOCK_FINISH_REASONS = new Set(['SAFETY', 'PROHIBITED_CONTENT', 'OTHER']);
 
 const SAFETY_CATEGORY_MAP = {
     HARM_CATEGORY_SEXUALLY_EXPLICIT: 'sexual',
@@ -63,7 +63,7 @@ function buildSafetyBlockedResult({ safetyRatings = [], raw = null, reason = '' 
     const strongestRating = pickStrongestSafetyRating(safetyRatings);
     const category = SAFETY_CATEGORY_MAP[strongestRating?.category] || 'unknown';
     const confidence = Math.max(
-        SAFETY_BLOCK_CONFIDENCE_FLOOR,
+        MODEL_BLOCK_CONFIDENCE_FLOOR,
         safetyProbabilityScore(strongestRating?.probability)
     );
 
@@ -83,7 +83,7 @@ export function extractGeminiImageSafetyBlock(responseOrError) {
     const response = responseOrError?.response || responseOrError;
     const promptFeedback = response?.promptFeedback;
 
-    if (SAFETY_BLOCK_REASONS.has(String(promptFeedback?.blockReason || '').toUpperCase())) {
+    if (MODEL_BLOCK_REASONS.has(String(promptFeedback?.blockReason || '').toUpperCase())) {
         return buildSafetyBlockedResult({
             safetyRatings: promptFeedback?.safetyRatings || [],
             raw: promptFeedback,
@@ -92,7 +92,7 @@ export function extractGeminiImageSafetyBlock(responseOrError) {
     }
 
     const safetyCandidate = response?.candidates?.find?.((candidate) =>
-        SAFETY_FINISH_REASONS.has(String(candidate?.finishReason || '').toUpperCase())
+        MODEL_BLOCK_FINISH_REASONS.has(String(candidate?.finishReason || '').toUpperCase())
     );
 
     if (safetyCandidate) {
@@ -104,7 +104,7 @@ export function extractGeminiImageSafetyBlock(responseOrError) {
     }
 
     const message = String(responseOrError?.message || '');
-    if (/blocked due to (SAFETY|PROHIBITED_CONTENT)/i.test(message)) {
+    if (/blocked due to (SAFETY|PROHIBITED_CONTENT|OTHER)/i.test(message)) {
         return buildSafetyBlockedResult({
             raw: { message },
         });
