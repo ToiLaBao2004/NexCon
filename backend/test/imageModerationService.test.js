@@ -24,5 +24,16 @@ test('extractGeminiImageSafetyBlock blocks Gemini sexually explicit safety feedb
 
 test('extractGeminiImageSafetyBlock ignores non-safety failures', () => {
     assert.equal(extractGeminiImageSafetyBlock(new Error('quota exceeded')), null);
-    assert.equal(extractGeminiImageSafetyBlock({ promptFeedback: { blockReason: 'OTHER' } }), null);
+});
+
+test('extractGeminiImageSafetyBlock blocks Gemini OTHER response blocks for images', () => {
+    const result = extractGeminiImageSafetyBlock({
+        promptFeedback: {
+            blockReason: 'OTHER',
+        },
+    });
+
+    assert.equal(result.blocked, true);
+    assert.equal(result.safe, false);
+    assert.equal(result.category, 'unknown');
 });
