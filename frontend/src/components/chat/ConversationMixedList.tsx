@@ -304,7 +304,6 @@ const getFriendSearchText = (friend: FriendItem) => {
   return normalizeSearchText([
     raw.nickname,
     raw.displayName,
-    raw.email,
     raw.phone,
     raw.bio,
   ].filter(Boolean).join(" "));
@@ -315,7 +314,12 @@ const searchFriendsCache = (friends: FriendItem[], keyword: string, limit = DEFA
   if (!normalizedKeyword) return buildPage<GlobalSearchUser>([], limit);
 
   const matches = friends
-    .filter((friend) => getFriendSearchText(friend).includes(normalizedKeyword))
+    .filter((friend) => {
+      const raw = friend as FriendItem & { email?: string };
+      const normalizedEmail = normalizeSearchText(raw.email || "");
+      return getFriendSearchText(friend).includes(normalizedKeyword)
+        || (Boolean(normalizedEmail) && normalizedEmail === normalizedKeyword);
+    })
     .map((friend) => {
       const raw = friend as FriendItem & { email?: string; phone?: string; bio?: string };
       return {
@@ -756,11 +760,7 @@ const ConversationMixedList = ({
     let active = true;
 
     if (type === "users") {
-      setTabLoading((prev) => ({ ...prev, users: false }));
       setTabPages((prev) => ({ ...prev, users: cachedUsers }));
-      fetchedTabsRef.current = { ...fetchedTabsRef.current, users: true };
-      setSearchError("");
-      return;
     }
 
     if (type === "all") {
@@ -777,7 +777,7 @@ const ConversationMixedList = ({
         conversations: cachedConversations,
       }));
       fetchedTabsRef.current = { ...fetchedTabsRef.current, all: true };
-      setTabLoading({ users: false, conversations: true, messages: true });
+      setTabLoading({ users: true, conversations: true, messages: true });
       setSearchError("");
       let allSearchFinished = false;
       const isCanceled = (error: { code?: string; name?: string } | null | undefined) => (
@@ -788,10 +788,28 @@ const ConversationMixedList = ({
         try {
           await chatService.globalSearchStream(keyword, {
             signal: controller.signal,
+            userLimit: DEFAULT_TAB_LIMITS.users,
             conversationLimit: DEFAULT_TAB_LIMITS.conversations,
             messageLimit: DEFAULT_TAB_LIMITS.messages,
             onChunk: (chunk) => {
               if (!active) return;
+
+              if (chunk.type === "users") {
+                const mergedUsers = mergeUniqueById(cachedUsers.items, chunk.users.items);
+                const usersPage = {
+                  ...chunk.users,
+                  items: mergedUsers,
+                  hasMore: chunk.users.hasMore || cachedUsers.hasMore,
+                };
+                setGlobalResults((prev) => (
+                  prev.query.trim() === keyword
+                    ? { ...prev, users: usersPage }
+                    : { ...EMPTY_RESULTS, query: keyword, type: "all", users: usersPage }
+                ));
+                setTabPages((prev) => ({ ...prev, users: usersPage }));
+                setTabLoading((prev) => ({ ...prev, users: false }));
+                return;
+              }
 
               if (chunk.type === "conversations") {
                 const mergedConversations = mergeUniqueById(cachedConversations.items, chunk.conversations.items);
@@ -840,6 +858,7 @@ const ConversationMixedList = ({
           fetchedTabsRef.current = {
             ...fetchedTabsRef.current,
             all: false,
+            users: false,
             conversations: false,
             messages: false,
           };
@@ -856,7 +875,7 @@ const ConversationMixedList = ({
         active = false;
         controller.abort();
         if (!allSearchFinished) {
-          fetchedTabsRef.current = { ...fetchedTabsRef.current, all: false, messages: false };
+          fetchedTabsRef.current = { ...fetchedTabsRef.current, all: false, users: false, messages: false };
         }
       };
     }
@@ -871,7 +890,16 @@ const ConversationMixedList = ({
     chatService.globalSearch(keyword, { signal: controller.signal, type })
       .then((response) => {
         if (!active) return;
-        if (type === "conversations") {
+        if (type === "users") {
+          setTabPages((prev) => ({
+            ...prev,
+            users: {
+              ...response.users,
+              items: mergeUniqueById(cachedUsers.items, response.users.items),
+              hasMore: response.users.hasMore || cachedUsers.hasMore,
+            },
+          }));
+        } else if (type === "conversations") {
           setTabPages((prev) => ({
             ...prev,
             conversations: {
@@ -915,17 +943,6 @@ const ConversationMixedList = ({
 
     if (!keyword || tabLoading[tab] || tabLoadingMore[tab]) return;
 
-    if (tab === "users") {
-      const cachedUsers = searchFriendsCache(
-        friends,
-        keyword,
-        Math.max(friends.length, DEFAULT_TAB_LIMITS.users),
-      );
-      setTabPages((prev) => ({ ...prev, users: cachedUsers }));
-      fetchedTabsRef.current = { ...fetchedTabsRef.current, users: true };
-      return;
-    }
-
     if (!page.hasMore || !page.nextCursor) return;
 
     setTabLoadingMore((prev) => ({ ...prev, [tab]: true }));
@@ -939,7 +956,15 @@ const ConversationMixedList = ({
         limit: page.limit || DEFAULT_TAB_LIMITS[tab],
       });
 
-      if (tab === "conversations") {
+      if (tab === "users") {
+        setTabPages((prev) => ({
+          ...prev,
+          users: {
+            ...response.users,
+            items: appendUniqueById(prev.users.items, response.users.items),
+          },
+        }));
+      } else if (tab === "conversations") {
         setTabPages((prev) => ({
           ...prev,
           conversations: {
@@ -1139,6 +1164,10 @@ const ConversationMixedList = ({
             <UserResultRow key={item._id} user={item} keyword={trimmedQuery} onOpen={() => setProfileUser(item)} />
           ))}
         </ResultSection>
+
+        {isAllUserSearchLoading && resultData.users.items.length === 0 && (
+          <SearchSectionSkeleton title="Người dùng" rows={2} />
+        )}
 
         <ResultSection title="Đoạn chat" count={resultData.conversations.items.length} hasMore={resultData.conversations.hasMore} onMore={() => setSearchTab("conversations")}>
           {resultData.conversations.items.map((item) => (
