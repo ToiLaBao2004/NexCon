@@ -479,29 +479,32 @@ async function searchUsersForGlobal({ keyword, keywordRegex, currentUserId, bloc
         { role: null },
     ];
 
-    const searchClauses = [];
-    if (friendIds.length > 0) {
+    if (!keyword.trim()) {
+        return emptyPage(limit);
+    }
+
+    const directConversationUserIds = await Conversation.distinct('participants.userId', {
+        type: 'direct',
+        'participants.userId': currentUserId,
+        disbanded: { $ne: true },
+    });
+    const relatedUserIds = [...new Map(
+        [...friendIds, ...directConversationUserIds]
+            .filter((id) => id.toString() !== currentUserIdString)
+            .map((id) => [id.toString(), id])
+    ).values()];
+    const exactEmail = keyword.trim().toLowerCase();
+    const searchClauses = [{ email: exactEmail }];
+
+    if (relatedUserIds.length > 0) {
         searchClauses.push({
-            _id: { $in: friendIds },
+            _id: { $in: relatedUserIds },
             $or: [
                 { displayName: keywordRegex },
-                { email: keywordRegex },
                 { phone: keywordRegex },
                 ...(nicknameMatchedFriendIds.length > 0 ? [{ _id: { $in: nicknameMatchedFriendIds } }] : []),
             ],
         });
-    }
-
-    const exactEmail = keyword.trim().toLowerCase();
-    if (exactEmail) {
-        searchClauses.push({
-            _id: { $nin: friendIds },
-            email: exactEmail,
-        });
-    }
-
-    if (searchClauses.length === 0) {
-        return emptyPage(limit);
     }
 
     const cursorFilter = buildObjectIdCursorFilter(cursor);
@@ -538,7 +541,8 @@ async function searchUsersForGlobal({ keyword, keywordRegex, currentUserId, bloc
     })), limit, hasMore, nextCursor);
 }
 
-async function getConversationMatchedUserIds(keywordRegex, currentUserId) {
+async function getConversationMatchedUserIds(keyword, keywordRegex, currentUserId) {
+    const exactEmail = keyword.trim().toLowerCase();
     const matchedUsers = await User.find({
         _id: { $ne: currentUserId },
         $or: [
@@ -549,7 +553,7 @@ async function getConversationMatchedUserIds(keywordRegex, currentUserId) {
         $and: [{
                 $or: [
                     { displayName: keywordRegex },
-                    { email: keywordRegex },
+                    { email: exactEmail },
                     { phone: keywordRegex },
                 ],
         }],
@@ -583,10 +587,10 @@ async function getNicknameMatchedUserIds(keywordRegex, currentUserId) {
     return [...ids].map((id) => new mongoose.Types.ObjectId(id));
 }
 
-async function searchConversationsForGlobal({ keywordRegex, currentUserId, limit, nickMap, cursor, isAborted = () => false }) {
+async function searchConversationsForGlobal({ keyword, keywordRegex, currentUserId, limit, nickMap, cursor, isAborted = () => false }) {
     if (isAborted()) return emptyPage(limit);
 
-    const matchedUserIds = await getConversationMatchedUserIds(keywordRegex, currentUserId);
+    const matchedUserIds = await getConversationMatchedUserIds(keyword, keywordRegex, currentUserId);
     if (isAborted()) return emptyPage(limit);
 
     const nicknameMatchedUserIds = await getNicknameMatchedUserIds(keywordRegex, currentUserId);
@@ -908,6 +912,7 @@ export async function globalSearch(req, res) {
         if (searchAll || requestedType === 'conversations') {
             tasks.push((async () => {
                 conversations = await searchConversationsForGlobal({
+                    keyword,
                     keywordRegex,
                     currentUserId,
                     limit: conversationLimit,
@@ -959,6 +964,7 @@ export async function globalSearchStream(req, res) {
     try {
         const currentUserId = req.user._id;
         const keyword = String(req.query.keyword || req.query.q || '').trim();
+        const userLimit = getLimitForType(req, 'users', 'users', DEFAULT_USER_LIMIT, 'userLimit');
         const conversationLimit = getLimitForType(req, 'conversations', 'conversations', DEFAULT_CONVERSATION_LIMIT, 'conversationLimit');
         const messageLimit = getLimitForType(req, 'messages', 'messages', DEFAULT_MESSAGE_LIMIT, 'messageLimit');
 
@@ -973,6 +979,7 @@ export async function globalSearchStream(req, res) {
             sendChunk({
                 type: 'done',
                 query: '',
+                users: emptyPage(userLimit),
                 conversations: emptyPage(conversationLimit),
                 messages: emptyPage(messageLimit),
             });
@@ -1005,7 +1012,23 @@ export async function globalSearchStream(req, res) {
 
         const nickMap = buildNicknameMap(friends, currentUserId.toString());
 
+        const blockedIds = await getBlockedIds(currentUserId);
+        if (aborted) return;
+
+        const users = await searchUsersForGlobal({
+            keyword,
+            keywordRegex,
+            currentUserId,
+            blockedIds,
+            friends,
+            limit: userLimit,
+            cursor: null,
+        });
+        if (aborted) return;
+        sendChunk({ type: 'users', query: keyword, users });
+
         const conversations = await searchConversationsForGlobal({
+            keyword,
             keywordRegex,
             currentUserId,
             limit: conversationLimit,

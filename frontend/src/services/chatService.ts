@@ -7,6 +7,7 @@ import type {
 	GlobalSearchMessage,
 	GlobalSearchPage,
 	GlobalSearchResponse,
+	GlobalSearchUser,
 	Message,
 } from '@/types/chat';
 import type { SendMessagePayload } from '@/types/store';
@@ -33,6 +34,7 @@ interface FetchMessageProps {
 const pageLimit = 20;
 
 type GlobalSearchStreamChunk =
+	| { type: 'users'; query: string; users: GlobalSearchPage<GlobalSearchUser> }
 	| { type: 'conversations'; query: string; conversations: GlobalSearchPage<Conversation> }
 	| { type: 'messages'; query: string; messages: GlobalSearchPage<GlobalSearchMessage> }
 	| { type: 'done'; query: string }
@@ -149,6 +151,7 @@ export const chatService = {
 		keyword: string,
 		options: {
 			signal?: AbortSignal;
+			userLimit?: number;
 			conversationLimit?: number;
 			messageLimit?: number;
 			onChunk: (chunk: GlobalSearchStreamChunk) => void;
@@ -168,6 +171,7 @@ export const chatService = {
 
 		const response = await fetch(buildStreamUrl('/search/global/stream', {
 			keyword,
+			userLimit: options.userLimit,
 			conversationLimit: options.conversationLimit,
 			messageLimit: options.messageLimit,
 		}), {
