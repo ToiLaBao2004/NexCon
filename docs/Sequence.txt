@@ -1,0 +1,1481 @@
+Sequence:
+1. Đăng ký tài khoản và xác thực OTP
+@startuml
+autonumber
+
+actor "Người dùng" as User
+
+participant "FE\nSignUpPage / SignupForm" as SignUpFE
+participant "FE\nOtpPage / OTPForm" as OtpFE
+
+participant "BE\nauthController" as AuthController
+participant "BE\notpController" as OtpController
+
+database "Database\nMongoDB\n(users, otps)" as DB
+participant "EmailService\nsendEmail.js / Brevo API" as EmailService
+
+User -> SignUpFE: Nhập thông tin đăng ký
+SignUpFE -> AuthController: POST /api/auth/verify-valid-fields-signup
+AuthController -> DB: Kiểm tra email đã tồn tại
+DB --> AuthController: Email chưa tồn tại
+
+AuthController --> SignUpFE: Thông tin đăng ký hợp lệ
+
+SignUpFE -> OtpController: POST /api/otp/otp-create-user
+OtpController -> DB: Tạo và lưu OTP đăng ký
+DB --> OtpController: OTP đã được lưu
+
+OtpController -> EmailService: Gửi email chứa OTP
+EmailService --> OtpController: Gửi email thành công
+
+OtpController --> SignUpFE: Trả kết quả gửi OTP
+SignUpFE --> OtpFE: navigate("/otp", { signupData })
+
+User -> OtpFE: Nhập mã OTP
+OtpFE -> AuthController: POST /api/auth/signup
+AuthController -> DB: Kiểm tra email và OTP đăng ký
+DB --> AuthController: Kết quả kiểm tra
+
+alt Email đã tồn tại hoặc OTP sai/hết hạn
+    AuthController --> OtpFE: Trả lỗi đăng ký/xác thực OTP
+    OtpFE --> User: Hiển thị lỗi
+else OTP hợp lệ
+    AuthController -> DB: Tạo tài khoản người dùng
+    DB --> AuthController: Tài khoản đã được tạo
+
+    AuthController --> OtpFE: Đăng ký thành công
+    OtpFE --> User: Chuyển sang màn hình đăng nhập
+end
+
+@enduml
+
+2. Đăng Nhập Bằng Email và Google
+@startuml
+autonumber
+
+actor "Người dùng" as User
+
+participant "FE\nSignInPage / SigninForm / OAuthSuccess" as FE
+
+participant "BE\nauthController" as AuthController
+participant "BE\nuserController" as UserController
+
+database "Database\nMongoDB\n(users, sessions)" as DB
+participant "Google OAuth\nProvider" as Google
+participant "Cloudinary\nMedia Storage" as Cloudinary
+
+== Luồng 1: Đăng nhập bằng Email ==
+
+User -> FE: Nhập email và mật khẩu
+FE -> AuthController: POST /api/auth/signin
+AuthController -> DB: Xác thực tài khoản và tạo session
+DB --> AuthController: Kết quả xác thực
+
+alt Sai thông tin đăng nhập hoặc tài khoản bị khóa
+    AuthController --> FE: Trả lỗi đăng nhập
+    FE --> User: Hiển thị lỗi
+else Đăng nhập thành công
+    AuthController --> FE: Trả accessToken, user và refreshToken cookie
+
+    FE -> UserController: GET /api/users/me
+    UserController -> DB: Lấy thông tin người dùng hiện tại
+    DB --> UserController: Thông tin người dùng
+    UserController --> FE: Trả dữ liệu người dùng
+
+    FE --> User: Chuyển vào ứng dụng
+end
+
+== Luồng 2: Đăng nhập bằng Google ==
+
+User -> FE: Chọn đăng nhập bằng Google
+FE -> AuthController: GET /api/auth/google
+AuthController -> Google: Chuyển hướng đến Google OAuth
+
+User -> Google: Chọn tài khoản Google
+Google -> AuthController: GET /api/auth/google/callback
+
+AuthController -> DB: Tìm hoặc tạo tài khoản Google
+DB --> AuthController: Thông tin tài khoản
+
+AuthController -> Cloudinary: Lưu avatar Google nếu cần
+Cloudinary --> AuthController: URL avatar
+
+AuthController -> DB: Lưu/cập nhật user và session
+DB --> AuthController: Session đã được lưu
+
+AuthController --> FE: Redirect /oauth-success
+
+FE -> AuthController: GET /api/auth/google/success
+AuthController -> DB: Kiểm tra session từ refreshToken cookie
+DB --> AuthController: Session hợp lệ
+AuthController --> FE: Trả accessToken
+
+FE -> UserController: GET /api/users/me
+UserController -> DB: Lấy thông tin người dùng hiện tại
+DB --> UserController: Thông tin người dùng
+UserController --> FE: Trả dữ liệu người dùng
+
+FE --> User: Chuyển vào ứng dụng
+
+@enduml
+
+3. Quên mật khẩu và cập nhật mật khẩu
+@startuml
+
+autonumber
+
+actor "Người dùng" as User
+
+participant "FE\nSignInPage / SigninForm\nOtpResetPassPage / OTPForm\nResetPassPage / ResetPassForm" as AuthFE
+participant "FE\nSettingsDialog / SecurityTab" as SettingsFE
+
+participant "BE\notpController" as OtpController
+participant "BE\nauthController / userController" as AuthUserController
+
+database "Database\nMongoDB\n(users, otps, sessions)" as DB
+participant "EmailService\nsendEmail.js / Brevo API" as EmailService
+
+== Luồng 1: Quên mật khẩu -> Xác thực OTP -> Cập nhật mật khẩu ==
+
+User -> AuthFE: Nhập email và chọn quên mật khẩu
+AuthFE -> OtpController: POST /api/otp/otp-reset-password
+OtpController -> DB: Kiểm tra email và lưu OTP reset password
+DB --> OtpController: OTP đã được lưu
+
+OtpController -> EmailService: Gửi email chứa OTP
+EmailService --> OtpController: Gửi email thành công
+
+OtpController --> AuthFE: Trả kết quả gửi OTP
+AuthFE --> User: Chuyển sang màn hình nhập OTP
+
+User -> AuthFE: Nhập mã OTP
+AuthFE -> OtpController: POST /api/otp/otp-verify-reset-password
+OtpController -> DB: Kiểm tra OTP reset password
+DB --> OtpController: OTP hợp lệ
+
+OtpController --> AuthFE: Trả resetToken
+AuthFE --> User: Chuyển sang màn hình nhập mật khẩu mới
+
+User -> AuthFE: Nhập mật khẩu mới
+AuthFE -> AuthUserController: PUT /api/auth/reset-new-password
+AuthUserController -> DB: Cập nhật mật khẩu mới và vô hiệu hóa session cũ
+DB --> AuthUserController: Mật khẩu đã được cập nhật
+
+AuthUserController --> AuthFE: Trả kết quả cập nhật mật khẩu thành công
+AuthFE --> User: Chuyển về màn hình đăng nhập
+
+== Luồng 2: Đổi mật khẩu khi nhớ mật khẩu cũ ==
+
+User -> SettingsFE: Nhập mật khẩu hiện tại và mật khẩu mới
+SettingsFE -> AuthUserController: PUT /api/users/change-password
+AuthUserController -> DB: Kiểm tra mật khẩu hiện tại
+DB --> AuthUserController: Kết quả kiểm tra
+
+alt Mật khẩu hiện tại không đúng
+    AuthUserController --> SettingsFE: Trả lỗi đổi mật khẩu
+    SettingsFE --> User: Hiển thị lỗi
+else Mật khẩu hiện tại hợp lệ
+    AuthUserController -> DB: Cập nhật mật khẩu mới
+    DB --> AuthUserController: Mật khẩu đã được cập nhật
+
+    AuthUserController --> SettingsFE: Trả kết quả đổi mật khẩu thành công
+    SettingsFE --> User: Hiển thị thông báo thành công
+end
+
+@enduml
+
+4. Quản lý tài khoản cá nhân
+@startuml
+
+autonumber
+
+actor "Người dùng" as User
+
+participant "FE\nProfileEditDialog / EditMusicProfile" as ProfileFE
+participant "BE\nuserController" as UserController
+
+database "Database\nMongoDB\n(users)" as DB
+participant "Cloudinary\nMedia Storage" as Cloudinary
+participant "SpotifyService\nSpotify API" as Spotify
+participant "Socket\nSocket.IO" as Socket
+
+== Luồng 1: Xem thông tin tài khoản cá nhân ==
+
+User -> ProfileFE: Mở màn hình chỉnh sửa hồ sơ
+ProfileFE -> UserController: GET /api/users/me
+UserController -> DB: Lấy thông tin người dùng hiện tại
+DB --> UserController: Thông tin tài khoản
+UserController --> ProfileFE: Trả thông tin hồ sơ
+ProfileFE --> User: Hiển thị thông tin tài khoản cá nhân
+
+== Luồng 2: Cập nhật hồ sơ cá nhân ==
+
+User -> ProfileFE: Sửa tên, tiểu sử, số điện thoại, quyền riêng tư
+ProfileFE -> UserController: PUT /api/users/update-profile
+UserController -> DB: Cập nhật thông tin hồ sơ
+DB --> UserController: Hồ sơ đã được cập nhật
+
+UserController -> Socket: Phát sự kiện profile-updated
+Socket --> UserController: Đã gửi sự kiện
+
+UserController --> ProfileFE: Trả hồ sơ mới
+ProfileFE --> User: Hiển thị cập nhật thành công
+
+== Luồng 3: Cập nhật ảnh đại diện ==
+
+User -> ProfileFE: Chọn và cắt ảnh đại diện
+ProfileFE -> UserController: POST /api/users/update-avatar
+UserController -> Cloudinary: Upload ảnh đại diện mới
+Cloudinary --> UserController: URL ảnh mới
+
+UserController -> DB: Lưu avatarUrl và avatarId
+DB --> UserController: Avatar đã được cập nhật
+
+UserController -> Socket: Phát sự kiện profile-updated
+Socket --> UserController: Đã gửi sự kiện
+
+UserController --> ProfileFE: Trả hồ sơ mới
+ProfileFE --> User: Hiển thị ảnh đại diện mới
+
+== Luồng 4: Cập nhật nhạc trên profile ==
+
+User -> ProfileFE: Tìm bài hát trên profile
+ProfileFE -> UserController: GET /api/users/music/search?q={keyword}
+UserController -> Spotify: Tìm bài hát
+Spotify --> UserController: Danh sách bài hát
+UserController --> ProfileFE: Trả kết quả tìm kiếm
+
+User -> ProfileFE: Chọn bài hát
+ProfileFE -> UserController: PUT /api/users/me/music
+UserController -> DB: Lưu trackId vào hồ sơ
+DB --> UserController: Nhạc profile đã được cập nhật
+
+UserController --> ProfileFE: Trả hồ sơ mới
+ProfileFE --> User: Hiển thị nhạc trên profile
+
+alt Cập nhật thất bại
+    UserController --> ProfileFE: Trả lỗi
+    ProfileFE --> User: Hiển thị thông báo lỗi
+end
+
+@enduml
+
+5. Quản Lý Bạn Bè, Xóa, Chặn
+@startuml
+
+autonumber
+
+actor "Người dùng" as User
+
+participant "FE\nPeoplePage / FriendsTab / BlockedTab" as PeopleFE
+participant "BE\nfriendController" as FriendController
+
+database "Database\nMongoDB\n(users, friends, blockusers)" as DB
+participant "Socket\nSocket.IO" as Socket
+
+== Xem danh sách bạn bè và danh sách bị chặn ==
+
+User -> PeopleFE: Mở trang quản lý bạn bè
+PeopleFE -> FriendController: GET /api/friends/get-friends
+FriendController -> DB: Lấy danh sách bạn bè
+DB --> FriendController: Danh sách bạn bè
+FriendController --> PeopleFE: Trả listedFriends
+
+User -> PeopleFE: Mở tab bị chặn
+PeopleFE -> FriendController: GET /api/friends/blocked-users
+FriendController -> DB: Lấy danh sách người dùng bị chặn
+DB --> FriendController: Danh sách bị chặn
+FriendController --> PeopleFE: Trả blockedUsers
+
+== Hủy kết bạn ==
+
+User -> PeopleFE: Chọn hủy kết bạn
+PeopleFE -> FriendController: DELETE /api/friends/unfriend/{friendId}
+FriendController -> DB: Xóa quan hệ bạn bè
+DB --> FriendController: Quan hệ bạn bè đã được xóa
+
+FriendController -> Socket: Gửi sự kiện unfriended
+Socket --> FriendController: Đã phát sự kiện
+
+FriendController --> PeopleFE: Trả kết quả hủy kết bạn thành công
+PeopleFE --> User: Cập nhật danh sách bạn bè
+
+== Chặn và bỏ chặn người dùng ==
+
+User -> PeopleFE: Chọn chặn người dùng
+PeopleFE -> FriendController: POST /api/friends/block/{userIdBlocked}
+FriendController -> DB: Lưu block và xóa quan hệ/lời mời liên quan
+DB --> FriendController: Người dùng đã bị chặn
+
+FriendController -> Socket: Gửi sự kiện user-blocked
+Socket --> FriendController: Đã phát sự kiện
+
+FriendController --> PeopleFE: Trả kết quả chặn thành công
+PeopleFE --> User: Cập nhật danh sách bị chặn
+
+User -> PeopleFE: Chọn bỏ chặn người dùng
+PeopleFE -> FriendController: DELETE /api/friends/unblock/{userIdUnblocked}
+FriendController -> DB: Xóa block
+DB --> FriendController: Người dùng đã được bỏ chặn
+
+FriendController -> Socket: Gửi sự kiện user-unblocked
+Socket --> FriendController: Đã phát sự kiện
+
+FriendController --> PeopleFE: Trả kết quả bỏ chặn thành công
+PeopleFE --> User: Cập nhật danh sách bị chặn
+
+alt Thao tác thất bại
+    FriendController --> PeopleFE: Trả lỗi
+    PeopleFE --> User: Hiển thị thông báo lỗi
+end
+
+@enduml
+
+6. Gửi lời mời và xử lý kết bạn
+@startuml
+title NexCon - Gửi lời mời và xử lý kết bạn
+
+autonumber
+
+actor "Người dùng" as User
+
+participant "FE\nPeoplePage / UserSearch\nSuggestionsTab / RequestsTab" as PeopleFE
+participant "BE\nfriendController" as FriendController
+
+database "Database\nMongoDB\n(users, friends, friendrequests, blockusers)" as DB
+participant "Socket\nSocket.IO" as Socket
+
+== Xem gợi ý và lời mời kết bạn ==
+
+User -> PeopleFE: Mở trang kết bạn
+PeopleFE -> FriendController: GET /api/friends/suggestions
+FriendController -> DB: Tính toán gợi ý kết bạn
+DB --> FriendController: Danh sách gợi ý
+FriendController --> PeopleFE: Trả suggestions
+
+PeopleFE -> FriendController: GET /api/friends/requests
+FriendController -> DB: Lấy lời mời kết bạn đến
+DB --> FriendController: Danh sách lời mời đến
+FriendController --> PeopleFE: Trả friendRequests
+
+PeopleFE -> FriendController: GET /api/friends/requests-sended
+FriendController -> DB: Lấy lời mời đã gửi
+DB --> FriendController: Danh sách lời mời đã gửi
+FriendController --> PeopleFE: Trả friendRequests
+
+== Gửi lời mời kết bạn ==
+
+User -> PeopleFE: Tìm người dùng hoặc chọn gợi ý kết bạn
+PeopleFE -> FriendController: POST /api/friends/send-request
+FriendController -> DB: Kiểm tra người nhận và quan hệ hiện tại
+
+alt Không thể gửi lời mời
+    DB --> FriendController: Người dùng không tồn tại / đã là bạn / bị chặn
+    FriendController --> PeopleFE: Trả lỗi gửi lời mời
+    PeopleFE --> User: Hiển thị lỗi
+else Gửi lời mời thành công
+    FriendController -> DB: Lưu friend request
+    DB --> FriendController: Friend request đã được lưu
+
+    FriendController -> Socket: Gửi sự kiện new-friend-request
+    Socket --> FriendController: Đã phát sự kiện
+
+    FriendController --> PeopleFE: Trả kết quả gửi lời mời thành công
+    PeopleFE --> User: Cập nhật danh sách lời mời đã gửi
+end
+
+== Chấp nhận hoặc từ chối lời mời ==
+
+User -> PeopleFE: Chấp nhận lời mời kết bạn
+PeopleFE -> FriendController: POST /api/friends/accept-request/{requestId}
+FriendController -> DB: Tạo quan hệ bạn bè và cập nhật lời mời
+DB --> FriendController: Bạn bè đã được tạo
+
+FriendController -> Socket: Gửi sự kiện friend-request-accepted
+Socket --> FriendController: Đã phát sự kiện
+
+FriendController --> PeopleFE: Trả kết quả chấp nhận thành công
+PeopleFE --> User: Cập nhật danh sách bạn bè
+
+User -> PeopleFE: Từ chối lời mời
+PeopleFE -> FriendController: POST /api/friends/reject-request/{requestId}
+FriendController -> DB: Cập nhật trạng thái lời mời
+DB --> FriendController: Lời mời đã được từ chối
+
+FriendController -> Socket: Gửi sự kiện friend-request-rejected
+Socket --> FriendController: Đã phát sự kiện
+
+FriendController --> PeopleFE: Trả kết quả từ chối thành công
+PeopleFE --> User: Cập nhật danh sách lời mời
+
+User -> PeopleFE: Hủy lời mời đã gửi
+PeopleFE -> FriendController: DELETE /api/friends/cancel-request/{requestId}
+FriendController -> DB: Xóa lời mời đã gửi
+DB --> FriendController: Lời mời đã được xóa
+
+FriendController -> Socket: Gửi sự kiện friend-request-cancelled
+Socket --> FriendController: Đã phát sự kiện
+
+FriendController --> PeopleFE: Trả kết quả hủy lời mời thành công
+PeopleFE --> User: Cập nhật danh sách lời mời đã gửi
+
+@enduml
+
+7. Xem, tạo và quản lý trạng thái hội thoại
+@startuml
+title NexCon - Xem, tạo và quản lý trạng thái hội thoại
+
+autonumber
+
+actor "Người dùng" as User
+
+participant "FE\nChatAppPage / ConversationMixedList\nDirectMessageCard / GroupChatCard\nNewGroupModal" as ChatFE
+participant "BE\nconversationController" as ConversationController
+
+database "Database\nMongoDB\n(conversations, messages, users)" as DB
+participant "Socket\nSocket.IO" as Socket
+participant "Redis Queue\nBullMQ Cleanup" as RedisQueue
+
+== Xem và mở hội thoại ==
+
+User -> ChatFE: Mở trang chat
+ChatFE -> ConversationController: GET /api/conversations/get-conversations
+ConversationController -> DB: Lấy danh sách hội thoại
+DB --> ConversationController: Danh sách hội thoại
+ConversationController --> ChatFE: Trả conversations
+
+User -> ChatFE: Chọn một hội thoại
+ChatFE -> ConversationController: GET /api/conversations/{conversationId}
+ConversationController -> DB: Lấy thông tin hội thoại
+DB --> ConversationController: Thông tin hội thoại
+ConversationController --> ChatFE: Trả conversation
+
+ChatFE -> ConversationController: GET /api/conversations/{conversationId}/messages
+ConversationController -> DB: Lấy tin nhắn hội thoại
+DB --> ConversationController: Danh sách tin nhắn
+ConversationController --> ChatFE: Trả messages
+
+== Tạo hội thoại ==
+
+User -> ChatFE: Tạo chat trực tiếp hoặc nhóm mới
+ChatFE -> ConversationController: POST /api/conversations/create-conversation
+ConversationController -> DB: Tạo hoặc lấy hội thoại
+DB --> ConversationController: Hội thoại đã sẵn sàng
+
+ConversationController -> Socket: Phát sự kiện new-conversation
+Socket --> ConversationController: Đã phát sự kiện
+
+ConversationController --> ChatFE: Trả conversation
+ChatFE --> User: Mở hội thoại vừa tạo
+
+== Quản lý trạng thái hội thoại ==
+
+User -> ChatFE: Đánh dấu đã đọc
+ChatFE -> ConversationController: PATCH /api/conversations/{conversationId}/mark-seen
+ConversationController -> DB: Cập nhật trạng thái đã xem
+DB --> ConversationController: Đã cập nhật
+ConversationController -> Socket: Phát sự kiện read-message
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> ChatFE: Trả kết quả đã đọc
+
+User -> ChatFE: Ghim hoặc bỏ ghim hội thoại
+ChatFE -> ConversationController: PATCH /api/conversations/{conversationId}/pin
+ConversationController -> DB: Cập nhật trạng thái ghim
+DB --> ConversationController: Đã cập nhật
+ConversationController --> ChatFE: Trả trạng thái ghim mới
+
+User -> ChatFE: Tắt hoặc bật thông báo hội thoại
+ChatFE -> ConversationController: PATCH /api/conversations/{conversationId}/mute
+ConversationController -> DB: Cập nhật cấu hình mute
+DB --> ConversationController: Đã cập nhật
+ConversationController -> Socket: Phát sự kiện conversation-mute-updated
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> ChatFE: Trả cấu hình mute mới
+
+User -> ChatFE: Xóa lịch sử hội thoại phía mình
+ChatFE -> ConversationController: DELETE /api/conversations/{conversationId}/clear
+ConversationController -> DB: Đánh dấu clearedAt cho người dùng
+DB --> ConversationController: Đã cập nhật
+ConversationController -> RedisQueue: Lên lịch dọn dữ liệu nếu đủ điều kiện
+RedisQueue --> ConversationController: Đã nhận job
+ConversationController -> Socket: Phát sự kiện conversation-cleared
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> ChatFE: Trả kết quả xóa hội thoại
+
+alt Hội thoại không hợp lệ hoặc không có quyền
+    ConversationController --> ChatFE: Trả lỗi thao tác hội thoại
+    ChatFE --> User: Hiển thị thông báo lỗi
+end
+
+@enduml
+
+
+8. Quản lý nhóm chat
+@startuml
+title NexCon - Quản lý nhóm chat
+
+autonumber
+
+actor "Người dùng" as User
+
+participant "FE\nConversationInfoSidebar\nAddMemberModal / MembersPanel\nGroupManagementPanel / LeaveGroupModal" as GroupFE
+participant "BE\nconversationController" as ConversationController
+
+database "Database\nMongoDB\n(conversations, messages, users)" as DB
+participant "Socket\nSocket.IO" as Socket
+participant "Cloudinary\nMedia Storage" as Cloudinary
+participant "Redis Queue\nBullMQ Cleanup" as RedisQueue
+
+== Cập nhật thông tin nhóm ==
+
+User -> GroupFE: Đổi tên nhóm
+GroupFE -> ConversationController: PUT /api/conversations/{conversationId}/update-group-name
+ConversationController -> DB: Cập nhật tên nhóm
+DB --> ConversationController: Nhóm đã được cập nhật
+ConversationController -> Socket: Phát sự kiện conversation-updated
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả conversation mới
+
+User -> GroupFE: Đổi ảnh nhóm
+GroupFE -> ConversationController: POST /api/conversations/{conversationId}/update-group-avatar
+ConversationController -> Cloudinary: Upload ảnh nhóm mới
+Cloudinary --> ConversationController: URL ảnh nhóm
+ConversationController -> DB: Lưu avatar nhóm
+DB --> ConversationController: Avatar nhóm đã được cập nhật
+ConversationController -> Socket: Phát sự kiện conversation-updated
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả conversation mới
+
+== Quản lý thành viên ==
+
+User -> GroupFE: Thêm thành viên vào nhóm
+GroupFE -> ConversationController: POST /api/conversations/{conversationId}/add-members
+ConversationController -> DB: Thêm thành viên hoặc đưa vào hàng chờ duyệt
+DB --> ConversationController: Nhóm đã được cập nhật
+ConversationController -> Socket: Phát sự kiện members-added / approval-requested
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả kết quả thêm thành viên
+
+User -> GroupFE: Duyệt hoặc từ chối thành viên chờ vào nhóm
+GroupFE -> ConversationController: POST /api/conversations/{conversationId}/approvals
+ConversationController -> DB: Cập nhật hàng chờ duyệt
+DB --> ConversationController: Hàng chờ đã được cập nhật
+ConversationController -> Socket: Phát sự kiện approval-queue-updated
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả kết quả duyệt
+
+User -> GroupFE: Xóa thành viên khỏi nhóm
+GroupFE -> ConversationController: DELETE /api/conversations/{conversationId}/members/{memberId}
+ConversationController -> DB: Xóa thành viên khỏi nhóm
+DB --> ConversationController: Nhóm đã được cập nhật
+ConversationController -> Socket: Phát sự kiện member-removed
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả kết quả xóa thành viên
+
+== Quản trị nhóm ==
+
+User -> GroupFE: Cập nhật cài đặt nhóm
+GroupFE -> ConversationController: PATCH /api/conversations/{conversationId}/settings
+ConversationController -> DB: Cập nhật cài đặt nhóm
+DB --> ConversationController: Cài đặt nhóm đã được cập nhật
+ConversationController -> Socket: Phát sự kiện conversation-updated
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả group settings mới
+
+User -> GroupFE: Chuyển quyền quản trị
+GroupFE -> ConversationController: PATCH /api/conversations/{conversationId}/admins/{memberId}
+ConversationController -> DB: Cập nhật quản trị viên nhóm
+DB --> ConversationController: Quản trị viên đã được cập nhật
+ConversationController -> Socket: Phát sự kiện admin-transferred
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả kết quả chuyển quyền
+
+User -> GroupFE: Rời nhóm
+GroupFE -> ConversationController: DELETE /api/conversations/{conversationId}/leave
+ConversationController -> DB: Cập nhật thành viên còn lại
+DB --> ConversationController: Nhóm đã được cập nhật
+ConversationController -> Socket: Phát sự kiện member-left / left-group
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả kết quả rời nhóm
+
+User -> GroupFE: Giải tán nhóm
+GroupFE -> ConversationController: DELETE /api/conversations/{conversationId}/disband-group
+ConversationController -> DB: Đánh dấu nhóm đã giải tán
+DB --> ConversationController: Nhóm đã được giải tán
+ConversationController -> RedisQueue: Lên lịch dọn nhóm sau thời gian lưu giữ
+RedisQueue --> ConversationController: Đã nhận job
+ConversationController -> Socket: Phát sự kiện group-disbanded
+Socket --> ConversationController: Đã phát sự kiện
+ConversationController --> GroupFE: Trả kết quả giải tán nhóm
+
+alt Không có quyền hoặc nhóm không hợp lệ
+    ConversationController --> GroupFE: Trả lỗi thao tác nhóm
+    GroupFE --> User: Hiển thị thông báo lỗi
+end
+
+@enduml
+
+9. Gửi và nhận tin nhắn
+@startuml
+
+skinparam defaultFontSize 20
+skinparam maxMessageSize 250
+
+actor "Người gửi" as Sender
+
+participant "FE người gửi\nChatWindowLayout / MessageInput\nchatService" as FESender
+participant "BE\nmessageController" as BE
+database "Database\nMongoDB\nMessage / Conversation" as DB
+participant "Cloudinary\nMedia Storage" as Cloudinary
+participant "Socket.IO\nReplica hiện tại" as SocketA
+queue "Redis Pub/Sub\nSocket.IO Redis Adapter" as Redis
+participant "Socket.IO\nReplica khác\ntrong 6 Railway replicas" as SocketB
+participant "FE người nhận\nChatWindowBody" as FEReceiver
+participant "AI Moderation\nGemini / AssemblyAI" as AI
+
+note over FESender, FEReceiver
+Các client đã join conversation room
+khi mở màn hình chat
+end note
+
+== Gửi tin nhắn ==
+
+Sender -> FESender: Nhập nội dung / chọn file và bấm gửi
+FESender -> BE: POST /api/messages/send\nconversationId, content, type, file?
+
+activate BE
+
+opt Tin nhắn có file / ảnh / audio
+    BE -> Cloudinary: Upload media
+    Cloudinary --> BE: Trả về mediaUrl / publicId / signedUrl
+end
+
+BE -> DB: Lưu Message
+DB --> BE: Message đã tạo
+
+BE -> DB: Cập nhật Conversation\nlastMessage, unreadCounts
+DB --> BE: Conversation đã cập nhật
+
+== Phát realtime qua Socket multi-replicas ==
+
+BE -> SocketA: emitNewMessage()\nevent "new-message"
+
+SocketA -> Redis: Publish event vào room conversationId
+
+Redis -> SocketA: Fan-out tới socket ở replica hiện tại
+Redis -> SocketB: Fan-out tới socket ở replica khác
+
+SocketA --> FESender: Nhận event "new-message"
+SocketB --> FEReceiver: Nhận event "new-message"
+
+BE --> FESender: 201 Created\n{ message, signedUrl }
+
+deactivate BE
+
+FESender -> Sender: Hiển thị tin nhắn đã gửi
+FEReceiver -> FEReceiver: Render tin nhắn realtime
+
+== AI kiểm duyệt sau khi tin nhắn đã gửi ==
+
+activate BE
+
+BE -> AI: Kiểm duyệt nội dung tin nhắn sau gửi
+
+note right of AI
+Text / link: kiểm duyệt nội dung
+Image: kiểm duyệt hình ảnh
+Audio: transcribe rồi kiểm duyệt
+end note
+
+AI --> BE: Trả kết quả kiểm duyệt
+
+alt Tin nhắn vi phạm
+    BE -> DB: Cập nhật moderationStatus\nvà đánh dấu tin nhắn vi phạm
+    DB --> BE: Cập nhật thành công
+
+    BE -> SocketA: emit event "message-moderated"
+    SocketA -> Redis: Publish moderation event
+
+    Redis -> SocketA: Fan-out tới replica hiện tại
+    Redis -> SocketB: Fan-out tới replica khác
+
+    SocketA --> FESender: Nhận event "message-moderated"
+    SocketB --> FEReceiver: Nhận event "message-moderated"
+
+    FESender -> Sender: Cập nhật tin nhắn bị đánh dấu / bị ẩn
+    FEReceiver -> FEReceiver: Cập nhật tin nhắn vi phạm
+else Tin nhắn hợp lệ
+    BE -> DB: Cập nhật moderationStatus = approved
+    DB --> BE: Cập nhật thành công
+
+    BE -> SocketA: emit event "message-moderation-updated"
+    SocketA -> Redis: Publish moderation updated event
+
+    Redis -> SocketA: Fan-out tới replica hiện tại
+    Redis -> SocketB: Fan-out tới replica khác
+
+    SocketA --> FESender: Nhận event "message-moderation-updated"
+    SocketB --> FEReceiver: Nhận event "message-moderation-updated"
+end
+
+deactivate BE
+
+@enduml
+
+10. Tương tác và tìm kiếm tin nhắn
+@startuml
+
+skinparam defaultFontSize 20
+
+actor "Người dùng" as User
+
+participant "FE\nChatAppPage\nMessageItem / PinnedMessagesBanner\nForwardMessageModal / MessageSearchSidebar" as FE
+participant "BE\nmessageController" as BE
+database "Database\nMongoDB\nMessage / Conversation" as DB
+participant "Cloudinary\nMedia Storage" as Cloudinary
+participant "Socket.IO Cluster\n6 Railway Replicas" as Socket
+queue "Redis Pub/Sub\nSocket.IO Redis Adapter" as Redis
+
+note over Socket, Redis
+Các Socket.IO instance trên 6 Railway replicas
+đồng bộ realtime event thông qua Redis Adapter
+end note
+
+== Luồng 1: Tương tác tin nhắn ==
+
+User -> FE: Chọn thao tác trên tin nhắn
+
+alt Thả / đổi / gỡ reaction
+    FE -> BE: PUT /api/messages/{messageId}/react
+    BE -> DB: Cập nhật reactions của Message
+    DB --> BE: Trả reactions mới
+
+    BE -> Socket: emit "message-reaction"
+    Socket -> Redis: Publish realtime event
+    Redis --> Socket: Fan-out tới sockets trên các replicas
+    Socket --> FE: Cập nhật reaction trên UI
+
+    BE --> FE: 200 OK { reactions }
+
+else Ghim / bỏ ghim tin nhắn
+    FE -> BE: PUT /api/messages/pin
+    BE -> DB: Cập nhật isPinned, pinnedAt\nvà tạo system message
+    DB --> BE: Trạng thái ghim mới
+
+    BE -> Socket: emit "pin-message"\nvà "new-message" system
+    Socket -> Redis: Publish realtime event
+    Redis --> Socket: Fan-out tới các replicas
+    Socket --> FE: Cập nhật tin nhắn ghim
+
+    BE --> FE: 200 OK { data }
+
+else Thu hồi tin nhắn
+    FE -> BE: PUT /api/messages/recall
+    BE -> Cloudinary: Xóa media nếu tin nhắn có file
+    Cloudinary --> BE: Xóa thành công
+
+    BE -> DB: Đánh dấu isRecalled\nvà bỏ ghim nếu đang ghim
+    DB --> BE: Cập nhật thành công
+
+    BE -> Socket: emit "recall-message"
+    Socket -> Redis: Publish realtime event
+    Redis --> Socket: Fan-out tới các replicas
+    Socket --> FE: Hiển thị "Tin nhắn này đã được thu hồi"
+
+    BE --> FE: 200 OK { success }
+
+else Chuyển tiếp tin nhắn
+    FE -> BE: POST /api/messages/{messageId}/forward
+    BE -> DB: Tạo message mới ở conversation đích\nvà cập nhật lastMessage / unreadCounts
+    DB --> BE: Kết quả forward
+
+    BE -> Socket: emit "new-message" tới conversation đích
+    Socket -> Redis: Publish realtime event
+    Redis --> Socket: Fan-out tới các replicas
+    Socket --> FE: Hiển thị tin nhắn được chuyển tiếp
+
+    BE --> FE: 200 OK { forwarded, results, errors }
+end
+
+== Luồng 2: Tìm kiếm tin nhắn ==
+
+User -> FE: Nhập keyword / chọn bộ lọc trong MessageSearchSidebar
+
+FE -> BE: GET /api/messages/search?conversationId={id}&keyword={text}&senderId={id}&fromDate={date}&toDate={date}
+
+BE -> DB: Kiểm tra quyền trong conversation\nvà truy vấn Message theo bộ lọc
+DB --> BE: Danh sách message phù hợp điều kiện cơ bản
+
+BE -> BE: Giải mã searchContent\nnormalize keyword và lọc kết quả
+BE --> FE: 200 OK { messages, hasMore, nextCursor }
+
+FE -> User: Hiển thị kết quả tìm kiếm
+
+loop Cuộn để tải thêm kết quả
+    FE -> BE: GET /api/messages/search?...&cursor={nextCursor}
+    BE -> DB: Truy vấn page tiếp theo
+    DB --> BE: Danh sách message tiếp theo
+    BE --> FE: 200 OK { messages, hasMore, nextCursor }
+    FE -> User: Append kết quả vào sidebar
+end
+
+User -> FE: Chọn một kết quả
+FE -> User: Scroll tới tin nhắn trong ChatWindowBody
+
+@enduml
+
+11. Quản lý lời nhắc cá nhân
+@startuml
+
+actor "Người dùng" as User
+
+participant "FE\nReminderPage\nReminderFormModal / ReminderCard" as FE
+participant "BE\nreminderController" as BE
+database "Database\nMongoDB\nReminder" as DB
+queue "Redis + BullMQ\nReminderQueue" as Queue
+participant "Socket.IO Cluster\nRedis Adapter\n6 Railway replicas" as Socket
+
+note over Socket
+Socket.IO Redis Adapter đồng bộ realtime event
+giữa 6 Railway replicas.
+end note
+
+== Xem danh sách lời nhắc ==
+
+User -> FE: Mở ReminderPage
+FE -> BE: GET /api/reminders?status={status}&from={date}&to={date}&sort={sort}
+BE -> DB: Lấy danh sách Reminder của user
+DB --> BE: reminders
+BE --> FE: 200 OK { reminders, hasMore, nextCursor }
+
+FE -> BE: GET /api/reminders/summary
+BE -> DB: Đếm reminder sắp tới
+DB --> BE: upcomingCount
+BE --> FE: 200 OK { upcomingCount }
+
+FE -> User: Hiển thị danh sách / lịch lời nhắc
+
+== Tạo lời nhắc cá nhân ==
+
+User -> FE: Nhập nội dung, thời gian, kênh thông báo
+FE -> BE: POST /api/reminders
+
+BE -> DB: Tạo Reminder cá nhân
+DB --> BE: Reminder đã tạo
+
+BE -> Queue: scheduleReminderJob(reminder)
+BE -> Socket: emit "reminder-created"
+Socket --> FE: Cập nhật reminder realtime
+
+BE --> FE: 201 Created { reminder }
+FE -> User: Hiển thị lời nhắc mới
+
+== Sửa / snooze / dismiss / xóa ==
+
+User -> FE: Chọn thao tác trên ReminderCard
+
+alt Chỉnh sửa lời nhắc
+    FE -> BE: PATCH /api/reminders/{id}
+    BE -> DB: Cập nhật content / remindAt / repeatRule / notifyChannels
+    DB --> BE: Reminder đã cập nhật
+
+    BE -> Queue: removeReminderJob(id)\nvà scheduleReminderJob(reminder)
+    BE -> Socket: emit "reminder-updated"
+    Socket --> FE: Cập nhật lời nhắc realtime
+
+    BE --> FE: 200 OK { reminder }
+
+else Tạm hoãn lời nhắc
+    FE -> BE: POST /api/reminders/{id}/snooze
+    BE -> DB: Cập nhật status = snoozed\nvà snoozeUntil
+    DB --> BE: Reminder đã snooze
+
+    BE -> Queue: scheduleReminderJob(reminder)
+    BE -> Socket: emit "reminder-snoozed"
+    Socket --> FE: Cập nhật trạng thái snooze
+
+    BE --> FE: 200 OK { reminder }
+
+else Bỏ qua lời nhắc
+    FE -> BE: POST /api/reminders/{id}/dismiss
+    BE -> DB: Cập nhật status = dismissed
+    DB --> BE: Reminder đã dismissed
+
+    BE -> Queue: removeReminderJob(id)
+    BE -> Socket: emit "reminder-updated"
+    Socket --> FE: Cập nhật trạng thái dismissed
+
+    BE --> FE: 200 OK { reminder }
+
+else Xóa lời nhắc
+    FE -> BE: DELETE /api/reminders/{id}
+    BE -> DB: Xóa Reminder cá nhân
+    DB --> BE: Đã xóa
+
+    BE -> Queue: removeReminderJob(id)
+    BE -> Socket: emit "reminder-deleted"
+    Socket --> FE: Xóa reminder khỏi danh sách
+
+    BE --> FE: 200 OK { message }
+end
+
+@enduml
+
+12. Tạo lời nhắc chung
+@startuml
+
+actor "Người dùng" as User
+
+participant "FE\nMessageItem / ReminderQuickModal\nScheduleMeetingModal / ReminderToast" as FE
+participant "BE\nreminderController\nmessageController(system message)" as BE
+database "Database\nMongoDB\nReminder / Message / Conversation / Meeting" as DB
+queue "Redis + BullMQ\nReminderQueue / ReminderWorker" as Queue
+participant "Socket.IO Cluster\nRedis Adapter\n6 Railway replicas" as Socket
+participant "Notification Services\nPush / In-app / EmailService" as Notify
+
+note over Socket
+Socket.IO Redis Adapter giúp các event reminder/chat
+được fan-out tới client đang kết nối trên mọi replica.
+end note
+
+== Tạo lời nhắc chung ==
+
+User -> FE: Tạo lời nhắc chung từ tin nhắn\nhoặc lên lịch họp
+
+alt Tạo lời nhắc chung từ tin nhắn
+    FE -> BE: POST /api/reminders/shared/from-message
+    BE -> DB: Lấy Conversation / Message\nvà tạo Reminder cho các thành viên
+    DB --> BE: Shared reminders đã tạo
+
+    BE -> DB: Tạo system message\nshared_reminder_created
+    DB --> BE: System message đã tạo
+
+    BE -> Queue: scheduleReminderJob() cho từng thành viên
+    BE -> Socket: emit "new-message"\nvà "reminder-created"
+    Socket --> FE: Cập nhật chat và reminder realtime
+
+    BE --> FE: 201 Created { reminder, sharedKey, participantCount }
+
+else Lên lịch cuộc họp
+    FE -> BE: POST /api/reminders/schedule-meeting
+    BE -> DB: Tạo Meeting\nvà Reminder cho các thành viên
+    DB --> BE: Meeting + reminders đã tạo
+
+    BE -> DB: Tạo system message\nshared_reminder_created
+    DB --> BE: System message đã tạo
+
+    BE -> Queue: scheduleReminderJob() cho từng thành viên
+    BE -> Socket: emit "new-message"\nvà "reminder-created"
+    Socket --> FE: Cập nhật lịch họp và lời nhắc
+
+    BE --> FE: 201 Created { reminder, meeting, sharedKey }
+end
+
+FE -> User: Hiển thị lời nhắc chung / lịch họp
+
+== Tham gia, từ chối hoặc hủy lời nhắc chung ==
+
+User -> FE: Chọn tham gia / từ chối / hủy lời nhắc chung
+
+alt Cập nhật tham gia
+    FE -> BE: PATCH /api/reminders/shared/{sharedKey}/participation
+    BE -> DB: Cập nhật participationStatus\nvà status của Reminder
+    DB --> BE: Reminder đã cập nhật
+
+    BE -> Queue: scheduleReminderJob()\nhoặc removeReminderJob()
+    BE -> Socket: emit "reminder-participation-updated"
+
+    BE -> DB: Tạo system message\nshared_reminder_participation_changed
+    DB --> BE: System message đã tạo
+    BE -> Socket: emit "new-message"
+
+    Socket --> FE: Cập nhật trạng thái tham gia realtime
+    BE --> FE: 200 OK { reminder }
+
+else Creator hủy lời nhắc chung
+    FE -> BE: DELETE /api/reminders/{id}
+    BE -> DB: Xóa tất cả Reminder cùng sharedKey\nvà đánh dấu system message đã hủy
+    DB --> BE: Đã hủy lời nhắc chung
+
+    BE -> Queue: removeReminderJob() cho các thành viên
+    BE -> Socket: emit "shared-reminder-cancelled"
+
+    BE -> DB: Tạo system message\nshared_reminder_cancelled
+    DB --> BE: System message đã tạo
+    BE -> Socket: emit "new-message"
+
+    Socket --> FE: Cập nhật reminder và chat realtime
+    BE --> FE: 200 OK { message, deletedCount }
+end
+
+== Kích hoạt lời nhắc đúng giờ ==
+
+Queue -> BE: ReminderWorker xử lý job đến hạn
+
+BE -> DB: Lấy Reminder và cập nhật trạng thái
+DB --> BE: Reminder sau cập nhật
+
+BE -> Socket: emit "reminder-triggered"
+Socket --> FE: Hiển thị ReminderToast realtime
+FE -> User: Nhận popup lời nhắc trong app
+
+BE -> Notify: Gửi Push / In-app / Email nếu được cấu hình
+Notify --> User: Nhận thông báo ngoài ứng dụng
+
+opt Lời nhắc lặp lại
+    BE -> DB: Tính remindAt tiếp theo\nvà cập nhật status = pending
+    DB --> BE: Reminder lặp lại đã cập nhật
+    BE -> Queue: scheduleReminderJob() lần tiếp theo
+end
+
+@enduml
+
+13. Tạo và tham gia cuộc họp
+@startuml
+
+actor "Chủ phòng" as Host
+actor "Người tham gia" as Guest
+
+participant "FE\nMeetPage / PreviewScreen\nMeetManager / GroupCallRoom" as FE
+participant "BE\nmeetingController" as BE
+database "Database\nMongoDB\nMeeting" as DB
+participant "LiveKit\nVideo Room" as LiveKit
+
+== Chủ phòng tạo cuộc họp ==
+
+Host -> FE: Bấm "Tạo cuộc họp mới"
+FE -> BE: POST /api/meetings
+
+BE -> DB: Tạo Meeting\nstatus = active, requireApproval = true
+DB --> BE: Meeting đã tạo
+
+BE -> BE: Tạo LiveKit access token cho host
+BE --> FE: 201 Created { meeting, token }
+
+FE -> Host: Hiển thị link cuộc họp\nvà PreviewScreen
+
+Host -> FE: Bấm "Tham gia"
+FE -> LiveKit: Connect LiveKitRoom(token, roomName)
+LiveKit --> FE: Kết nối thành công
+
+FE -> Host: Hiển thị MeetManager / GroupCallRoom
+
+== Người tham gia mở link cuộc họp ==
+
+Guest -> FE: Mở /meet?code={roomName}\nhoặc nhập link cuộc họp
+
+FE -> BE: GET /api/meetings/{roomName}
+BE -> DB: Lấy thông tin Meeting và host
+DB --> BE: Meeting info
+BE --> FE: 200 OK { meeting }
+
+FE -> BE: POST /api/meetings/{roomName}/join\n{ requestApproval: false }
+
+BE -> DB: Kiểm tra phòng và trạng thái người tham gia
+DB --> BE: Kết quả kiểm tra
+
+alt Được vào phòng ngay
+    BE -> DB: Thêm participant nếu cần
+    DB --> BE: Participant đã cập nhật
+
+    BE -> BE: Tạo LiveKit access token
+    BE --> FE: 200 OK { token, isHost, waitingRoom }
+
+    Guest -> FE: Bấm "Tham gia" trên PreviewScreen
+    FE -> LiveKit: Connect LiveKitRoom(token, roomName)
+    LiveKit --> FE: Kết nối thành công
+
+    FE -> Guest: Vào cuộc họp
+
+else Cần chủ phòng duyệt
+    BE --> FE: 200 OK { status: "needs_approval" }
+    FE -> Guest: Hiển thị PreviewScreen\nvới nút "Yêu cầu tham gia"
+end
+
+@enduml
+
+14. Vào phòng chờ và kết thúc cuộc họp
+@startuml
+
+actor "Chủ phòng" as Host
+actor "Người tham gia" as Guest
+
+participant "FE\nWaitingScreen / WaitingRoomPanel\nMeetManager / GroupCallRoom" as FE
+participant "BE\nmeetingController\nSocket handlers" as BE
+database "Database\nMongoDB\nMeeting" as DB
+queue "Socket.IO + Redis\nAdapter / RealtimeTimeoutQueue" as Realtime
+participant "LiveKit\nVideo Room" as LiveKit
+
+note over Realtime
+Socket.IO Redis Adapter đồng bộ realtime event
+giữa 6 Railway replicas.
+RealtimeTimeoutQueue xử lý timeout phòng chờ.
+end note
+
+== Gửi yêu cầu vào phòng chờ ==
+
+Guest -> FE: Bấm "Yêu cầu tham gia"
+FE -> BE: POST /api/meetings/{roomName}/join\n{ requestApproval: true }
+
+BE -> DB: Thêm user vào waitingRoom
+DB --> BE: Waiting room đã cập nhật
+
+BE -> Realtime: schedule meeting-waiting-timeout
+BE -> Realtime: emit "waiting-room-update" đến host
+Realtime --> FE: Host thấy người đang chờ
+
+BE --> FE: 200 OK { status: "waiting" }
+FE -> Guest: Hiển thị WaitingScreen
+
+== Chủ phòng duyệt yêu cầu ==
+
+alt Chấp nhận người tham gia
+    Host -> FE: Bấm "Chấp nhận"
+    FE -> Realtime: socket.emit("admit-participant")
+
+    Realtime -> DB: Xóa khỏi waitingRoom\nvà thêm vào participants
+    DB --> Realtime: Cập nhật thành công
+
+    Realtime -> Realtime: clear waiting timeout
+    Realtime -> BE: Tạo LiveKit token cho participant
+
+    Realtime --> FE: emit "participant-admitted"\n{ token, roomName }
+
+    FE -> LiveKit: Connect LiveKitRoom(token, roomName)
+    LiveKit --> FE: Kết nối thành công
+
+    FE -> Guest: Vào cuộc họp
+
+else Từ chối hoặc hết thời gian chờ
+    Host -> FE: Bấm "Từ chối"\nhoặc timeout xảy ra
+    FE -> Realtime: socket.emit("reject-participant")\nhoặc meeting-waiting-timeout
+
+    Realtime -> DB: Xóa user khỏi waitingRoom
+    DB --> Realtime: Cập nhật thành công
+
+    Realtime --> FE: emit "participant-rejected"
+    FE -> Guest: Hiển thị trạng thái bị từ chối
+end
+
+== Kết thúc cuộc họp ==
+
+Host -> FE: Chọn "Kết thúc cuộc họp với tất cả"
+FE -> BE: DELETE /api/livekit/end/{roomName}
+
+BE -> DB: Cập nhật Meeting\nstatus = ended, endedAt,\nclear waitingRoom
+DB --> BE: Meeting đã kết thúc
+
+BE -> Realtime: clear waiting timeouts
+BE -> Realtime: emit "meeting-ended"\nvà "participant-rejected" cho người đang chờ
+Realtime --> FE: Các client nhận trạng thái kết thúc
+
+BE --> FE: 200 OK { success: true }
+
+FE -> LiveKit: Disconnect room
+LiveKit --> FE: Đã rời phòng
+
+FE -> Host: Đóng giao diện cuộc họp
+
+@enduml
+
+15. Gửi báo cáo vi phạm
+@startuml
+title Sequence - Gửi báo cáo vi phạm
+
+actor "Người dùng" as User
+
+participant "FE\nMessageItem / UserProfileDialog\nReportDialog" as FE
+participant "BE\nreportController" as BE
+database "Database\nMongoDB\nUser / Message / Conversation / Report" as DB
+
+== Mở form báo cáo ==
+
+User -> FE: Chọn "Báo cáo"
+FE -> User: Hiển thị ReportDialog\nchọn lý do và nhập mô tả
+
+User -> FE: Bấm "Gửi báo cáo"
+
+alt Báo cáo tin nhắn
+    FE -> BE: POST /api/reports/messages/{messageId}
+
+    BE -> DB: Lấy Message được báo cáo
+    DB --> BE: Message
+
+    BE -> DB: Kiểm tra Conversation\nngười báo cáo có quyền xem tin nhắn
+    DB --> BE: Conversation hợp lệ
+
+    BE -> DB: Lấy User gửi tin nhắn
+    DB --> BE: Target user
+
+    BE -> DB: Kiểm tra report đang pending/reviewing
+    DB --> BE: Chưa có report trùng
+
+    BE -> DB: Tạo Report\nkèm reporterSnapshot,\ntargetUserSnapshot,\nmessageSnapshot
+    DB --> BE: Report đã tạo
+
+    BE --> FE: 201 Created\n{ message, report }
+
+else Báo cáo người dùng
+    FE -> BE: POST /api/reports/users/{userId}
+
+    BE -> DB: Lấy User bị báo cáo
+    DB --> BE: Target user
+
+    BE -> DB: Kiểm tra Conversation nếu có conversationId
+    DB --> BE: Conversation hợp lệ
+
+    BE -> DB: Kiểm tra report đang pending/reviewing
+    DB --> BE: Chưa có report trùng
+
+    BE -> DB: Tạo Report\nkèm reporterSnapshot,\ntargetUserSnapshot
+    DB --> BE: Report đã tạo
+
+    BE --> FE: 201 Created\n{ message, report }
+end
+
+FE -> User: Hiển thị thông báo\n"Đã gửi báo cáo"
+
+== Lỗi quan trọng ==
+
+alt Đã có báo cáo đang chờ xử lý
+    BE --> FE: 409 Conflict\n{ message }
+    FE -> User: Hiển thị lỗi\n"Bạn đã báo cáo nội dung này"
+end
+
+@enduml
+
+16. Quản lý báo cáo vi phạm
+@startuml
+skinparam defaultFontSize 20
+
+actor "Quản trị viên" as Admin
+
+participant "FE\nAdminReportsPage\nAdminEvidencePreview / AdminUserDrawer" as FE
+participant "BE\nadminController" as BE
+database "Database\nMongoDB\nReport / User / Message / Notification" as DB
+participant "AI Moderation\nGemini / OpenAI / AssemblyAI" as AI
+participant "Socket.IO Cluster\nRedis Adapter" as Socket
+participant "NotificationService" as Notify
+
+== Xem danh sách báo cáo ==
+
+Admin -> FE: Mở trang quản lý báo cáo
+FE -> BE: GET /api/admin/reports?targetType={message|user}&status={status}&limit=100
+
+BE -> DB: Lấy danh sách Report\nkèm evidence nếu là message report
+DB --> BE: reports + messageEvidence
+
+BE --> FE: 200 OK { reports, pagination }
+FE -> Admin: Hiển thị danh sách báo cáo
+
+== Đánh dấu đang xem xét ==
+
+Admin -> FE: Chọn báo cáo\nvà bấm "Đang xem xét"
+FE -> BE: PATCH /api/admin/reports/{reportId}/reviewing
+
+BE -> DB: Cập nhật Report\nstatus = reviewing,\nreviewedBy, reviewedAt
+DB --> BE: Report đã cập nhật
+
+BE --> FE: 200 OK { report }
+FE -> Admin: Cập nhật trạng thái báo cáo
+
+== AI lọc báo cáo tin nhắn ==
+
+Admin -> FE: Bấm "AI lọc hàng loạt"
+FE -> BE: POST /api/admin/reports/messages/ai-review
+
+BE -> DB: Lấy các Report tin nhắn\nstatus pending/reviewing
+DB --> BE: Reports + target messages
+
+BE -> AI: Kiểm duyệt lại nội dung tin nhắn
+AI --> BE: Kết quả moderation
+
+alt AI xác nhận vi phạm đủ tự tin
+    BE -> DB: Resolve Report = violation\nvà lưu aiModeration
+
+    BE -> DB: Cập nhật Message\nreportStatus = true
+    DB --> BE: Message đã bị đánh dấu vi phạm
+
+    BE -> DB: Ghi nhận violation cho target user\nvà khóa tài khoản nếu vượt ngưỡng
+    DB --> BE: Violation summary
+
+    BE -> Socket: emit "message-moderated"
+    Socket --> FE: Cập nhật tin nhắn bị ẩn / vi phạm
+
+    BE -> Notify: Tạo thông báo kết quả report\ncho reporter và target user
+    Notify -> DB: Lưu Notification
+else AI chưa đủ chắc chắn
+    BE --> FE: Trả kết quả cần admin xem tiếp
+end
+
+BE --> FE: 200 OK { scanned, resolved, needsReview, results }
+FE -> Admin: Hiển thị kết quả AI review
+
+== Admin kết luận báo cáo ==
+
+Admin -> FE: Chọn "Xác nhận vi phạm"\nhoặc "Không vi phạm"
+FE -> BE: PATCH /api/admin/reports/{reportId}/resolve
+
+alt Quyết định: violation
+    BE -> DB: Cập nhật Report\nstatus = resolved,\nresolution.decision = violation
+    DB --> BE: Report đã cập nhật
+
+    BE -> DB: Nếu là message report:\ncập nhật Message.reportStatus = true
+    DB --> BE: Message đã cập nhật
+
+    BE -> DB: Ghi nhận violation cho target user\nvà khóa tài khoản nếu vượt ngưỡng
+    DB --> BE: Violation summary
+
+    BE -> Socket: emit "message-moderated"
+    Socket --> FE: Realtime cập nhật tin nhắn vi phạm
+
+    BE -> Notify: Gửi thông báo cho người báo cáo\nvà người bị báo cáo
+    Notify -> DB: Lưu Notification
+
+    BE --> FE: 200 OK { report }
+
+else Quyết định: no_violation
+    BE -> DB: Cập nhật Report\nstatus = dismissed,\nresolution.decision = no_violation
+    DB --> BE: Report đã cập nhật
+
+    BE -> Notify: Gửi thông báo kết quả\ncho người báo cáo
+    Notify -> DB: Lưu Notification
+
+    BE --> FE: 200 OK { report }
+end
+
+FE -> Admin: Làm mới danh sách báo cáo
+
+@enduml
+
+17. Xem danh sách người dùng và chi tiết
+
+18. Ghi nhận vi phạm, khóa và mở khóa
+@startuml
+title Quản lý người dùng - Ghi nhận vi phạm, khóa và mở khóa
+
+autonumber
+actor "Quản trị viên" as Admin
+participant "AdminUserDrawer\n(FE)" as Drawer
+participant "adminController\n(BE)" as BE
+participant "Redis\nViolation Counter" as Redis
+database "MongoDB\n(User/Session/Notification)" as DB
+participant "Socket.IO Cluster" as Socket
+participant "NotificationService" as Noti
+
+Admin -> Drawer: Chọn hành động quản trị
+
+alt Ghi nhận vi phạm thủ công
+    Drawer -> BE: POST /api/admin/users/{userId}/violations
+    BE -> Redis: Tăng bộ đếm vi phạm
+    Redis --> BE: Count hiện tại
+    BE -> DB: Cập nhật moderation + violationHistory
+    BE -> Noti: Tạo cảnh báo vi phạm
+    Noti -> DB: Lưu notification
+    BE -> DB: Nếu đủ ngưỡng thì khóa user + xóa session
+    BE -> Socket: Nếu bị khóa thì ngắt socket user
+    BE --> Drawer: 200 { violation }
+    Drawer --> Admin: Cập nhật trạng thái vi phạm
+
+else Khóa tài khoản
+    Drawer -> BE: POST /api/admin/users/{userId}/lock
+    BE -> DB: Khóa user + xóa session
+    BE -> Socket: Ngắt socket user
+    BE -> Noti: Tạo thông báo account-lock
+    Noti -> DB: Lưu notification
+    BE --> Drawer: 200 { user }
+    Drawer --> Admin: Hiển thị user đã bị khóa
+
+else Mở khóa tài khoản
+    Drawer -> BE: POST /api/admin/users/{userId}/unlock
+    BE -> Redis: Xóa counter nếu resetViolations=true
+    BE -> DB: Mở khóa user + reset moderation
+    BE -> Noti: Tạo thông báo account-unlock
+    Noti -> DB: Lưu notification
+    BE --> Drawer: 200 { user }
+    Drawer --> Admin: Hiển thị user đã được mở khóa
+end
+
+@enduml
+
+19. Kháng cáo vi phạm
+@startuml
+title Kháng cáo vi phạm / khóa tài khoản
+
+autonumber
+actor "Người dùng bị khóa" as User
+actor "Quản trị viên" as Admin
+participant "SignInForm\n(FE)" as SignIn
+participant "AdminAppealsPage\n(FE)" as Appeals
+participant "authController / adminController\n(BE)" as BE
+database "MongoDB\n(User/LockAppeal/Notification)" as DB
+participant "Redis\nViolation Counter" as Redis
+
+User -> SignIn: Nhập lý do kháng cáo
+SignIn -> BE: POST /api/auth/locked-appeals
+BE -> DB: Kiểm tra user bị khóa + kháng cáo pending
+DB --> BE: Hợp lệ
+BE -> DB: Tạo LockAppeal(status=pending)
+DB --> BE: Appeal đã tạo
+BE --> SignIn: 201 { message }
+SignIn --> User: Thông báo đã gửi kháng cáo
+
+Admin -> Appeals: Mở /admin/appeals
+Appeals -> BE: GET /api/admin/appeals?status=pending&limit=100
+BE -> DB: Lấy danh sách LockAppeal + thông tin user
+DB --> BE: Appeals
+BE --> Appeals: 200 { appeals, pagination }
+
+Admin -> Appeals: Duyệt hoặc từ chối kháng cáo
+
+alt Duyệt kháng cáo
+    Appeals -> BE: PATCH /api/admin/appeals/{appealId}/review
+    BE -> DB: Cập nhật appeal = approved
+    BE -> Redis: Xóa violation counter
+    BE -> DB: Mở khóa user + reset moderation + lưu notification
+    DB --> BE: Appeal đã duyệt
+    BE --> Appeals: 200 { appeal }
+    Appeals --> Admin: Hiển thị đã duyệt
+
+else Từ chối kháng cáo
+    Appeals -> BE: PATCH /api/admin/appeals/{appealId}/review
+    BE -> DB: Cập nhật appeal = rejected + lưu notification
+    DB --> BE: Appeal đã từ chối
+    BE --> Appeals: 200 { appeal }
+    Appeals --> Admin: Hiển thị đã từ chối
+end
+
+@enduml
+
+20. Xem log
+@startuml
+
+autonumber
+actor "Quản trị viên" as Admin
+participant "AdminObservabilityPage\n(FE)" as FE
+participant "adminController.getAdminObservability\n(BE)" as BE
+database "MongoDB\n(AuditLog/User/Message/Report/LockAppeal)" as DB
+participant "systemMetricsService\n(Runtime Metrics)" as Metrics
+
+note over BE,DB
+AuditLog được ghi trước đó bởi auditLogMiddleware
+khi các request API chạy qua hệ thống.
+end note
+
+Admin -> FE: Mở /admin/observability
+FE -> BE: GET /api/admin/observability?range=24h
+
+BE -> DB: Aggregate AuditLog theo thời gian
+DB --> BE: Requests, errors, latency, recentErrors
+
+BE -> DB: Đếm message, user mới, report, pending appeals
+DB --> BE: Series + totals
+
+BE -> Metrics: Lấy runtime metrics
+Metrics --> BE: CPU, memory, uptime, traffic samples
+
+BE --> FE: 200 { range, summary, series, runtimeSamples, recentErrors }
+FE --> Admin: Hiển thị biểu đồ và log lỗi gần đây
+
+@enduml
+
