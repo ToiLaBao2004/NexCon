@@ -3,7 +3,14 @@ import Message from '../models/messageModel.js';
 import User from '../models/userModel.js';
 import BlockUser from '../models/blockUserModel.js';
 import Conversation from '../models/conversationModel.js';
-import { emitNewMessage, updateConversationLastMessage, generateSignedUrl, replaceMentionTags } from '../utils/messageHelper.js';
+import {
+    emitNewMessage,
+    getParticipantUserId,
+    pruneInvalidConversationParticipants,
+    updateConversationLastMessage,
+    generateSignedUrl,
+    replaceMentionTags,
+} from '../utils/messageHelper.js';
 import { io, getReceiverSocketId, emitToUser, joinUserSocketsToRoom } from '../socket/index.js';
 import { normalizeVietnamese } from '../utils/vietnameseHelper.js';
 import {
@@ -675,6 +682,8 @@ const saveConversationForNewMessage = async ({ conversationId, message, senderId
             throw error;
         }
 
+        pruneInvalidConversationParticipants(conversation);
+
         if (Array.isArray(mentions) && mentions.length > 0) {
             const mentionedUserIds = new Set(
                 mentions
@@ -684,7 +693,7 @@ const saveConversationForNewMessage = async ({ conversationId, message, senderId
 
             if (mentionedUserIds.size > 0) {
                 conversation.participants.forEach((participant) => {
-                    const participantId = participant.userId.toString();
+                    const participantId = getParticipantUserId(participant);
                     if (mentionedUserIds.has(participantId)) {
                         participant.unreadMentionCount = (participant.unreadMentionCount || 0) + 1;
                     }
@@ -1016,7 +1025,8 @@ export async function sendMessage(req, res) {
             });
 
             for (const participant of conversation.participants) {
-                const participantId = (participant.userId._id || participant.userId).toString();
+                const participantId = getParticipantUserId(participant);
+                if (!participantId) continue;
                 joinUserSocketsToRoom(participantId, conversation._id.toString());
                 emitToUser(participantId, 'new-conversation', {
                     conversation: populatedConversation || conversation,
@@ -1249,12 +1259,16 @@ export async function pinMessage(req, res) {
         }
 
         if (conversation.type === 'direct') {
-            const otherParticipant = conversation.participants.find(p => p.userId.toString() !== req.user._id.toString());
+            const otherParticipant = conversation.participants.find(p => {
+                const participantId = getParticipantUserId(p);
+                return participantId && participantId !== req.user._id.toString();
+            });
             if (otherParticipant) {
+                const otherParticipantId = getParticipantUserId(otherParticipant);
                 const blockExists = await BlockUser.findOne({
                     $or: [
-                        { from: req.user._id, to: otherParticipant.userId },
-                        { from: otherParticipant.userId, to: req.user._id }
+                        { from: req.user._id, to: otherParticipantId },
+                        { from: otherParticipantId, to: req.user._id }
                     ]
                 });
                 if (blockExists) {
@@ -1394,7 +1408,7 @@ export async function searchMessages(req, res) {
             return res.status(404).json({ message: 'Conversation not found.' });
         }
         const isMember = conversation.participants?.some(
-            (participant) => participant.userId.toString() === userId
+            (participant) => getParticipantUserId(participant) === userId
         );
         if (!isMember) {
             return res.status(403).json({ message: 'You are not a participant in this conversation.' });
@@ -1654,12 +1668,16 @@ export async function reactToMessage(req, res) {
         }
 
         if (conversation.type === 'direct') {
-            const otherParticipant = conversation.participants.find(p => p.userId.toString() !== req.user._id.toString());
+            const otherParticipant = conversation.participants.find(p => {
+                const participantId = getParticipantUserId(p);
+                return participantId && participantId !== req.user._id.toString();
+            });
             if (otherParticipant) {
+                const otherParticipantId = getParticipantUserId(otherParticipant);
                 const blockExists = await BlockUser.findOne({
                     $or: [
-                        { from: req.user._id, to: otherParticipant.userId },
-                        { from: otherParticipant.userId, to: req.user._id }
+                        { from: req.user._id, to: otherParticipantId },
+                        { from: otherParticipantId, to: req.user._id }
                     ]
                 });
                 if (blockExists) {
@@ -1694,7 +1712,9 @@ export async function reactToMessage(req, res) {
 
         await message.save();
         conversation.participants.forEach((p) => {
-            const socketId = getReceiverSocketId(p.userId._id?.toString() ?? p.userId.toString());
+            const participantId = getParticipantUserId(p);
+            if (!participantId) return;
+            const socketId = getReceiverSocketId(participantId);
             if (socketId) {
                 io.to(socketId).emit('message-reaction', {
                     conversationId: conversation._id.toString(),
@@ -1740,7 +1760,7 @@ export async function getSignedMediaUrl(req, res) {
         }
 
         const userId = req.user._id.toString();
-        const participant = conversation.participants.find((p) => p.userId.toString() === userId);
+        const participant = conversation.participants.find((p) => getParticipantUserId(p) === userId);
         if (participant?.clearedAt && new Date(message.createdAt).getTime() <= new Date(participant.clearedAt).getTime()) {
             return res.status(404).json({ message: 'Tài nguyên không còn tồn tại trong cuộc trò chuyện của bạn.' });
         }
@@ -1796,7 +1816,7 @@ export async function forwardMessage(req, res) {
             return res.status(404).json({ message: 'Cuộc trò chuyện gốc không tồn tại.' });
         }
         const isMemberOfSource = sourceConvo.participants.some(
-            (p) => p.userId.toString() === senderId.toString()
+            (p) => getParticipantUserId(p) === senderId.toString()
         );
         if (!isMemberOfSource) {
             return res.status(403).json({ message: 'Bạn không có quyền truy cập tin nhắn này.' });
@@ -1831,7 +1851,7 @@ export async function forwardMessage(req, res) {
                 }
 
                 const isMember = targetConvo.participants.some(
-                    (p) => p.userId.toString() === senderId.toString()
+                    (p) => getParticipantUserId(p) === senderId.toString()
                 );
                 if (!isMember) {
                     errors.push({ conversationId: targetConvoId, reason: 'Bạn không phải thành viên.' });
@@ -1839,17 +1859,21 @@ export async function forwardMessage(req, res) {
                 }
 
                 if (targetConvo.type === 'direct') {
-                    const otherParticipant = targetConvo.participants.find(p => p.userId.toString() !== senderId.toString());
+                    const otherParticipant = targetConvo.participants.find(p => {
+                        const participantId = getParticipantUserId(p);
+                        return participantId && participantId !== senderId.toString();
+                    });
                     if (otherParticipant) {
-                        const recipient = await User.findById(otherParticipant.userId).select('lock').lean();
+                        const otherParticipantId = getParticipantUserId(otherParticipant);
+                        const recipient = await User.findById(otherParticipantId).select('lock').lean();
                         if (recipient?.lock?.isLocked) {
                             errors.push({ conversationId: targetConvoId, reason: 'Không thể chuyển tiếp tới tài khoản đã bị khóa.' });
                             continue;
                         }
                         const blockExists = await BlockUser.findOne({
                             $or: [
-                                { from: senderId, to: otherParticipant.userId },
-                                { from: otherParticipant.userId, to: senderId }
+                                { from: senderId, to: otherParticipantId },
+                                { from: otherParticipantId, to: senderId }
                             ]
                         });
                         if (blockExists) {

@@ -106,7 +106,7 @@ function ensureUnreadCounts(conversation) {
     return conversation.unreadCounts;
 }
 
-function normalizeUserId(value) {
+export function normalizeUserId(value) {
     if (value == null) return null;
     if (typeof value === 'string') {
         const trimmed = value.trim();
@@ -120,8 +120,19 @@ function normalizeUserId(value) {
     return normalized;
 }
 
-function getParticipantUserId(participant) {
+export function getParticipantUserId(participant) {
     return normalizeUserId(participant?.userId);
+}
+
+export function pruneInvalidConversationParticipants(conversation) {
+    if (!conversation?.participants?.length) return false;
+
+    const validParticipants = conversation.participants.filter((participant) => getParticipantUserId(participant));
+    if (validParticipants.length === conversation.participants.length) return false;
+
+    conversation.participants = validParticipants;
+    conversation.markModified?.('participants');
+    return true;
 }
 
 export const updateConversationLastMessage = (conversation, message, senderId) => {
@@ -148,6 +159,7 @@ export const updateConversationLastMessage = (conversation, message, senderId) =
     if (safeMessage.isExpired) lastMessage.isExpired = true;
 
     conversation.set({ lastMessage });
+    pruneInvalidConversationParticipants(conversation);
 
     const unreadCounts = ensureUnreadCounts(conversation);
     conversation.participants.forEach((participant) => {

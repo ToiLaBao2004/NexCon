@@ -6,6 +6,24 @@ import { buildDirectConversationLookup } from '../utils/directConversation.js';
 
 const pair = (a, b) => (a < b ? [a, b] : [b, a]);
 
+function normalizeUserId(value) {
+    if (value == null) return null;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed || null;
+    }
+    if (typeof value === 'object' && value._id != null && value._id !== value) {
+        return normalizeUserId(value._id);
+    }
+    const normalized = value?.toString?.();
+    if (!normalized || normalized === '[object Object]') return null;
+    return normalized;
+}
+
+function getParticipantUserId(participant) {
+    return normalizeUserId(participant?.userId);
+}
+
 export async function checkMessagePermission(req, res, next) {
     try {
         const senderId = req.user._id.toString();
@@ -44,10 +62,13 @@ export async function checkMessagePermission(req, res, next) {
 
             if (conversation.type === 'direct') {
                 const otherParticipant = conversation.participants.find(
-                    (p) => p.userId.toString() !== senderId
+                    (p) => {
+                        const participantId = getParticipantUserId(p);
+                        return participantId && participantId !== senderId;
+                    }
                 );
                 if (otherParticipant) {
-                    const recipient = await User.findById(otherParticipant.userId).select('lock').lean();
+                    const recipient = await User.findById(getParticipantUserId(otherParticipant)).select('lock').lean();
                     if (recipient?.lock?.isLocked) {
                         return res.status(423).json({ message: 'Không thể gửi tin nhắn tới tài khoản đã bị khóa.' });
                     }
@@ -55,7 +76,7 @@ export async function checkMessagePermission(req, res, next) {
             }
 
             const isMember = conversation.participants.some(
-                (p) => p.userId.toString() === senderId
+                (p) => getParticipantUserId(p) === senderId
             );
             if (!isMember) {
                 return res.status(403).json({ message: 'You are not in this group.' });
@@ -99,7 +120,7 @@ export async function checkConversationMembership(req, res, next) {
         }
 
         const isMember = conversation.participants.some(
-            (p) => p.userId.toString() === userId
+            (p) => getParticipantUserId(p) === userId
         );
         if (!isMember) {
             return res.status(403).json({ message: 'You are not a member of this conversation.' });
