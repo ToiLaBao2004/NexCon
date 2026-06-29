@@ -127,7 +127,21 @@ function countJoined(groupCall) {
 }
 
 function normalizeUserId(value) {
-    return value?.toString?.() || String(value);
+    if (value == null) return null;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed || null;
+    }
+    if (typeof value === 'object' && value._id != null && value._id !== value) {
+        return normalizeUserId(value._id);
+    }
+    const normalized = value?.toString?.();
+    if (!normalized || normalized === '[object Object]') return null;
+    return normalized;
+}
+
+function getConversationParticipantUserId(participant) {
+    return normalizeUserId(participant?.userId);
 }
 
 function hasUserDirectCall(userId) {
@@ -283,8 +297,11 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
             if (conversation.disbanded === true) {
                 return socket.emit('group-call:error', { reason: 'group-disbanded', message: 'Không thể gọi vì nhóm đã bị giải tán' });
             }
-            const isMember = conversation.participants.some(
-                (participant) => participant.userId._id.toString() === userId
+            const activeParticipants = (conversation.participants || []).filter((participant) =>
+                getConversationParticipantUserId(participant)
+            );
+            const isMember = activeParticipants.some(
+                (participant) => getConversationParticipantUserId(participant) === userId
             );
             if (!isMember) {
                 return socket.emit('group-call:error', { reason: 'not-a-member' });
@@ -302,13 +319,15 @@ function registerGroupCallHandlers(socket, user, io, getReceiverSocketId) {
             const callId = buildSessionId('group-call');
 
             const participantsMap = {};
-            for (const participant of conversation.participants) {
-                const pid = participant.userId._id.toString();
-                const isLocked = Boolean(participant.userId.lock?.isLocked);
+            for (const participant of activeParticipants) {
+                const participantUser = participant.userId;
+                const pid = getConversationParticipantUserId(participant);
+                if (!pid) continue;
+                const isLocked = Boolean(participantUser?.lock?.isLocked);
                 participantsMap[pid] = {
                     userId: pid,
-                    displayName: isLocked ? LOCKED_USER_DISPLAY_NAME : participant.userId.displayName,
-                    avatarUrl: isLocked ? null : (participant.userId.avatarUrl || null),
+                    displayName: isLocked ? LOCKED_USER_DISPLAY_NAME : participantUser?.displayName,
+                    avatarUrl: isLocked ? null : (participantUser?.avatarUrl || null),
                     isLocked,
                     status: isLocked ? 'locked' : (pid === userId ? 'joined' : 'ringing'),
                     joinedAt: pid === userId ? new Date().toISOString() : null,

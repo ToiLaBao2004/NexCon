@@ -797,10 +797,14 @@ export async function getAllFriends(req, res) {
             { path: 'userA', select: PROFILE_USER_SELECT },
             { path: 'userB', select: PROFILE_USER_SELECT }
         ]).lean();
-        let listedFriends = friends.map(friend => {
+        let listedFriends = friends.flatMap(friend => {
+            if (!friend.userA || !friend.userB) return [];
+
             const isUserA = friend.userA._id.toString() === user._id.toString();
             const friendUser = sanitizeProfileForViewer(isUserA ? friend.userB : friend.userA, user._id, true);
-            return {
+            if (!friendUser?._id) return [];
+
+            return [{
                 _id: friend._id,
                 friendId: friendUser._id,
                 displayName: friendUser.displayName,
@@ -811,7 +815,7 @@ export async function getAllFriends(req, res) {
                 nickname: isUserA ? friend.nicknameB : friend.nicknameA,
                 createdAt: friend.createdAt,
                 updatedAt: friend.updatedAt
-            };
+            }];
         });
         const friendIds = listedFriends.map((friend) => friend.friendId?.toString()).filter(Boolean);
         const socketOnlineUserIds = await getOnlineUserIdsForUsers(friendIds);
