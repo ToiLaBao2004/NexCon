@@ -117,6 +117,24 @@ function sanitizeParticipantUser(userObj) {
 	return maskLockedUserDoc(userObj);
 }
 
+function normalizeUserId(value) {
+	if (value == null) return null;
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		return trimmed || null;
+	}
+	if (typeof value === 'object' && value._id != null && value._id !== value) {
+		return normalizeUserId(value._id);
+	}
+	const normalized = value?.toString?.();
+	if (!normalized || normalized === '[object Object]') return null;
+	return normalized;
+}
+
+function getParticipantUserId(participant) {
+	return normalizeUserId(participant?.userId);
+}
+
 async function attachPresenceToConversationParticipants(conversations = [], viewerId) {
 	const participantIds = [
 		...new Set(
@@ -174,7 +192,9 @@ function sanitizePopulatedConversation(conversation) {
 }
 
 function isConversationParticipant(conversation, userId) {
-	return conversation?.participants?.some((participant) => participant.userId.toString() === userId);
+	const normalizedUserId = normalizeUserId(userId);
+	if (!normalizedUserId) return false;
+	return conversation?.participants?.some((participant) => getParticipantUserId(participant) === normalizedUserId);
 }
 
 function isGroupAdmin(conversation, userId) {
@@ -1802,14 +1822,21 @@ export async function addMembers(req, res) {
 		if (conversation.disbanded === true) {
 			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
 		}
-		if (!conversation.participants.some(p => p.userId.toString() === currentUserId)) {
+		const existingParticipantIds = new Set(
+			(conversation.participants || [])
+				.map(getParticipantUserId)
+				.filter(Boolean)
+		);
+
+		if (!existingParticipantIds.has(currentUserId)) {
 			return res.status(403).json({ message: "Only group participants can add members." });
 		}
 
-		const filteredUserIds = userIds.filter(id =>
-			!conversation.participants.some(p => p.userId.toString() === id.toString())
-		);
-		const normalizedUserIds = filteredUserIds.map(id => id.toString());
+		const requestedUserIds = [
+			...new Set(userIds.map(normalizeUserId).filter(Boolean))
+		];
+		const filteredUserIds = requestedUserIds.filter(id => !existingParticipantIds.has(id));
+		const normalizedUserIds = filteredUserIds;
 
 		if (filteredUserIds.length === 0) {
 			return res.status(400).json({ message: 'Tất cả người dùng được chọn đã là thành viên của nhóm.' });
@@ -1911,15 +1938,19 @@ export async function addMembers(req, res) {
 			{ path: 'participants.userId', select: CLIENT_PARTICIPANT_SELECT },
 			{ path: 'lastMessage.senderId', select: MESSAGE_SENDER_SELECT }
 		]);
+		const addedUserIdSet = new Set(normalizedUserIds);
 		const newParticipants = conversation.participants.filter(p =>
-			filteredUserIds.some(id => id.toString() === p.userId._id?.toString())
+			addedUserIdSet.has(getParticipantUserId(p))
 		);
-		const addedUserNamesString = newParticipants.map(p => p.userId.displayName || p.userInfo?.displayName).join(", ");
-		const addedUsersInfo = newParticipants.map(p => ({
-			_id: p.userId._id || p.userId,
-			displayName: p.userId.displayName || p.userInfo?.displayName,
-			avatarUrl: p.userId.avatarUrl || p.userInfo?.avatarUrl
-		}));
+		const addedUsersInfo = newParticipants.map(p => {
+			const participantUser = p.userId;
+			return {
+				_id: getParticipantUserId(p),
+				displayName: participantUser?.displayName || p.userInfo?.displayName || 'Người dùng',
+				avatarUrl: participantUser?.avatarUrl || p.userInfo?.avatarUrl || null
+			};
+		});
+		const addedUserNamesString = addedUsersInfo.map(user => user.displayName).join(", ");
 
 		const systemMessage = new Message({
 			conversationId,
