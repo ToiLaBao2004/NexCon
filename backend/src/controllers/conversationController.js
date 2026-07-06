@@ -117,6 +117,24 @@ function sanitizeParticipantUser(userObj) {
 	return maskLockedUserDoc(userObj);
 }
 
+function normalizeUserId(value) {
+	if (value == null) return null;
+	if (typeof value === 'string') {
+		const trimmed = value.trim();
+		return trimmed || null;
+	}
+	if (typeof value === 'object' && value._id != null && value._id !== value) {
+		return normalizeUserId(value._id);
+	}
+	const normalized = value?.toString?.();
+	if (!normalized || normalized === '[object Object]') return null;
+	return normalized;
+}
+
+function getParticipantUserId(participant) {
+	return normalizeUserId(participant?.userId);
+}
+
 async function attachPresenceToConversationParticipants(conversations = [], viewerId) {
 	const participantIds = [
 		...new Set(
@@ -174,7 +192,9 @@ function sanitizePopulatedConversation(conversation) {
 }
 
 function isConversationParticipant(conversation, userId) {
-	return conversation?.participants?.some((participant) => participant.userId.toString() === userId);
+	const normalizedUserId = normalizeUserId(userId);
+	if (!normalizedUserId) return false;
+	return conversation?.participants?.some((participant) => getParticipantUserId(participant) === normalizedUserId);
 }
 
 function isGroupAdmin(conversation, userId) {
@@ -335,7 +355,9 @@ export async function createConversation(req, res) {
 
 		if (createdConversation) {
 			conversation.participants.forEach(p => {
-				const receiverSocketId = getReceiverSocketId(p.userId._id.toString());
+				const participantId = getParticipantUserId(p);
+				if (!participantId) return;
+				const receiverSocketId = getReceiverSocketId(participantId);
 				if (receiverSocketId) {
 					io.to(receiverSocketId).emit("new-conversation", { conversation });
 				}
@@ -818,7 +840,7 @@ export async function getMessages(req, res) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
 
-		const me = conversation.participants?.find(p => p.userId.toString() === userId);
+		const me = conversation.participants?.find(p => getParticipantUserId(p) === userId);
 		if (!me) {
 			return res.status(403).json({ message: "You are not a participant in this conversation." });
 		}
@@ -1071,7 +1093,7 @@ export async function markAsSeen(req, res) {
 			return res.status(404).json({ message: "Conversation not found" });
 		}
 
-		const me = conversation.participants?.find((participant) => participant.userId.toString() === userId);
+		const me = conversation.participants?.find((participant) => getParticipantUserId(participant) === userId);
 		const latestMessage = conversation.lastMessage?._id
 			? { _id: conversation.lastMessage._id }
 			: await Message.findOne({ conversationId }).sort({ createdAt: -1 }).select('_id').lean();
@@ -1125,12 +1147,16 @@ export async function markAsSeen(req, res) {
 		};
 
 		if (conversation.type === 'direct') {
-			const otherParticipant = conversation.participants.find(p => p.userId.toString() !== userId);
+			const otherParticipant = conversation.participants.find(p => {
+				const participantId = getParticipantUserId(p);
+				return participantId && participantId !== userId;
+			});
 			if (otherParticipant) {
+				const otherParticipantId = getParticipantUserId(otherParticipant);
 				const blockExists = await BlockUser.exists({
 					$or: [
-						{ from: userId, to: otherParticipant.userId },
-						{ from: otherParticipant.userId, to: userId }
+						{ from: userId, to: otherParticipantId },
+						{ from: otherParticipantId, to: userId }
 					]
 				});
 				if (blockExists) {
@@ -1218,7 +1244,7 @@ export async function toggleConversationPin(req, res) {
 		}
 
 		const participant = conversation.participants.find(
-			(p) => p.userId.toString() === userId
+			(p) => getParticipantUserId(p) === userId
 		);
 
 		if (!participant) {
@@ -1352,7 +1378,7 @@ export async function getMediaByType(req, res) {
 			return res.status(404).json({ message: 'Conversation not found' });
 		}
 
-		const me = conversation.participants?.find((p) => p.userId.toString() === userId);
+		const me = conversation.participants?.find((p) => getParticipantUserId(p) === userId);
 		if (!me) {
 			return res.status(403).json({ message: 'You are not a participant in this conversation.' });
 		}
@@ -1387,7 +1413,7 @@ export async function getMediaByType(req, res) {
 
 		if (senderId) {
 			const normalizedSenderId = senderId.toString();
-			const isConversationSender = conversation.participants?.some((p) => p.userId.toString() === normalizedSenderId);
+			const isConversationSender = conversation.participants?.some((p) => getParticipantUserId(p) === normalizedSenderId);
 			if (!mongoose.Types.ObjectId.isValid(normalizedSenderId) || !isConversationSender) {
 				return res.status(400).json({ message: 'Invalid senderId' });
 			}
@@ -1463,7 +1489,7 @@ export async function updateGroupName(req, res) {
 		if (conversation.disbanded === true) {
 			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
 		}
-		if (!conversation.participants.some(p => p.userId.toString() === userId)) {
+		if (!conversation.participants.some(p => getParticipantUserId(p) === userId)) {
 			return res.status(403).json({ message: "Only group participants can rename the group" });
 		}
 		const canUpdateGroupInfo = isGroupAdmin(conversation, userId) || conversation.group?.allowMembersChangeAvatar !== false;
@@ -1752,7 +1778,7 @@ export async function clearConversation(req, res) {
 			return res.status(404).json({ message: 'Conversation not found.' });
 		}
 
-		const participant = conversation.participants.find(p => p.userId.toString() === userId.toString());
+		const participant = conversation.participants.find(p => getParticipantUserId(p) === userId.toString());
 		if (!participant) {
 			return res.status(403).json({ message: 'You are not a participant in this conversation.' });
 		}
@@ -1802,14 +1828,21 @@ export async function addMembers(req, res) {
 		if (conversation.disbanded === true) {
 			return res.status(403).json({ message: 'Nhóm này đã bị giải tán, bạn không thể thực hiện thao tác.' });
 		}
-		if (!conversation.participants.some(p => p.userId.toString() === currentUserId)) {
+		const existingParticipantIds = new Set(
+			(conversation.participants || [])
+				.map(getParticipantUserId)
+				.filter(Boolean)
+		);
+
+		if (!existingParticipantIds.has(currentUserId)) {
 			return res.status(403).json({ message: "Only group participants can add members." });
 		}
 
-		const filteredUserIds = userIds.filter(id =>
-			!conversation.participants.some(p => p.userId.toString() === id.toString())
-		);
-		const normalizedUserIds = filteredUserIds.map(id => id.toString());
+		const requestedUserIds = [
+			...new Set(userIds.map(normalizeUserId).filter(Boolean))
+		];
+		const filteredUserIds = requestedUserIds.filter(id => !existingParticipantIds.has(id));
+		const normalizedUserIds = filteredUserIds;
 
 		if (filteredUserIds.length === 0) {
 			return res.status(400).json({ message: 'Tất cả người dùng được chọn đã là thành viên của nhóm.' });
@@ -1911,15 +1944,19 @@ export async function addMembers(req, res) {
 			{ path: 'participants.userId', select: CLIENT_PARTICIPANT_SELECT },
 			{ path: 'lastMessage.senderId', select: MESSAGE_SENDER_SELECT }
 		]);
+		const addedUserIdSet = new Set(normalizedUserIds);
 		const newParticipants = conversation.participants.filter(p =>
-			filteredUserIds.some(id => id.toString() === p.userId._id?.toString())
+			addedUserIdSet.has(getParticipantUserId(p))
 		);
-		const addedUserNamesString = newParticipants.map(p => p.userId.displayName || p.userInfo?.displayName).join(", ");
-		const addedUsersInfo = newParticipants.map(p => ({
-			_id: p.userId._id || p.userId,
-			displayName: p.userId.displayName || p.userInfo?.displayName,
-			avatarUrl: p.userId.avatarUrl || p.userInfo?.avatarUrl
-		}));
+		const addedUsersInfo = newParticipants.map(p => {
+			const participantUser = p.userId;
+			return {
+				_id: getParticipantUserId(p),
+				displayName: participantUser?.displayName || p.userInfo?.displayName || 'Người dùng',
+				avatarUrl: participantUser?.avatarUrl || p.userInfo?.avatarUrl || null
+			};
+		});
+		const addedUserNamesString = addedUsersInfo.map(user => user.displayName).join(", ");
 
 		const systemMessage = new Message({
 			conversationId,
@@ -2166,7 +2203,7 @@ export async function handleApproval(req, res) {
 		approvalQueue.splice(queueIndex, 1);
 
 		if (action === 'approve') {
-			if (!conversation.participants.some(p => p.userId.toString() === userId.toString())) {
+			if (!conversation.participants.some(p => getParticipantUserId(p) === userId.toString())) {
 				const memberToAdd = await User.findById(userId).select('displayName avatarUrl lock');
 				const addedByUser = sanitizeParticipantUser(await User.findById(originalAddedById).select('displayName avatarUrl lock'));
 				if (memberToAdd) {
@@ -2301,7 +2338,7 @@ export async function removeMember(req, res) {
 			return res.status(403).json({ message: 'Cannot remove another admin from the group.' });
 		}
 
-		const memberIndex = conversation.participants.findIndex(p => p.userId.toString() === memberId);
+		const memberIndex = conversation.participants.findIndex(p => getParticipantUserId(p) === memberId);
 		if (memberIndex === -1) {
 			return res.status(404).json({ message: 'Member not found in group.' });
 		}
@@ -2394,7 +2431,7 @@ export async function transferAdminRole(req, res) {
 			return res.status(403).json({ message: 'Only admins can transfer admin role.' });
 		}
 
-		if (!conversation.participants.some(p => p.userId.toString() === memberId.toString())) {
+		if (!conversation.participants.some(p => getParticipantUserId(p) === memberId.toString())) {
 			return res.status(400).json({ message: 'User is not a participant in this group.' });
 		}
 
@@ -2469,7 +2506,7 @@ export async function leaveGroup(req, res) {
 			return res.status(403).json({ message: 'Nhóm này đã bị giải tán.' });
 		}
 
-		const memberIndex = conversation.participants.findIndex(p => p.userId.toString() === userId);
+		const memberIndex = conversation.participants.findIndex(p => getParticipantUserId(p) === userId);
 		if (memberIndex === -1) {
 			return res.status(400).json({ message: 'Bạn không phải thành viên của nhóm này.' });
 		}
@@ -2491,7 +2528,7 @@ export async function leaveGroup(req, res) {
 			}
 
 			const newAdminParticipant = remainingParticipants.find(
-				(p) => p.userId.toString() === newAdminId.toString()
+				(p) => getParticipantUserId(p) === newAdminId.toString()
 			);
 
 			if (!newAdminParticipant) {
@@ -2499,7 +2536,7 @@ export async function leaveGroup(req, res) {
 			}
 
 			conversation.group.admins = [newAdminParticipant.userId];
-			promotedAdminId = newAdminParticipant.userId.toString();
+			promotedAdminId = getParticipantUserId(newAdminParticipant);
 			const promotedAdminUser = await User.findById(newAdminParticipant.userId).select('displayName avatarUrl lock');
 			if (promotedAdminUser?.lock?.isLocked) {
 				return res.status(423).json({ message: 'Không thể chuyển quyền trưởng nhóm cho tài khoản đã bị khóa.' });

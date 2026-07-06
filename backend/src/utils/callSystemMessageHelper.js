@@ -1,6 +1,6 @@
 import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
-import { emitNewMessage } from './messageHelper.js';
+import { emitNewMessage, getParticipantUserId, pruneInvalidConversationParticipants } from './messageHelper.js';
 
 const SEEN_STATUSES = new Set(['accepted', 'declined', 'left', 'joined']);
 const MISSED_STATUSES = new Set(['missed', 'no-answer']);
@@ -34,6 +34,7 @@ function buildCallContent(callType, mode) {
 
 function applyCallConversationState(conversation, message, initiatorId, participants) {
     const initiatorIdStr = initiatorId.toString();
+    pruneInvalidConversationParticipants(conversation);
 
     if (!conversation.unreadCounts || typeof conversation.unreadCounts.get !== 'function') {
         conversation.unreadCounts = new Map();
@@ -62,7 +63,8 @@ function applyCallConversationState(conversation, message, initiatorId, particip
 
     const now = new Date();
     conversation.participants.forEach((participant) => {
-        const memberId = (participant.userId?._id || participant.userId).toString();
+        const memberId = getParticipantUserId(participant);
+        if (!memberId) return;
         if (seenUserIds.has(memberId)) {
             participant.lastReadMessageId = message._id;
             participant.lastReadAt = now;
@@ -71,7 +73,8 @@ function applyCallConversationState(conversation, message, initiatorId, particip
     conversation.markModified('participants');
 
     conversation.participants.forEach((participant) => {
-        const memberId = (participant.userId?._id || participant.userId).toString();
+        const memberId = getParticipantUserId(participant);
+        if (!memberId) return;
         if (memberId === initiatorIdStr) {
             return;
         }
