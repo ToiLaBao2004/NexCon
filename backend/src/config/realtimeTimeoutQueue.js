@@ -89,15 +89,15 @@ async function removeTimeoutJob(jobId) {
 }
 
 export function directCallTimeoutJobId(sessionId) {
-    return `direct-call:${sessionId}`;
+    return `direct-call-${sessionId}`;
 }
 
 export function groupCallRingTimeoutJobId(conversationId, callId) {
-    return `group-call-ring:${conversationId}:${callId}`;
+    return `group-call-ring-${conversationId}-${callId}`;
 }
 
 export function meetingWaitingTimeoutJobId(roomName, userId) {
-    return `meeting-waiting:${roomName}:${userId}`;
+    return `meeting-waiting-${roomName}-${userId}`;
 }
 
 function meetingWaitingJobSetKey(roomName) {

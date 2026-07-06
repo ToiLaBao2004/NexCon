@@ -2,11 +2,14 @@ import { Worker } from 'bullmq';
 import redisIOClient, { isRedisIOReady } from '../config/redisIOClient.js';
 import Conversation from '../models/conversationModel.js';
 import Message from '../models/messageModel.js';
+import Reminder from '../models/reminderModel.js';
 import { deleteCloudinaryResource } from '../middlewares/uploadMiddleware.js';
+import { removeReminderJob } from '../config/reminderQueue.js';
 import { enqueueConversationClearCleanup } from '../config/conversationClearCleanupQueue.js';
 import { decryptMessagePayload, encryptText } from '../utils/messageCrypto.js';
 
 const MESSAGE_BATCH_SIZE = 50;
+const REMINDER_BATCH_SIZE = 100;
 
 function getCloudinaryResource(message) {
     if (!message?.filePublicId) return null;
@@ -141,14 +144,62 @@ async function cleanupMessages(conversationId, cleanupBefore) {
     }
 }
 
+async function cleanupGroupAvatar(conversation) {
+    const avatarId = conversation.group?.avatarId;
+    if (!avatarId) return;
+
+    await deleteCloudinaryResource(avatarId, 'image');
+}
+
+async function cleanupReminders(conversationId) {
+    while (true) {
+        const reminders = await Reminder.find({ conversationId })
+            .select('_id')
+            .sort({ _id: 1 })
+            .limit(REMINDER_BATCH_SIZE)
+            .lean();
+
+        if (!reminders.length) break;
+
+        await Promise.allSettled(
+            reminders.map((reminder) => removeReminderJob(reminder._id.toString()))
+        );
+
+        await Reminder.deleteMany({
+            _id: { $in: reminders.map((reminder) => reminder._id) },
+        });
+    }
+}
+
+async function deleteFullyClearedEmptyGroup(conversation) {
+    if (conversation.type !== 'group' || conversation.disbanded) return false;
+
+    const remainingMessage = await Message.exists({ conversationId: conversation._id });
+    if (remainingMessage) return false;
+
+    await cleanupGroupAvatar(conversation);
+    await cleanupReminders(conversation._id);
+
+    const deleted = await Conversation.deleteOne({
+        _id: conversation._id,
+        type: 'group',
+        disbanded: { $ne: true },
+    });
+
+    return deleted.deletedCount > 0;
+}
+
 async function processConversationClearCleanup(conversationId, requestedCutoff) {
-    const conversation = await Conversation.findById(conversationId).select('participants').lean();
+    const conversation = await Conversation.findById(conversationId)
+        .select('type participants group.avatarId disbanded')
+        .lean();
     if (!conversation) return;
 
     const cleanupBefore = getSafeCleanupCutoff(conversation, requestedCutoff);
     if (!cleanupBefore) return;
 
     await cleanupMessages(conversationId, cleanupBefore);
+    await deleteFullyClearedEmptyGroup(conversation);
 }
 
 let workerInstance = null;
@@ -187,7 +238,7 @@ export async function reloadPendingConversationClearCleanups() {
                         },
                     },
                 },
-            }).select('_id participants.clearedAt').lean();
+            }).select('_id type participants.clearedAt disbanded').lean();
 
             let count = 0;
             for (const conversation of conversations) {
@@ -202,8 +253,12 @@ export async function reloadPendingConversationClearCleanups() {
                     conversationId: conversation._id,
                     createdAt: { $lte: cleanupBefore },
                 });
+                const shouldCheckFullyClearedGroup = conversation.type === 'group' && !conversation.disbanded;
+                const hasAnyMessages = shouldCheckFullyClearedGroup
+                    ? await Message.exists({ conversationId: conversation._id })
+                    : null;
 
-                if (!hasDeletableMessages) continue;
+                if (!hasDeletableMessages && (!shouldCheckFullyClearedGroup || hasAnyMessages)) continue;
 
                 const job = await enqueueConversationClearCleanup(conversation._id, cleanupBefore);
                 if (job) count += 1;

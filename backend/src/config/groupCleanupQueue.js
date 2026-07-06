@@ -53,12 +53,13 @@ export async function enqueueGroupCleanup(conversationId, deleteAfter = null) {
     const id = conversationId.toString();
     const delay = getGroupCleanupDelay(deleteAfter);
     const scheduledFor = deleteAfter ? new Date(deleteAfter) : new Date();
+    const scheduledAt = scheduledFor.getTime();
 
     return groupCleanupQueue.add(
         'cleanup',
         { conversationId: id },
         {
-            jobId: `${id}:${scheduledFor.getTime()}`,
+            jobId: `group-cleanup-${id}-${Number.isFinite(scheduledAt) ? scheduledAt : Date.now()}`,
             delay,
         },
     );
