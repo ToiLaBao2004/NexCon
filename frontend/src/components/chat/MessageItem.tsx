@@ -17,14 +17,16 @@ import { useState, useMemo, useEffect, useCallback, useRef, type MouseEvent as R
 import { toast } from "sonner";
 import SecureImage from "../SecureImage";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import useMediaCacheStore from "@/stores/useMediaCacheStore";
 import { useFriendStore } from "@/stores/useFriendStore";
 import { chatService } from "@/services/chatService";
 import { reminderService } from "@/services/reminderService";
-import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions, Check, CheckCheck, Flag, ShieldAlert } from "lucide-react";
+import { FileText, Link2, ExternalLink, Clock, BellPlus, AlertCircle, Pin, PinOff, Undo2, Reply, ImageIcon, Smile, Copy, Download, Search, Forward, Mic, Play, Pause, Captions, Check, CheckCheck, Flag, ShieldAlert, Scale, Loader2 } from "lucide-react";
 import { StickerIcon } from "@/components/shared/StickerIcon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSocketStore } from "@/stores/useSocketStore";
 import Picker from '@emoji-mart/react';
@@ -52,8 +54,26 @@ const sharedReminderOverviewCache = new Map<string, SharedReminderOverviewRespon
 /* ── Custom audio player for voice messages ─────────────────────────────────── */
 const AUDIO_BAR_COUNT = 32;
 const MAX_VISIBLE_SEEN_AVATARS = 8;
+const MESSAGE_APPEAL_MIN_REASON_LENGTH = 10;
 const singleImageFrameClass = "relative inline-flex max-w-[70vw] overflow-hidden rounded-xl bg-muted sm:max-w-[360px]";
 const imagePreviewClass = "block h-auto w-auto max-h-[420px] max-w-[70vw] object-contain cursor-zoom-in hover:opacity-90 transition-opacity sm:max-w-[360px]";
+
+const messageAppealLabels = {
+	pending: "Đang chờ xử lý",
+	approved: "Đã chấp nhận",
+	rejected: "Đã từ chối",
+} as const;
+
+function isAiRejectedMessage(message: Message) {
+	const metadata = message.metadata || {};
+	return Boolean(
+		message.reportStatus === true
+		&& (
+			metadata.moderationStatus === "rejected"
+			|| metadata.imageModerationStatus === "rejected"
+		)
+	);
+}
 
 function MentionChip({
 	children,
@@ -2243,7 +2263,7 @@ const MessageItem = ({
 		shouldAlignSeenReceiptsRight ? "ml-auto mr-3 justify-end" : "ml-[60px] mr-3 justify-start"
 	);
 
-	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage, openChat } = useChatStore();
+	const { recallMessage, pinMessage, reactToMessage, createReminderSystemMessage, openChat, updateMessageAppealLocal } = useChatStore();
 	const { isDark } = useThemeStore();
 	const { blockedUsers, blockedBy } = useFriendStore();
 
@@ -2268,6 +2288,9 @@ const MessageItem = ({
 	const [showForwardModal, setShowForwardModal] = useState(false);
 	const [showSeenUsersDialog, setShowSeenUsersDialog] = useState(false);
 	const [showReportDialog, setShowReportDialog] = useState(false);
+	const [showAppealDialog, setShowAppealDialog] = useState(false);
+	const [appealReason, setAppealReason] = useState("");
+	const [appealSubmitting, setAppealSubmitting] = useState(false);
 	const [profileUser, setProfileUser] = useState<{
 		_id: string;
 		displayName: string;
@@ -2519,7 +2542,38 @@ const MessageItem = ({
 		|| selectedConvo.group?.allowMembersCreateSharedReminder !== false
 		|| isCurrentUserGroupAdmin;
 	const canReportMessage = !isOwn && !isDisbanded && Boolean(actionableMessage);
+	const canAppealMessage = isOwn && !isDisbanded && isAiRejectedMessage(message);
+	const hasSubmittedAppeal = Boolean(message.appeal);
+	const canSubmitAppeal = canAppealMessage && !hasSubmittedAppeal;
+	const appealStatusLabel = message.appeal?.status ? messageAppealLabels[message.appeal.status] : "";
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
+
+	const handleSubmitAppeal = async () => {
+		const reason = appealReason.trim();
+		if (!canSubmitAppeal || appealSubmitting) return;
+		if (reason.length < MESSAGE_APPEAL_MIN_REASON_LENGTH) {
+			toast.warning(`Vui lòng nhập lý do ít nhất ${MESSAGE_APPEAL_MIN_REASON_LENGTH} ký tự.`);
+			return;
+		}
+
+		try {
+			setAppealSubmitting(true);
+			const result = await chatService.submitMessageAppeal(message._id, reason);
+			if (result.appeal) {
+				updateMessageAppealLocal(message.conversationId, message._id, result.appeal);
+			}
+			toast.success("Đã gửi kháng cáo tin nhắn");
+			setShowAppealDialog(false);
+			setAppealReason("");
+		} catch (error: any) {
+			if (error?.appeal) {
+				updateMessageAppealLocal(message.conversationId, message._id, error.appeal);
+			}
+			toast.error(error?.message || "Không thể gửi kháng cáo");
+		} finally {
+			setAppealSubmitting(false);
+		}
+	};
 
 	return (
 		<>
@@ -2651,6 +2705,37 @@ const MessageItem = ({
 
 							</div>
 						</Card>
+						{(canSubmitAppeal || message.appeal) && (
+							<div className={cn(
+								"mt-1.5 flex max-w-[260px] items-center gap-2 text-[12px] sm:text-[13px]",
+								isOwn ? "justify-end self-end" : "justify-start"
+							)}>
+								{message.appeal ? (
+									<span className={cn(
+										"inline-flex items-center gap-1 rounded-full border px-2 py-1 font-medium",
+										message.appeal.status === "approved"
+											? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+											: message.appeal.status === "rejected"
+												? "border-destructive/30 bg-destructive/10 text-destructive"
+												: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+									)}>
+										<Scale className="size-3.5" />
+										{appealStatusLabel}
+									</span>
+								) : (
+									<Button
+										type="button"
+										size="sm"
+										variant="outline"
+										className="h-8 rounded-md border-destructive/30 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
+										onClick={() => setShowAppealDialog(true)}
+									>
+										<Scale className="size-3.5" />
+										Kháng cáo
+									</Button>
+								)}
+							</div>
+						)}
 						{/* Reaction Display */}
 						{reactionSummary && (
 							<button
@@ -3187,6 +3272,69 @@ const MessageItem = ({
 					await openChat({ userId: targetUser.friendId || targetUser._id });
 				}}
 			/>
+
+			{canAppealMessage && (
+				<Dialog open={showAppealDialog} onOpenChange={(open) => {
+					if (appealSubmitting) return;
+					setShowAppealDialog(open);
+					if (!open) setAppealReason("");
+				}}>
+					<DialogContent className="z-[300] !flex max-h-[calc(100dvh-2rem)] w-[92vw] max-w-md flex-col !gap-0 overflow-hidden rounded-2xl p-0 sm:!max-w-md">
+						<DialogHeader className="shrink-0 px-5 pt-5 pb-3 text-left">
+							<div className="flex items-start gap-3">
+								<div className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-md bg-destructive/10 text-destructive">
+									<Scale className="size-5" strokeWidth={1.8} />
+								</div>
+								<div className="min-w-0">
+									<DialogTitle>Kháng cáo tin nhắn</DialogTitle>
+									<DialogDescription className="mt-1">
+										Gửi lý do để admin xem xét lại kết luận vi phạm của AI.
+									</DialogDescription>
+								</div>
+							</div>
+						</DialogHeader>
+
+						<div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 pb-4 beautiful-scrollbar">
+							<div className="rounded-md border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+								Tin nhắn hiện đang bị ẩn vì AI đánh dấu vi phạm tiêu chuẩn cộng đồng.
+							</div>
+							<div className="space-y-2">
+								<div className="flex items-center justify-between gap-3">
+									<label htmlFor={`message-appeal-${message._id}`} className="text-sm font-medium text-foreground">
+										Lý do kháng cáo
+									</label>
+									<span className="text-xs text-muted-foreground">
+										{appealReason.trim().length}/{MESSAGE_APPEAL_MIN_REASON_LENGTH}
+									</span>
+								</div>
+								<Textarea
+									id={`message-appeal-${message._id}`}
+									value={appealReason}
+									maxLength={2000}
+									onChange={(event) => setAppealReason(event.target.value)}
+									placeholder="Ví dụ: AI hiểu nhầm ngữ cảnh cuộc trò chuyện..."
+									className="min-h-28 resize-none"
+									disabled={appealSubmitting || hasSubmittedAppeal}
+								/>
+							</div>
+						</div>
+
+						<DialogFooter className="shrink-0 border-t bg-muted/20 px-5 py-4 sm:justify-end">
+							<Button variant="ghost" onClick={() => setShowAppealDialog(false)} disabled={appealSubmitting}>
+								Hủy
+							</Button>
+							<Button
+								variant="destructive"
+								onClick={() => void handleSubmitAppeal()}
+								disabled={appealSubmitting || hasSubmittedAppeal || appealReason.trim().length < MESSAGE_APPEAL_MIN_REASON_LENGTH}
+							>
+								{appealSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
+								Gửi kháng cáo
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			)}
 
 			{canReportMessage && (
 				<ReportDialog

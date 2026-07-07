@@ -169,6 +169,8 @@ export interface ChatState {
   fetchMediaPage: (conversationId: string, type: MediaKind, limit?: number, force?: boolean, filters?: MediaFilters) => Promise<void>;
   resetMediaPagination: (conversationId: string, type?: MediaKind) => void;
   updateMessageReaction: (messageId: string, reactions: { userId: string; emoji: string }[]) => void;
+  updateMessageAppealLocal: (conversationId: string, messageId: string, appeal: Message["appeal"]) => void;
+  restoreMessageLocal: (conversationId: string, message: Message, lastMessage?: Conversation["lastMessage"] | null) => void;
   reactToMessage: (messageId: string, emoji: string) => Promise<void>;
   markGroupAsDisbanded: (conversationId: string) => void;
   transferAdminRole: (conversationId: string, memberId: string) => Promise<void>;

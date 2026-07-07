@@ -147,6 +147,19 @@ export interface MessageMetadata {
   [key: string]: any;
 }
 
+export type MessageAppealStatus = "pending" | "approved" | "rejected";
+
+export interface MessageAppealSummary {
+  _id: string;
+  messageId: string;
+  status: MessageAppealStatus;
+  reason: string;
+  reviewedAt?: string | null;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Mention {
   userId: string;
   displayName: string;
@@ -192,6 +205,7 @@ export interface Message {
   expiresAt?: string | null;
   isExpired?: boolean;
   expiredAt?: string | null;
+  appeal?: MessageAppealSummary | null;
 }
 
 export interface GlobalSearchUser {

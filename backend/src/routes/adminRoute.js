@@ -18,6 +18,10 @@ import {
     reviewAdminAppeal,
     unlockAdminUser,
 } from '../controllers/adminController.js';
+import {
+    listAdminMessageAppeals as listMessageAppeals,
+    reviewAdminMessageAppeal as reviewMessageAppeal,
+} from '../controllers/messageAppealController.js';
 import { requireAdmin } from '../middlewares/roleMiddleware.js';
 
 const adminRouter = express.Router();
@@ -40,6 +44,9 @@ adminRouter.get('/reports', listAdminReports);
 adminRouter.post('/reports/messages/ai-review', aiReviewMessageReports);
 adminRouter.patch('/reports/:reportId/reviewing', markAdminReportReviewing);
 adminRouter.patch('/reports/:reportId/resolve', resolveAdminReport);
+
+adminRouter.get('/message-appeals', listMessageAppeals);
+adminRouter.patch('/message-appeals/:appealId/review', reviewMessageAppeal);
 
 adminRouter.get('/appeals', listAdminAppeals);
 adminRouter.patch('/appeals/:appealId/review', reviewAdminAppeal);

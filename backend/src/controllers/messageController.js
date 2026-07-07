@@ -56,6 +56,7 @@ const SEARCH_DEFAULT_LIMIT = 20;
 const SEARCH_MAX_LIMIT = 100;
 const SEARCH_SCAN_BATCH_SIZE = 100;
 const MESSAGE_MODERATION_STATUS_PENDING = 'pending_review';
+const MODERATED_MESSAGE_PLACEHOLDER = 'Tin nhắn vi phạm tiêu chuẩn cộng đồng';
 const MEDIA_CLEANUP_RETRY_DELAYS_MS = [0, 500, 2000];
 const REPLY_TO_SELECT = '_id senderId type metadata content fileName fileUrl filePublicId isRecalled isExpired expiresAt reportStatus mentions';
 
@@ -397,6 +398,15 @@ function buildModerationUpdate({ type, result, transcript, transcriptStatus }) {
         'metadata.moderationCategory': result.category || (result.blocked ? 'unknown' : 'safe'),
     };
 
+    if (result.source) {
+        fields['metadata.moderationSource'] = String(result.source).slice(0, 80);
+    }
+
+    const confidence = Number(result.confidence);
+    if (Number.isFinite(confidence)) {
+        fields['metadata.moderationConfidence'] = confidence;
+    }
+
     if (result.reason && moderationStatus !== 'approved') {
         fields['metadata.moderationReason'] = String(result.reason).slice(0, 1000);
     }
@@ -411,9 +421,10 @@ function buildModerationUpdate({ type, result, transcript, transcriptStatus }) {
 
     if (type === 'audio') {
         fields['metadata.transcriptStatus'] = transcriptStatus || 'unavailable';
-        if (!result.blocked && transcript) {
+        if (transcript) {
             fields.content = transcript;
             fields.searchContent = normalizeVietnamese(transcript);
+            fields['metadata.moderationTranscript'] = String(transcript).slice(0, 4000);
         }
     }
 
@@ -519,15 +530,11 @@ async function moderateDeliveredMessage({
             { new: true }
         ).lean();
 
-        if (publicId) {
-            await cleanupRejectedMedia(publicId, getModerationMediaResourceType(type));
-        }
-
         if (!moderatedMessage) return;
 
         const conversation = await Conversation.findById(conversationId);
         if (conversation?.lastMessage?._id?.toString?.() === messageId.toString()) {
-            conversation.lastMessage.content = 'Tin nhắn vi phạm tiêu chuẩn cộng đồng';
+            conversation.lastMessage.content = MODERATED_MESSAGE_PLACEHOLDER;
             await conversation.save();
         }
 
@@ -535,7 +542,17 @@ async function moderateDeliveredMessage({
             conversationId: conversationId.toString(),
             messageId: messageId.toString(),
             reportStatus: true,
-            content: 'Tin nhắn vi phạm tiêu chuẩn cộng đồng',
+            content: MODERATED_MESSAGE_PLACEHOLDER,
+            metadata: {
+                moderationStatus: updateFields['metadata.moderationStatus'],
+                moderationCategory: updateFields['metadata.moderationCategory'],
+                moderationReason: updateFields['metadata.moderationReason'],
+                moderationSource: updateFields['metadata.moderationSource'],
+                moderationConfidence: updateFields['metadata.moderationConfidence'],
+                imageModerationStatus: updateFields['metadata.imageModerationStatus'],
+                imageModerationCategory: updateFields['metadata.imageModerationCategory'],
+                imageModerationReason: updateFields['metadata.imageModerationReason'],
+            },
         });
     } catch (error) {
         console.error('[Moderation] Background review failed:', error);

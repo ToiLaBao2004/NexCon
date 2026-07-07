@@ -10,7 +10,7 @@ import {
 
 export { replaceMentionTags };
 
-const resolveLastMessagePreview = (rawMessage) => {
+export const resolveLastMessagePreview = (rawMessage) => {
     const message = decryptMessagePayload(rawMessage);
     if (isMessageExpired(message)) return DISAPPEARED_MESSAGE_PLACEHOLDER;
     if (message.isRecalled) return 'Tin nhắn đã được thu hồi';

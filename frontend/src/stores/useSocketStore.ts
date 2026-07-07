@@ -1077,7 +1077,7 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       },
     );
 
-    socket.on("message-moderated", ({ conversationId, messageId, reportStatus, content }) => {
+    socket.on("message-moderated", ({ conversationId, messageId, reportStatus, content, metadata }) => {
       const targetConversationId = conversationId?.toString?.() || conversationId;
       const targetMessageId = messageId?.toString?.() || messageId;
       if (!targetConversationId || !targetMessageId) return;
@@ -1095,6 +1095,10 @@ export const useSocketStore = create<SocketState>((set, get) => ({
                     ...message,
                     reportStatus: Boolean(reportStatus),
                     content: content || "Tin nhắn vi phạm tiêu chuẩn cộng đồng",
+                    metadata: {
+                      ...(message.metadata || {}),
+                      ...(metadata || {}),
+                    },
                     reactions: [],
                   }
                   : message
@@ -1133,6 +1137,22 @@ export const useSocketStore = create<SocketState>((set, get) => ({
           }),
         };
       });
+    });
+
+    socket.on("message-appeal-updated", ({ conversationId, messageId, appeal }) => {
+      const targetConversationId = conversationId?.toString?.() || conversationId;
+      const targetMessageId = messageId?.toString?.() || messageId;
+      if (!targetConversationId || !targetMessageId || !appeal) return;
+
+      useChatStore.getState().updateMessageAppealLocal(targetConversationId, targetMessageId, appeal);
+    });
+
+    socket.on("message-restored", ({ conversationId, message, lastMessage }) => {
+      const targetConversationId = conversationId?.toString?.() || conversationId || message?.conversationId;
+      if (!targetConversationId || !message?._id) return;
+
+      useChatStore.getState().restoreMessageLocal(targetConversationId, message, lastMessage || null);
+      useChatStore.getState().fetchConversations(true);
     });
 
     socket.on("message-moderation-updated", ({ conversationId, messageId, content, metadata }) => {
