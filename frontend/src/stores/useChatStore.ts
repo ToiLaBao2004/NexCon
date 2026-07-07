@@ -2159,6 +2159,78 @@ export const useChatStore = create<ChatState>()(
                     return { messages: nextMessages };
                 });
             },
+            updateMessageAppealLocal: (conversationId, messageId, appeal) => {
+                const targetConversationId = String(conversationId || "");
+                const targetMessageId = String(messageId || "");
+                if (!targetConversationId || !targetMessageId || !appeal) return;
+
+                const patchMessage = (message: any) =>
+                    String(message?._id || "") === targetMessageId
+                        ? { ...message, appeal }
+                        : message;
+
+                set((state) => {
+                    const currentMessages = state.messages[targetConversationId];
+                    const nextMessages = currentMessages
+                        ? {
+                            ...state.messages,
+                            [targetConversationId]: {
+                                ...currentMessages,
+                                items: currentMessages.items.map(patchMessage),
+                                pinnedMessages: (currentMessages.pinnedMessages || []).map(patchMessage),
+                            },
+                        }
+                        : state.messages;
+
+                    return {
+                        messages: nextMessages,
+                        searchResults: {
+                            ...state.searchResults,
+                            items: state.searchResults.items.map(patchMessage),
+                        },
+                    };
+                });
+            },
+            restoreMessageLocal: (conversationId, restoredMessage, lastMessage = null) => {
+                const targetConversationId = String(conversationId || "");
+                const targetMessageId = String(restoredMessage?._id || "");
+                if (!targetConversationId || !targetMessageId) return;
+
+                const patchMessage = (message: any) =>
+                    String(message?._id || "") === targetMessageId
+                        ? { ...message, ...restoredMessage, status: message.status || restoredMessage.status }
+                        : message;
+
+                set((state) => {
+                    const currentMessages = state.messages[targetConversationId];
+                    const nextMessages = currentMessages
+                        ? {
+                            ...state.messages,
+                            [targetConversationId]: {
+                                ...currentMessages,
+                                items: currentMessages.items.map(patchMessage),
+                                pinnedMessages: (currentMessages.pinnedMessages || []).map(patchMessage),
+                            },
+                        }
+                        : state.messages;
+
+                    const patchConversation = (conversation: Conversation) => {
+                        if (String(conversation._id) !== targetConversationId) return conversation;
+                        if (!lastMessage || String(conversation.lastMessage?._id || "") !== targetMessageId) return conversation;
+                        return { ...conversation, lastMessage };
+                    };
+
+                    return {
+                        messages: nextMessages,
+                        conversations: state.conversations.map(patchConversation),
+                        groupConversations: state.groupConversations.map(patchConversation),
+                        searchResults: {
+                            ...state.searchResults,
+                            items: state.searchResults.items.map(patchMessage),
+                        },
+                    };
+                });
+            },
             expireMessageLocal: (
                 conversationId: string,
                 messageId: string,

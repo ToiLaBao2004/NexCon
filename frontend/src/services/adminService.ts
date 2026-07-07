@@ -128,6 +128,8 @@ export interface AdminMessage {
   senderId: string;
   type: string;
   content?: string;
+  originalContent?: string;
+  displayContent?: string;
   fileName?: string;
   mimeType?: string;
   fileSize?: number;
@@ -135,6 +137,14 @@ export interface AdminMessage {
   preview?: string;
   mentions?: Mention[];
   reportStatus?: boolean;
+  senderInfo?: { displayName?: string; avatarUrl?: string | null } | null;
+  aiModeration?: {
+    status?: string;
+    category?: string;
+    reason?: string;
+    source?: string;
+    confidence?: number | null;
+  };
   createdAt: string;
 }
 
@@ -216,6 +226,28 @@ export interface AdminAppeal {
   reviewedAt?: string | null;
   adminNote?: string;
   createdAt: string;
+}
+
+export interface AdminMessageAppeal {
+  _id: string;
+  requesterId?: AdminUser | string | null;
+  messageId: string;
+  reason: string;
+  status: "pending" | "approved" | "rejected";
+  reviewedBy?: AdminUser | string | null;
+  reviewedAt?: string | null;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt?: string;
+  message?: AdminMessage | null;
+  conversation?: {
+    _id: string;
+    type: "direct" | "group";
+    title: string;
+    participantCount: number;
+    group?: { name?: string; avatarUrl?: string } | null;
+    disbanded?: boolean;
+  } | null;
 }
 
 export const adminService = {
@@ -303,6 +335,18 @@ export const adminService = {
   async resolveReport(reportId: string, decision: "violation" | "no_violation", note: string) {
     const res = await api.patch(`/admin/reports/${reportId}/resolve`, { decision, note });
     return res.data as { report: AdminReport };
+  },
+
+  async listMessageAppeals(status: AdminMessageAppeal["status"] | "all" = "pending") {
+    const query = new URLSearchParams({ limit: "100" });
+    if (status !== "all") query.set("status", status);
+    const res = await api.get(`/admin/message-appeals?${query.toString()}`);
+    return res.data as { appeals: AdminMessageAppeal[]; pagination: Pagination };
+  },
+
+  async reviewMessageAppeal(appealId: string, action: "approve" | "reject", adminNote: string) {
+    const res = await api.patch(`/admin/message-appeals/${appealId}/review`, { action, adminNote });
+    return res.data as { appeal: AdminMessageAppeal; restoredMessage?: AdminMessage | null };
   },
 
   async listAppeals(status: AdminAppeal["status"] | "all" = "pending") {

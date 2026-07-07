@@ -13,6 +13,7 @@ import AdminOverviewPage from "./pages/AdminOverviewPage";
 import AdminObservabilityPage from "./pages/AdminObservabilityPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminAppealsPage from "./pages/AdminAppealsPage";
+import AdminMessageAppealsPage from "./pages/AdminMessageAppealsPage";
 import SignInPage from "./pages/SignInPage";
 import SignUpPage from "./pages/SignUpPage";
 import OtpPage from "./pages/OtpPage";
@@ -310,6 +311,7 @@ function App() {
                 <Route path="/admin/observability" element={<AdminObservabilityPage />} />
                 <Route path="/admin/reports/messages" element={<AdminReportsPage targetType="message" />} />
                 <Route path="/admin/reports/users" element={<AdminReportsPage targetType="user" />} />
+                <Route path="/admin/message-appeals" element={<AdminMessageAppealsPage />} />
                 <Route path="/admin/appeals" element={<AdminAppealsPage />} />
               </Route>
             </Route>

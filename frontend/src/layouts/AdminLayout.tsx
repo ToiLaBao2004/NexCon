@@ -4,6 +4,7 @@ import {
   FileWarning,
   LayoutDashboard,
   LogOut,
+  Scale,
   ShieldCheck,
   UnlockKeyhole,
   UserRoundX,
@@ -17,6 +18,7 @@ const navItems = [
   { to: "/admin/observability", label: "Giám sát", icon: Activity },
   { to: "/admin/reports/messages", label: "Báo cáo tin nhắn", icon: FileWarning },
   { to: "/admin/reports/users", label: "Báo cáo người dùng", icon: UserRoundX },
+  { to: "/admin/message-appeals", label: "Kháng cáo tin nhắn", icon: Scale },
   { to: "/admin/appeals", label: "Kháng cáo khóa", icon: UnlockKeyhole },
 ];
 

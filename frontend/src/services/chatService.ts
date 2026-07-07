@@ -412,6 +412,18 @@ export const chatService = {
 		}
 	},
 
+	async submitMessageAppeal(messageId: string, reason: string) {
+		try {
+			const res = await api.post(`/messages/${messageId}/appeals`, { reason });
+			return res.data as { message: string; appeal: Message['appeal'] };
+		} catch (error: any) {
+			const appeal = error?.response?.data?.appeal as Message['appeal'] | undefined;
+			const chatError = new Error(resolveErrorMessage(error)) as Error & { appeal?: Message['appeal'] };
+			chatError.appeal = appeal;
+			throw chatError;
+		}
+	},
+
 	async getSignedMediaUrl(messageId: string) {
 		try {
 			const res = await api.get(`/messages/${messageId}/media-url`);

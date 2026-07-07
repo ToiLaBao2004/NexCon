@@ -48,6 +48,7 @@ import {
 	isMessageExpired,
 	sanitizeExpiredMessageForClient,
 } from '../utils/disappearingMessages.js';
+import { attachAppealsToMessages } from '../services/messageAppealService.js';
 
 const MUTE_DURATION_MS = {
 	'1h': 60 * 60 * 1000,
@@ -946,7 +947,7 @@ export async function getMessages(req, res) {
 			].map(fallbackSender);
 
 			const payload = {
-				messages: sanitizeMessages(combined),
+				messages: await attachAppealsToMessages(sanitizeMessages(combined), userId),
 				anchorId: aroundId,
 				hasMoreOlder: olderMessages.length === half,
 				hasMoreNewer: newerMessages.length === half,
@@ -1019,7 +1020,7 @@ export async function getMessages(req, res) {
 			messages = messages.reverse();
 		}
 
-		messages = sanitizeMessages(messages.map(fallbackSender));
+		messages = await attachAppealsToMessages(sanitizeMessages(messages.map(fallbackSender)), userId);
 
 		// Handle pinned messages (only for initial load or backward pagination)
 		let safePinnedMessages = [];
@@ -1042,7 +1043,7 @@ export async function getMessages(req, res) {
 					populate: { path: 'senderId', select: 'displayName' },
 				})
 				.lean();
-			safePinnedMessages = sanitizeMessages(pinnedMessages.map(fallbackSender));
+			safePinnedMessages = await attachAppealsToMessages(sanitizeMessages(pinnedMessages.map(fallbackSender)), userId);
 		}
 
 		const payload = {
