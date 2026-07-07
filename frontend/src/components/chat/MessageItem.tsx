@@ -2158,6 +2158,7 @@ const MessageItem = ({
 	const canAppealMessage = isOwn && !isDisbanded && isAiRejectedMessage(message);
 	const hasSubmittedAppeal = Boolean(message.appeal);
 	const canSubmitAppeal = canAppealMessage && !hasSubmittedAppeal;
+	const shouldShowPendingAppealStatus = message.appeal?.status === "pending";
 	const appealStatusLabel = message.appeal?.status ? messageAppealLabels[message.appeal.status] : "";
 
 	const hasContent = isImageBatch
@@ -2706,18 +2707,13 @@ const MessageItem = ({
 
 							</div>
 						</Card>
-						{message.appeal && (
+						{shouldShowPendingAppealStatus && (
 							<div className={cn(
 								"mt-1.5 flex max-w-[260px] items-center gap-2 text-[12px] sm:text-[13px]",
 								isOwn ? "justify-end self-end" : "justify-start"
 							)}>
 								<span className={cn(
-									"inline-flex items-center gap-1 rounded-full border px-2 py-1 font-medium",
-									message.appeal.status === "approved"
-										? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-										: message.appeal.status === "rejected"
-											? "border-destructive/30 bg-destructive/10 text-destructive"
-											: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+									"inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-1 font-medium text-amber-700 dark:text-amber-300"
 								)}>
 									<Scale className="size-3.5" />
 									{appealStatusLabel}
