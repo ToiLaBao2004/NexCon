@@ -2155,6 +2155,10 @@ const MessageItem = ({
 	const isSticker = message.type === "sticker" && !isRecalled;
 	const isTextBubble = (!message.type || message.type === "text") && !isRecalled && !isViolationMessage;
 	const isDisbanded = selectedConvo.type === "group" && selectedConvo.disbanded === true;
+	const canAppealMessage = isOwn && !isDisbanded && isAiRejectedMessage(message);
+	const hasSubmittedAppeal = Boolean(message.appeal);
+	const canSubmitAppeal = canAppealMessage && !hasSubmittedAppeal;
+	const appealStatusLabel = message.appeal?.status ? messageAppealLabels[message.appeal.status] : "";
 
 	const hasContent = isImageBatch
 		? Boolean(imageBatchItems?.some((item) => item.isRecalled !== true && item.reportStatus !== true && item.content?.trim()))
@@ -2390,7 +2394,7 @@ const MessageItem = ({
 	const handlePointerDownForActions = (event: React.PointerEvent<HTMLDivElement>) => {
 		if (!isCoarsePointer) return;
 		if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
-		if (!actionableMessage || isDisbanded) return;
+		if ((!actionableMessage && !canSubmitAppeal) || isDisbanded) return;
 
 		clearLongPressTimer();
 		longPressTimeoutRef.current = window.setTimeout(() => {
@@ -2542,10 +2546,7 @@ const MessageItem = ({
 		|| selectedConvo.group?.allowMembersCreateSharedReminder !== false
 		|| isCurrentUserGroupAdmin;
 	const canReportMessage = !isOwn && !isDisbanded && Boolean(actionableMessage);
-	const canAppealMessage = isOwn && !isDisbanded && isAiRejectedMessage(message);
-	const hasSubmittedAppeal = Boolean(message.appeal);
-	const canSubmitAppeal = canAppealMessage && !hasSubmittedAppeal;
-	const appealStatusLabel = message.appeal?.status ? messageAppealLabels[message.appeal.status] : "";
+	const canOpenActionMenu = Boolean(actionableMessage || canSubmitAppeal);
 	const shouldShowTouchActionControls = isCoarsePointer && showTouchActions;
 
 	const handleSubmitAppeal = async () => {
@@ -2705,35 +2706,22 @@ const MessageItem = ({
 
 							</div>
 						</Card>
-						{(canSubmitAppeal || message.appeal) && (
+						{message.appeal && (
 							<div className={cn(
 								"mt-1.5 flex max-w-[260px] items-center gap-2 text-[12px] sm:text-[13px]",
 								isOwn ? "justify-end self-end" : "justify-start"
 							)}>
-								{message.appeal ? (
-									<span className={cn(
-										"inline-flex items-center gap-1 rounded-full border px-2 py-1 font-medium",
-										message.appeal.status === "approved"
-											? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-											: message.appeal.status === "rejected"
-												? "border-destructive/30 bg-destructive/10 text-destructive"
-												: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
-									)}>
-										<Scale className="size-3.5" />
-										{appealStatusLabel}
-									</span>
-								) : (
-									<Button
-										type="button"
-										size="sm"
-										variant="outline"
-										className="h-8 rounded-md border-destructive/30 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive"
-										onClick={() => setShowAppealDialog(true)}
-									>
-										<Scale className="size-3.5" />
-										Kháng cáo
-									</Button>
-								)}
+								<span className={cn(
+									"inline-flex items-center gap-1 rounded-full border px-2 py-1 font-medium",
+									message.appeal.status === "approved"
+										? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+										: message.appeal.status === "rejected"
+											? "border-destructive/30 bg-destructive/10 text-destructive"
+											: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+								)}>
+									<Scale className="size-3.5" />
+									{appealStatusLabel}
+								</span>
 							</div>
 						)}
 						{/* Reaction Display */}
@@ -2809,7 +2797,7 @@ const MessageItem = ({
 						)}
 
 
-						{actionableMessage && (
+						{canOpenActionMenu && (
 							<>
 								{/* Desktop Dropdown */}
 								<div className="hidden sm:block">
@@ -2844,78 +2832,91 @@ const MessageItem = ({
 												}
 											}}
 										>
-											<DropdownMenuItem 
-												disabled={isBlocked}
-												onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(actionMessage); } }}
-												className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
-											>
-												<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
-												Trả lời
-											</DropdownMenuItem>
-											{!isRecalled && (
-												<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }}>
-													<Forward className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													Chuyển tiếp
-												</DropdownMenuItem>
+											{actionableMessage && (
+												<>
+													<DropdownMenuItem 
+														disabled={isBlocked}
+														onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(actionMessage); } }}
+														className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
+													>
+														<Reply className="w-4 h-4 mr-2" strokeWidth={1.6} />
+														Trả lời
+													</DropdownMenuItem>
+													{!isRecalled && (
+														<DropdownMenuItem onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }}>
+															<Forward className="w-4 h-4 mr-2" strokeWidth={1.6} />
+															Chuyển tiếp
+														</DropdownMenuItem>
+													)}
+													{actionMessage.content && actionMessage.type !== 'sticker' && (
+														<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
+															<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
+															Sao chép
+														</DropdownMenuItem>
+													)}
+													{downloadableBubbleMessages.length > 0 && (
+														<DropdownMenuItem onClick={() => { setShowTouchActions(false); void handleDownloadBubble(); }}>
+															<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
+															Tải xuống
+														</DropdownMenuItem>
+													)}
+													<DropdownMenuItem 
+														disabled={isBlocked || isDisappearing}
+														onClick={() => { if(!isBlocked && !isDisappearing) { setShowTouchActions(false); setShowPinOptions(true); } }}
+														className={cn((isBlocked || isDisappearing) && "opacity-50 grayscale cursor-not-allowed")}
+													>
+														{isPinned ? (
+															<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
+														) : (
+															<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
+														)}
+														{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
+													</DropdownMenuItem>
+													{canCreateReminder && (
+														<DropdownMenuItem
+															disabled={isBlocked}
+															onClick={() => {
+																if(!isBlocked) {
+																	setShowTouchActions(false);
+																	setReminderTargetMessage({
+																		messageId: message._id,
+																		messagePreview: messagePreviewText,
+																	});
+																}
+															}}
+															className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
+														>
+															<BellPlus className="w-4 h-4 mr-2" strokeWidth={1.6} />
+															Tạo nhắc hẹn
+														</DropdownMenuItem>
+													)}
+													{isOwn && !isDisbanded && (
+														<DropdownMenuItem
+															className="text-destructive focus:text-destructive focus:bg-destructive/10"
+															onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }}
+														>
+															<Undo2 className="w-4 h-4 mr-2" strokeWidth={1.6} />
+															Thu hồi
+														</DropdownMenuItem>
+													)}
+													{canReportMessage && (
+														<DropdownMenuItem
+															className="text-destructive focus:text-destructive focus:bg-destructive/10"
+															onClick={() => { setShowTouchActions(false); setShowReportDialog(true); }}
+														>
+															<Flag className="w-4 h-4 mr-2" strokeWidth={1.6} />
+															Báo cáo tin nhắn
+														</DropdownMenuItem>
+													)}
+												</>
 											)}
-											{actionMessage.content && actionMessage.type !== 'sticker' && (
-												<DropdownMenuItem onClick={() => { setShowTouchActions(false); handleCopy(); }}>
-													<Copy className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													Sao chép
-												</DropdownMenuItem>
-											)}
-											{downloadableBubbleMessages.length > 0 && (
-												<DropdownMenuItem onClick={() => { setShowTouchActions(false); void handleDownloadBubble(); }}>
-													<Download className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													Tải xuống
-												</DropdownMenuItem>
-											)}
-											<DropdownMenuItem 
-												disabled={isBlocked || isDisappearing}
-												onClick={() => { if(!isBlocked && !isDisappearing) { setShowTouchActions(false); setShowPinOptions(true); } }}
-												className={cn((isBlocked || isDisappearing) && "opacity-50 grayscale cursor-not-allowed")}
-											>
-												{isPinned ? (
-													<PinOff className="w-4 h-4 mr-2" strokeWidth={1.6} />
-												) : (
-													<Pin className="w-4 h-4 mr-2" strokeWidth={1.6} />
-												)}
-												{isPinned ? "Bỏ ghim tin nhắn" : "Ghim tin nhắn"}
-											</DropdownMenuItem>
-											{canCreateReminder && (
-												<DropdownMenuItem
-													disabled={isBlocked}
-													onClick={() => {
-														if(!isBlocked) {
-															setShowTouchActions(false);
-															setReminderTargetMessage({
-																messageId: message._id,
-																messagePreview: messagePreviewText,
-															});
-														}
-													}}
-													className={cn(isBlocked && "opacity-50 grayscale cursor-not-allowed")}
-												>
-													<BellPlus className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													Tạo nhắc hẹn
-												</DropdownMenuItem>
-											)}
-											{isOwn && !isDisbanded && (
+											{canSubmitAppeal && (
 												<DropdownMenuItem
 													className="text-destructive focus:text-destructive focus:bg-destructive/10"
-													onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }}
+													onClick={() => { setShowTouchActions(false); setShowAppealDialog(true); }}
 												>
-													<Undo2 className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													Thu hồi
-												</DropdownMenuItem>
-											)}
-											{canReportMessage && (
-												<DropdownMenuItem
-													className="text-destructive focus:text-destructive focus:bg-destructive/10"
-													onClick={() => { setShowTouchActions(false); setShowReportDialog(true); }}
-												>
-													<Flag className="w-4 h-4 mr-2" strokeWidth={1.6} />
-													Báo cáo tin nhắn
+													<Scale className="w-4 h-4 mr-2" strokeWidth={1.6} />
+													Kháng cáo
 												</DropdownMenuItem>
 											)}
 										</DropdownMenuContent>
@@ -2939,98 +2940,110 @@ const MessageItem = ({
 											>
 												<DialogTitle className="sr-only">Thao tác tin nhắn</DialogTitle>
 												<div className="grid grid-cols-4 sm:grid-cols-5 gap-y-6 gap-x-1">
-													<button 
-														disabled={isBlocked}
-														onClick={() => { if(!isBlocked) setTouchActionView("emoji"); }} 
-														className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
-													>
-														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-															<Smile className="h-5 w-5" strokeWidth={1.5} />
-														</div>
-														<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Cảm xúc</span>
-													</button>
+													{actionableMessage && (
+														<>
+															<button 
+																disabled={isBlocked}
+																onClick={() => { if(!isBlocked) setTouchActionView("emoji"); }} 
+																className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
+															>
+																<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																	<Smile className="h-5 w-5" strokeWidth={1.5} />
+																</div>
+																<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Cảm xúc</span>
+															</button>
 
-													<button 
-														disabled={isBlocked}
-														onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(actionMessage); } }}
-														className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
-													>
-														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-															<Reply className="h-5 w-5" strokeWidth={1.5} />
-														</div>
-														<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Trả lời</span>
-													</button>
+															<button 
+																disabled={isBlocked}
+																onClick={() => { if(!isBlocked) { setShowTouchActions(false); onReply?.(actionMessage); } }}
+																className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
+															>
+																<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																	<Reply className="h-5 w-5" strokeWidth={1.5} />
+																</div>
+																<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Trả lời</span>
+															</button>
 
-													{!isRecalled && (
-														<button onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }} className="flex flex-col items-center gap-2">
-															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-																<Forward className="h-5 w-5" strokeWidth={1.5} />
-															</div>
-															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Chuyển tiếp</span>
-														</button>
+															{!isRecalled && (
+																<button onClick={() => { setShowTouchActions(false); setShowForwardModal(true); }} className="flex flex-col items-center gap-2">
+																	<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																		<Forward className="h-5 w-5" strokeWidth={1.5} />
+																	</div>
+																	<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Chuyển tiếp</span>
+																</button>
+															)}
+
+															{actionMessage.content && actionMessage.type !== 'sticker' && (
+																<button onClick={() => { setShowTouchActions(false); handleCopy(); }} className="flex flex-col items-center gap-2">
+																	<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																		<Copy className="h-5 w-5" strokeWidth={1.5} />
+																	</div>
+																	<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Sao chép</span>
+																</button>
+															)}
+
+															{downloadableBubbleMessages.length > 0 && (
+																<button className="flex flex-col items-center gap-2" onClick={() => { setShowTouchActions(false); void handleDownloadBubble(); }}>
+																	<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																		<Download className="h-5 w-5" strokeWidth={1.5} />
+																	</div>
+																	<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Tải xuống</span>
+																</button>
+															)}
+
+															<button 
+																disabled={isBlocked || isDisappearing}
+																onClick={() => { if(!isBlocked && !isDisappearing) { setShowTouchActions(false); setShowPinOptions(true); } }}
+																className={cn("flex flex-col items-center gap-2", (isBlocked || isDisappearing) && "opacity-40 grayscale cursor-not-allowed")}
+															>
+																<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																	{isPinned ? <PinOff className="h-5 w-5" strokeWidth={1.5} /> : <Pin className="h-5 w-5" strokeWidth={1.5} />}
+																</div>
+																<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">{isPinned ? "Bỏ ghim" : "Ghim"}</span>
+															</button>
+
+															{canCreateReminder && (
+																<button
+																	disabled={isBlocked}
+																	onClick={() => {
+																		if(!isBlocked) {
+																			setShowTouchActions(false);
+																			setReminderTargetMessage({ messageId: message._id, messagePreview: messagePreviewText });
+																		}
+																	}}
+																	className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
+																>
+																	<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+																		<BellPlus className="h-5 w-5" strokeWidth={1.5} />
+																	</div>
+																	<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap overflow-visible">Nhắc hẹn</span>
+																</button>
+															)}
+
+															{isOwn && !isDisbanded && (
+																<button onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }} className="flex flex-col items-center gap-2">
+																	<div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 shadow-sm hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors">
+																		<Undo2 className="h-5 w-5" strokeWidth={1.5} />
+																	</div>
+																	<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Thu hồi</span>
+																</button>
+															)}
+															{canReportMessage && (
+																<button onClick={() => { setShowTouchActions(false); setShowReportDialog(true); }} className="flex flex-col items-center gap-2">
+																	<div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 shadow-sm hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors">
+																		<Flag className="h-5 w-5" strokeWidth={1.5} />
+																	</div>
+																	<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Báo cáo</span>
+																</button>
+															)}
+														</>
 													)}
-
-													{actionMessage.content && actionMessage.type !== 'sticker' && (
-														<button onClick={() => { setShowTouchActions(false); handleCopy(); }} className="flex flex-col items-center gap-2">
-															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-																<Copy className="h-5 w-5" strokeWidth={1.5} />
-															</div>
-															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Sao chép</span>
-														</button>
-													)}
-
-													{downloadableBubbleMessages.length > 0 && (
-														<button className="flex flex-col items-center gap-2" onClick={() => { setShowTouchActions(false); void handleDownloadBubble(); }}>
-															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-																<Download className="h-5 w-5" strokeWidth={1.5} />
-															</div>
-															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">Tải xuống</span>
-														</button>
-													)}
-
-													<button 
-														disabled={isBlocked || isDisappearing}
-														onClick={() => { if(!isBlocked && !isDisappearing) { setShowTouchActions(false); setShowPinOptions(true); } }}
-														className={cn("flex flex-col items-center gap-2", (isBlocked || isDisappearing) && "opacity-40 grayscale cursor-not-allowed")}
-													>
-														<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-															{isPinned ? <PinOff className="h-5 w-5" strokeWidth={1.5} /> : <Pin className="h-5 w-5" strokeWidth={1.5} />}
-														</div>
-														<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap">{isPinned ? "Bỏ ghim" : "Ghim"}</span>
-													</button>
-
-													{canCreateReminder && (
-														<button
-															disabled={isBlocked}
-															onClick={() => {
-																if(!isBlocked) {
-																	setShowTouchActions(false);
-																	setReminderTargetMessage({ messageId: message._id, messagePreview: messagePreviewText });
-																}
-															}}
-															className={cn("flex flex-col items-center gap-2", isBlocked && "opacity-40 grayscale cursor-not-allowed")}
-														>
-															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-foreground shadow-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-																<BellPlus className="h-5 w-5" strokeWidth={1.5} />
-															</div>
-															<span className="text-[11.5px] font-medium text-foreground whitespace-nowrap overflow-visible">Nhắc hẹn</span>
-														</button>
-													)}
-
-													{isOwn && !isDisbanded && (
-														<button onClick={() => { setShowTouchActions(false); setShowConfirmRecall(true); }} className="flex flex-col items-center gap-2">
+													{canSubmitAppeal && (
+														<button onClick={() => { setShowTouchActions(false); setShowAppealDialog(true); }} className="flex flex-col items-center gap-2">
 															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 shadow-sm hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors">
-																<Undo2 className="h-5 w-5" strokeWidth={1.5} />
+																<Scale className="h-5 w-5" strokeWidth={1.5} />
 															</div>
-															<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Thu hồi</span>
-														</button>
-													)}
-													{canReportMessage && (
-														<button onClick={() => { setShowTouchActions(false); setShowReportDialog(true); }} className="flex flex-col items-center gap-2">
-															<div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500 shadow-sm hover:bg-red-200 dark:hover:bg-red-500/20 transition-colors">
-																<Flag className="h-5 w-5" strokeWidth={1.5} />
-															</div>
-															<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Báo cáo</span>
+															<span className="text-[11.5px] font-medium text-red-600 dark:text-red-500 whitespace-nowrap">Kháng cáo</span>
 														</button>
 													)}
 												</div>
