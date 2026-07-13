@@ -108,7 +108,11 @@ public class MainActivity extends BridgeActivity {
         }
 
         screenCaptureCallback = this::dispatchScreenshotEvent;
-        registerScreenCaptureCallback(getMainExecutor(), screenCaptureCallback);
+        try {
+            registerScreenCaptureCallback(getMainExecutor(), screenCaptureCallback);
+        } catch (SecurityException error) {
+            screenCaptureCallback = null;
+        }
     }
 
     private void unregisterScreenCaptureCallback() {
@@ -116,7 +120,11 @@ public class MainActivity extends BridgeActivity {
             return;
         }
 
-        unregisterScreenCaptureCallback(screenCaptureCallback);
+        try {
+            unregisterScreenCaptureCallback(screenCaptureCallback);
+        } catch (IllegalArgumentException | SecurityException ignored) {
+            // The callback may not be registered if Android denied screen-capture detection.
+        }
         screenCaptureCallback = null;
     }
 }

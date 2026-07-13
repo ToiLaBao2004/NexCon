@@ -577,7 +577,10 @@ export const useChatStore = create<ChatState>()(
                 }
 
                 const current = messages?.[convoId];
-                const rawNextCursor = current?.nextCursor === undefined ? "" : current?.nextCursor;
+                const shouldRefreshJumpWindow = current?.isJumpWindow === true;
+                const rawNextCursor = shouldRefreshJumpWindow
+                    ? ""
+                    : current?.nextCursor === undefined ? "" : current?.nextCursor;
                 if (rawNextCursor === null) return;
 
                 const nextCursor = resolveMessagePaginationCursor(rawNextCursor, current?.items ?? []);
@@ -626,7 +629,7 @@ export const useChatStore = create<ChatState>()(
                             pinnedMessages: [],
                         };
 
-                        const prevItems = prevState.items ?? [];
+                        const prevItems = shouldRefreshJumpWindow ? [] : (prevState.items ?? []);
                         const merged = prevItems.length > 0 ? [...processed, ...prevItems] : processed;
 
                         // Use a Map to deduplicate by _id
@@ -645,6 +648,7 @@ export const useChatStore = create<ChatState>()(
                                     hasMore: fetched.length > 0 ? (backendHasMore ?? !!cursor) : false,
                                     nextCursor: cursor ?? null,
                                     pinnedMessages: pinnedMessages ?? prevState.pinnedMessages ?? [],
+                                    isJumpWindow: false,
                                 },
                             },
                         };
@@ -697,6 +701,7 @@ export const useChatStore = create<ChatState>()(
                                 hasMore: response.hasMoreOlder ?? false,
                                 nextCursor: null,
                                 pinnedMessages: state.messages[conversationId]?.pinnedMessages ?? [],
+                                isJumpWindow: true,
                             }
 
                         },
@@ -760,6 +765,7 @@ export const useChatStore = create<ChatState>()(
                                 [conversationId]: {
                                     ...prevState,
                                     items: uniqueMerged,
+                                    isJumpWindow: true,
                                 },
                             },
                             jumpContexts: {
@@ -824,6 +830,7 @@ export const useChatStore = create<ChatState>()(
                                 [conversationId]: {
                                     ...prevState,
                                     items: uniqueMerged,
+                                    isJumpWindow: !isTransitioning,
                                     // If transitioning to normal mode, update nextCursor to support upward scrolling
                                     ...(isTransitioning ? {
                                         nextCursor: oldestMessageCursor ?? null,
@@ -875,6 +882,7 @@ export const useChatStore = create<ChatState>()(
                                 hasMore: !!response.cursor,
                                 nextCursor: response.cursor ?? null,
                                 pinnedMessages: response.pinnedMessages ?? currentMessages?.pinnedMessages ?? [],
+                                isJumpWindow: false,
                             }
                         },
                         jumpContexts: {
@@ -1098,7 +1106,12 @@ export const useChatStore = create<ChatState>()(
 
                     const convoId = message.conversationId;
 
-                    let prevItems = get().messages[convoId]?.items ?? [];
+                    const currentMessageState = get().messages[convoId];
+                    if (currentMessageState?.isJumpWindow) {
+                        return;
+                    }
+
+                    let prevItems = currentMessageState?.items ?? [];
 
                     if (prevItems.length === 0) {
                         await fetchMessages(message.conversationId);

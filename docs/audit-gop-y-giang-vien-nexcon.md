@@ -441,6 +441,16 @@ Dựa trên source nào:
 
 ## Gợi ý vị trí chèn citation
 
+- Chương 2 - Cơ sở lý thuyết: mỗi khái niệm/lý thuyết được trình bày cần có citation ngay trong đoạn nội dung, không chỉ liệt kê tài liệu ở cuối báo cáo.
+- Các mục kiến trúc client-server, REST API, SPA và clean architecture: thêm citation tương ứng với Clean Architecture, Designing Data-Intensive Applications, Node.js, Express và React.
+- Các mục realtime communication, WebSocket/Socket.IO, multi-instance và Redis Pub/Sub: thêm citation Socket.IO, Socket.IO Redis Adapter và Redis.
+- Các mục cơ sở dữ liệu NoSQL, MongoDB, Mongoose, index, cursor pagination: thêm citation MongoDB, Mongoose và Designing Data-Intensive Applications.
+- Các mục xác thực và bảo mật: thêm citation JWT/RFC 7519, OWASP; nếu có mô tả bcrypt/hash mật khẩu thì nên bổ sung thêm nguồn OWASP Password Storage Cheat Sheet hoặc tài liệu bcrypt phù hợp.
+- Các mục media storage, signed URL/authenticated asset: thêm citation Cloudinary.
+- Các mục notification/push: thêm citation Firebase Cloud Messaging và Push API.
+- Các mục gọi thoại/gọi video/họp trực tuyến: thêm citation LiveKit và WebRTC.
+- Các mục AI moderation/transcription: thêm citation Gemini API và AssemblyAI.
+- Các mục kiểm thử, triển khai và vận hành: thêm citation k6, Docker, Vercel, Railway, Redis/BullMQ nếu có nhắc worker/job queue.
 - Trang 38-39: REST API, Socket.IO, multi-instance, Redis Adapter: thêm citation Socket.IO, Socket.IO Redis Adapter, Redis.
 - Trang 42: JWT, bcrypt, rate limit, CORS, bảo mật web: thêm RFC 7519, OWASP.
 - Trang 43: MongoDB/Mongoose/index: thêm MongoDB và Mongoose.
@@ -448,6 +458,13 @@ Dựa trên source nào:
 - Trang 44: Cloudinary signed/authenticated media, LiveKit/WebRTC, FCM/Web Push, Gemini, AssemblyAI: thêm Cloudinary, LiveKit, MDN WebRTC, Firebase, MDN Push API, Gemini, AssemblyAI.
 - Trang 45-47: TypeScript, Vite, Zustand, Capacitor: thêm TypeScript, Vite, Zustand, Capacitor.
 - Trang 123-136: Docker, Vercel, Railway, GitHub Actions, k6: thêm Docker, Vercel, Railway, k6.
+
+Nguyên tắc sửa theo chuẩn IEEE:
+- Tài liệu tham khảo phải được đánh số theo thứ tự xuất hiện đầu tiên trong nội dung báo cáo.
+- Một tài liệu đã có trong danh mục cuối bài thì trong thân bài phải có ít nhất một citation dạng `[n]`.
+- Nếu một nguồn chỉ được liệt kê ở cuối nhưng không xuất hiện trong nội dung, cần chèn citation vào đoạn phù hợp hoặc loại khỏi danh mục.
+- Không nên gom citation dồn vào cuối một mục lớn; nên đặt citation ngay sau câu/đoạn đang dùng khái niệm hoặc công nghệ đó.
+- Với các phần tự thiết kế dựa trên source code của nhóm như use case, ERD, sequence diagram, giao diện và luồng nghiệp vụ, không cần citation bên ngoài trừ khi mượn mô hình/ký hiệu/khái niệm từ tài liệu khác.
 
 ## Các điểm không tìm thấy bằng chứng trong source
 

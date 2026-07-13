@@ -75,7 +75,9 @@ const ChatWindowLayout = () => {
     messageIdParam && (!conversationIdParam || conversationIdParam === activeConversationId)
   );
 
-  const hasLoadedMessages = (allMessages[activeConversationId!]?.items?.length ?? 0) > 0;
+  const activeMessageData = activeConversationId ? allMessages[activeConversationId] : undefined;
+  const hasLoadedMessages = (activeMessageData?.items?.length ?? 0) > 0;
+  const shouldRefreshJumpWindow = activeMessageData?.isJumpWindow === true;
   const { joinConversation } = useSocketStore();
   const clearDeepLinkParams = useCallback(() => {
     const nextParams = new URLSearchParams(searchParams);
@@ -111,12 +113,22 @@ const ChatWindowLayout = () => {
       joinConversation(activeConversationId);
 
       // Chỉ gọi fetch nếu ONLINE và chưa có tin nhắn, hoặc nếu bắt buộc phải load
-      if (!isDeepLinkingToActiveMessage && !allMessages[activeConversationId] && !messageLoading && !isOffline) {
+      if (!isDeepLinkingToActiveMessage && (!activeMessageData || shouldRefreshJumpWindow) && !messageLoading && !isOffline) {
         fetchMessages(activeConversationId);
       }
     }
 
-  }, [activeConversationId, conversationIdParam, messageIdParam, setSearchParams]);
+  }, [
+    activeConversationId,
+    activeMessageData,
+    fetchMessages,
+    isDeepLinkingToActiveMessage,
+    isOffline,
+    joinConversation,
+    messageLoading,
+    selectedConvo,
+    shouldRefreshJumpWindow,
+  ]);
 
 
   useEffect(() => {
@@ -231,7 +243,7 @@ const ChatWindowLayout = () => {
     return <ChatWelcomeScreen />;
   }
 
-  const messageData = allMessages[activeConversationId!];
+  const messageData = activeMessageData;
   const isInitialLoading = selectedConvo && (
     !hasLoadedMessages && (messageLoading || !messageData)
   );

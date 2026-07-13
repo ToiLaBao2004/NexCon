@@ -113,6 +113,7 @@ export interface ChatState {
     hasMore: boolean,
     nextCursor?: string | null,
     pinnedMessages: Message[];
+    isJumpWindow?: boolean;
   }>;
   media: Record<string, MediaState>;
   mediaPagination: Record<string, MediaPaginationState>;
