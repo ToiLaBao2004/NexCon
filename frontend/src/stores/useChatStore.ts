@@ -282,10 +282,24 @@ export const useChatStore = create<ChatState>()(
                     if (prevId) nextJumpContexts[prevId] = null;
                     if (id) nextJumpContexts[id] = null;
 
+                    const shouldDiscardJumpWindow = Boolean(
+                        prevId
+                        && prevId !== id
+                        && state.messages[prevId]?.isJumpWindow
+                    );
+                    const nextMessages = shouldDiscardJumpWindow
+                        ? { ...state.messages }
+                        : state.messages;
+
+                    if (shouldDiscardJumpWindow && prevId) {
+                        delete nextMessages[prevId];
+                    }
+
                     return {
                         activeConversationId: id,
                         focusedConversationId: id,
                         jumpContexts: nextJumpContexts,
+                        messages: nextMessages,
                     };
                 });
             },
@@ -577,10 +591,7 @@ export const useChatStore = create<ChatState>()(
                 }
 
                 const current = messages?.[convoId];
-                const shouldRefreshJumpWindow = current?.isJumpWindow === true;
-                const rawNextCursor = shouldRefreshJumpWindow
-                    ? ""
-                    : current?.nextCursor === undefined ? "" : current?.nextCursor;
+                const rawNextCursor = current?.nextCursor === undefined ? "" : current?.nextCursor;
                 if (rawNextCursor === null) return;
 
                 const nextCursor = resolveMessagePaginationCursor(rawNextCursor, current?.items ?? []);
@@ -629,7 +640,7 @@ export const useChatStore = create<ChatState>()(
                             pinnedMessages: [],
                         };
 
-                        const prevItems = shouldRefreshJumpWindow ? [] : (prevState.items ?? []);
+                        const prevItems = prevState.items ?? [];
                         const merged = prevItems.length > 0 ? [...processed, ...prevItems] : processed;
 
                         // Use a Map to deduplicate by _id
@@ -687,6 +698,9 @@ export const useChatStore = create<ChatState>()(
                         aroundId: messageId,
                         limit: 40
                     });
+
+                    // Người dùng có thể đã chuyển sang hội thoại khác trong lúc request đang chạy.
+                    if (get().activeConversationId !== conversationId) return;
 
                     const processed = response.messages.map((m) => ({
                         ...m,
